@@ -15,16 +15,16 @@ This repository showcases small, complete automation pipelines and PoCs for inte
 
 ## プロジェクト一覧 (Projects)
 1. **仕様書テキスト → 構造化テストケース → CLIで自動実行**  
-   仕様からテストを起こし、CIで回すパイプラインの最小例。  
-   _Convert plain-text specs into structured test cases, execute automatically via CLI and CI pipeline._
+   - 仕様からテストを起こし、CIで回すパイプラインの最小例。  
+   - _Convert plain-text specs into structured test cases, execute automatically via CLI and CI pipeline._
 
 2. **要件定義・受け入れ基準をLLMで拡張 → PlaywrightのE2Eテスト自動生成PoC**  
-   LLMを用いてテスト設計を支援、E2Eテスト作成を効率化。  
-   _Leverage LLM to expand acceptance criteria and generate Playwright-based E2E tests._
+   - LLMを用いてテスト設計を支援、E2Eテスト作成を効率化。  
+   - _Leverage LLM to expand acceptance criteria and generate Playwright-based E2E tests._
 
 3. **CIログ解析 → 不安定テストの検知・再実行・タグ付け/自動起票**  
-   CIの信頼性を高めるため、flaky test を自動処理する仕組み。  
-   _Analyze CI logs to detect flaky tests, auto-rerun, tag, or create tickets automatically._
+   - CIの信頼性を高めるため、flaky test を自動処理する仕組み。  
+   - _Analyze CI logs to detect flaky tests, auto-rerun, tag, or create tickets automatically._
 
 ---
 
