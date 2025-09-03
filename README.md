@@ -1,44 +1,44 @@
 # Portfolio Hub ? Ryosuke4219
-
+[![CI](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
 [![CI](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
 
 ---
 
-## ŠT—v (Overview)
-QA ~ SDET ~ LLM ‚ğ²‚É‚µ‚½À‘H“Iƒ|[ƒgƒtƒHƒŠƒIB  
-¬‚³‚­Š®Œ‹‚µ‚½©“®‰»ƒpƒCƒvƒ‰ƒCƒ“‚âLLMŠˆ—p‚ÌPoC‚ğŒöŠJ‚µ‚Ä‚¢‚Ü‚·B  
+## ï¿½Tï¿½v (Overview)
+QA ï¿½~ SDET ï¿½~ LLM ï¿½ï¿½ï¿½ï¿½ï¿½É‚ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Hï¿½Iï¿½|ï¿½[ï¿½gï¿½tï¿½Hï¿½ï¿½ï¿½Iï¿½B  
+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pï¿½Cï¿½vï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½LLMï¿½ï¿½ï¿½pï¿½ï¿½PoCï¿½ï¿½ï¿½ï¿½ï¿½Jï¿½ï¿½ï¿½Ä‚ï¿½ï¿½Ü‚ï¿½ï¿½B  
 
-Practical portfolio focusing on **QA ~ SDET ~ LLM**.  
+Practical portfolio focusing on **QA ï¿½~ SDET ï¿½~ LLM**.  
 This repository showcases small, complete automation pipelines and PoCs for integrating LLMs into QA/SDET workflows.  
 
 ---
 
-## ƒvƒƒWƒFƒNƒgˆê—— (Projects)
-1. **d—l‘ƒeƒLƒXƒg ¨ \‘¢‰»ƒeƒXƒgƒP[ƒX ¨ CLI‚Å©“®Às**  
-   - d—l‚©‚çƒeƒXƒg‚ğ‹N‚±‚µACI‚Å‰ñ‚·ƒpƒCƒvƒ‰ƒCƒ“‚ÌÅ¬—áB  
+## ï¿½vï¿½ï¿½ï¿½Wï¿½Fï¿½Nï¿½gï¿½ê—— (Projects)
+1. **ï¿½dï¿½lï¿½ï¿½ï¿½eï¿½Lï¿½Xï¿½g ï¿½ï¿½ ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½eï¿½Xï¿½gï¿½Pï¿½[ï¿½X ï¿½ï¿½ CLIï¿½Åï¿½ï¿½ï¿½ï¿½ï¿½ï¿½s**  
+   - ï¿½dï¿½lï¿½ï¿½ï¿½ï¿½eï¿½Xï¿½gï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½ï¿½ï¿½ACIï¿½Å‰ñ‚·ƒpï¿½Cï¿½vï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ÌÅï¿½ï¿½ï¿½B  
    - _Convert plain-text specs into structured test cases, execute automatically via CLI and CI pipeline._
 
-2. **—vŒ’è‹`Eó‚¯“ü‚êŠî€‚ğLLM‚ÅŠg’£ ¨ Playwright‚ÌE2EƒeƒXƒg©“®¶¬PoC**  
-   - LLM‚ğ—p‚¢‚ÄƒeƒXƒgİŒv‚ğx‰‡AE2EƒeƒXƒgì¬‚ğŒø—¦‰»B  
+2. **ï¿½vï¿½ï¿½ï¿½ï¿½`ï¿½Eï¿½ó‚¯“ï¿½ï¿½ï¿½î€ï¿½ï¿½LLMï¿½ÅŠgï¿½ï¿½ ï¿½ï¿½ Playwrightï¿½ï¿½E2Eï¿½eï¿½Xï¿½gï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½PoC**  
+   - LLMï¿½ï¿½pï¿½ï¿½ï¿½Äƒeï¿½Xï¿½gï¿½İŒvï¿½ï¿½ï¿½xï¿½ï¿½ï¿½AE2Eï¿½eï¿½Xï¿½gï¿½ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½B  
    - _Leverage LLM to expand acceptance criteria and generate Playwright-based E2E tests._
 
-3. **CIƒƒO‰ğÍ ¨ •sˆÀ’èƒeƒXƒg‚ÌŒŸ’mEÄÀsEƒ^ƒO•t‚¯/©“®‹N•[**  
-   - CI‚ÌM—Š«‚ğ‚‚ß‚é‚½‚ßAflaky test ‚ğ©“®ˆ—‚·‚éd‘g‚İB  
+3. **CIï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½sï¿½ï¿½ï¿½ï¿½eï¿½Xï¿½gï¿½ÌŒï¿½ï¿½mï¿½Eï¿½Äï¿½ï¿½sï¿½Eï¿½^ï¿½Oï¿½tï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½Nï¿½[**  
+   - CIï¿½ÌMï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß‚é‚½ï¿½ßAflaky test ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dï¿½gï¿½İB  
    - _Analyze CI logs to detect flaky tests, auto-rerun, tag, or create tickets automatically._
 
 ---
 
-## ŠÂ‹« (Environment)
+## ï¿½Â‹ï¿½ (Environment)
 - Node: v24.6.0 (fnm)  
 - Python: 3.11+ (uv)  
 - CI: GitHub Actions  
 
 ---
 
-## ¡Œã (Next Steps)
-- ŠeƒvƒƒWƒFƒNƒg‚ÌƒTƒ“ƒvƒ‹ƒR[ƒh‚ğ’Ç‰Á  
-- ƒƒgƒŠƒNƒX‚â¬‰ÊiH”íŒ¸AˆÀ’è‰»—¦‚È‚Çj‚ğREADME“à‚É–¾‹L  
-- ‰pŒêREADME‚âƒfƒ‚“®‰æ‚ğ’Ç‰Á—\’è  
+## ï¿½ï¿½ï¿½ï¿½ (Next Steps)
+- ï¿½eï¿½vï¿½ï¿½ï¿½Wï¿½Fï¿½Nï¿½gï¿½ÌƒTï¿½ï¿½ï¿½vï¿½ï¿½ï¿½Rï¿½[ï¿½hï¿½ï¿½Ç‰ï¿½  
+- ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½Nï¿½Xï¿½â¬ï¿½Êiï¿½Hï¿½ï¿½ï¿½íŒ¸ï¿½Aï¿½ï¿½ï¿½è‰»ï¿½ï¿½ï¿½È‚Çjï¿½ï¿½READMEï¿½ï¿½ï¿½É–ï¿½ï¿½L  
+- ï¿½pï¿½ï¿½READMEï¿½ï¿½fï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç‰ï¿½ï¿½\ï¿½ï¿½  
 
 _Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._  
 

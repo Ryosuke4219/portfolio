@@ -3,6 +3,11 @@ name: portfolio-ci
 
 on: [push, pull_request]
 
+# 同じブランチで複数実行されたら古い方をキャンセル
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -16,10 +21,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'   # ← npm依存キャッシュを有効化
 
       - name: Install deps & Playwright browsers
         run: |
-          npm ci
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
           npx playwright install --with-deps
 
       - name: Validate cases JSON
@@ -28,10 +34,9 @@ jobs:
       - name: Generate E2E tests
         run: npm run e2e:gen
 
-      # ← これがミソ：デモサーバを起動し、起動完了まで待機
       - name: Start demo server
         run: |
-          npx http-server projects/02-llm-to-playwright/demo -p 5173 -c-1 &
+          npx -y http-server projects/02-llm-to-playwright/demo -p 5173 -c-1 &
           for i in {1..30}; do
             if curl -sSf http://localhost:5173 > /dev/null; then
               echo "Demo server is up";
