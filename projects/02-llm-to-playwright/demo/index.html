@@ -1,0 +1,18 @@
+﻿<!doctype html><html><body>
+<form>
+  <input id="user" name="user" placeholder="user">
+  <input id="pass" name="pass" type="password" placeholder="pass">
+  <button type="submit">Login</button>
+</form>
+<script>
+  document.querySelector('form').addEventListener('submit', function(e){
+    e.preventDefault();
+    var pass = document.getElementById('pass').value;
+    if (pass === 'wrong') {
+      location.href = '/invalid.html';
+    } else {
+      location.href = '/dashboard.html';
+    }
+  });
+</script>
+</body></html>

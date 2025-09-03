@@ -1,0 +1,21 @@
+{
+  "name": "qa-sdet-llm-portfolio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "spec:validate": "ts-node projects/01-spec2cases/scripts/spec2cases.ts projects/01-spec2cases/cases.sample.json",
+    "e2e:gen": "ts-node projects/02-llm-to-playwright/scripts/blueprint_to_code.ts projects/02-llm-to-playwright/blueprint.sample.json",
+    "test": "playwright test -c projects/02-llm-to-playwright/playwright.config.ts",
+    "ci:analyze": "node projects/03-ci-flaky/scripts/analyze-junit.mjs",
+    "ci:issue": "node projects/03-ci-flaky/scripts/create-issue.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "ajv": "^8.17.1",
+    "fast-xml-parser": "^4.4.0",
+    "handlebars": "^4.7.8",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  }
+}

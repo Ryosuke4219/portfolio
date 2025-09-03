@@ -1,0 +1,43 @@
+{
+  "suite": "ログイン機能",
+  "cases": [
+    {
+      "id": "LGN-001",
+      "title": "正常ログイン",
+      "pre": [
+        "ユーザー alice が存在する"
+      ],
+      "steps": [
+        "ログイン画面にアクセス",
+        "ID/PWを入力",
+        "ログインを押下"
+      ],
+      "expected": [
+        "ダッシュボードに遷移",
+        "Welcome Alice が表示"
+      ],
+      "tags": [
+        "happy-path",
+        "smoke"
+      ]
+    },
+    {
+      "id": "LGN-002",
+      "title": "パスワード誤り",
+      "pre": [
+        "ユーザー alice が存在する"
+      ],
+      "steps": [
+        "ログイン画面にアクセス",
+        "ID=alice, PW=wrong を入力",
+        "ログインを押下"
+      ],
+      "expected": [
+        "エラートースト 'Invalid credentials'"
+      ],
+      "tags": [
+        "negative"
+      ]
+    }
+  ]
+}

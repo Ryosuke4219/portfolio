@@ -1,10 +1,66 @@
-name: ci
+# .github/workflows/ci.yml
+name: portfolio-ci
+
 on: [push, pull_request]
+
 jobs:
-  node:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '24' }
-      - run: node -v && npm -v
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install deps & Playwright browsers
+        run: |
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Validate cases JSON
+        run: npm run spec:validate
+
+      - name: Generate E2E tests
+        run: npm run e2e:gen
+
+      # ← これがミソ：デモサーバを起動し、起動完了まで待機
+      - name: Start demo server
+        run: |
+          npx http-server projects/02-llm-to-playwright/demo -p 5173 -c-1 &
+          for i in {1..30}; do
+            if curl -sSf http://localhost:5173 > /dev/null; then
+              echo "Demo server is up";
+              break;
+            fi
+            sleep 1
+          done
+
+      - name: Run Playwright
+        run: npm test
+        env:
+          BASE_URL: http://localhost:5173
+
+      - name: Analyze JUnit
+        if: always()
+        run: npm run ci:analyze
+
+      - name: Create issue (stub)
+        if: always()
+        run: npm run ci:issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts (JUnit, DB, raw results)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            junit-results.xml
+            database.json
+            test-results/**
