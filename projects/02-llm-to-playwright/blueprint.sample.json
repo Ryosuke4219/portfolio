@@ -1,0 +1,38 @@
+{
+  "feature": "ログイン",
+  "scenarios": [
+    {
+      "id": "LGN-001",
+      "title": "正常ログイン",
+      "selectors": {
+        "user": "#user",
+        "pass": "#pass",
+        "submit": "button[type=submit]"
+      },
+      "data": {
+        "user": "alice",
+        "pass": "secret"
+      },
+      "asserts": [
+        "url:/dashboard",
+        "text:Welcome Alice"
+      ]
+    },
+    {
+      "id": "LGN-002",
+      "title": "パスワード誤り",
+      "selectors": {
+        "user": "#user",
+        "pass": "#pass",
+        "submit": "button[type=submit]"
+      },
+      "data": {
+        "user": "alice",
+        "pass": "wrong"
+      },
+      "asserts": [
+        "text:Invalid credentials"
+      ]
+    }
+  ]
+}
