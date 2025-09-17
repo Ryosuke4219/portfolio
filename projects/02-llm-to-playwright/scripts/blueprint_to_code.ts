@@ -36,16 +36,37 @@ const tplPath = path.join(process.cwd(), 'projects/02-llm-to-playwright/template
 const tplSrc = fs.readFileSync(tplPath, 'utf8');
 const template = Handlebars.compile(tplSrc);
 
-const bp = JSON.parse(fs.readFileSync(input, 'utf8'));
-if (!Array.isArray(bp.scenarios)) {
+const blueprint = JSON.parse(fs.readFileSync(input, 'utf8'));
+if (!Array.isArray(blueprint.scenarios)) {
   console.error('Invalid blueprint: scenarios[] is required');
   process.exit(1);
 }
 
-for (const s of bp.scenarios) {
-  const code = template(s);
-  const filename = `${s.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.spec.ts`;
+const generated: string[] = [];
+
+for (const scenario of blueprint.scenarios) {
+  if (!scenario?.id || !scenario?.title) {
+    console.error('Scenario must include id and title:', scenario);
+    process.exit(1);
+  }
+  if (!scenario.selectors || !scenario.selectors.user || !scenario.selectors.pass || !scenario.selectors.submit) {
+    console.error(`Scenario ${scenario.id} is missing selectors.user/pass/submit`);
+    process.exit(1);
+  }
+  if (!scenario.data || typeof scenario.data.user !== 'string' || typeof scenario.data.pass !== 'string') {
+    console.error(`Scenario ${scenario.id} is missing data.user or data.pass`);
+    process.exit(1);
+  }
+  if (!Array.isArray(scenario.asserts)) {
+    console.error(`Scenario ${scenario.id} has invalid asserts. Expected an array.`);
+    process.exit(1);
+  }
+
+  const filename = `${scenario.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.spec.ts`;
+  const code = template(scenario);
   fs.writeFileSync(path.join(outDir, filename), code, 'utf8');
+  generated.push(filename);
   console.log('📝 generated:', filename);
 }
-console.log('✅ done');
+
+console.log(`✅ done (files: ${generated.join(', ')})`);

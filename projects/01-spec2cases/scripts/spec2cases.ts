@@ -10,9 +10,15 @@ const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schema.json')
 const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
 const validate = ajv.compile(schema);
 
-const input = process.argv[2];
-if (!input) {
-  console.error('Usage: ts-node spec2cases.ts <cases.json>');
+const inputArg = process.argv[2];
+const input = inputArg ?? path.join(__dirname, '../cases.sample.json');
+
+if (!inputArg) {
+  console.log(`ℹ️  No path provided. Defaulting to sample cases: ${input}`);
+}
+
+if (!fs.existsSync(input)) {
+  console.error(`Could not find cases file: ${input}`);
   process.exit(2);
 }
 
