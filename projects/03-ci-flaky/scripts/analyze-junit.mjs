@@ -1,17 +1,130 @@
+#!/usr/bin/env node
 import fs from 'fs';
-import { XMLParser } from 'fast-xml-parser';
-const junitPath='junit-results.xml';
-if(!fs.existsSync(junitPath)){ console.warn('No junit-results.xml'); process.exit(0); }
-const xml=fs.readFileSync(junitPath,'utf8');
-const parser=new XMLParser({ignoreAttributes:false,attributeNamePrefix:''});
-const d=parser.parse(xml);
-const cases=[];
-function collect(ts){ if(!ts) return; const arr=Array.isArray(ts.testcase)?ts.testcase:(ts.testcase?[ts.testcase]:[]);
-  for(const c of arr){ const failed=!!(c.failure||c.error); cases.push({name:`${c.classname||''}::${c.name}`,failed}); } }
-if(d.testsuite) collect(d.testsuite);
-if(d.testsuites){ const arr=Array.isArray(d.testsuites.testsuite)?d.testsuites.testsuite:[d.testsuites.testsuite]; for(const ts of arr) collect(ts);}
-let db={history:{}}; const p='database.json'; if(fs.existsSync(p)) db=JSON.parse(fs.readFileSync(p,'utf8'));
-for(const c of cases){ const h=db.history[c.name]||[]; h.push({ts:Date.now(),failed:c.failed}); db.history[c.name]=h.slice(-10); }
-fs.writeFileSync(p,JSON.stringify(db,null,2));
-const flaky=Object.entries(db.history).filter(([,arr])=>{ const last2=arr.slice(-2); return last2.length===2 && last2[0].failed && !last2[1].failed;}).map(([n])=>n);
-console.log('Analyzed cases:',cases.length); console.log('Flaky detected:',flaky.length); if(flaky.length) console.log(flaky.join('\n'));
+
+function readXml(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (error) {
+    return null;
+  }
+}
+
+function parseAttributes(segment) {
+  const attributes = {};
+  const regex = /(\w+)=("([^"]*)"|'([^']*)')/g;
+  let match;
+  while ((match = regex.exec(segment))) {
+    attributes[match[1]] = match[3] ?? match[4] ?? '';
+  }
+  return attributes;
+}
+
+function collectTestCases(xml) {
+  const cases = [];
+  if (!xml) {
+    return cases;
+  }
+
+  const pattern = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+  let match;
+  while ((match = pattern.exec(xml))) {
+    const attrs = parseAttributes(match[1] || '');
+    const body = match[2] || '';
+    const hasFailure = /<(failure|error)\b/i.test(body);
+    const classname = attrs.classname ? `${attrs.classname}::` : '';
+    const name = attrs.name || 'unknown';
+    cases.push({
+      name: `${classname}${name}`,
+      failed: hasFailure,
+    });
+  }
+  return cases;
+}
+
+function loadDatabase(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return { history: {} };
+  }
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.history !== 'object') {
+      return { history: {} };
+    }
+    return parsed;
+  } catch (error) {
+    return { history: {} };
+  }
+}
+
+function saveDatabase(filePath, db) {
+  const json = `${JSON.stringify(db, null, 2)}\n`;
+  fs.writeFileSync(filePath, json, 'utf8');
+}
+
+function detectFlaky(history) {
+  const entries = Object.entries(history);
+  const flaky = [];
+  for (const [name, records] of entries) {
+    if (!Array.isArray(records)) {
+      continue;
+    }
+    const lastTwo = records.slice(-2);
+    if (lastTwo.length === 2 && lastTwo[0]?.failed && lastTwo[1] && lastTwo[1].failed === false) {
+      flaky.push(name);
+    }
+  }
+  return flaky;
+}
+
+export function analyzeJUnitReport(junitPath, databasePath = 'database.json') {
+  if (!fs.existsSync(junitPath)) {
+    return { cases: [], flaky: [], databasePath };
+  }
+
+  const xml = readXml(junitPath);
+  if (!xml) {
+    throw new Error(`Failed to read ${junitPath}`);
+  }
+
+  const cases = collectTestCases(xml);
+  const db = loadDatabase(databasePath);
+
+  for (const testCase of cases) {
+    const history = Array.isArray(db.history[testCase.name]) ? db.history[testCase.name] : [];
+    history.push({ ts: Date.now(), failed: testCase.failed });
+    db.history[testCase.name] = history.slice(-10);
+  }
+
+  saveDatabase(databasePath, db);
+
+  const flaky = detectFlaky(db.history);
+  return { cases, flaky, databasePath };
+}
+
+function main(argv) {
+  const [, , inputArg] = argv;
+  const junitPath = inputArg || 'junit-results.xml';
+  if (!fs.existsSync(junitPath)) {
+    console.warn('No junit-results.xml');
+    process.exit(0);
+  }
+
+  let result;
+  try {
+    result = analyzeJUnitReport(junitPath);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  console.log('Analyzed cases:', result.cases.length);
+  console.log('Flaky detected:', result.flaky.length);
+  if (result.flaky.length) {
+    console.log(result.flaky.join('\n'));
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main(process.argv);
+}
