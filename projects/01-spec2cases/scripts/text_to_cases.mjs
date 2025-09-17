@@ -1,43 +1,24 @@
-import fs from 'fs';
-import path from 'path';
-import Ajv from 'ajv';
-import { fileURLToPath } from 'url';
-
-interface TestCase {
-  id: string;
-  title: string;
-  pre: string[];
-  steps: string[];
-  expected: string[];
-  tags: string[];
-}
-
-interface SuiteDefinition {
-  suite: string;
-  cases: TestCase[];
-}
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schema.json'), 'utf8'));
-const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
-const validate = ajv.compile(schema);
-
 const [, , inputPath, outputPath] = process.argv;
 if (!inputPath || !outputPath) {
-  console.error('Usage: ts-node text_to_cases.ts <spec.md> <output.json>');
+  console.error('Usage: node text_to_cases.mjs <spec.md> <output.json>');
   process.exit(2);
 }
 
 const rawSpec = fs.readFileSync(inputPath, 'utf8').replace(/^\uFEFF/, '');
 
-function parseSpec(text: string): SuiteDefinition {
+function parseSpec(text) {
   const lines = text.split(/\r?\n/);
   let suite = '';
-  const cases: TestCase[] = [];
-  let current: TestCase | null = null;
-  const warnings: string[] = [];
+  const cases = [];
+  let current = null;
+  const warnings = [];
 
   const pushCurrent = () => {
     if (current) {
@@ -144,7 +125,7 @@ function parseSpec(text: string): SuiteDefinition {
     throw new Error('No test cases were parsed. Ensure "## <id> <title>" blocks exist.');
   }
 
-  const uniqueIds = new Set<string>();
+  const uniqueIds = new Set();
   for (const testCase of cases) {
     if (uniqueIds.has(testCase.id)) {
       throw new Error(`Duplicate test case id detected: ${testCase.id}`);
@@ -161,11 +142,55 @@ function parseSpec(text: string): SuiteDefinition {
   return { suite, cases };
 }
 
-const suiteDef = parseSpec(rawSpec);
+function validateSuite(definition) {
+  const errors = [];
+  if (!definition || typeof definition !== 'object') {
+    errors.push('Definition must be an object.');
+    return { valid: false, errors };
+  }
+  if (typeof definition.suite !== 'string' || !definition.suite.trim()) {
+    errors.push('suite must be a non-empty string.');
+  }
+  if (!Array.isArray(definition.cases) || definition.cases.length === 0) {
+    errors.push('cases must be a non-empty array.');
+  } else {
+    definition.cases.forEach((testCase, index) => {
+      const prefix = `cases[${index}]`;
+      if (!testCase || typeof testCase !== 'object') {
+        errors.push(`${prefix} must be an object.`);
+        return;
+      }
+      if (typeof testCase.id !== 'string' || !testCase.id.trim()) {
+        errors.push(`${prefix}.id must be a non-empty string.`);
+      }
+      if (typeof testCase.title !== 'string' || !testCase.title.trim()) {
+        errors.push(`${prefix}.title must be a non-empty string.`);
+      }
+      ['pre', 'steps', 'expected', 'tags'].forEach((field) => {
+        const value = testCase[field];
+        if (!Array.isArray(value)) {
+          errors.push(`${prefix}.${field} must be an array.`);
+          return;
+        }
+        value.forEach((item, itemIndex) => {
+          if (typeof item !== 'string' || !item.trim()) {
+            errors.push(`${prefix}.${field}[${itemIndex}] must be a non-empty string.`);
+          }
+        });
+      });
+    });
+  }
 
-if (!validate(suiteDef)) {
-  console.error('Generated test cases did not pass schema validation:');
-  console.error(validate.errors);
+  return { valid: errors.length === 0, errors };
+}
+
+const suiteDef = parseSpec(rawSpec);
+const { valid, errors } = validateSuite(suiteDef);
+if (!valid) {
+  console.error('Generated test cases did not pass validation:');
+  for (const error of errors) {
+    console.error('-', error);
+  }
   process.exit(1);
 }
 

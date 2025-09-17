@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-import { XMLParser } from 'fast-xml-parser';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const [, , junitArg, dbArg] = process.argv;
 const junitPath = path.resolve(process.cwd(), junitArg || 'junit-results.xml');
@@ -12,51 +11,38 @@ if (!fs.existsSync(junitPath)) {
 }
 
 const xml = fs.readFileSync(junitPath, 'utf8');
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
-const parsed = parser.parse(xml);
 
-const toArray = (value) => {
-  if (!value) return [];
-  return Array.isArray(value) ? value : [value];
+const parseAttributes = (input) => {
+  const attrs = {};
+  const regex = /(\w+)=\"([^\"]*)\"/g;
+  let match;
+  while ((match = regex.exec(input))) {
+    attrs[match[1]] = match[2];
+  }
+  return attrs;
 };
 
-const collectTestcases = (node) => {
+const extractTestcases = (xmlText) => {
   const results = [];
-  if (!node) {
-    return results;
+  const regex = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+  let match;
+  while ((match = regex.exec(xmlText))) {
+    const attrs = parseAttributes(match[1] || '');
+    const body = match[2] || '';
+    const hasFailure = /<failure\b|<error\b/.test(body);
+    const timeMs = attrs.time ? Number(attrs.time) * 1000 : 0;
+    const classname = attrs.classname || 'unknown';
+    const name = attrs.name || 'unknown';
+    results.push({
+      id: `${classname}::${name}`,
+      failed: hasFailure,
+      timeMs,
+    });
   }
-  const suites = [];
-  if (Array.isArray(node)) {
-    suites.push(...node);
-  } else {
-    suites.push(node);
-  }
-
-  for (const suite of suites) {
-    if (!suite) continue;
-    results.push(
-      ...toArray(suite.testcase).map((testcase) => {
-        const classname = testcase.classname || 'unknown';
-        const name = testcase.name || 'unknown';
-        const id = `${classname}::${name}`;
-        const failed = Boolean(testcase.failure || testcase.error);
-        const timeMs = testcase.time ? Number(testcase.time) * 1000 : 0;
-        return { id, failed, timeMs };
-      }),
-    );
-
-    if (suite.testsuite) {
-      results.push(...collectTestcases(suite.testsuite));
-    }
-  }
-
   return results;
 };
 
-let testcases = collectTestcases(parsed.testsuite);
-if (parsed.testsuites) {
-  testcases = testcases.concat(collectTestcases(parsed.testsuites.testsuite));
-}
+const testcases = extractTestcases(xml);
 
 if (!testcases.length) {
   console.warn('JUnit report did not contain any <testcase> elements.');
@@ -78,37 +64,12 @@ const loadDatabase = () => {
   return { history: {} };
 };
 
-const db = loadDatabase();
-if (!db.history) {
-  db.history = {};
-}
-
-const ensureRecord = (value) => {
-  if (!value) {
-    return { events: [], stats: { totalRuns: 0, failureCount: 0, avgTimeMs: 0 } };
-  }
-  if (Array.isArray(value)) {
-    const events = value.map((entry) => ({ ts: entry.ts, failed: entry.failed, timeMs: entry.timeMs || 0 })).filter((entry) => typeof entry.ts === 'number');
-    return {
-      events,
-      stats: summarise(events),
-    };
-  }
-  const events = Array.isArray(value.events)
-    ? value.events.map((entry) => ({ ts: entry.ts, failed: entry.failed, timeMs: entry.timeMs || 0 })).filter((entry) => typeof entry.ts === 'number')
-    : [];
-  return {
-    events,
-    stats: value.stats || summarise(events),
-  };
-};
-
-function summarise(events) {
+const summarise = (events) => {
   const totalRuns = events.length;
   const failureCount = events.filter((event) => event.failed).length;
   const avgTimeMs = totalRuns ? Math.round(events.reduce((sum, event) => sum + (event.timeMs || 0), 0) / totalRuns) : 0;
   return { totalRuns, failureCount, avgTimeMs };
-}
+};
 
 const isFlaky = (events) => {
   if (events.length < 2) {
@@ -123,6 +84,33 @@ const isFlaky = (events) => {
   const [prev, last] = events.slice(-2);
   return Boolean(prev?.failed && last && !last.failed);
 };
+
+const ensureRecord = (value) => {
+  if (!value) {
+    return { events: [], stats: { totalRuns: 0, failureCount: 0, avgTimeMs: 0 } };
+  }
+  if (Array.isArray(value)) {
+    const events = value
+      .map((entry) => ({ ts: entry.ts, failed: entry.failed, timeMs: entry.timeMs || 0 }))
+      .filter((entry) => typeof entry.ts === 'number');
+    return {
+      events,
+      stats: summarise(events),
+    };
+  }
+  const events = Array.isArray(value.events)
+    ? value.events.map((entry) => ({ ts: entry.ts, failed: entry.failed, timeMs: entry.timeMs || 0 })).filter((entry) => typeof entry.ts === 'number')
+    : [];
+  return {
+    events,
+    stats: value.stats || summarise(events),
+  };
+};
+
+const db = loadDatabase();
+if (!db.history) {
+  db.history = {};
+}
 
 const timestamp = Date.now();
 const maxHistory = 20;

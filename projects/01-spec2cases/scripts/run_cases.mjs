@@ -1,25 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-interface TestCase {
-  id: string;
-  title: string;
-  pre: string[];
-  steps: string[];
-  expected: string[];
-  tags: string[];
-}
-
-interface SuiteDefinition {
-  suite: string;
-  cases: TestCase[];
-}
-
-interface Options {
-  tag?: string;
-  id?: string;
-}
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,8 +10,8 @@ if (!args.length) {
   console.log('ℹ️  No cases file specified. Defaulting to sample cases.');
 }
 
-const options: Options = {};
-let casesPath: string | undefined;
+const options = {};
+let casesPath;
 
 for (let i = 0; i < args.length; i += 1) {
   const arg = args[i];
@@ -61,23 +42,25 @@ if (!fs.existsSync(resolvedCasesPath)) {
 }
 
 const content = fs.readFileSync(resolvedCasesPath, 'utf8');
-const suiteDef = JSON.parse(content) as SuiteDefinition;
+const suiteDef = JSON.parse(content);
 
-const filterByTag = (testCase: TestCase) => {
+const filterByTag = (testCase) => {
   if (!options.tag) {
     return true;
   }
-  return testCase.tags?.includes(options.tag);
+  return Array.isArray(testCase.tags) && testCase.tags.includes(options.tag);
 };
 
-const filterById = (testCase: TestCase) => {
+const filterById = (testCase) => {
   if (!options.id) {
     return true;
   }
   return testCase.id === options.id;
 };
 
-const targetCases = suiteDef.cases.filter((c) => filterByTag(c) && filterById(c));
+const targetCases = (Array.isArray(suiteDef.cases) ? suiteDef.cases : []).filter(
+  (testCase) => filterByTag(testCase) && filterById(testCase),
+);
 
 if (!targetCases.length) {
   console.warn('No test cases matched the provided filters.');
@@ -99,26 +82,26 @@ let failed = 0;
 
 for (const testCase of targetCases) {
   console.log(`Running ${testCase.id} ${testCase.title}`);
-  if (testCase.pre.length) {
+  if (Array.isArray(testCase.pre) && testCase.pre.length) {
     console.log('  Preconditions:');
     for (const item of testCase.pre) {
       console.log(`   - ${item}`);
     }
   }
   console.log('  Steps:');
-  for (const step of testCase.steps) {
+  for (const step of testCase.steps || []) {
     console.log(`   → ${step}`);
   }
   console.log('  Expected:');
-  for (const expected of testCase.expected) {
+  for (const expected of testCase.expected || []) {
     console.log(`   ☆ ${expected}`);
   }
 
-  const issues: string[] = [];
-  if (!testCase.steps.length) {
+  const issues = [];
+  if (!Array.isArray(testCase.steps) || !testCase.steps.length) {
     issues.push('steps are missing');
   }
-  if (!testCase.expected.length) {
+  if (!Array.isArray(testCase.expected) || !testCase.expected.length) {
     issues.push('expected results are missing');
   }
 

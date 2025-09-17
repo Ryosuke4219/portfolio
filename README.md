@@ -34,7 +34,7 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   npm run spec:generate
   # => projects/01-spec2cases/cases.generated.json を出力
   ```
-- JSON スキーマに準拠しているかをバリデーション。
+- 内蔵の軽量バリデータで JSON 構造を検証。
   ```bash
   npm run spec:validate -- projects/01-spec2cases/cases.generated.json
   ```
@@ -42,6 +42,8 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   ```bash
   npm run spec:run -- projects/01-spec2cases/cases.generated.json --tag smoke
   ```
+  - `--tag` や `--id` で絞り込めるため、スモークテスト／個別ケースを即座に確認可能。
+  - 期待値や手順が欠落している場合は失敗としてサマリに計上し、仕様漏れを検知。
 
 ### 2. LLM設計 → Playwright E2E テスト自動生成
 
@@ -49,6 +51,8 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   ```bash
   npm run e2e:gen
   ```
+  - シナリオごとに ID/タイトル・セレクタ・テストデータ・アサーションをチェックし、欠損時は即エラー。
+  - `url:`/`text:` 形式のアサーションはそれぞれ `toHaveURL`／`getByText().toBeVisible()` に変換。
 - 生成されたテストは `projects/02-llm-to-playwright/tests/generated/` に配置され、同梱の静的サーバーでデモ UI を起動して実行。
   ```bash
   # 事前に Playwright のブラウザをインストール
@@ -63,17 +67,21 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-fail.xml
   npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-pass.xml
   ```
+  - Node.js のみで動作する軽量 XML パーサーを実装し、外部依存なしでレポートを吸収。
+  - 直近 5 件の実行から fail→pass を検知すると flaky として表示。
 - 直近で fail→pass したテストを Markdown で出力し、Issue 化に利用。
   ```bash
   npm run ci:issue
   ```
+  - 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
 
 ---
 
 ## 環境 (Environment)
-- Node: v24.6.0 (fnm)  
-- Python: 3.11+ (uv)  
-- CI: GitHub Actions  
+- Node: v24.6.0 (fnm)
+- Python: 3.11+ (uv)
+- CI: GitHub Actions
+- Node.js 標準ライブラリのみで動く CLI を採用。`npm install` は Playwright 実行時のみ必要。
 
 ---
 

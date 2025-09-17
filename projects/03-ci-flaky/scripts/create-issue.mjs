@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const [, , dbArg] = process.argv;
 const databasePath = path.resolve(process.cwd(), dbArg || 'database.json');
@@ -29,17 +29,20 @@ const isFlaky = (events) => {
   return Boolean(prev?.failed && last && !last.failed);
 };
 
-const formatTimeline = (events) => {
-  return events
+const formatTimeline = (events) =>
+  events
     .slice(-10)
     .map((event) => (event.failed ? '❌' : '✅'))
     .join(' ');
-};
 
 const flakyEntries = Object.entries(db.history)
   .map(([id, record]) => {
     if (!record) return null;
-    const events = Array.isArray(record.events) ? record.events : Array.isArray(record) ? record : [];
+    const events = Array.isArray(record.events)
+      ? record.events
+      : Array.isArray(record)
+      ? record
+      : [];
     const stats = record.stats || {
       totalRuns: events.length,
       failureCount: events.filter((event) => event.failed).length,
