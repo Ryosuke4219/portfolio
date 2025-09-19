@@ -93,3 +93,16 @@ This repository showcases small, complete automation pipelines and PoCs for inte
 _Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._  
 
 ---
+
+
+### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
+
+- プライマリ結果はそのまま採用しつつ、**影（shadow）実行**で別プロバイダを並走 → 差分をメトリクスに記録して可視化。
+- タイムアウト/レート制限/形式不正などの**異常系固定セット**でフォールバック動作を確認。
+- 📂 `projects/04-llm-adapter-shadow/`
+  - `src/llm_adapter/…`（最小コア）
+  - `tests/…`（ERR/SHDシナリオ）
+  - `demo_shadow.py`（デモ）
+
+> **EN:** Minimal adapter showcasing shadow execution (metrics-only background run) and error-case fallbacks.
+
