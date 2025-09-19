@@ -40,7 +40,7 @@ pytest -q
 ```
 
 ## What it demonstrates
-- **Shadow execution:** `src/llm_adapter/shadow.py` — primaryを採用しつつ、影で別Providerを実行；差分は `artifacts/runs-metrics.jsonl` へ。
+- **Shadow execution:** `src/llm_adapter/shadow.py` — primaryを採用しつつ、影で別Providerを実行；差分は `artifacts/runs-metrics.jsonl` へ（成功時は `provider_success`、差分は `shadow_diff` として記録）。
 - **Fallback path:** `runner.py` — `TimeoutError / RateLimitError / RetriableError` を捕捉して**次のProviderに切替**。
 - **Mocked errors:** `providers/mock.py` — プロンプトに `[TIMEOUT]`, `[RATELIMIT]`, `[INVALID_JSON]` を含めると異常を発火。
 

@@ -1,12 +1,35 @@
-import json, time, os
-from typing import Any, Dict
+"""Lightweight JSONL metrics helpers."""
 
-def _ensure_dir(path: str):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+from __future__ import annotations
 
-def log_event(event_type: str, path: str, **fields: Dict[str, Any]) -> None:
-    _ensure_dir(path)
-    rec = {"ts": int(time.time() * 1000), "event": event_type}
-    rec.update(fields)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+import json
+import time
+from pathlib import Path
+from typing import Any, Union
+
+PathLike = Union[str, "Path"]
+
+
+def _ensure_dir(path: Path) -> None:
+    """Create the parent directory for ``path`` if it is missing."""
+
+    parent = path.parent
+    if parent != Path(""):
+        parent.mkdir(parents=True, exist_ok=True)
+
+
+def log_event(event_type: str, path: PathLike, **fields: Any) -> None:
+    """Append a structured metrics record to ``path``.
+
+    The file is encoded as UTF-8 JSONL so that it can easily be tailed or
+    ingested by lightweight tooling.
+    """
+
+    target = Path(path)
+    _ensure_dir(target)
+
+    record = {"ts": int(time.time() * 1000), "event": event_type}
+    record.update(fields)
+
+    with target.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
