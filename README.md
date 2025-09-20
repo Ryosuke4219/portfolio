@@ -27,6 +27,10 @@ This repository showcases small, complete automation pipelines and PoCs for inte
    - CIの信頼性を高めるため、flaky test を自動処理する仕組み。
    - _Analyze CI logs to detect flaky tests, auto-rerun, tag, or create tickets automatically._
 
+4. **LLM Adapter — Shadow Execution & Error Handling (Minimal)**
+   - プライマリ結果はそのまま採用しつつ、影（shadow）実行で別プロバイダを並走 → 差分をメトリクスに記録して可視化。
+   - _Minimal adapter showcasing shadow execution (metrics-only background run) and deterministic error-case fallbacks._
+
 ### 1. 仕様書テキスト → 構造化テストケース → CLIで自動実行
 
 - `projects/01-spec2cases/spec.sample.md` のような Markdown からテストケース JSON を生成。
@@ -69,11 +73,28 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   ```
   - Node.js のみで動作する軽量 XML パーサーを実装し、外部依存なしでレポートを吸収。
   - 直近 5 件の実行から fail→pass を検知すると flaky として表示。
-- 直近で fail→pass したテストを Markdown で出力し、Issue 化に利用。
+  - 直近で fail→pass したテストを Markdown で出力し、Issue 化に利用。
   ```bash
   npm run ci:issue
   ```
   - 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
+
+### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
+
+- プライマリ結果をそのまま使いながら、裏で別プロバイダを**影（shadow）実行**して差分メトリクスを蓄積。
+- `[TIMEOUT]` / `[RATELIMIT]` / `[INVALID_JSON]` を含むプロンプトで異常系を明示的に再現し、フォールバックの挙動を検証。
+
+```bash
+cd projects/04-llm-adapter-shadow
+python3 -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python demo_shadow.py  # => artifacts/runs-metrics.jsonl に shadow_diff / provider_success を記録
+pytest -q  # ERR / SHD シナリオのテスト一式
+```
+
+- `shadow_diff` ではプライマリと影のレイテンシ差分・トークン使用量・ハッシュを記録。
+- `provider_error` / `provider_chain_failed` でフォールバック過程をトレース可能。
+- 詳細な構成は `projects/04-llm-adapter-shadow/README.md` を参照。
 
 ---
 
@@ -90,19 +111,5 @@ This repository showcases small, complete automation pipelines and PoCs for inte
 - メトリクスや成果（工数削減、安定化率など）をREADME内に明記  
 - 英語READMEやデモ動画を追加予定  
 
-_Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._  
-
----
-
-
-### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
-
-- プライマリ結果はそのまま採用しつつ、**影（shadow）実行**で別プロバイダを並走 → 差分をメトリクスに記録して可視化。
-- タイムアウト/レート制限/形式不正などの**異常系固定セット**でフォールバック動作を確認。
-- 📂 `projects/04-llm-adapter-shadow/`
-  - `src/llm_adapter/…`（最小コア）
-  - `tests/…`（ERR/SHDシナリオ）
-  - `demo_shadow.py`（デモ）
-
-> **EN:** Minimal adapter showcasing shadow execution (metrics-only background run) and error-case fallbacks.
+_Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._
 
