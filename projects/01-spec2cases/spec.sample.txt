@@ -1,0 +1,26 @@
+Suite: ログイン機能
+
+Case: LGN-001
+Title: 正常ログイン
+Pre:
+- ユーザー alice が存在する
+Steps:
+- ログイン画面にアクセス
+- ID/PWを入力
+- ログインを押下
+Expected:
+- ダッシュボードに遷移
+- Welcome Alice が表示
+Tags: happy-path, smoke
+
+Case: LGN-002
+Title: パスワード誤り
+Pre:
+- ユーザー alice が存在する
+Steps:
+- ログイン画面にアクセス
+- ID=alice, PW=wrong を入力
+- ログインを押下
+Expected:
+- エラートースト 'Invalid credentials'
+Tags: negative
