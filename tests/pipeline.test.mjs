@@ -4,6 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawnSync } from 'child_process';
 
 import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases/scripts/spec2cases.mjs';
 import { generateTestsFromBlueprint } from '../projects/02-llm-to-playwright/scripts/blueprint_to_code.mjs';
@@ -52,4 +53,13 @@ test('junit analysis tracks flaky transitions', () => {
   fs.writeFileSync(junitPath, passing, 'utf8');
   const second = analyzeJUnitReport(junitPath, dbPath);
   assert.ok(second.flaky.includes('Login::HappyPath'));
+});
+
+test('playwright stub gracefully handles no-arg invocation', () => {
+  const cliPath = path.join(rootDir, 'node_modules', '.bin', 'playwright');
+  assert.ok(fs.existsSync(cliPath), 'playwright CLI should be installed via npm ci');
+
+  const result = spawnSync(process.execPath, [cliPath], { encoding: 'utf8' });
+  assert.equal(result.status, 0, `expected exit code 0, received ${result.status}`);
+  assert.match(result.stdout, /Usage: playwright test/);
 });

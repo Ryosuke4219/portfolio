@@ -14,6 +14,20 @@ const resultsDir = path.resolve(projectRoot, 'test-results');
 const args = process.argv.slice(2);
 const command = args.shift();
 
+const printUsage = () => {
+  console.log('[playwright-stub] Usage: playwright test [options]');
+};
+
+if (command == null || command === '' || command === '--help' || command === '-h') {
+  printUsage();
+  process.exit(0);
+}
+
+if (command === '--version' || command === '-v') {
+  console.log('0.0.0-stub');
+  process.exit(0);
+}
+
 if (command !== 'test') {
   console.error('[playwright-stub] Only "playwright test" is supported.');
   process.exit(1);
