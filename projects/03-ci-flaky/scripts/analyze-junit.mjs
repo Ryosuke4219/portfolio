@@ -2,7 +2,7 @@
 // analyze-junit.mjs
 import fs from 'node:fs';
 import path from 'node:path';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser } from '../lib/fast-xml-parser.js';
 
 // ---- Utils ----
 const toArray = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);

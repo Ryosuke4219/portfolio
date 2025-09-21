@@ -7,14 +7,6 @@ function usage() {
   console.error('Usage: node blueprint_to_code.mjs <blueprint.json>');
 }
 
-const [, , inputPath] = process.argv;
-if (!inputPath) {
-  usage();
-  process.exit(2);
-}
-
-const outDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
-
 // ---- IO Helpers ----
 function readJson(filePath) {
   let raw;
@@ -127,10 +119,19 @@ export function generateTestsFromBlueprint(blueprint, outputDirectory) {
 
   fs.mkdirSync(outputDirectory, { recursive: true });
   const generatedFiles = [];
+  const seenFilenames = new Map();
 
   for (const scenario of blueprint.scenarios) {
     validateScenario(scenario);
-    const filename = `${sanitiseFileName(scenario.id)}.spec.ts`;
+    const baseName = sanitiseFileName(scenario.id);
+    const existingScenarioId = seenFilenames.get(baseName);
+    if (existingScenarioId) {
+      throw new Error(
+        `Duplicate scenario file name "${baseName}.spec.ts" generated from IDs "${existingScenarioId}" and "${scenario.id}". Ensure scenario IDs resolve to unique filenames.`,
+      );
+    }
+    seenFilenames.set(baseName, scenario.id);
+    const filename = `${baseName}.spec.ts`;
     const filePath = path.join(outputDirectory, filename);
     const code = renderScenario(scenario);
     fs.writeFileSync(filePath, `${code}\n`, 'utf8');
@@ -142,6 +143,14 @@ export function generateTestsFromBlueprint(blueprint, outputDirectory) {
 
 // ---- CLI main ----
 function main() {
+  const [, , inputPath] = process.argv;
+  if (!inputPath) {
+    usage();
+    process.exit(2);
+  }
+
+  const outDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
+
   let blueprint;
   try {
     blueprint = readJson(inputPath);

@@ -38,6 +38,41 @@ test('blueprint is rendered into playwright spec files', () => {
   assert.ok(content.includes("await expect(page).toHaveURL(/dashboard/);"));
 });
 
+test('blueprint generation fails when scenario IDs would create duplicate filenames', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'playwright-gen-duplicate-'));
+  const duplicateBlueprint = {
+    scenarios: [
+      {
+        id: 'DUP-001',
+        title: 'first',
+        selectors: { user: '#user', pass: '#pass', submit: '#submit' },
+        data: { user: 'alice', pass: 'secret' },
+        asserts: [],
+      },
+      {
+        id: 'dup 001',
+        title: 'second',
+        selectors: { user: '#user', pass: '#pass', submit: '#submit' },
+        data: { user: 'bob', pass: 'hunter2' },
+        asserts: [],
+      },
+    ],
+  };
+
+  assert.throws(
+    () => {
+      generateTestsFromBlueprint(duplicateBlueprint, tmpDir);
+    },
+    (error) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /duplicate scenario file name/i);
+      assert.match(error.message, /DUP-001/);
+      assert.match(error.message, /dup 001/);
+      return true;
+    },
+  );
+});
+
 test('junit analysis tracks flaky transitions', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'junit-db-'));
   const junitPath = path.join(tmpDir, 'junit-results.xml');
