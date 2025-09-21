@@ -27,6 +27,10 @@ This repository showcases small, complete automation pipelines and PoCs for inte
    - CIの信頼性を高めるため、flaky test を自動処理する仕組み。
    - _Analyze CI logs to detect flaky tests, auto-rerun, tag, or create tickets automatically._
 
+4. **LLM Adapter — Shadow Execution & Error Handling (Minimal)**
+   - プライマリ応答を返しながら影（shadow）実行で別プロバイダを並走させ、差分メトリクスを JSONL に蓄積。
+   - _Minimal adapter showcasing shadow execution (metrics-only background run) and deterministic error-case fallbacks._
+
 ### 1. 仕様書テキスト → 構造化テストケース → CLIで自動実行
 
 - `projects/01-spec2cases/spec.sample.md` のような Markdown からテストケース JSON を生成。
@@ -53,12 +57,12 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   ```
   - シナリオごとに ID/タイトル・セレクタ・テストデータ・アサーションをチェックし、欠損時は即エラー。
   - `url:`/`text:` 形式のアサーションはそれぞれ `toHaveURL`／`getByText().toBeVisible()` に変換。
-- 生成されたテストは `projects/02-llm-to-playwright/tests/generated/` に配置され、同梱の静的サーバーでデモ UI を起動して実行。
+- 生成されたテストは `projects/02-llm-to-playwright/tests/generated/` に配置され、同梱の Playwright 互換スタブでシナリオを検証。
   ```bash
-  # 事前に Playwright のブラウザをインストール
-  npx playwright install --with-deps
   npm test
   ```
+  - スタブランナーは静的デモの遷移と文言を解析し、`junit-results.xml` / `test-results/` を生成。
+  - CI ではこれらの成果物を `npm run ci:analyze` / `npm run ci:issue` へ渡して履歴管理を行う。
 
 ### 3. CI ログ解析と flaky テスト検出
 
@@ -69,11 +73,83 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   ```
   - Node.js のみで動作する軽量 XML パーサーを実装し、外部依存なしでレポートを吸収。
   - 直近 5 件の実行から fail→pass を検知すると flaky として表示。
-- 直近で fail→pass したテストを Markdown で出力し、Issue 化に利用。
+  - 直近で fail→pass したテストを Markdown で出力し、Issue 化に利用。
   ```bash
   npm run ci:issue
   ```
   - 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
+
+### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
+
+**概要**
+プライマリの応答はそのまま返しつつ、同一プロンプトを**別プロバイダで影（shadow）実行**して差分メトリクスを**JSONL**に収集。`TIMEOUT / RATELIMIT / INVALID_JSON`は**障害注入**（モック／ラッパ）で再現し、**フォールバックの連鎖**を最小構成で検証できる。
+
+**収集メトリクス（Minimal）**
+
+* 差分系：`latency_ms_delta`, `tokens_in_delta`, `tokens_out_delta`, `content_sha256_equal`（本文ハッシュ一致のbool）
+* 個別計測：`{primary, shadow}.status|latency_ms|tokens_in|tokens_out|content_sha256`
+* フォールバック：`fallback.attempted`（bool）, `fallback.chain`（試行の配列）, `fallback.final_outcome`（`ok|error`）
+* 追跡：`trace_id`（要求単位の一意キー）
+
+**使い方**
+
+```bash
+cd projects/04-llm-adapter-shadow
+python3 -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\activate
+pip install -r requirements.txt
+
+# デモ：影実行と差分メトリクスを記録
+python demo_shadow.py
+# => artifacts/runs-metrics.jsonl に1行/リクエストで追記
+```
+
+**記録フォーマット（例）**
+
+```json
+{
+  "trace_id": "2025-09-21T02:10:33.412Z-7f2c",
+  "primary": {
+    "provider": "openrouter:gpt-x",
+    "status": "ok",
+    "latency_ms": 812,
+    "tokens_in": 128,
+    "tokens_out": 236,
+    "content_sha256": "5e1d...a9"
+  },
+  "shadow": {
+    "provider": "ollama:qwen",
+    "status": "ok",
+    "latency_ms": 1046,
+    "tokens_in": 128,
+    "tokens_out": 230,
+    "content_sha256": "5e1d...a9"
+  },
+  "deltas": {
+    "latency_ms_delta": 234,
+    "tokens_in_delta": 0,
+    "tokens_out_delta": -6,
+    "content_sha256_equal": true
+  },
+  "fallback": {
+    "attempted": false,
+    "chain": [],
+    "final_outcome": "ok"
+  }
+}
+```
+
+**テスト**
+
+```bash
+# ERR（障害注入）/ SHD（影実行）シナリオ一式
+pytest -q
+```
+
+**補足**
+
+* “Minimal”の範囲は**観測（差分収集）×影実行×障害注入×単段フォールバック**に限定。
+* リトライ／指数バックオフ／多段フォールバック／詳細コスト集計は**将来拡張**として明示的に棚上げ。
+* 詳細は `projects/04-llm-adapter-shadow/README.md` を参照。
 
 ---
 
@@ -90,19 +166,5 @@ This repository showcases small, complete automation pipelines and PoCs for inte
 - メトリクスや成果（工数削減、安定化率など）をREADME内に明記  
 - 英語READMEやデモ動画を追加予定  
 
-_Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._  
-
----
-
-
-### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
-
-- プライマリ結果はそのまま採用しつつ、**影（shadow）実行**で別プロバイダを並走 → 差分をメトリクスに記録して可視化。
-- タイムアウト/レート制限/形式不正などの**異常系固定セット**でフォールバック動作を確認。
-- 📂 `projects/04-llm-adapter-shadow/`
-  - `src/llm_adapter/…`（最小コア）
-  - `tests/…`（ERR/SHDシナリオ）
-  - `demo_shadow.py`（デモ）
-
-> **EN:** Minimal adapter showcasing shadow execution (metrics-only background run) and error-case fallbacks.
+_Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._
 
