@@ -63,3 +63,12 @@ test('playwright stub gracefully handles no-arg invocation', () => {
   assert.equal(result.status, 0, `expected exit code 0, received ${result.status}`);
   assert.match(result.stdout, /Usage: playwright test/);
 });
+
+test('playwright stub treats install commands as no-ops', () => {
+  const cliPath = path.join(rootDir, 'node_modules', '.bin', 'playwright');
+  assert.ok(fs.existsSync(cliPath), 'playwright CLI should be installed via npm ci');
+
+  const result = spawnSync(process.execPath, [cliPath, 'install'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, `expected exit code 0, received ${result.status}`);
+  assert.match(result.stdout, /Skipping "playwright install"/);
+});
