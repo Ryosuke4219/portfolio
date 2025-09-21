@@ -1,99 +1,169 @@
+#!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
 
-const input = process.argv[2];
-if (!input) {
+// ---- CLI / Paths ----
+function usage() {
   console.error('Usage: node blueprint_to_code.mjs <blueprint.json>');
+}
+
+const [, , inputPath] = process.argv;
+if (!inputPath) {
+  usage();
   process.exit(2);
 }
 
 const outDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
-fs.mkdirSync(outDir, { recursive: true });
 
-const blueprint = JSON.parse(fs.readFileSync(input, 'utf8'));
-if (!Array.isArray(blueprint.scenarios)) {
-  console.error('Invalid blueprint: scenarios[] is required');
-  process.exit(1);
+// ---- IO Helpers ----
+function readJson(filePath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch (error) {
+    const message = error && typeof error.message === 'string' ? error.message : String(error);
+    throw new Error(`Failed to read "${filePath}": ${message}`);
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Invalid JSON in "${filePath}": ${(error && error.message) || error}`);
+  }
 }
 
-const escapeJs = (value) =>
-  (value ?? '')
-    .toString()
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'");
+// ---- Validation ----
+function validateBlueprint(blueprint) {
+  if (!blueprint || typeof blueprint !== 'object') {
+    throw new Error('Blueprint must be an object.');
+  }
+  if (!Array.isArray(blueprint.scenarios)) {
+    throw new Error('Invalid blueprint: scenarios[] is required');
+  }
+}
 
-const toRegex = (value) => {
-  const v = (value ?? '').toString();
-  const raw = v.split(':', 2)[1] ?? '';
+function validateScenario(scenario) {
+  if (!scenario || typeof scenario !== 'object') {
+    throw new Error('Scenario must be an object.');
+  }
+  if (!scenario.id || !scenario.title) {
+    throw new Error('Scenario must include non-empty id and title.');
+  }
+  if (!scenario.selectors || !scenario.selectors.user || !scenario.selectors.pass || !scenario.selectors.submit) {
+    throw new Error(`Scenario ${scenario.id} is missing selectors.user/pass/submit`);
+  }
+  if (!scenario.data || typeof scenario.data.user !== 'string' || typeof scenario.data.pass !== 'string') {
+    throw new Error(`Scenario ${scenario.id} is missing data.user or data.pass (string).`);
+  }
+  if (!Array.isArray(scenario.asserts)) {
+    throw new Error(`Scenario ${scenario.id} has invalid asserts. Expected an array.`);
+  }
+}
+
+// ---- Utilities for codegen ----
+function sanitiseFileName(id) {
+  const base = (id || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return base || 'scenario';
+}
+
+function toQuoted(value) {
+  // Safe JS string literal via JSON
+  return JSON.stringify((value ?? '').toString());
+}
+
+function toUrlRegex(assertion) {
+  const raw = assertion.split(':', 2)[1] ?? '';
   const trimmed = raw.replace(/^\/+/, '');
   const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return `/${escaped}/`;
-};
+}
 
-const toText = (value) => {
-  const v = (value ?? '').toString();
-  const raw = v.split(':', 2)[1] ?? '';
-  return JSON.stringify(raw);
-};
+function buildAssert(assertion) {
+  if (typeof assertion !== 'string') {
+    return '  // skipped: unsupported assertion';
+  }
+  if (assertion.startsWith('url:')) {
+    return `  await expect(page).toHaveURL(${toUrlRegex(assertion)});`;
+  }
+  if (assertion.startsWith('text:')) {
+    const raw = assertion.split(':', 2)[1] ?? '';
+    return `  await expect(page.getByText(${JSON.stringify(raw)})).toBeVisible();`;
+  }
+  return `  // unsupported assert: ${assertion.replace(/\*\//g, '* /')}`;
+}
 
-const renderTest = (scenario) => {
+// ---- Rendering ----
+function renderScenario(scenario) {
+  const selectors = scenario.selectors || {};
+  const data = scenario.data || {};
+  const assertLines = Array.isArray(scenario.asserts)
+    ? scenario.asserts.map((a) => [`  // assert: ${String(a)}`, buildAssert(a)].join('\n')).join('\n')
+    : '';
+
   const lines = [];
   lines.push("import { test, expect } from '@playwright/test';");
   lines.push('');
   lines.push(`test('${scenario.id} ${scenario.title}', async ({ page }) => {`);
   lines.push("  await page.goto(process.env.BASE_URL || 'http://127.0.0.1:4173');");
-  lines.push(
-    `  await page.fill('${escapeJs(scenario.selectors.user)}', '${escapeJs(scenario.data.user)}');`,
-  );
-  lines.push(
-    `  await page.fill('${escapeJs(scenario.selectors.pass)}', '${escapeJs(scenario.data.pass)}');`,
-  );
-  lines.push(`  await page.click('${escapeJs(scenario.selectors.submit)}');`);
-  lines.push('');
-  for (const assert of scenario.asserts) {
-    lines.push(`  // assert: ${assert}`);
-    if (typeof assert === 'string' && assert.startsWith('url:')) {
-      lines.push(`  await expect(page).toHaveURL(${toRegex(assert)});`);
-    } else if (typeof assert === 'string' && assert.startsWith('text:')) {
-      lines.push(`  await expect(page.getByText(${toText(assert)})).toBeVisible();`);
-    } else {
-      lines.push("  // Unsupported assert type");
-    }
+
+  // Inputs
+  lines.push(`  await page.fill(${toQuoted(selectors.user)}, ${toQuoted(data.user)});`);
+  lines.push(`  await page.fill(${toQuoted(selectors.pass)}, ${toQuoted(data.pass)});`);
+  lines.push(`  await page.click(${toQuoted(selectors.submit)});`);
+
+  if (assertLines) {
     lines.push('');
+    lines.push(assertLines);
   }
-  if (lines[lines.length - 1] === '') {
-    lines.pop();
-  }
+
   lines.push('});');
   lines.push('');
   return lines.join('\n');
-};
-
-const generated = [];
-
-for (const scenario of blueprint.scenarios) {
-  if (!scenario?.id || !scenario?.title) {
-    console.error('Scenario must include id and title:', scenario);
-    process.exit(1);
-  }
-  if (!scenario.selectors || !scenario.selectors.user || !scenario.selectors.pass || !scenario.selectors.submit) {
-    console.error(`Scenario ${scenario.id} is missing selectors.user/pass/submit`);
-    process.exit(1);
-  }
-  if (!scenario.data || typeof scenario.data.user !== 'string' || typeof scenario.data.pass !== 'string') {
-    console.error(`Scenario ${scenario.id} is missing data.user or data.pass`);
-    process.exit(1);
-  }
-  if (!Array.isArray(scenario.asserts)) {
-    console.error(`Scenario ${scenario.id} has invalid asserts. Expected an array.`);
-    process.exit(1);
-  }
-
-  const filename = `${scenario.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.spec.ts`;
-  const code = renderTest(scenario);
-  fs.writeFileSync(path.join(outDir, filename), code, 'utf8');
-  generated.push(filename);
-  console.log('📝 generated:', filename);
 }
 
-console.log(`✅ done (files: ${generated.join(', ')})`);
+// ---- Public API (used by script & importers) ----
+export function generateTestsFromBlueprint(blueprint, outputDirectory) {
+  validateBlueprint(blueprint);
+  if (!outputDirectory) throw new Error('Output directory is required');
+
+  fs.mkdirSync(outputDirectory, { recursive: true });
+  const generatedFiles = [];
+
+  for (const scenario of blueprint.scenarios) {
+    validateScenario(scenario);
+    const filename = `${sanitiseFileName(scenario.id)}.spec.ts`;
+    const filePath = path.join(outputDirectory, filename);
+    const code = renderScenario(scenario);
+    fs.writeFileSync(filePath, `${code}\n`, 'utf8');
+    generatedFiles.push(filename);
+  }
+
+  return generatedFiles;
+}
+
+// ---- CLI main ----
+function main() {
+  let blueprint;
+  try {
+    blueprint = readJson(inputPath);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+
+  let generated;
+  try {
+    generated = generateTestsFromBlueprint(blueprint, outDir);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+
+  for (const f of generated) {
+    console.log('📝 generated:', f);
+  }
+  console.log(`✅ done (files: ${generated.join(', ')})`);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

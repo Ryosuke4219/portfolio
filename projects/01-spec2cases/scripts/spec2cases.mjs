@@ -1,74 +1,269 @@
+#!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const inputArg = process.argv[2];
-const input = inputArg ?? path.join(__dirname, '../cases.sample.json');
-
-if (!inputArg) {
-  console.log(`ℹ️  No path provided. Defaulting to sample cases: ${input}`);
+function usage() {
+  console.error('Usage: node spec2cases.mjs <input.(json|txt|md)> [output.json]');
+  console.error('       (no args) -> defaults to ../cases.sample.json');
 }
 
-if (!fs.existsSync(input)) {
-  console.error(`Could not find cases file: ${input}`);
-  process.exit(2);
+function readFile(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (error) {
+    const message = error && typeof error.message === 'string' ? error.message : String(error);
+    throw new Error(`Failed to read "${filePath}": ${message}`);
+  }
 }
 
-const data = JSON.parse(fs.readFileSync(input, 'utf8'));
+function normaliseBullet(line) {
+  return line
+    .replace(/^[-*\d.\)\s]+/, '')
+    .trim();
+}
 
-function validateSuite(definition) {
+function parseListSection(lines, startIndex) {
+  const values = [];
+  let index = startIndex;
+  for (; index < lines.length; index += 1) {
+    const raw = lines[index];
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+
+    if (/^(suite|case|title|pre|steps?|expected|tags)\s*:/i.test(trimmed)) {
+      break;
+    }
+    if (/^[-*\d]/.test(trimmed)) {
+      const normalised = normaliseBullet(trimmed);
+      if (normalised) values.push(normalised);
+      continue;
+    }
+    if (values.length) {
+      const merged = `${values[values.length - 1]} ${trimmed}`.trim();
+      values[values.length - 1] = merged;
+      continue;
+    }
+    values.push(trimmed);
+  }
+  return { values, nextIndex: index - 1 };
+}
+
+function parseSpecText(text) {
+  const lines = text.split(/\r?\n/);
+  let suite = '';
+  const cases = [];
+  let current = null;
+  let currentSection = null;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const suiteMatch = trimmed.match(/^suite\s*:\s*(.+)$/i);
+    if (suiteMatch) {
+      suite = suiteMatch[1].trim();
+      continue;
+    }
+
+    const caseMatch = trimmed.match(/^case\s*:\s*(.+)$/i);
+    if (caseMatch) {
+      if (current) cases.push(current);
+      current = {
+        id: caseMatch[1].trim(),
+        title: '',
+        pre: [],
+        steps: [],
+        expected: [],
+        tags: [],
+      };
+      currentSection = null;
+      continue;
+    }
+
+    if (!current) continue;
+
+    const titleMatch = trimmed.match(/^title\s*:\s*(.+)$/i);
+    if (titleMatch) {
+      current.title = titleMatch[1].trim();
+      currentSection = null;
+      continue;
+    }
+
+    if (/^pre\s*:/i.test(trimmed)) {
+      currentSection = 'pre';
+      const { values, nextIndex } = parseListSection(lines, i + 1);
+      current.pre.push(...values);
+      i = nextIndex;
+      continue;
+    }
+
+    if (/^steps?\s*:/i.test(trimmed)) {
+      currentSection = 'steps';
+      const { values, nextIndex } = parseListSection(lines, i + 1);
+      current.steps.push(...values);
+      i = nextIndex;
+      continue;
+    }
+
+    if (/^expected\s*:/i.test(trimmed)) {
+      currentSection = 'expected';
+      const { values, nextIndex } = parseListSection(lines, i + 1);
+      current.expected.push(...values);
+      i = nextIndex;
+      continue;
+    }
+
+    const tagsMatch = trimmed.match(/^tags\s*:\s*(.+)$/i);
+    if (tagsMatch) {
+      current.tags = tagsMatch[1]
+        .split(/[\s,\u3001]+/)
+        .map((token) => token.trim())
+        .filter(Boolean);
+      currentSection = null;
+      continue;
+    }
+
+    if (currentSection) {
+      const targetArray = current[currentSection];
+      const normalised = normaliseBullet(trimmed);
+      if (!normalised) continue;
+
+      if (targetArray.length) {
+        const merged = `${targetArray[targetArray.length - 1]} ${normalised}`.trim();
+        targetArray[targetArray.length - 1] = merged;
+      } else {
+        targetArray.push(normalised);
+      }
+    }
+  }
+
+  if (current) cases.push(current);
+  return { suite: suite.trim(), cases };
+}
+
+function ensureArrayOfStrings(value) {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => typeof item === 'string' && item.trim().length > 0);
+}
+
+function validateCaseStructure(testCase, index, errors) {
+  const prefix = `cases[${index}]`;
+  if (!testCase || typeof testCase !== 'object') {
+    errors.push(`${prefix} must be an object`);
+    return;
+  }
+
+  if (typeof testCase.id !== 'string' || testCase.id.trim().length === 0) {
+    errors.push(`${prefix}.id must be a non-empty string`);
+  }
+  if (typeof testCase.title !== 'string' || testCase.title.trim().length === 0) {
+    errors.push(`${prefix}.title must be a non-empty string`);
+  }
+  if (!ensureArrayOfStrings(testCase.pre)) {
+    errors.push(`${prefix}.pre must be an array of non-empty strings`);
+  }
+  if (!ensureArrayOfStrings(testCase.steps)) {
+    errors.push(`${prefix}.steps must be an array of non-empty strings`);
+  }
+  if (!ensureArrayOfStrings(testCase.expected)) {
+    errors.push(`${prefix}.expected must be an array of non-empty strings`);
+  }
+  if (!ensureArrayOfStrings(testCase.tags)) {
+    errors.push(`${prefix}.tags must be an array of non-empty strings`);
+  }
+}
+
+export function validateCasesSchema(data) {
   const errors = [];
-  if (!definition || typeof definition !== 'object') {
-    errors.push('Definition must be an object.');
-    return { valid: false, errors };
+  if (!data || typeof data !== 'object') {
+    errors.push('root must be an object');
+    return errors;
   }
-  if (typeof definition.suite !== 'string' || !definition.suite.trim()) {
-    errors.push('suite must be a non-empty string.');
+  if (typeof data.suite !== 'string' || data.suite.trim().length === 0) {
+    errors.push('suite must be a non-empty string');
   }
-  if (!Array.isArray(definition.cases) || definition.cases.length === 0) {
-    errors.push('cases must be a non-empty array.');
+  if (!Array.isArray(data.cases)) {
+    errors.push('cases must be an array');
+  } else if (data.cases.length === 0) {
+    errors.push('cases must contain at least one item');
   } else {
-    definition.cases.forEach((testCase, index) => {
-      const prefix = `cases[${index}]`;
-      if (!testCase || typeof testCase !== 'object') {
-        errors.push(`${prefix} must be an object.`);
-        return;
-      }
-      if (typeof testCase.id !== 'string' || !testCase.id.trim()) {
-        errors.push(`${prefix}.id must be a non-empty string.`);
-      }
-      if (typeof testCase.title !== 'string' || !testCase.title.trim()) {
-        errors.push(`${prefix}.title must be a non-empty string.`);
-      }
-      ['pre', 'steps', 'expected', 'tags'].forEach((field) => {
-        const value = testCase[field];
-        if (!Array.isArray(value)) {
-          errors.push(`${prefix}.${field} must be an array.`);
-          return;
-        }
-        value.forEach((item, itemIndex) => {
-          if (typeof item !== 'string' || !item.trim()) {
-            errors.push(`${prefix}.${field}[${itemIndex}] must be a non-empty string.`);
-          }
-        });
-      });
+    data.cases.forEach((testCase, index) => {
+      validateCaseStructure(testCase, index, errors);
     });
   }
-
-  return { valid: errors.length === 0, errors };
+  return errors;
 }
 
-const { valid, errors } = validateSuite(data);
-if (!valid) {
-  console.error('Schema validation failed:');
-  for (const error of errors) {
-    console.error('-', error);
+export function parseSpecFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const raw = readFile(filePath);
+  if (ext === '.json') {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      throw new Error(`Invalid JSON: ${(error && error.message) || error}`);
+    }
+    return parsed;
   }
-  process.exit(1);
+  if (ext === '.txt' || ext === '.md') {
+    return parseSpecText(raw);
+  }
+  throw new Error(`Unsupported file extension for "${filePath}"`);
 }
 
-console.log(`✅ Valid cases: suite="${data.suite}", count=${data.cases.length}`);
-process.exit(0);
+export function saveCases(result, outputPath) {
+  const json = `${JSON.stringify(result, null, 2)}\n`;
+  fs.writeFileSync(outputPath, json, 'utf8');
+}
+
+function main(argv) {
+  let [, , inputPath, outputPath] = argv;
+
+  // Default to sample file if no input provided (retains main-branch behavior)
+  if (!inputPath) {
+    const sample = path.join(__dirname, '../cases.sample.json');
+    if (fs.existsSync(sample)) {
+      console.log(`ℹ️  No path provided. Defaulting to sample cases: ${sample}`);
+      inputPath = sample;
+    } else {
+      usage();
+      process.exit(2);
+    }
+  }
+
+  let parsed;
+  try {
+    parsed = parseSpecFile(inputPath);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  const errors = validateCasesSchema(parsed);
+  if (errors.length > 0) {
+    console.error('Schema validation failed:');
+    for (const err of errors) console.error(`- ${err}`);
+    process.exit(1);
+  }
+
+  if (outputPath) {
+    saveCases(parsed, outputPath);
+    console.log(`📝 Wrote ${parsed.cases.length} cases to ${outputPath}`);
+  } else if (path.extname(inputPath).toLowerCase() !== '.json') {
+    // When parsing from text/markdown and no output is specified, print the JSON to stdout
+    console.log(JSON.stringify(parsed, null, 2));
+  }
+
+  console.log(`✅ Valid cases: suite="${parsed.suite}", count=${parsed.cases.length}`);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main(process.argv);
+}

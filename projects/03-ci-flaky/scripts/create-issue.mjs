@@ -1,91 +1,105 @@
+#!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
 
-const [, , dbArg] = process.argv;
-const databasePath = path.resolve(process.cwd(), dbArg || 'database.json');
+// -------- Helpers --------
+const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
-if (!fs.existsSync(databasePath)) {
-  console.log(`No database found at ${databasePath}`);
-  process.exit(0);
-}
+const getEvents = (record) => {
+  if (!record) return [];
+  if (Array.isArray(record.events)) return record.events;
+  if (Array.isArray(record)) return record; // backward compatibility
+  return [];
+};
 
-const db = JSON.parse(fs.readFileSync(databasePath, 'utf8'));
-if (!db.history || typeof db.history !== 'object') {
-  console.log('Database does not include any history data.');
-  process.exit(0);
-}
+const summarise = (events) => {
+  const totalRuns = events.length;
+  const failureCount = events.filter((e) => e.failed).length;
+  const avgTimeMs = totalRuns
+    ? Math.round(events.reduce((s, e) => s + (e.timeMs || 0), 0) / totalRuns)
+    : 0;
+  return { totalRuns, failureCount, avgTimeMs };
+};
 
+// flaky: recent(<=5) にP/F混在 かつ 直近2件が F→P
 const isFlaky = (events) => {
-  if (!Array.isArray(events) || events.length < 2) {
-    return false;
-  }
+  if (!Array.isArray(events) || events.length < 2) return false;
   const recent = events.slice(-5);
-  const hasFail = recent.some((event) => event.failed);
-  const hasPass = recent.some((event) => !event.failed);
-  if (!hasFail || !hasPass) {
-    return false;
-  }
+  const hasFail = recent.some((e) => e.failed);
+  const hasPass = recent.some((e) => !e.failed);
+  if (!hasFail || !hasPass) return false;
   const [prev, last] = events.slice(-2);
   return Boolean(prev?.failed && last && !last.failed);
 };
 
 const formatTimeline = (events) =>
-  events
-    .slice(-10)
-    .map((event) => (event.failed ? '❌' : '✅'))
-    .join(' ');
+  events.slice(-10).map((e) => (e.failed ? '❌' : '✅')).join(' ');
 
-const flakyEntries = Object.entries(db.history)
-  .map(([id, record]) => {
-    if (!record) return null;
-    const events = Array.isArray(record.events)
-      ? record.events
-      : Array.isArray(record)
-      ? record
-      : [];
-    const stats = record.stats || {
-      totalRuns: events.length,
-      failureCount: events.filter((event) => event.failed).length,
-      avgTimeMs: events.length
-        ? Math.round(events.reduce((sum, event) => sum + (event.timeMs || 0), 0) / events.length)
-        : 0,
-    };
-    return { id, events, stats };
-  })
-  .filter(Boolean)
-  .filter((entry) => isFlaky(entry.events));
-
-if (!flakyEntries.length) {
-  console.log('No flaky tests');
-  process.exit(0);
-}
-
-let output = `# Flaky tests detected (${flakyEntries.length})\n\n`;
-output += 'The following tests recently flipped from fail ➜ pass. Investigate their stability.\n\n';
-
-for (const entry of flakyEntries) {
-  const lastFailure = [...entry.events].reverse().find((event) => event.failed);
-  const lastPass = [...entry.events].reverse().find((event) => !event.failed);
-  const failureRate = entry.stats.totalRuns
-    ? ((entry.stats.failureCount / entry.stats.totalRuns) * 100).toFixed(1)
-    : '0.0';
-  output += `## ${entry.id}\n`;
-  output += `- Runs tracked: ${entry.stats.totalRuns}\n`;
-  output += `- Failure rate: ${failureRate}%\n`;
-  output += `- Avg duration: ${entry.stats.avgTimeMs} ms\n`;
-  output += `- Recent runs: ${formatTimeline(entry.events)}\n`;
-  if (lastFailure) {
-    output += `- Last failure: ${new Date(lastFailure.ts).toISOString()}\n`;
+// -------- Core --------
+export function generateFlakyMarkdown(databasePath) {
+  if (!fs.existsSync(databasePath)) {
+    return { hasReport: false, message: `No database found at ${databasePath}` };
   }
-  if (lastPass) {
-    output += `- Last success: ${new Date(lastPass.ts).toISOString()}\n`;
+
+  let db;
+  try {
+    db = readJson(databasePath);
+  } catch (e) {
+    return { hasReport: false, message: `Failed to parse database: ${e?.message || String(e)}` };
   }
-  output += '\n';
+
+  if (!db.history || typeof db.history !== 'object') {
+    return { hasReport: false, message: 'Database does not include any history data.' };
+  }
+
+  const entries = Object.entries(db.history)
+    .map(([id, rec]) => {
+      const events = getEvents(rec);
+      const stats = rec?.stats || summarise(events);
+      return { id, events, stats };
+    })
+    .filter((e) => e.events.length > 0 && isFlaky(e.events));
+
+  if (!entries.length) {
+    return { hasReport: false, message: 'No flaky tests' };
+  }
+
+  let md = `# Flaky tests detected (${entries.length})\n\n`;
+  md += 'The following tests recently flipped from **fail ➜ pass**. Investigate their stability.\n\n';
+
+  for (const entry of entries) {
+    const lastFailure = [...entry.events].reverse().find((ev) => ev.failed);
+    const lastPass = [...entry.events].reverse().find((ev) => !ev.failed);
+    const failureRate = entry.stats.totalRuns
+      ? ((entry.stats.failureCount / entry.stats.totalRuns) * 100).toFixed(1)
+      : '0.0';
+
+    md += `## ${entry.id}\n`;
+    md += `- Runs tracked: ${entry.stats.totalRuns}\n`;
+    md += `- Failure rate: ${failureRate}%\n`;
+    md += `- Avg duration: ${entry.stats.avgTimeMs} ms\n`;
+    md += `- Recent runs: ${formatTimeline(entry.events)}\n`;
+    if (lastFailure) md += `- Last failure: ${new Date(lastFailure.ts).toISOString()}\n`;
+    if (lastPass) md += `- Last success: ${new Date(lastPass.ts).toISOString()}\n`;
+    md += '\n';
+  }
+
+  md += `Database: ${databasePath}\n`;
+  if (db.updatedAt) md += `Updated at: ${db.updatedAt}\n`;
+
+  return { hasReport: true, markdown: md.trim() };
 }
 
-output += `Database: ${databasePath}\n`;
-if (db.updatedAt) {
-  output += `Updated at: ${db.updatedAt}\n`;
-}
+// -------- CLI --------
+const [, , dbArg] = process.argv;
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const databasePath = path.resolve(process.cwd(), dbArg || 'database.json');
+  const result = generateFlakyMarkdown(databasePath);
 
-console.log(output.trim());
+  if (!result.hasReport) {
+    console.log(result.message);
+    process.exit(0);
+  }
+
+  console.log(result.markdown);
+}
