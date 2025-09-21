@@ -89,7 +89,7 @@ for (const scenario of blueprint.scenarios) {
     process.exit(1);
   }
 
-  const filename = `${scenario.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.spec.ts`;
+  const filename = `${scenario.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.spec.mjs`;
   const code = renderTest(scenario);
   fs.writeFileSync(path.join(outDir, filename), code, 'utf8');
   generated.push(filename);
