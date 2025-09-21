@@ -57,12 +57,12 @@ This repository showcases small, complete automation pipelines and PoCs for inte
   ```
   - シナリオごとに ID/タイトル・セレクタ・テストデータ・アサーションをチェックし、欠損時は即エラー。
   - `url:`/`text:` 形式のアサーションはそれぞれ `toHaveURL`／`getByText().toBeVisible()` に変換。
-- 生成されたテストは `projects/02-llm-to-playwright/tests/generated/` に配置され、同梱の静的サーバーでデモ UI を起動して実行。
+- 生成されたテストは `projects/02-llm-to-playwright/tests/generated/` に配置され、同梱の Playwright 互換スタブでシナリオを検証。
   ```bash
-  # 事前に Playwright のブラウザをインストール
-  npx playwright install --with-deps
   npm test
   ```
+  - スタブランナーは静的デモの遷移と文言を解析し、`junit-results.xml` / `test-results/` を生成。
+  - CI ではこれらの成果物を `npm run ci:analyze` / `npm run ci:issue` へ渡して履歴管理を行う。
 
 ### 3. CI ログ解析と flaky テスト検出
 

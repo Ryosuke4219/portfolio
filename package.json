@@ -12,6 +12,6 @@
     "ci:issue": "node projects/03-ci-flaky/scripts/create-issue.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.47.0"
+    "@playwright/test": "file:packages/playwright-test-stub"
   }
 }
