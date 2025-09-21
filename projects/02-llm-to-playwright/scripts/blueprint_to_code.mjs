@@ -7,6 +7,8 @@ function usage() {
   console.error('Usage: node blueprint_to_code.mjs <blueprint.json>');
 }
 
+const defaultOutputDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
+
 // ---- IO Helpers ----
 function readJson(filePath) {
   let raw;
@@ -53,7 +55,11 @@ function validateScenario(scenario) {
 
 // ---- Utilities for codegen ----
 function sanitiseFileName(id) {
-  const base = (id || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const base = (id || '')
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
   return base || 'scenario';
 }
 
@@ -88,91 +94,4 @@ function renderScenario(scenario) {
   const selectors = scenario.selectors || {};
   const data = scenario.data || {};
   const assertLines = Array.isArray(scenario.asserts)
-    ? scenario.asserts.map((a) => [`  // assert: ${String(a)}`, buildAssert(a)].join('\n')).join('\n')
-    : '';
-
-  const lines = [];
-  lines.push("import { test, expect } from '@playwright/test';");
-  lines.push('');
-  lines.push(`test('${scenario.id} ${scenario.title}', async ({ page }) => {`);
-  lines.push("  await page.goto(process.env.BASE_URL || 'http://127.0.0.1:4173');");
-
-  // Inputs
-  lines.push(`  await page.fill(${toQuoted(selectors.user)}, ${toQuoted(data.user)});`);
-  lines.push(`  await page.fill(${toQuoted(selectors.pass)}, ${toQuoted(data.pass)});`);
-  lines.push(`  await page.click(${toQuoted(selectors.submit)});`);
-
-  if (assertLines) {
-    lines.push('');
-    lines.push(assertLines);
-  }
-
-  lines.push('});');
-  lines.push('');
-  return lines.join('\n');
-}
-
-// ---- Public API (used by script & importers) ----
-export function generateTestsFromBlueprint(blueprint, outputDirectory) {
-  validateBlueprint(blueprint);
-  if (!outputDirectory) throw new Error('Output directory is required');
-
-  fs.mkdirSync(outputDirectory, { recursive: true });
-  const generatedFiles = [];
-  const seenFilenames = new Map();
-
-  for (const scenario of blueprint.scenarios) {
-    validateScenario(scenario);
-    const baseName = sanitiseFileName(scenario.id);
-    const existingScenarioId = seenFilenames.get(baseName);
-    if (existingScenarioId) {
-      throw new Error(
-        `Duplicate scenario file name "${baseName}.spec.ts" generated from IDs "${existingScenarioId}" and "${scenario.id}". Ensure scenario IDs resolve to unique filenames.`,
-      );
-    }
-    seenFilenames.set(baseName, scenario.id);
-    const filename = `${baseName}.spec.ts`;
-    const filePath = path.join(outputDirectory, filename);
-    const code = renderScenario(scenario);
-    fs.writeFileSync(filePath, `${code}\n`, 'utf8');
-    generatedFiles.push(filename);
-  }
-
-  return generatedFiles;
-}
-
-// ---- CLI main ----
-function main() {
-  const [, , inputPath] = process.argv;
-  if (!inputPath) {
-    usage();
-    process.exit(2);
-  }
-
-  const outDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
-
-  let blueprint;
-  try {
-    blueprint = readJson(inputPath);
-  } catch (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-
-  let generated;
-  try {
-    generated = generateTestsFromBlueprint(blueprint, outDir);
-  } catch (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-
-  for (const f of generated) {
-    console.log('📝 generated:', f);
-  }
-  console.log(`✅ done (files: ${generated.join(', ')})`);
-}
-
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
-}
+    ? scen
