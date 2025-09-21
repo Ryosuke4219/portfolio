@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "setup": "npm install",
     "spec:generate": "node projects/01-spec2cases/scripts/text_to_cases.mjs projects/01-spec2cases/spec.sample.md projects/01-spec2cases/cases.generated.json",
     "spec:from-text": "node projects/01-spec2cases/scripts/spec2cases.mjs projects/01-spec2cases/spec.sample.txt projects/01-spec2cases/cases.sample.json",
     "spec:validate": "node projects/01-spec2cases/scripts/spec2cases.mjs",

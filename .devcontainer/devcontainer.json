@@ -1,0 +1,13 @@
+{
+  "name": "QA SDET LLM Portfolio",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-18-bullseye",
+  "postCreateCommand": "npm run setup",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-playwright.playwright",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
