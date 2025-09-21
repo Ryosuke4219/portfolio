@@ -155,7 +155,18 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 * Node: v24.6.0 (fnm)
 * Python: 3.11+ (uv)
 * CI: GitHub Actions
-* Node.js 標準ライブラリのみで動く CLI を採用。`npm install` は Playwright 実行時のみ必要。
+* Node.js 標準ライブラリのみで動く CLI を採用。`npm run setup`（内部で `npm install` を実行）は Playwright 実行時のみ必要。
+
+## セットアップ & テスト (Setup & Test)
+
+開発環境は VS Code Dev Containers に対応しています。`.devcontainer/devcontainer.json` を利用することで、Node.js と Playwright 拡張が揃った環境が自動構築されます。
+
+ローカル／Dev Container のいずれでも、以下の 2 コマンドで依存関係の導入からテスト実行まで完結します。
+
+```bash
+npm run setup
+npm test
+```
 
 ---
 
