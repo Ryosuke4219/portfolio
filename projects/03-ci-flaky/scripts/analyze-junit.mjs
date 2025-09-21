@@ -2,7 +2,28 @@
 // analyze-junit.mjs
 import fs from 'node:fs';
 import path from 'node:path';
-import { XMLParser } from '../lib/fast-xml-parser.js';
+
+// Prefer the bundled XML parser so we do not rely on external dependencies, but fall back
+// to the real fast-xml-parser package if the local copy is missing (e.g. in other projects).
+let XMLParser;
+try {
+  ({ XMLParser } = await import('../lib/fast-xml-parser.js'));
+} catch (error) {
+  if (
+    error?.code !== 'ERR_MODULE_NOT_FOUND' &&
+    !/(?:Cannot find module|Cannot find package)/iu.test(error?.message || '')
+  ) {
+    throw error;
+  }
+  try {
+    ({ XMLParser } = await import('fast-xml-parser'));
+  } catch (fallbackError) {
+    const message = fallbackError?.message || String(fallbackError);
+    throw new Error(
+      `Failed to load XML parser implementation. Ensure bundled parser exists or install fast-xml-parser. Original error: ${message}`,
+    );
+  }
+}
 
 // ---- Utils ----
 const toArray = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
