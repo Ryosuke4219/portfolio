@@ -23,16 +23,86 @@ This repository showcases small, complete automation pipelines and PoCs for inte
    - LLMを用いてテスト設計を支援、E2Eテスト作成を効率化。  
    - _Leverage LLM to expand acceptance criteria and generate Playwright-based E2E tests._
 
-3. **CIログ解析 → 不安定テストの検知・再実行・タグ付け/自動起票**  
-   - CIの信頼性を高めるため、flaky test を自動処理する仕組み。  
+3. **CIログ解析 → 不安定テストの検知・再実行・タグ付け/自動起票**
+   - CIの信頼性を高めるため、flaky test を自動処理する仕組み。
    - _Analyze CI logs to detect flaky tests, auto-rerun, tag, or create tickets automatically._
+
+4. **LLM Adapter — Shadow Execution & Error Handling (Minimal)**
+   - プライマリ結果はそのまま採用しつつ、影（shadow）実行で別プロバイダを並走 → 差分をメトリクスに記録して可視化。
+   - _Minimal adapter showcasing shadow execution (metrics-only background run) and deterministic error-case fallbacks._
+
+### 1. 仕様書テキスト → 構造化テストケース → CLIで自動実行
+
+- `projects/01-spec2cases/spec.sample.md` のような Markdown からテストケース JSON を生成。
+  ```bash
+  npm run spec:generate
+  # => projects/01-spec2cases/cases.generated.json を出力
+  ```
+- 内蔵の軽量バリデータで JSON 構造を検証。
+  ```bash
+  npm run spec:validate -- projects/01-spec2cases/cases.generated.json
+  ```
+- CLI からテストケースを読み込み、タグや ID でフィルタして擬似実行。
+  ```bash
+  npm run spec:run -- projects/01-spec2cases/cases.generated.json --tag smoke
+  ```
+  - `--tag` や `--id` で絞り込めるため、スモークテスト／個別ケースを即座に確認可能。
+  - 期待値や手順が欠落している場合は失敗としてサマリに計上し、仕様漏れを検知。
+
+### 2. LLM設計 → Playwright E2E テスト自動生成
+
+- `projects/02-llm-to-playwright/blueprint.sample.json` をもとにテストコードを自動生成。
+  ```bash
+  npm run e2e:gen
+  ```
+  - シナリオごとに ID/タイトル・セレクタ・テストデータ・アサーションをチェックし、欠損時は即エラー。
+  - `url:`/`text:` 形式のアサーションはそれぞれ `toHaveURL`／`getByText().toBeVisible()` に変換。
+- 生成されたテストは `projects/02-llm-to-playwright/tests/generated/` に配置され、同梱の Playwright 互換スタブでシナリオを検証。
+  ```bash
+  npm test
+  ```
+  - スタブランナーは静的デモの遷移と文言を解析し、`junit-results.xml` / `test-results/` を生成。
+  - CI ではこれらの成果物を `npm run ci:analyze` / `npm run ci:issue` へ渡して履歴管理を行う。
+
+### 3. CI ログ解析と flaky テスト検出
+
+- JUnit XML を解析して履歴 DB (`database.json`) を更新。
+  ```bash
+  npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-fail.xml
+  npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-pass.xml
+  ```
+  - Node.js のみで動作する軽量 XML パーサーを実装し、外部依存なしでレポートを吸収。
+  - 直近 5 件の実行から fail→pass を検知すると flaky として表示。
+  - 直近で fail→pass したテストを Markdown で出力し、Issue 化に利用。
+  ```bash
+  npm run ci:issue
+  ```
+  - 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
+
+### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
+
+- プライマリ結果をそのまま使いながら、裏で別プロバイダを**影（shadow）実行**して差分メトリクスを蓄積。
+- `[TIMEOUT]` / `[RATELIMIT]` / `[INVALID_JSON]` を含むプロンプトで異常系を明示的に再現し、フォールバックの挙動を検証。
+
+```bash
+cd projects/04-llm-adapter-shadow
+python3 -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python demo_shadow.py  # => artifacts/runs-metrics.jsonl に shadow_diff / provider_success を記録
+pytest -q  # ERR / SHD シナリオのテスト一式
+```
+
+- `shadow_diff` ではプライマリと影のレイテンシ差分・トークン使用量・ハッシュを記録。
+- `provider_error` / `provider_chain_failed` でフォールバック過程をトレース可能。
+- 詳細な構成は `projects/04-llm-adapter-shadow/README.md` を参照。
 
 ---
 
 ## 環境 (Environment)
-- Node: v24.6.0 (fnm)  
-- Python: 3.11+ (uv)  
-- CI: GitHub Actions  
+- Node: v24.6.0 (fnm)
+- Python: 3.11+ (uv)
+- CI: GitHub Actions
+- Node.js 標準ライブラリのみで動く CLI を採用。`npm install` は Playwright 実行時のみ必要。
 
 ---
 
@@ -41,6 +111,5 @@ This repository showcases small, complete automation pipelines and PoCs for inte
 - メトリクスや成果（工数削減、安定化率など）をREADME内に明記  
 - 英語READMEやデモ動画を追加予定  
 
-_Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._  
+_Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future._
 
----

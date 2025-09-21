@@ -1,9 +1,15 @@
 #!/usr/bin/env node
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// __dirname for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function usage() {
   console.error('Usage: node spec2cases.mjs <input.(json|txt|md)> [output.json]');
+  console.error('       (no args) -> defaults to ../cases.sample.json');
 }
 
 function readFile(filePath) {
@@ -27,17 +33,14 @@ function parseListSection(lines, startIndex) {
   for (; index < lines.length; index += 1) {
     const raw = lines[index];
     const trimmed = raw.trim();
-    if (!trimmed) {
-      continue;
-    }
+    if (!trimmed) continue;
+
     if (/^(suite|case|title|pre|steps?|expected|tags)\s*:/i.test(trimmed)) {
       break;
     }
     if (/^[-*\d]/.test(trimmed)) {
       const normalised = normaliseBullet(trimmed);
-      if (normalised) {
-        values.push(normalised);
-      }
+      if (normalised) values.push(normalised);
       continue;
     }
     if (values.length) {
@@ -60,9 +63,7 @@ function parseSpecText(text) {
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
+    if (!trimmed) continue;
 
     const suiteMatch = trimmed.match(/^suite\s*:\s*(.+)$/i);
     if (suiteMatch) {
@@ -72,9 +73,7 @@ function parseSpecText(text) {
 
     const caseMatch = trimmed.match(/^case\s*:\s*(.+)$/i);
     if (caseMatch) {
-      if (current) {
-        cases.push(current);
-      }
+      if (current) cases.push(current);
       current = {
         id: caseMatch[1].trim(),
         title: '',
@@ -87,9 +86,7 @@ function parseSpecText(text) {
       continue;
     }
 
-    if (!current) {
-      continue;
-    }
+    if (!current) continue;
 
     const titleMatch = trimmed.match(/^title\s*:\s*(.+)$/i);
     if (titleMatch) {
@@ -135,9 +132,8 @@ function parseSpecText(text) {
     if (currentSection) {
       const targetArray = current[currentSection];
       const normalised = normaliseBullet(trimmed);
-      if (!normalised) {
-        continue;
-      }
+      if (!normalised) continue;
+
       if (targetArray.length) {
         const merged = `${targetArray[targetArray.length - 1]} ${normalised}`.trim();
         targetArray[targetArray.length - 1] = merged;
@@ -147,17 +143,12 @@ function parseSpecText(text) {
     }
   }
 
-  if (current) {
-    cases.push(current);
-  }
-
+  if (current) cases.push(current);
   return { suite: suite.trim(), cases };
 }
 
 function ensureArrayOfStrings(value) {
-  if (!Array.isArray(value)) {
-    return false;
-  }
+  if (!Array.isArray(value)) return false;
   return value.every((item) => typeof item === 'string' && item.trim().length > 0);
 }
 
@@ -233,10 +224,18 @@ export function saveCases(result, outputPath) {
 }
 
 function main(argv) {
-  const [, , inputPath, outputPath] = argv;
+  let [, , inputPath, outputPath] = argv;
+
+  // Default to sample file if no input provided (retains main-branch behavior)
   if (!inputPath) {
-    usage();
-    process.exit(2);
+    const sample = path.join(__dirname, '../cases.sample.json');
+    if (fs.existsSync(sample)) {
+      console.log(`ℹ️  No path provided. Defaulting to sample cases: ${sample}`);
+      inputPath = sample;
+    } else {
+      usage();
+      process.exit(2);
+    }
   }
 
   let parsed;
@@ -250,9 +249,7 @@ function main(argv) {
   const errors = validateCasesSchema(parsed);
   if (errors.length > 0) {
     console.error('Schema validation failed:');
-    for (const err of errors) {
-      console.error(`- ${err}`);
-    }
+    for (const err of errors) console.error(`- ${err}`);
     process.exit(1);
   }
 
@@ -260,6 +257,7 @@ function main(argv) {
     saveCases(parsed, outputPath);
     console.log(`📝 Wrote ${parsed.cases.length} cases to ${outputPath}`);
   } else if (path.extname(inputPath).toLowerCase() !== '.json') {
+    // When parsing from text/markdown and no output is specified, print the JSON to stdout
     console.log(JSON.stringify(parsed, null, 2));
   }
 

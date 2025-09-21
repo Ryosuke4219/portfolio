@@ -1,11 +1,21 @@
 #!/usr/bin/env node
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
+// ---- CLI / Paths ----
 function usage() {
   console.error('Usage: node blueprint_to_code.mjs <blueprint.json>');
 }
 
+const [, , inputPath] = process.argv;
+if (!inputPath) {
+  usage();
+  process.exit(2);
+}
+
+const outDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
+
+// ---- IO Helpers ----
 function readJson(filePath) {
   let raw;
   try {
@@ -21,12 +31,42 @@ function readJson(filePath) {
   }
 }
 
+// ---- Validation ----
+function validateBlueprint(blueprint) {
+  if (!blueprint || typeof blueprint !== 'object') {
+    throw new Error('Blueprint must be an object.');
+  }
+  if (!Array.isArray(blueprint.scenarios)) {
+    throw new Error('Invalid blueprint: scenarios[] is required');
+  }
+}
+
+function validateScenario(scenario) {
+  if (!scenario || typeof scenario !== 'object') {
+    throw new Error('Scenario must be an object.');
+  }
+  if (!scenario.id || !scenario.title) {
+    throw new Error('Scenario must include non-empty id and title.');
+  }
+  if (!scenario.selectors || !scenario.selectors.user || !scenario.selectors.pass || !scenario.selectors.submit) {
+    throw new Error(`Scenario ${scenario.id} is missing selectors.user/pass/submit`);
+  }
+  if (!scenario.data || typeof scenario.data.user !== 'string' || typeof scenario.data.pass !== 'string') {
+    throw new Error(`Scenario ${scenario.id} is missing data.user or data.pass (string).`);
+  }
+  if (!Array.isArray(scenario.asserts)) {
+    throw new Error(`Scenario ${scenario.id} has invalid asserts. Expected an array.`);
+  }
+}
+
+// ---- Utilities for codegen ----
 function sanitiseFileName(id) {
   const base = (id || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return base || 'scenario';
 }
 
 function toQuoted(value) {
+  // Safe JS string literal via JSON
   return JSON.stringify((value ?? '').toString());
 }
 
@@ -51,59 +91,47 @@ function buildAssert(assertion) {
   return `  // unsupported assert: ${assertion.replace(/\*\//g, '* /')}`;
 }
 
+// ---- Rendering ----
 function renderScenario(scenario) {
   const selectors = scenario.selectors || {};
   const data = scenario.data || {};
   const assertLines = Array.isArray(scenario.asserts)
-    ? scenario.asserts.map((item) => buildAssert(item)).join('\n')
+    ? scenario.asserts.map((a) => [`  // assert: ${String(a)}`, buildAssert(a)].join('\n')).join('\n')
     : '';
 
-  const lines = [
-    "import { test, expect } from '@playwright/test';",
-    '',
-    `test('${scenario.id} ${scenario.title}', async ({ page }) => {`,
-    "  await page.goto(process.env.BASE_URL || 'http://localhost:5173');",
-  ];
+  const lines = [];
+  lines.push("import { test, expect } from '@playwright/test';");
+  lines.push('');
+  lines.push(`test('${scenario.id} ${scenario.title}', async ({ page }) => {`);
+  lines.push("  await page.goto(process.env.BASE_URL || 'http://127.0.0.1:4173');");
 
-  if (selectors.user && data.user !== undefined) {
-    lines.push(`  await page.fill(${toQuoted(selectors.user)}, ${toQuoted(data.user)});`);
-  }
-  if (selectors.pass && data.pass !== undefined) {
-    lines.push(`  await page.fill(${toQuoted(selectors.pass)}, ${toQuoted(data.pass)});`);
-  }
-  if (selectors.submit) {
-    lines.push(`  await page.click(${toQuoted(selectors.submit)});`);
-  }
+  // Inputs
+  lines.push(`  await page.fill(${toQuoted(selectors.user)}, ${toQuoted(data.user)});`);
+  lines.push(`  await page.fill(${toQuoted(selectors.pass)}, ${toQuoted(data.pass)});`);
+  lines.push(`  await page.click(${toQuoted(selectors.submit)});`);
 
   if (assertLines) {
-    lines.push('', assertLines);
+    lines.push('');
+    lines.push(assertLines);
   }
 
-  lines.push('});', '');
-
+  lines.push('});');
+  lines.push('');
   return lines.join('\n');
 }
 
-export function generateTestsFromBlueprint(blueprint, outDir) {
-  if (!blueprint || typeof blueprint !== 'object') {
-    throw new Error('Blueprint must be an object');
-  }
-  if (!Array.isArray(blueprint.scenarios)) {
-    throw new Error('Invalid blueprint: scenarios[] is required');
-  }
-  if (!outDir) {
-    throw new Error('Output directory is required');
-  }
+// ---- Public API (used by script & importers) ----
+export function generateTestsFromBlueprint(blueprint, outputDirectory) {
+  validateBlueprint(blueprint);
+  if (!outputDirectory) throw new Error('Output directory is required');
 
-  fs.mkdirSync(outDir, { recursive: true });
+  fs.mkdirSync(outputDirectory, { recursive: true });
   const generatedFiles = [];
 
   for (const scenario of blueprint.scenarios) {
-    if (!scenario || typeof scenario !== 'object') {
-      continue;
-    }
+    validateScenario(scenario);
     const filename = `${sanitiseFileName(scenario.id)}.spec.ts`;
-    const filePath = path.join(outDir, filename);
+    const filePath = path.join(outputDirectory, filename);
     const code = renderScenario(scenario);
     fs.writeFileSync(filePath, `${code}\n`, 'utf8');
     generatedFiles.push(filename);
@@ -112,36 +140,30 @@ export function generateTestsFromBlueprint(blueprint, outDir) {
   return generatedFiles;
 }
 
-function main(argv) {
-  const [, , inputPath] = argv;
-  if (!inputPath) {
-    usage();
-    process.exit(2);
-  }
-
+// ---- CLI main ----
+function main() {
   let blueprint;
   try {
     blueprint = readJson(inputPath);
-  } catch (error) {
-    console.error(error.message);
+  } catch (err) {
+    console.error(err.message);
     process.exit(1);
   }
 
-  const outDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
   let generated;
   try {
     generated = generateTestsFromBlueprint(blueprint, outDir);
-  } catch (error) {
-    console.error(error.message);
+  } catch (err) {
+    console.error(err.message);
     process.exit(1);
   }
 
-  for (const file of generated) {
-    console.log('📝 generated:', file);
+  for (const f of generated) {
+    console.log('📝 generated:', f);
   }
-  console.log('✅ done');
+  console.log(`✅ done (files: ${generated.join(', ')})`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main(process.argv);
+  main();
 }
