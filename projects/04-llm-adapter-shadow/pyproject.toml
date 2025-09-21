@@ -1,0 +1,10 @@
+[project]
+name = "portfolio-llm-adapter-shadow"
+version = "0.0.1"
+description = "Minimal shadow-execution + error-cases PoC for portfolio"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["projects/04-llm-adapter-shadow"]
+addopts = "-q"

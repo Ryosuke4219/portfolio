@@ -1,0 +1,11 @@
+{
+  "name": "@playwright/test",
+  "version": "0.0.0-stub",
+  "type": "module",
+  "bin": {
+    "playwright": "./bin/playwright.js"
+  },
+  "exports": {
+    ".": "./index.js"
+  }
+}
