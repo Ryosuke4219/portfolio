@@ -1,7 +1,8 @@
 {
   "name": "fast-xml-parser",
-  "version": "0.0.0-stub",
+  "version": "4.2.7",
   "type": "module",
+  "main": "index.js",
   "exports": {
     ".": "./index.js"
   }
