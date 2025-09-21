@@ -7,13 +7,7 @@ function usage() {
   console.error('Usage: node blueprint_to_code.mjs <blueprint.json>');
 }
 
-const [, , inputPath] = process.argv;
-if (!inputPath) {
-  usage();
-  process.exit(2);
-}
-
-const outDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
+const defaultOutputDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
 
 // ---- IO Helpers ----
 function readJson(filePath) {
@@ -142,6 +136,13 @@ export function generateTestsFromBlueprint(blueprint, outputDirectory) {
 
 // ---- CLI main ----
 function main() {
+  const [, , inputPath] = process.argv;
+  if (!inputPath) {
+    usage();
+    process.exit(2);
+  }
+
+  const outDir = defaultOutputDir;
   let blueprint;
   try {
     blueprint = readJson(inputPath);
