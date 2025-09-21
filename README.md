@@ -1,7 +1,6 @@
-# Portfolio Hub ? Ryosuke4219
+# Portfolio Hub × Ryosuke4219
 
 [![CI](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
-[![CI](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
 
 ---
 
