@@ -1,5 +1,5 @@
 const defaultOptions = {
-  attributeNamePrefix: '',
+  attributeNamePrefix: '@_',   // fast-xml-parser 互換の既定プレフィックス
   ignoreAttributes: true,
   allowBooleanAttributes: false,
   textNodeName: '#text',
@@ -76,7 +76,7 @@ export class XMLParser {
     const attrs = {};
     const rest = source.slice(name.length).trim();
     if (rest) {
-      const attrRegex = /([^\s=]+)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'>=]+)))?/g;
+      const attrRegex = /([^\s/=><"']+)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'>/]+)))?/g;
       let match;
       while ((match = attrRegex.exec(rest))) {
         const key = match[1];
@@ -95,7 +95,7 @@ export class XMLParser {
   }
 
   #buildNode(node) {
-    const prefix = this.options.attributeNamePrefix ?? '';
+    const prefix = this.options.attributeNamePrefix ?? '@_';
     const textNodeName = this.options.textNodeName ?? '#text';
     const rawText = node.text.join('');
     const textValue = this.options.trimValues === false ? rawText : rawText.trim();
@@ -103,6 +103,7 @@ export class XMLParser {
     const hasChildren = node.children.length > 0;
     const hasAttributes = !this.options.ignoreAttributes && Object.keys(node.attrs).length > 0;
 
+    // テキストのみの場合は素の文字列を返す（fast-xml-parser 的挙動に近づける）
     if (!hasAttributes && !hasChildren) {
       if (hasText) return textValue;
       return {};
@@ -136,13 +137,14 @@ export class XMLParser {
 
   #tokenize(xml) {
     const tokens = [];
+    // CDATA, コメント, PI を考慮した素朴トークナイザ
     const regex = /<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/?[^>]+>|[^<]+/g;
     let match;
     while ((match = regex.exec(xml)) !== null) {
       const value = match[0];
       if (!value) continue;
-      if (value.startsWith('<?')) continue;
-      if (value.startsWith('<!--')) continue;
+      if (value.startsWith('<?')) continue;          // XML 宣言 / PI は無視
+      if (value.startsWith('<!--')) continue;        // コメントは無視
       if (value.startsWith('<![CDATA[')) {
         tokens.push({ type: 'text', value: value.slice(9, -3) });
         continue;
