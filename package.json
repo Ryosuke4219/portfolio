@@ -13,6 +13,9 @@
     "ci:analyze": "node projects/03-ci-flaky/scripts/analyze-junit.mjs",
     "ci:issue": "node projects/03-ci-flaky/scripts/create-issue.mjs"
   },
+  "dependencies": {
+    "fast-xml-parser": "file:packages/fast-xml-parser"
+  },
   "devDependencies": {
     "@playwright/test": "file:packages/playwright-test-stub"
   }
