@@ -65,9 +65,26 @@ function parseSpecText(text) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    const suiteMatch = trimmed.match(/^suite\s*:\s*(.+)$/i);
+    const suiteMatch =
+      trimmed.match(/^suite\s*:\s*(.+)$/i) || trimmed.match(/^#\s+(.+)$/);
     if (suiteMatch) {
       suite = suiteMatch[1].trim();
+      continue;
+    }
+
+    const caseHeadingMatch = trimmed.match(/^##\s+(\S+)(?:\s+(.+))?$/);
+    if (caseHeadingMatch) {
+      if (current) cases.push(current);
+      const [, headingId, headingTitle = ''] = caseHeadingMatch;
+      current = {
+        id: headingId.trim(),
+        title: headingTitle.trim(),
+        pre: [],
+        steps: [],
+        expected: [],
+        tags: [],
+      };
+      currentSection = null;
       continue;
     }
 
@@ -88,50 +105,73 @@ function parseSpecText(text) {
 
     if (!current) continue;
 
-    const titleMatch = trimmed.match(/^title\s*:\s*(.+)$/i);
+    const normalisedLine = normaliseBullet(trimmed);
+
+    const titleMatch = normalisedLine.match(/^title\s*:\s*(.+)$/i);
     if (titleMatch) {
       current.title = titleMatch[1].trim();
       currentSection = null;
       continue;
     }
 
-    if (/^pre\s*:/i.test(trimmed)) {
+    if (/^pre\s*:/i.test(normalisedLine)) {
       currentSection = 'pre';
-      const { values, nextIndex } = parseListSection(lines, i + 1);
-      current.pre.push(...values);
-      i = nextIndex;
+      const inlineValue = normalisedLine.replace(/^pre\s*:\s*/i, '').trim();
+      if (inlineValue) {
+        current.pre.push(inlineValue);
+      } else {
+        const { values, nextIndex } = parseListSection(lines, i + 1);
+        current.pre.push(...values);
+        i = nextIndex;
+      }
       continue;
     }
 
-    if (/^steps?\s*:/i.test(trimmed)) {
+    if (/^steps?\s*:/i.test(normalisedLine)) {
       currentSection = 'steps';
-      const { values, nextIndex } = parseListSection(lines, i + 1);
-      current.steps.push(...values);
-      i = nextIndex;
+      const inlineValue = normalisedLine.replace(/^steps?\s*:\s*/i, '').trim();
+      if (inlineValue) {
+        current.steps.push(inlineValue);
+      } else {
+        const { values, nextIndex } = parseListSection(lines, i + 1);
+        current.steps.push(...values);
+        i = nextIndex;
+      }
       continue;
     }
 
-    if (/^expected\s*:/i.test(trimmed)) {
+    if (/^expected\s*:/i.test(normalisedLine)) {
       currentSection = 'expected';
-      const { values, nextIndex } = parseListSection(lines, i + 1);
-      current.expected.push(...values);
-      i = nextIndex;
+      const inlineValue = normalisedLine.replace(/^expected\s*:\s*/i, '').trim();
+      if (inlineValue) {
+        current.expected.push(inlineValue);
+      } else {
+        const { values, nextIndex } = parseListSection(lines, i + 1);
+        current.expected.push(...values);
+        i = nextIndex;
+      }
       continue;
     }
 
-    const tagsMatch = trimmed.match(/^tags\s*:\s*(.+)$/i);
+    const tagsMatch = normalisedLine.match(/^(tags?)\s*:\s*(.+)$/i);
     if (tagsMatch) {
-      current.tags = tagsMatch[1]
+      const [, label, value] = tagsMatch;
+      const tokens = value
         .split(/[\s,\u3001]+/)
         .map((token) => token.trim())
         .filter(Boolean);
+      if (label.toLowerCase() === 'tag') {
+        current.tags.push(...tokens);
+      } else {
+        current.tags = tokens;
+      }
       currentSection = null;
       continue;
     }
 
     if (currentSection) {
       const targetArray = current[currentSection];
-      const normalised = normaliseBullet(trimmed);
+      const normalised = normalisedLine;
       if (!normalised) continue;
 
       if (targetArray.length) {
