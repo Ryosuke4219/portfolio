@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      pages_enabled: ${{ steps.pages_status.outputs.has_pages }}
+      pages_enabled: ${{ steps.pages_status.outputs.actions_ready }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,27 +29,48 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const { data } = await github.rest.repos.get({
+            const { data: repo } = await github.rest.repos.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            core.setOutput("has_pages", String(data.has_pages));
+            let buildType = "disabled";
+            if (repo.has_pages) {
+              try {
+                const { data: pages } = await github.rest.repos.getPages({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                });
+                buildType = pages.build_type ?? "legacy";
+              } catch (error) {
+                if (error.status === 404) {
+                  buildType = "not_configured";
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            const actionsReady = repo.has_pages && buildType === "workflow";
+            core.setOutput("has_pages", String(repo.has_pages));
+            core.setOutput("build_type", buildType);
+            core.setOutput("actions_ready", String(actionsReady));
 
       - name: Setup Pages
-        if: steps.pages_status.outputs.has_pages == 'true'
+        if: steps.pages_status.outputs.actions_ready == 'true'
         uses: actions/configure-pages@v3
 
       - name: Upload documentation artifact
-        if: steps.pages_status.outputs.has_pages == 'true'
+        if: steps.pages_status.outputs.actions_ready == 'true'
         uses: actions/upload-pages-artifact@v2
         with:
           path: docs
 
-      - name: GitHub Pages disabled notice
-        if: steps.pages_status.outputs.has_pages != 'true'
+      - name: GitHub Pages status notice
+        if: steps.pages_status.outputs.actions_ready != 'true'
         run: |
-          echo "GitHub Pages is not enabled for this repository."
-          echo "Enable it in the repository settings to activate automated deployments."
+          echo "GitHub Pages が未設定、もしくは 'GitHub Actions' 以外の配信方法になっています。"
+          echo "Settings > Pages で GitHub Pages を有効化し、Build and deployment に 'GitHub Actions' を選択してください。"
+          echo "現状ではドキュメントの自動デプロイはスキップされます。"
 
   deploy:
     if: needs.build.outputs.pages_enabled == 'true'
