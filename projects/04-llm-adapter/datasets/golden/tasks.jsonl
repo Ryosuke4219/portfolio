@@ -1,0 +1,2 @@
+{"id": "task-001", "name": "login_happy_path", "input": {"username": "alice", "password": "secret"}, "prompt_template": "Login user {{username}} with password {{password}} and return SUCCESS/FAIL.", "expected": {"type": "regex", "value": "SUCCESS"}}
+{"id": "task-002", "name": "password_reset_flow", "input": {"email": "alice@example.com"}, "prompt_template": "Reset password for {{email}} and respond with RESET_OK.", "expected": {"type": "regex", "value": "RESET_OK"}}

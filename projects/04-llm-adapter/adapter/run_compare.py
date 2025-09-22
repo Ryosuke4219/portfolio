@@ -1,0 +1,113 @@
+"""比較ランナー CLI。"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+
+try:
+    from .core.budgets import BudgetManager
+    from .core.config import load_budget_book, load_provider_configs
+    from .core.datasets import load_golden_tasks
+    from .core.runners import CompareRunner
+except ImportError:  # pragma: no cover - 直接実行時のフォールバック
+    PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+    if str(PACKAGE_ROOT) not in sys.path:
+        sys.path.insert(0, str(PACKAGE_ROOT))
+    from adapter.core.budgets import BudgetManager
+    from adapter.core.config import load_budget_book, load_provider_configs
+    from adapter.core.datasets import load_golden_tasks
+    from adapter.core.runners import CompareRunner
+
+LOGGER = logging.getLogger(__name__)
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="LLM Adapter 比較ランナー")
+    parser.add_argument(
+        "--providers",
+        required=True,
+        help="プロバイダ設定ファイル（カンマ区切り）",
+    )
+    parser.add_argument(
+        "--prompts",
+        required=True,
+        help="ゴールデンタスク JSONL のパス",
+    )
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="各組み合わせの反復回数",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["parallel", "serial"],
+        default="parallel",
+        help="実行モード",
+    )
+    parser.add_argument(
+        "--budgets",
+        default=None,
+        help="予算設定 YAML のパス",
+    )
+    parser.add_argument(
+        "--metrics",
+        default=None,
+        help="メトリクス JSONL の出力先",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        help="ログレベル (INFO/DEBUG など)",
+    )
+    parser.add_argument(
+        "--allow-overrun",
+        action="store_true",
+        help="予算超過時でも実行を継続する",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = _parse_args()
+    logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO))
+
+    provider_paths = [Path(p.strip()).expanduser().resolve() for p in args.providers.split(",") if p.strip()]
+    if not provider_paths:
+        raise SystemExit("--providers に有効なパスが指定されていません")
+    prompt_path = Path(args.prompts).expanduser().resolve()
+    if not prompt_path.exists():
+        raise SystemExit(f"ゴールデンタスクが見つかりません: {prompt_path}")
+    budgets_path = (
+        Path(args.budgets).expanduser().resolve()
+        if args.budgets
+        else Path(__file__).resolve().parent / "config" / "budgets.yaml"
+    )
+    metrics_path = (
+        Path(args.metrics).expanduser().resolve()
+        if args.metrics
+        else Path(__file__).resolve().parent.parent / "data" / "runs-metrics.jsonl"
+    )
+
+    provider_configs = load_provider_configs(provider_paths)
+    tasks = load_golden_tasks(prompt_path)
+    budget_book = load_budget_book(budgets_path)
+    budget_manager = BudgetManager(budget_book)
+
+    runner = CompareRunner(
+        provider_configs,
+        tasks,
+        budget_manager,
+        metrics_path,
+        allow_overrun=args.allow_overrun,
+    )
+    results = runner.run(repeat=max(args.repeat, 1), mode=args.mode)
+    LOGGER.info("%d 件の試行を記録しました", len(results))
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI エントリポイント
+    raise SystemExit(main())

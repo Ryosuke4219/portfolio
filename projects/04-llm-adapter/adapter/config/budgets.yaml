@@ -1,0 +1,9 @@
+default:
+  run_budget_usd: 0.05
+  daily_budget_usd: 2.0
+  stop_on_budget_exceed: true
+overrides:
+  openai:
+    run_budget_usd: 0.1
+  local_ollama:
+    run_budget_usd: 0.0

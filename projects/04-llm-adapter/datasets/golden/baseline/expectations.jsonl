@@ -1,0 +1,2 @@
+{"provider": "simulated", "model": "simulator-v1", "prompt_id": "task-001", "max_diff_rate": 0.05, "notes": "ログインフローは SUCCESS を返す想定"}
+{"provider": "simulated", "model": "simulator-v1", "prompt_id": "task-002", "max_diff_rate": 0.05, "notes": "パスワードリセットは RESET_OK を返す想定"}

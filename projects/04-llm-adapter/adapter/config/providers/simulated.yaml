@@ -1,0 +1,21 @@
+provider: simulated
+endpoint: null
+model: simulator-v1
+seed: 42
+temperature: 0.0
+top_p: 1.0
+max_tokens: 512
+timeout_s: 1
+retries:
+  max: 0
+  backoff_s: 0
+persist_output: false
+pricing:
+  prompt_usd: 0.0
+  completion_usd: 0.0
+rate_limit:
+  rpm: 1000
+  tpm: 1000000
+quality_gates:
+  determinism_diff_rate_max: 0.0
+  determinism_len_stdev_max: 0.0
