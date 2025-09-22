@@ -1,0 +1,20 @@
+[
+  {
+    "name": "happy path",
+    "username": "alice",
+    "password": "secret",
+    "expected": {
+      "urlPattern": "/dashboard\\.html$",
+      "bannerTestId": "dashboard-title"
+    }
+  },
+  {
+    "name": "invalid password",
+    "username": "alice",
+    "password": "wrong",
+    "expected": {
+      "urlPattern": "/invalid\\.html$",
+      "bannerTestId": "error-title"
+    }
+  }
+]

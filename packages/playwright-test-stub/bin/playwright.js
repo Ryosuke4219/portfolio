@@ -8,8 +8,49 @@ import vm from 'node:vm';
 const projectRoot = process.cwd();
 const demoDir = path.resolve(projectRoot, 'projects/02-llm-to-playwright/demo');
 const generatedDir = path.resolve(projectRoot, 'projects/02-llm-to-playwright/tests/generated');
+const snapshotDir = path.join(generatedDir, '__snapshots__');
 const junitPath = path.resolve(projectRoot, 'junit-results.xml');
 const resultsDir = path.resolve(projectRoot, 'test-results');
+const screenshotDiffDir = path.join(resultsDir, 'snapshot-diffs');
+
+const axeCoreStub = {
+  async run(input) {
+    const html = typeof input === 'string' ? input : input?.html || '';
+    if (typeof html !== 'string') {
+      throw new Error('[axe-core:run] Expected HTML string input in stub environment.');
+    }
+    const violations = [];
+
+    const imgRegex = /<img\b[^>]*>/gi;
+    let match;
+    while ((match = imgRegex.exec(html)) !== null) {
+      if (!/\balt=/.test(match[0])) {
+        violations.push({
+          id: 'image-alt',
+          help: 'Images must have alternate text',
+          impact: 'serious',
+          nodes: [{ html: match[0] }],
+        });
+      }
+    }
+
+    const hasLandmark = /<(main|nav|header|footer)\b/i.test(html);
+    if (!hasLandmark) {
+      violations.push({
+        id: 'landmark-structure',
+        help: 'Page should expose at least one landmark region',
+        impact: 'moderate',
+        nodes: [],
+      });
+    }
+
+    return {
+      violations,
+      passes: [],
+      inapplicable: [],
+    };
+  },
+};
 
 const args = process.argv.slice(2);
 const command = args.shift();
@@ -85,6 +126,15 @@ const readPage = (targetUrl) => {
   return fs.readFileSync(filePath, 'utf8');
 };
 
+const sanitiseForFile = (value) =>
+  value
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/[\s]+/g, ' ')
+    .trim()
+    .slice(0, 80) || 'snapshot';
+
+const normaliseSnapshotContent = (value) => value.replace(/\r\n/g, '\n');
+
 const createPage = () => {
   const state = {
     url: '',
@@ -93,6 +143,8 @@ const createPage = () => {
   };
 
   const normalise = (target) => new url.URL(target, `${base.protocol}//${base.host}`).toString();
+  const selectorForTestId = (testId) => `[data-testid="${testId}"]`;
+  const hasTestId = (testId) => new RegExp(`data-testid=["']${testId}["']`).test(state.content);
 
   return {
     async goto(target) {
@@ -105,10 +157,13 @@ const createPage = () => {
       state.fields.set(selector, value);
     },
     async click(selector) {
-      if (selector !== 'button[type=submit]') {
+      const normalizedSelector = selector.startsWith('[data-testid="') ? selector : selector.trim();
+      const submitSelectors = new Set(['button[type=submit]', selectorForTestId('login-submit')]);
+      if (!submitSelectors.has(normalizedSelector)) {
         throw new Error(`Unsupported selector for click(): ${selector}`);
       }
-      const pass = state.fields.get('#pass') || '';
+      const pass =
+        state.fields.get(selectorForTestId('login-password')) || state.fields.get('#pass') || state.fields.get('pass') || '';
       const destination = pass === 'wrong' ? '/invalid.html' : '/dashboard.html';
       const absolute = new url.URL(destination, `${base.protocol}//${base.host}`).toString();
       await this.goto(absolute);
@@ -124,10 +179,114 @@ const createPage = () => {
         },
       };
     },
+    getByTestId(testId) {
+      const selector = selectorForTestId(testId);
+      return {
+        __kind: 'test-id-locator',
+        testId,
+        selector,
+        async fill(value) {
+          if (!hasTestId(testId)) {
+            throw new Error(`Expected to find data-testid="${testId}" before fill()`);
+          }
+          await this.page.fill(selector, value);
+        },
+        async click() {
+          if (!hasTestId(testId)) {
+            throw new Error(`Expected to find data-testid="${testId}" before click()`);
+          }
+          await this.page.click(selector);
+        },
+        check() {
+          if (!hasTestId(testId)) {
+            throw new Error(`Expected element with data-testid="${testId}" in ${state.url}`);
+          }
+        },
+        page: null,
+      };
+    },
+    async content() {
+      return state.content;
+    },
     _getURL() {
       return state.url;
     },
+    _attach(locator) {
+      if (locator && typeof locator === 'object') {
+        locator.page = this;
+      }
+      return locator;
+    },
   };
+};
+
+let currentTest = null;
+
+const recordSnapshotMismatch = (name, expected, actual) => {
+  const safeTitle = currentTest ? sanitiseForFile(currentTest.title) : 'snapshot';
+  fs.mkdirSync(screenshotDiffDir, { recursive: true });
+  const diffPath = path.join(screenshotDiffDir, `${safeTitle}-${sanitiseForFile(name)}.diff.txt`);
+  const diffBody = [
+    `Snapshot mismatch for ${name}`,
+    '--- expected',
+    expected,
+    '--- actual',
+    actual,
+  ].join('\n');
+  fs.writeFileSync(diffPath, diffBody, 'utf8');
+  return diffPath;
+};
+
+const compareSnapshot = (name, value) => {
+  if (!name || typeof name !== 'string') {
+    throw new Error('[expect] Snapshot name must be a non-empty string.');
+  }
+  const baselinePath = path.join(snapshotDir, name);
+  if (!fs.existsSync(baselinePath)) {
+    throw new Error(
+      `[expect] Snapshot baseline not found for "${name}". Create ${baselinePath} to update the golden image.`,
+    );
+  }
+  const expected = normaliseSnapshotContent(fs.readFileSync(baselinePath, 'utf8'));
+  const actual = normaliseSnapshotContent(value);
+  if (expected !== actual) {
+    const diffPath = recordSnapshotMismatch(name, expected, actual);
+    throw new Error(`Snapshot mismatch for "${name}". See ${diffPath}`);
+  }
+};
+
+const deepEqual = (a, b) => {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== typeof b) {
+    return false;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) {
+      return false;
+    }
+    for (let i = 0; i < a.length; i += 1) {
+      if (!deepEqual(a[i], b[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) {
+      return false;
+    }
+    for (const key of keysA) {
+      if (!deepEqual(a[key], b[key])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
 };
 
 const expect = (actual) => ({
@@ -155,6 +314,29 @@ const expect = (actual) => ({
     }
     throw new Error('toBeVisible() is only supported on getByText() locators in the stub');
   },
+  async toHaveScreenshot(name) {
+    if (!actual || typeof actual.content !== 'function') {
+      throw new Error('toHaveScreenshot() expects a page-like object with content().');
+    }
+    const html = await actual.content();
+    compareSnapshot(name, html);
+  },
+  async toMatchSnapshot(name) {
+    if (typeof actual !== 'string') {
+      throw new Error('toMatchSnapshot() expects a string value in the stub environment.');
+    }
+    compareSnapshot(name, actual);
+  },
+  async toBe(expected) {
+    if (actual !== expected) {
+      throw new Error(`Expected ${actual} to be ${expected}`);
+    }
+  },
+  async toEqual(expected) {
+    if (!deepEqual(actual, expected)) {
+      throw new Error(`Expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`);
+    }
+  },
 });
 
 const tests = [];
@@ -167,11 +349,31 @@ if (!fs.existsSync(generatedDir)) {
   console.warn('[playwright-stub] No generated tests found. Did you run npm run e2e:gen?');
 }
 
+const requireFromContext = (specifier) => {
+  if (specifier === 'node:fs' || specifier === 'fs') {
+    return fs;
+  }
+  if (specifier === 'node:path' || specifier === 'path') {
+    return path;
+  }
+  if (specifier === 'node:url' || specifier === 'url') {
+    return url;
+  }
+  if (specifier === 'axe-core') {
+    return axeCoreStub;
+  }
+  throw new Error(`[playwright-stub] Unsupported require("${specifier}") in generated test.`);
+};
+
 const contextGlobals = {
   console,
   test: registerTest,
   expect,
-  process: { env: { ...process.env } },
+  process: {
+    env: { ...process.env },
+    cwd: () => projectRoot,
+  },
+  require: requireFromContext,
 };
 
 const vmContext = vm.createContext(contextGlobals);
@@ -207,7 +409,22 @@ const run = async () => {
     const page = createPage();
     const start = Date.now();
     try {
-      await fn({ page });
+      currentTest = { title };
+      await fn({
+        page: new Proxy(page, {
+          get(target, prop) {
+            const value = target[prop];
+            if (prop === 'getByTestId' && typeof value === 'function') {
+              return (testId) => target._attach(value.call(target, testId));
+            }
+            if (typeof value === 'function') {
+              return value.bind(target);
+            }
+            return value;
+          },
+        }),
+      });
+      currentTest = null;
       const durationMs = Date.now() - start;
       results.push({ title, status: 'passed', durationMs });
       console.log(`  ✓ ${title}`);
@@ -217,6 +434,7 @@ const run = async () => {
       results.push({ title, status: 'failed', durationMs, error });
       console.error(`  ✗ ${title}`);
       console.error(`    ${error?.message || error}`);
+      currentTest = null;
     }
   }
 };

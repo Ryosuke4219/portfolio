@@ -77,6 +77,7 @@ This repository showcases small, complete automation pipelines and PoCs for inte
 
   * スタブランナーは静的デモの遷移と文言を解析し、`junit-results.xml` / `test-results/` を生成。
   * CI ではこれらの成果物を `npm run ci:analyze` / `npm run ci:issue` へ渡して履歴管理を行う。
+  * `projects/02-llm-to-playwright/tests/README.md` にテスト生成時の**セレクタ・ガード方針**や**ビジュアル／a11y スモーク**の運用メモを記載。`login-cases.json` / `a11y-pages.csv` を編集するだけでデータドリブンにシナリオを増やせる構成とした。
 
 ### 3. CI ログ解析と flaky テスト検出
 

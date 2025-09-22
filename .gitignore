@@ -2,6 +2,13 @@ node_modules/*
 .playwright
 test-results
 projects/02-llm-to-playwright/tests/generated
+!projects/02-llm-to-playwright/tests/generated/
+!projects/02-llm-to-playwright/tests/generated/README.md
+!projects/02-llm-to-playwright/tests/generated/hardening.spec.ts
+!projects/02-llm-to-playwright/tests/generated/data/
+!projects/02-llm-to-playwright/tests/generated/data/**
+!projects/02-llm-to-playwright/tests/generated/__snapshots__/
+!projects/02-llm-to-playwright/tests/generated/__snapshots__/**
 projects/01-spec2cases/cases.generated.json
 junit-results.xml
 database.json
