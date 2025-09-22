@@ -1,0 +1,25 @@
+window: 20
+threshold: 0.60
+new_flaky_window: 5
+recency_lambda: 0.1
+weights:
+  intermittency: 0.50
+  p_fail: 0.30
+  recency: 0.15
+  impact: 0.05
+timeout_factor: 3.0
+impact_baseline_ms: 600000
+output:
+  top_n: 50
+  formats: [csv, json, html]
+issue:
+  enabled: true
+  dry_run: true
+  repo: "Ryosuke4219/portfolio"
+  labels: ["flaky", "test"]
+  assignees: []
+  dedupe_by: "failure_signature"
+paths:
+  input: "./projects/03-ci-flaky/junit"
+  store: "./projects/03-ci-flaky/data/runs.jsonl"
+  out: "./projects/03-ci-flaky/out"
