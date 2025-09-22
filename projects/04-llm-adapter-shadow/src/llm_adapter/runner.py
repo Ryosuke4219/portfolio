@@ -44,7 +44,9 @@ class Runner:
 
         last_err: Optional[Exception] = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
-        request_fingerprint = content_hash("runner", request.prompt, request.options)
+        request_fingerprint = content_hash(
+            "runner", request.prompt, request.options, request.max_tokens
+        )
 
         def _record_error(err: Exception, attempt: int, provider: ProviderSPI) -> None:
             if not metrics_path_str:
@@ -53,7 +55,9 @@ class Runner:
                 "provider_error",
                 metrics_path_str,
                 request_fingerprint=request_fingerprint,
-                request_hash=content_hash(provider.name(), request.prompt, request.options),
+                request_hash=content_hash(
+                    provider.name(), request.prompt, request.options, request.max_tokens
+                ),
                 provider=provider.name(),
                 attempt=attempt,
                 total_providers=len(self.providers),
@@ -78,7 +82,12 @@ class Runner:
                         "provider_success",
                         metrics_path_str,
                         request_fingerprint=request_fingerprint,
-                        request_hash=content_hash(provider.name(), request.prompt, request.options),
+                        request_hash=content_hash(
+                            provider.name(),
+                            request.prompt,
+                            request.options,
+                            request.max_tokens,
+                        ),
                         provider=provider.name(),
                         attempt=attempt_index,
                         total_providers=len(self.providers),

@@ -60,3 +60,29 @@ def test_shadow_error_records_metrics(tmp_path):
     assert diff_event["shadow_error"] == "TimeoutError"
     assert diff_event["shadow_error_message"] == "simulated timeout"
     assert diff_event["shadow_duration_ms"] >= 0
+
+
+def test_request_hash_includes_max_tokens(tmp_path):
+    provider = MockProvider("primary", base_latency_ms=1, error_markers=set())
+    runner = Runner([provider])
+
+    metrics_path = tmp_path / "metrics.jsonl"
+
+    runner.run(
+        ProviderRequest(prompt="hello", max_tokens=32),
+        shadow_metrics_path=metrics_path,
+    )
+    runner.run(
+        ProviderRequest(prompt="hello", max_tokens=64),
+        shadow_metrics_path=metrics_path,
+    )
+
+    payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
+    success_events = [item for item in payloads if item["event"] == "provider_success"]
+
+    assert len(success_events) == 2
+    request_hashes = {event["request_hash"] for event in success_events}
+    fingerprints = {event["request_fingerprint"] for event in success_events}
+
+    assert len(request_hashes) == 2
+    assert len(fingerprints) == 2
