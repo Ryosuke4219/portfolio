@@ -1,0 +1,32 @@
+name: Weekly QA Summary
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 月曜 09:00 JST
+  workflow_dispatch:
+
+jobs:
+  build-weekly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip
+      - name: Generate weekly summary
+        run: |
+          python tools/weekly_summary.py \
+            --runs projects/03-ci-flaky/data/runs.jsonl \
+            --flaky projects/03-ci-flaky/out/flaky_rank.csv \
+            --out docs/weekly-summary.md \
+            --days 7
+      - name: Commit summary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/weekly-summary.md
+          git commit -m "chore(docs): update weekly QA summary" || echo "no changes"
+          git push
