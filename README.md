@@ -18,8 +18,8 @@
 
 ## プロジェクト一覧（Projects）
 
-1. **docs/ — GitHub Pages向けドキュメントサイト**  
-   - `docs/index.md` から公開用のナビゲーションとメモを提供。GitHub Pages ワークフローがこのディレクトリを配信する。  
+1. **docs/ — GitHub Pages向けドキュメントサイト**
+   - `docs/index.md` をハブとして、`overview.md`・`specs/`・`design/` に分割した仕様/設計ドキュメントを公開。GitHub Pages ワークフローがこのディレクトリを配信する。
    - 主な操作:
      ```bash
      # ローカルでMarkdownをブラウズ（簡易サーバ）
@@ -107,7 +107,18 @@
 │       ├── codeql.yml
 │       └── publish-docs.yml
 ├── docs/
-│   └── index.md
+│   ├── design/
+│   │   ├── architecture.md
+│   │   ├── ci-cd.md
+│   │   ├── data-contracts.md
+│   │   └── risks-and-ops.md
+│   ├── index.md
+│   ├── overview.md
+│   └── specs/
+│       ├── 01-spec2cases.md
+│       ├── 02-ac-to-e2e.md
+│       ├── 03-ci-flaky.md
+│       └── 04-llm-adapter-shadow.md
 ├── README.md
 └── README_hero_snippet.md
 ```
