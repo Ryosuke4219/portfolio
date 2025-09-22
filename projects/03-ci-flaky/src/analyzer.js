@@ -45,11 +45,14 @@ export async function loadWindowRuns(storePath, windowSize) {
       if (record.ts && (!runEntry.meta.ts || record.ts > runEntry.meta.ts)) runEntry.meta.ts = record.ts;
       if (record.branch) runEntry.meta.branch = record.branch;
       if (record.commit) runEntry.meta.commit = record.commit;
+
+      // merge CI meta (prefer explicit fields, fallback to ci_meta)
       const ciMeta = record.ci_meta || {};
       const actor = record.actor || ciMeta.actor;
       if (actor) runEntry.meta.actor = actor;
       const workflow = record.workflow || ciMeta.workflow;
       if (workflow) runEntry.meta.workflow = workflow;
+
       if (record.duration_total_ms) runEntry.meta.duration_total_ms = record.duration_total_ms;
     }
   }
@@ -98,6 +101,7 @@ export function computeAggregates(runs, runOrder, config) {
       entry.class = attempt.class;
       entry.name = attempt.name;
       entry.params = attempt.params ?? entry.params;
+
       entry.statuses.push({
         runIndex: idx,
         status: attempt.status,
@@ -218,7 +222,7 @@ export function determineFlaky(results, config, runOrder) {
     if (entry.passes === 0 || entry.fails === 0) continue;
     if (entry.score < threshold) continue;
     const failureRuns = entry.statuses
-      .filter((status) => status.status === 'fail' || status.status === 'error')
+      .filter((status) => status.status === 'fail' || status === 'error' || status.status === 'error')
       .map((status) => status.runIndex);
     const firstFailure = failureRuns.length ? Math.min(...failureRuns) : Number.POSITIVE_INFINITY;
     const isNew = runOrder.length <= newWindow

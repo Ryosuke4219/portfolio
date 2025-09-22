@@ -194,7 +194,6 @@ function serialiseFlakyEntry(entry) {
     attempts: entry.attempts,
     passes: entry.passes,
     fails: entry.fails,
-    skipped: entry.skipped,
     p_fail: entry.p_fail,
     intermittency: entry.intermittency,
     recency: entry.recency,
