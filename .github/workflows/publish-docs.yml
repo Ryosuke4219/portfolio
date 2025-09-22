@@ -33,43 +33,58 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
+
             let buildType = "disabled";
-            if (repo.has_pages) {
-              try {
-                const { data: pages } = await github.rest.repos.getPages({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                });
-                buildType = pages.build_type ?? "legacy";
-              } catch (error) {
-                if (error.status === 404) {
-                  buildType = "not_configured";
-                } else {
-                  throw error;
-                }
+
+            try {
+              const { data: pages } = await github.rest.repos.getPages({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              buildType = pages.build_type ?? "legacy";
+            } catch (error) {
+              if (error.status === 404) {
+                core.info("GitHub Pages は GitHub Actions を使用するように設定されていますが、まだデプロイが完了していません。");
+                buildType = "workflow";
+              } else if (error.status === 403) {
+                core.info("GitHub Pages API が 403 を返しました。無効化されているものとして扱います。");
+              } else {
+                throw error;
               }
             }
 
-            const actionsReady = repo.has_pages && buildType === "workflow";
+            const actionsReady = buildType === "workflow";
+            core.info(`GitHub Pages build_type: ${buildType}`);
+            core.info(`GitHub Pages has_pages: ${repo.has_pages}`);
             core.setOutput("has_pages", String(repo.has_pages));
             core.setOutput("build_type", buildType);
             core.setOutput("actions_ready", String(actionsReady));
 
       - name: Setup Pages
-        if: steps.pages_status.outputs.actions_ready == 'true'
+        if: steps.pages_status.outputs.build_type == 'workflow'
         uses: actions/configure-pages@v3
 
       - name: Upload documentation artifact
-        if: steps.pages_status.outputs.actions_ready == 'true'
+        if: steps.pages_status.outputs.build_type == 'workflow'
         uses: actions/upload-pages-artifact@v2
         with:
           path: docs
 
       - name: GitHub Pages status notice
-        if: steps.pages_status.outputs.actions_ready != 'true'
+        if: steps.pages_status.outputs.build_type != 'workflow'
         run: |
-          echo "GitHub Pages が未設定、もしくは 'GitHub Actions' 以外の配信方法になっています。"
-          echo "Settings > Pages で GitHub Pages を有効化し、Build and deployment に 'GitHub Actions' を選択してください。"
+          case "${{ steps.pages_status.outputs.build_type }}" in
+            disabled)
+              echo "GitHub Pages が無効化されています。"
+              echo "Settings > Pages で GitHub Pages を有効化してください。"
+              echo "Build and deployment に 'GitHub Actions' を選択してください。"
+              ;;
+            *)
+              echo "GitHub Pages の配信方法として 'GitHub Actions' が選択されていません。"
+              echo "Build and deployment に 'GitHub Actions' を選択すると自動デプロイが有効になります。"
+              ;;
+          esac
           echo "現状ではドキュメントの自動デプロイはスキップされます。"
 
   deploy:
