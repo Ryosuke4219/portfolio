@@ -1,0 +1,4 @@
+2025-03-18T09:12:41Z ERROR login_flow timeout waiting for dashboard selector
+Stacktrace:
+  at Login.spec.ts:42:15
+  at runStep (/app/tests/login.ts:87:10)

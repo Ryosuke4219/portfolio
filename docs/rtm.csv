@@ -1,0 +1,13 @@
+RequirementID,RequirementTitle,Priority,Risk,TestID,Project,TestType,Status,Coverage,EvidenceLink,LastRunAt,Owner
+REQ-PLAN-001,QA計画がQuality Gatesを定義している,H,M,T-01-DOC-PLAN-REVIEW,01,Review,Implemented,Full,./test-plan.md,2025-03-24,y.sato
+REQ-PLAN-002,RTMリンクがテスト計画に明記されている,M,L,T-01-DOC-LINK-CHECK,01,Static,Implemented,Full,./test-plan.md#7-トレーサビリティ,2025-03-24,k.arai
+REQ-CASE-001,仕様サンプルからテストケースを生成できる,H,M,T-01-GEN-CASE-FLOW,01,Integration,Implemented,Full,../projects/01-spec2cases/scripts/spec2cases.mjs,2025-03-23,m.chen
+REQ-CASE-002,生成ケースがJSONスキーマに準拠する,M,M,T-01-SCHEMA-VALIDATE,01,Unit,Implemented,Full,../projects/01-spec2cases/schema.json,2025-03-23,m.chen
+REQ-E2E-001,LLM生成E2Eで正常系ログインを通過できる,H,M,T-02-E2E-LOGIN-VALID,02,E2E,Implemented,Full,../projects/02-llm-to-playwright/tests/README.md,2025-03-22,k.arai
+REQ-E2E-002,誤認証時にエラーメッセージを表示する,H,M,T-02-E2E-LOGIN-INVALID,02,E2E,Implemented,Full,../projects/02-llm-to-playwright/tests/README.md#セレクタ・ガード方針,2025-03-22,k.arai
+REQ-A11Y-001,a11y自動スキャンで重大違反が0件である,M,M,T-02-A11Y-AUDIT,02,a11y,Implemented,Partial,../projects/02-llm-to-playwright/tests/README.md#a11y-スキャン,2025-03-22,y.sato
+REQ-VIS-001,ビジュアル回帰差分がレビュー可能に保存される,M,L,T-02-VIS-SNAPSHOT,02,Visual,Implemented,Partial,../projects/02-llm-to-playwright/tests/README.md#ビジュアル差分（スモーク）,2025-03-21,m.chen
+REQ-FLAKY-001,Flaky Analyzerがスコアランキングを出力する,H,H,T-03-FLAKY-RANK,03,Integration,Implemented,Full,../projects/03-ci-flaky/README.md#生成物,2025-03-20,y.sato
+REQ-FLAKY-002,週次サマリをMarkdownで生成する,H,M,T-03-WEEKLY-SUMMARY,03,Automation,Implemented,Full,../docs/weekly-summary.md,2025-03-24,k.arai
+REQ-FLAKY-003,失敗分類がTop3で把握できる,M,M,T-03-FAILURE-KIND,03,Analytics,Implemented,Full,../projects/03-ci-flaky/docs/spec_flaky_analyzer.md#6-3-失敗分類（failure_kind）,2025-03-20,y.sato
+REQ-DEFECT-001,欠陥レポートに是正と予防が明記される,M,L,T-03-DEFECT-REPORT,03,Review,Implemented,Full,./defect-report-sample.md#欠陥レポート例,2025-03-24,m.chen
