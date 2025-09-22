@@ -45,7 +45,14 @@ export async function loadWindowRuns(storePath, windowSize) {
       if (record.ts && (!runEntry.meta.ts || record.ts > runEntry.meta.ts)) runEntry.meta.ts = record.ts;
       if (record.branch) runEntry.meta.branch = record.branch;
       if (record.commit) runEntry.meta.commit = record.commit;
-      if (record.actor) runEntry.meta.actor = record.actor;
+
+      // merge CI meta (prefer explicit fields, fallback to ci_meta)
+      const ciMeta = record.ci_meta || {};
+      const actor = record.actor || ciMeta.actor;
+      if (actor) runEntry.meta.actor = actor;
+      const workflow = record.workflow || ciMeta.workflow;
+      if (workflow) runEntry.meta.workflow = workflow;
+
       if (record.duration_total_ms) runEntry.meta.duration_total_ms = record.duration_total_ms;
     }
   }
@@ -94,7 +101,13 @@ export function computeAggregates(runs, runOrder, config) {
       entry.class = attempt.class;
       entry.name = attempt.name;
       entry.params = attempt.params ?? entry.params;
-      entry.statuses.push({ runIndex: idx, status: attempt.status, run_id: attempt.run_id });
+
+      entry.statuses.push({
+        runIndex: idx,
+        status: attempt.status,
+        run_id: attempt.run_id,
+        ts: attempt.ts || null,
+      });
 
       if (attempt.status === 'skipped') {
         entry.skipped += 1;
@@ -130,6 +143,7 @@ export function computeAggregates(runs, runOrder, config) {
             ts: attempt.ts,
             message: attempt.failure_message,
             details: attempt.failure_details,
+            excerpt: attempt.failure_excerpt,
             failure_kind: attempt.failure_kind,
             failure_signature: attempt.failure_signature,
           };
@@ -208,7 +222,7 @@ export function determineFlaky(results, config, runOrder) {
     if (entry.passes === 0 || entry.fails === 0) continue;
     if (entry.score < threshold) continue;
     const failureRuns = entry.statuses
-      .filter((status) => status.status === 'fail' || status.status === 'error')
+      .filter((status) => status.status === 'fail' || status === 'error' || status.status === 'error')
       .map((status) => status.runIndex);
     const firstFailure = failureRuns.length ? Math.min(...failureRuns) : Number.POSITIVE_INFINITY;
     const isNew = runOrder.length <= newWindow
@@ -223,11 +237,15 @@ export function determineFlaky(results, config, runOrder) {
 export function summarise(results, flaky, failureKindTotals, runOrder) {
   const totalTests = results.length;
   const mostCommonFailure = [...failureKindTotals.entries()].sort((a, b) => b[1] - a[1])[0];
+  const failureKindSummary = Object.fromEntries(
+    [...failureKindTotals.entries()].sort((a, b) => b[1] - a[1]),
+  );
   return {
     total_tests: totalTests,
     flaky_count: flaky.length,
     new_flaky_count: flaky.filter((item) => item.is_new).length,
     most_common_failure_kind: mostCommonFailure ? mostCommonFailure[0] : null,
     window_runs: runOrder.length,
+    failure_kind_totals: failureKindSummary,
   };
 }

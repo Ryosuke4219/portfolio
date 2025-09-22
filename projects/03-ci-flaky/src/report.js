@@ -53,7 +53,64 @@ function buildSparkline(values) {
   return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="spark"><polyline points="${points}" /></svg>`;
 }
 
-export function generateHtmlReport(summary, flaky, runMeta) {
+function normaliseFailureTotals(failureKindTotals) {
+  if (!failureKindTotals) return [];
+  if (failureKindTotals instanceof Map) return [...failureKindTotals.entries()];
+  return Object.entries(failureKindTotals);
+}
+
+function renderFailureDistribution(failureKindTotals) {
+  const entries = normaliseFailureTotals(failureKindTotals).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) {
+    return '<p>No failure kinds recorded.</p>';
+  }
+  const total = entries.reduce((acc, [, count]) => acc + count, 0) || 1;
+  const items = entries
+    .map(([kind, count]) => {
+      const pct = (count / total) * 100;
+      return `
+        <li>
+          <span class="label">${escapeHtml(kind)}</span>
+          <span class="bar"><span style="width: ${pct.toFixed(1)}%"></span></span>
+          <span class="value">${count} (${pct.toFixed(1)}%)</span>
+        </li>`;
+    })
+    .join('');
+  return `<ul class="failure-chart">${items}</ul>`;
+}
+
+function renderFailureDetails(flaky) {
+  const sections = flaky
+    .map((entry, index) => {
+      const latest = entry.latest_failure;
+      if (!latest) return '';
+      const snippet = latest.excerpt || latest.details || '';
+      const signature = latest.failure_signature ? `<p><strong>Signature:</strong> ${escapeHtml(latest.failure_signature)}</p>` : '';
+      const failureKind = latest.failure_kind ? `<p><strong>Failure kind:</strong> ${escapeHtml(latest.failure_kind)}</p>` : '';
+      const message = latest.message ? `<p><strong>Message:</strong> ${escapeHtml(latest.message)}</p>` : '';
+      const runInfo = latest.run_id ? `<p><strong>Run:</strong> ${escapeHtml(latest.run_id)}${latest.ts ? ` (${escapeHtml(latest.ts)})` : ''}</p>` : '';
+      const pre = snippet ? `<pre>${escapeHtml(snippet)}</pre>` : '<p>No failure details captured.</p>';
+      return `
+        <article id="flaky-${index + 1}">
+          <h3>${escapeHtml(entry.canonical_id)}</h3>
+          ${runInfo}
+          ${failureKind}
+          ${signature}
+          ${message}
+          ${pre}
+        </article>`;
+    })
+    .filter(Boolean)
+    .join('\n');
+  if (!sections) return '';
+  return `
+    <section>
+      <h2>Latest Failure Details</h2>
+      ${sections}
+    </section>`;
+}
+
+export function generateHtmlReport(summary, flaky, runMeta, failureKindTotals) {
   const rows = flaky
     .map((entry, index) => {
       const trend = buildSparkline(entry.trend || []);
@@ -61,7 +118,7 @@ export function generateHtmlReport(summary, flaky, runMeta) {
       return `
         <tr>
           <td>${index + 1}</td>
-          <td><code>${escapeHtml(entry.canonical_id)}</code>${entry.is_new ? ' <span class="badge">New</span>' : ''}</td>
+          <td><a href="#flaky-${index + 1}"><code>${escapeHtml(entry.canonical_id)}</code></a>${entry.is_new ? ' <span class="badge">New</span>' : ''}</td>
           <td>${entry.attempts}</td>
           <td>${entry.passes}</td>
           <td>${entry.fails}</td>
@@ -89,6 +146,9 @@ export function generateHtmlReport(summary, flaky, runMeta) {
     .map((meta) => `<li>${escapeHtml(meta.run_id)} — ${meta.ts ? escapeHtml(meta.ts) : 'unknown'}</li>`)
     .join('\n');
 
+  const failureDistribution = renderFailureDistribution(failureKindTotals);
+  const failureDetails = renderFailureDetails(flaky);
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -109,6 +169,17 @@ export function generateHtmlReport(summary, flaky, runMeta) {
     .spark { width: 120px; height: 40px; stroke: #3b82f6; stroke-width: 2; fill: none; }
     .run { background: #e2e8f0; border-radius: 0.4rem; padding: 0.1rem 0.4rem; margin: 0 0.1rem; display: inline-block; font-size: 0.75rem; }
     footer { margin-top: 3rem; font-size: 0.85rem; color: #64748b; }
+    .failure-card { flex: 1 1 260px; }
+    .failure-chart { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+    .failure-chart li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+    .failure-chart .label { flex: 0 0 140px; font-weight: 600; }
+    .failure-chart .bar { flex: 1; background: #e2e8f0; border-radius: 999px; overflow: hidden; height: 0.6rem; }
+    .failure-chart .bar span { display: block; height: 100%; background: #6366f1; }
+    .failure-chart .value { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    section article { background: #fff; border-radius: 0.75rem; padding: 1rem 1.25rem; margin-bottom: 1rem; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06); }
+    pre { background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.85rem; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -125,6 +196,10 @@ export function generateHtmlReport(summary, flaky, runMeta) {
       <ol>
         ${runList}
       </ol>
+    </div>
+    <div class="card failure-card">
+      <h2>Failure kinds</h2>
+      ${failureDistribution}
     </div>
   </section>
 
@@ -154,6 +229,7 @@ export function generateHtmlReport(summary, flaky, runMeta) {
       </tbody>
     </table>
   </section>
+  ${failureDetails}
   <footer>Generated on ${escapeHtml(new Date().toISOString())}</footer>
 </body>
 </html>`;
