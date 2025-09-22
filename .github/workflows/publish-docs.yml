@@ -80,9 +80,21 @@ jobs:
         if: steps.pages_status.outputs.pages_disabled != 'true' && steps.pages_status.outputs.actions_ready == 'true'
         uses: actions/checkout@v4
 
-      - name: Build site with Jekyll
+      - name: Detect build target (Jekyll or plain)
+        id: detect
         if: steps.pages_status.outputs.pages_disabled != 'true' && steps.pages_status.outputs.actions_ready == 'true'
-        uses: actions/jekyll-build@v1
+        run: |
+          if [ -f "docs/_config.yml" ] || ( [ -f "docs/Gemfile" ] && grep -qi "jekyll" "docs/Gemfile" ); then
+            echo "jekyll=1" >> "$GITHUB_OUTPUT"
+            echo "artifact_path=_site" >> "$GITHUB_OUTPUT"
+          else
+            echo "jekyll=0" >> "$GITHUB_OUTPUT"
+            echo "artifact_path=docs" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build site with Jekyll
+        if: steps.pages_status.outputs.pages_disabled != 'true' && steps.pages_status.outputs.actions_ready == 'true' && steps.detect.outputs.jekyll == '1'
+        uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
           destination: ./_site
@@ -91,7 +103,7 @@ jobs:
         if: steps.pages_status.outputs.pages_disabled != 'true' && steps.pages_status.outputs.actions_ready == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
-          path: _site
+          path: ${{ steps.detect.outputs.artifact_path }}
 
       - name: Configure GitHub Pages
         if: steps.pages_status.outputs.pages_disabled != 'true' && steps.pages_status.outputs.actions_ready == 'true'
