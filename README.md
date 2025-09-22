@@ -152,22 +152,34 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 
 ---
 
+## ローカルセットアップ (Local onboarding)
+
+1. `just setup` で Node.js / Python 依存と Playwright ブラウザスタブをまとめて初期化します。
+   * `.cache/` を共有キャッシュとして利用し、npm と pip のダウンロードを再利用します。
+   * `.venv/` に Python 3.11 の仮想環境を自動作成します。
+2. `just test` で CI 相当の検証を一括実行できます。
+   * Node 側: 仕様ケースの検証 → E2E テスト生成 → デモサーバー起動 → Playwright スタブ実行 → JUnit 解析/レポート生成。
+   * Python 側: `projects/04-llm-adapter-shadow` の pytest を実行。
+3. `just lint` / `just report` でワンコマンド lint / カバレッジ計測が可能です。
+
+VS Code Dev Container を利用する場合は `devcontainer.json` の postCreateCommand で自動的に `just setup` が走ります。
+
 ## 環境 (Environment)
 
 * Node: v24.6.0 (fnm)
 * Python: 3.11+ (uv)
 * CI: GitHub Actions
-* Node.js 標準ライブラリのみで動く CLI を採用。`npm run setup`（内部で `npm install` を実行）は Playwright 実行時のみ必要。
+* Node.js 標準ライブラリのみで動く CLI を採用。`just setup`（内部で `npm ci` / `pip install` などを実行）は Playwright 実行時のみ必要。
 
 ## セットアップ & テスト (Setup & Test)
 
-開発環境は VS Code Dev Containers に対応しています。`.devcontainer/devcontainer.json` を利用することで、Node.js と Playwright 拡張が揃った環境が自動構築されます。
+開発環境は VS Code Dev Containers に対応しています。`devcontainer.json` と `.devcontainer/Dockerfile` を利用することで、Node.js と Playwright 拡張が揃った環境が自動構築されます。
 
 ローカル／Dev Container のいずれでも、以下の 2 コマンドで依存関係の導入からテスト実行まで完結します。
 
 ```bash
-npm run setup
-npm test
+just setup
+just test
 ```
 
 ---
