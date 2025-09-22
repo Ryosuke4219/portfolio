@@ -11,8 +11,11 @@
     "spec:run": "node projects/01-spec2cases/scripts/run_cases.mjs",
     "e2e:gen": "node projects/02-llm-to-playwright/scripts/blueprint_to_code.mjs projects/02-llm-to-playwright/blueprint.sample.json",
     "test": "playwright test -c projects/02-llm-to-playwright/playwright.config.ts",
-    "ci:analyze": "node projects/03-ci-flaky/scripts/analyze-junit.mjs",
-    "ci:issue": "node projects/03-ci-flaky/scripts/create-issue.mjs"
+    "ci:analyze": "node projects/03-ci-flaky/scripts/flaky.mjs analyze",
+    "ci:issue": "node projects/03-ci-flaky/scripts/flaky.mjs issue"
+  },
+  "bin": {
+    "flaky": "./projects/03-ci-flaky/scripts/flaky.mjs"
   },
   "dependencies": {
     "fast-xml-parser": "file:packages/fast-xml-parser"
