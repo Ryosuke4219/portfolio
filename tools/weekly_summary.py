@@ -186,35 +186,77 @@ def week_over_week_notes(current_rows: List[dict], previous_rows: List[dict]) ->
     return entered, exited
 
 
-def fallback_write(out_path: Path, today: dt.date) -> None:
+def build_front_matter(today: dt.date, days: int) -> List[str]:
+    return [
+        "---",
+        "layout: default",
+        f"title: Weekly QA Summary — {today.isoformat()}",
+        f"description: 直近{days}日間のQA状況サマリ",
+        "---",
+        "",
+    ]
+
+
+def ensure_front_matter(lines: List[str], today: dt.date, days: int) -> List[str]:
+    stripped = list(lines)
+    if stripped and stripped[0] == "---":
+        try:
+            closing = stripped.index("---", 1)
+        except ValueError:
+            stripped = stripped[1:]
+        else:
+            stripped = stripped[closing + 1 :]
+        while stripped and stripped[0] == "":
+            stripped.pop(0)
+    return build_front_matter(today, days) + stripped
+
+
+def fallback_write(out_path: Path, today: dt.date, days: int) -> None:
     if out_path.exists():
         existing = out_path.read_text(encoding="utf-8").splitlines()
-        if existing:
-            existing[0] = f"# Weekly QA Summary — {today.isoformat()}"
-            out_path.write_text("\n".join(existing) + "\n", encoding="utf-8")
-            return
-    placeholder = [
-        f"# Weekly QA Summary — {today.isoformat()}",
-        "",
-        "## Overview (last 7 days)",
-        "- TotalTests: 0",
-        "- PassRate: N/A",
-        "- NewDefects: 0",
-        "- TopFailureKinds: -",
-        "",
-        "## Top Flaky (score)",
-        "| Rank | Canonical ID | Attempts | p_fail | Score |",
-        "|-----:|--------------|---------:|------:|------:|",
-        "| - | データなし | 0 | 0.00 | 0.00 |",
-        "",
-        "## Notes",
-        "- データソースが見つからなかったため前回出力を保持しました。",
-        "",
-        "<details><summary>Method</summary>",
-        "データソース: runs.jsonl, flaky_rank.csv / 期間: 直近7日 / 再計算: 毎週月曜 09:00 JST",
-        "</details>",
-    ]
-    out_path.write_text("\n".join(placeholder) + "\n", encoding="utf-8")
+    else:
+        existing = []
+
+    if not existing:
+        placeholder = [
+            f"# Weekly QA Summary — {today.isoformat()}",
+            "",
+            f"## Overview (last {days} days)",
+            "- TotalTests: 0",
+            "- PassRate: N/A",
+            "- NewDefects: 0",
+            "- TopFailureKinds: -",
+            "",
+            "## Top Flaky (score)",
+            "| Rank | Canonical ID | Attempts | p_fail | Score |",
+            "|-----:|--------------|---------:|------:|------:|",
+            "| - | データなし | 0 | 0.00 | 0.00 |",
+            "",
+            "## Notes",
+            "- データソースが見つからなかったため前回出力を保持しました。",
+            "",
+            "<details><summary>Method</summary>",
+            "データソース: runs.jsonl, flaky_rank.csv / 期間: 直近7日 / 再計算: 毎週月曜 09:00 JST",
+            "</details>",
+            "",
+        ]
+        out_path.write_text(
+            "\n".join(build_front_matter(today, days) + placeholder) + "\n",
+            encoding="utf-8",
+        )
+        return
+
+    updated = ensure_front_matter(existing, today, days)
+    title_line = f"# Weekly QA Summary — {today.isoformat()}"
+    for idx, line in enumerate(updated):
+        if line.startswith("# Weekly QA Summary"):
+            updated[idx] = title_line
+            break
+    else:
+        updated.append(title_line)
+        updated.append("")
+
+    out_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
 
 
 def main() -> None:
@@ -223,7 +265,7 @@ def main() -> None:
     today = dt.datetime.now(dt.timezone.utc).date()
 
     if not args.runs.exists() or not args.flaky.exists():
-        fallback_write(out_path, today)
+        fallback_write(out_path, today, args.days)
         return
 
     runs = load_runs(args.runs)
@@ -324,7 +366,8 @@ def main() -> None:
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(markdown_lines), encoding="utf-8")
+    content = build_front_matter(today, args.days) + markdown_lines
+    out_path.write_text("\n".join(content) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":  # pragma: no cover

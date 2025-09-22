@@ -4,15 +4,20 @@
 [![Lint](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint)](https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml)
 [![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
 
+> QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines.
+
+- **Website:** <https://ryosuke4219.github.io/portfolio/>
+- **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
+
 ---
 
 ## 概要 (Overview)
 
-QA × SDET × LLM を軸にした実践的ポートフォリオ。
-小さく完結した自動化パイプラインやLLM活用のPoCを公開しています。
+QA × SDET × LLM を軸にした実践的ポートフォリオで、テスト自動化やLLM活用のPoCを継続的に追加していきます。
+GitHub Pages の [Portfolio Gallery](docs/index.md) では週次サマリと成果物を常時公開しています。
 
 Practical portfolio focusing on **QA × SDET × LLM**.
-This repository showcases small, complete automation pipelines and PoCs for integrating LLMs into QA/SDET workflows.
+New automation pipelines and LLM-driven PoCs are published regularly, with a persistent [Portfolio Gallery](docs/index.md) available via GitHub Pages.
 
 ---
 
@@ -149,6 +154,14 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 * “Minimal”の範囲は**観測（差分収集）×影実行×障害注入×単段フォールバック**に限定。
 * リトライ／指数バックオフ／多段フォールバック／詳細コスト集計は**将来拡張**として棚上げ。
 * 詳細は `projects/04-llm-adapter-shadow/README.md` を参照。
+
+---
+
+## リリース (Releases)
+
+- GitHub Releases でマイルストーン単位の成果をタグ付けします。
+- 例: `v0.1 – 初期プロジェクト群`, `v0.2 – flaky検出＋週次サマリ`, `v0.3 – LLMアダプタ（shadow/fallback）最小版`。
+- 変更点サマリ・テスト状況・関連ドキュメントへのリンクを添えて公開することで、初見でも進化の軌跡をたどれるようにします。
 
 ---
 
