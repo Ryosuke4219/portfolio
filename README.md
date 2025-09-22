@@ -14,7 +14,7 @@
 ## 概要 (Overview)
 
 QA × SDET × LLM を軸にした実践的ポートフォリオで、テスト自動化やLLM活用のPoCを継続的に追加していきます。
-GitHub Pages の [Portfolio Gallery](docs/index.md) では週次サマリと成果物を常時公開しています。
+GitHub Pages の [Portfolio Gallery](docs/index.md) ではサマリと成果物を常時公開しています。
 
 Practical portfolio focusing on **QA × SDET × LLM**.
 New automation pipelines and LLM-driven PoCs are published regularly, with a persistent [Portfolio Gallery](docs/index.md) available via GitHub Pages.
@@ -23,15 +23,17 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
 ## プロジェクト一覧 (Projects)
 
-1. **仕様書テキスト → 構造化テストケース → CLIで自動実行**
+1. **仕様書テキスト → 構造化テストケース → CLIで自動実行** 【決定的生成】
 
-   * 仕様からテストを起こし、CIで回すパイプラインの最小例。
+   * 確定した仕様から**機械的にテストケースを生成**し、CIで回す最小パイプライン。
+   * 人手が介在しないため再現性が高く、決定的（deterministic）な結果を得られる。
    * *Convert plain-text specs into structured test cases, execute automatically via CLI and CI pipeline.*
 
-2. **要件定義・受け入れ基準をLLMで拡張 → PlaywrightのE2Eテスト自動生成PoC**
+2. **要件定義・受け入れ基準をLLMで拡張 → PlaywrightのE2Eテスト自動生成PoC** 【HITL支援】
 
-   * LLMを用いてテスト設計を支援、E2Eテスト作成を効率化。
-   * *Leverage LLM to expand acceptance criteria and generate Playwright-based E2E tests.*
+   * LLMを使って**受け入れ基準（AC）の補足・拡張を支援**し、E2Eテスト雛形を自動生成。  
+   * 要件定義の代替ではなく、人間のレビュー（HITL）を前提とした“効率化PoC”。  
+   * *Leverage LLM to expand acceptance criteria and generate Playwright-based E2E tests (HITL-oriented PoC).*
 
 3. **CIログ解析 → 不安定テストの検知・再実行・タグ付け/自動起票**
 
