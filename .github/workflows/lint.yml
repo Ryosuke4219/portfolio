@@ -1,0 +1,39 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Check JavaScript modules
+        run: |
+          set -euo pipefail
+          files=$(find . -type f \( -name '*.mjs' -o -name '*.js' \))
+          if [ -z "$files" ]; then
+            echo "No JavaScript modules found"
+          else
+            for file in $files; do
+              echo "Checking $file"
+              node --check "$file"
+            done
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Python modules
+        run: |
+          python -m compileall projects/04-llm-adapter-shadow
