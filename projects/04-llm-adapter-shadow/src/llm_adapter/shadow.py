@@ -86,9 +86,13 @@ def run_with_shadow(
 
         if metrics_path_str:
             primary_text_len = len(primary_res.text)
-            request_fingerprint = content_hash("runner", req.prompt, req.options)
+            request_fingerprint = content_hash(
+                "runner", req.prompt, req.options, req.max_tokens
+            )
             record: Dict[str, Any] = {
-                "request_hash": content_hash(primary.name(), req.prompt, req.options),
+                "request_hash": content_hash(
+                    primary.name(), req.prompt, req.options, req.max_tokens
+                ),
                 "request_fingerprint": request_fingerprint,
                 "primary_provider": primary.name(),
                 "primary_latency_ms": primary_res.latency_ms,
