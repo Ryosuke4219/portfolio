@@ -12,3 +12,7 @@ projects/02-llm-to-playwright/tests/generated
 projects/01-spec2cases/cases.generated.json
 junit-results.xml
 database.json
+.venv
+.cache
+coverage.xml
+coverage/
