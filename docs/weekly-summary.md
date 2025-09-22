@@ -1,3 +1,9 @@
+---
+layout: default
+title: Weekly QA Summary — 2025-09-22
+description: 直近7日間のQA状況サマリ
+---
+
 # Weekly QA Summary — 2025-09-22
 
 ## Overview (last 7 days)
@@ -28,3 +34,4 @@
 期間: 直近7日 / 比較対象: その前の7日
 再計算: 毎週月曜 09:00 JST (GitHub Actions)
 </details>
+

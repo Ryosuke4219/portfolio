@@ -1,0 +1,19 @@
+title: QA × SDET × LLM Portfolio
+lang: ja
+timezone: Asia/Tokyo
+description: QAエンジニアリングとLLM活用の成果物をまとめたポートフォリオ
+url: https://ryosuke4219.github.io
+baseurl: /portfolio
+theme: jekyll-theme-cayman
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: default
+markdown: kramdown
+include:
+  - _includes
