@@ -1,0 +1,63 @@
+name: バグレポート
+description: 問題を取り上げて修正へのインパクトを示します
+labels: [bug]
+title: "[Bug]: 問題概要を記述"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        以下のフォーマットに従い、内容を詳しく記述してください。内容は未来のレポート自動生成へ直接影響します。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 不具合の概要
+      description: 短くわかりやすくお書きください
+      placeholder: 例) トップページでナビゲーションが見えない
+      validations:
+        required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 再現手順
+      description: 再現に必要な歩数を整理します
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する挙動
+      description: どのような結果を期待していたかを記述
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 画像・ログ
+      description: 診断に役立つスクリーンショットやログを追加
+    validations:
+      required: false
+  - type: dropdown
+    id: impact
+    attributes:
+      label: ビジネスへの影響
+      description: 件の重大度を選択
+      options:
+        - プロダクト停止レベル
+        - 多くのユーザーに影響
+        - 少数ユーザーへの限定的な影響
+        - 内部チームに限定
+    validations:
+      required: true
+  - type: checkboxes
+    id: safeguards
+    attributes:
+      label: 保守安全性への配慮
+      description: 安全上の必要項目を確認
+      options:
+        - label: 権限や機密情報が漏えないように安全な再現手順にしている
+        - label: 再現情報に個人情報を含まない
+    validations:
+      required: true

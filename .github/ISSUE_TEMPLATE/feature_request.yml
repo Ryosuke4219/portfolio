@@ -1,0 +1,47 @@
+name: 機能提案
+description: ユーザー価値を上げるための改善提案を記入します
+labels: [enhancement]
+title: "[Feature]: 提案概要を記述"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        プロダクトの価値を明確にできるよう、ひと通りの参考情報をお書きください。
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 触発要因
+      description: なぜその改善が不可欠なのか
+      placeholder: 例) 週次レポートを自動化したい
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: ユーザー価値
+      description: 提案によって得られる価値や投資対効果を説明
+      placeholder: 例) タスク間の要素を可視化できる
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 展開範囲
+      description: MVPの要件やスコープ外事項について記述
+      placeholder: |
+        必須: ...
+        活用するコンポーネント: ...
+        除外: ...
+    validations:
+      required: true
+  - type: checkboxes
+    id: signals
+    attributes:
+      label: 成功サイン
+      description: 成功を判断する指標を整理
+      options:
+        - label: KPI / KGI に連動されたメトリクスが存在する
+        - label: ユーザーストーリーなど運用計画まで想定している
+        - label: 安全と保守性に配慮し、将来の再利用性を高める
+    validations:
+      required: true
