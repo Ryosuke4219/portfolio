@@ -1,9 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { SPEC2CASES_SAMPLE_CASES_PATH } from '../../../scripts/paths.mjs';
 
 const args = process.argv.slice(2);
 if (!args.length) {
@@ -33,7 +30,7 @@ for (let i = 0; i < args.length; i += 1) {
   process.exit(2);
 }
 
-const defaultCasesPath = path.join(__dirname, '../cases.sample.json');
+const defaultCasesPath = SPEC2CASES_SAMPLE_CASES_PATH;
 const resolvedCasesPath = casesPath ? path.resolve(process.cwd(), casesPath) : defaultCasesPath;
 
 if (!fs.existsSync(resolvedCasesPath)) {

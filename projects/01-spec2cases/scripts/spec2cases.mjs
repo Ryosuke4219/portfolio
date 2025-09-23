@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-// __dirname for ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { SPEC2CASES_SAMPLE_CASES_PATH } from '../../../scripts/paths.mjs';
 
 function usage() {
   console.error('Usage: node spec2cases.mjs <input.(json|txt|md)> [output.json]');
-  console.error('       (no args) -> defaults to ../cases.sample.json');
+  console.error(`       (no args) -> defaults to ${SPEC2CASES_SAMPLE_CASES_PATH}`);
 }
 
 function readFile(filePath) {
@@ -268,10 +264,11 @@ function main(argv) {
 
   // Default to sample file if no input provided (retains main-branch behavior)
   if (!inputPath) {
-    const sample = path.join(__dirname, '../cases.sample.json');
-    if (fs.existsSync(sample)) {
-      console.log(`ℹ️  No path provided. Defaulting to sample cases: ${sample}`);
-      inputPath = sample;
+    if (fs.existsSync(SPEC2CASES_SAMPLE_CASES_PATH)) {
+      console.log(
+        `ℹ️  No path provided. Defaulting to sample cases: ${SPEC2CASES_SAMPLE_CASES_PATH}`,
+      );
+      inputPath = SPEC2CASES_SAMPLE_CASES_PATH;
     } else {
       usage();
       process.exit(2);

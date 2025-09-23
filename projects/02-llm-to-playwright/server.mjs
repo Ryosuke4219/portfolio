@@ -3,8 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import url from 'url';
 
+import { LLM2PW_DEMO_DIR } from '../../scripts/paths.mjs';
+
 const port = Number(process.env.PORT || 4173);
-const rootDir = path.resolve(process.cwd(), 'projects/02-llm-to-playwright/demo');
+const rootDir = LLM2PW_DEMO_DIR;
 
 const mimeTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
