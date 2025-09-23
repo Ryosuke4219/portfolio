@@ -4,6 +4,63 @@ title: Portfolio Hub
 description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯瞰できるポータル
 ---
 
+<style>
+  .page-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin: 1.5rem 0 2rem;
+    padding: 1rem 1.5rem;
+    background: rgba(15, 76, 129, 0.08);
+    border: 1px solid rgba(15, 76, 129, 0.12);
+    border-radius: 0.75rem;
+  }
+
+  .page-nav ul {
+    display: contents;
+  }
+
+  .page-nav li {
+    list-style: none;
+  }
+
+  .page-nav a {
+    font-weight: 600;
+    color: #0f4c81;
+    text-decoration: none;
+  }
+
+  .page-nav a:focus,
+  .page-nav a:hover {
+    text-decoration: underline;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .page-nav {
+      background: rgba(124, 196, 255, 0.12);
+      border-color: rgba(124, 196, 255, 0.32);
+    }
+
+    .page-nav a {
+      color: #7cc4ff;
+    }
+  }
+</style>
+
+<nav class="page-nav" aria-label="ページ内ナビゲーション">
+  <ul>
+    <li><a href="#demos">Demos</a></li>
+    <li><a href="#demo-01">Demo 01</a></li>
+    <li><a href="#demo-02">Demo 02</a></li>
+    <li><a href="#demo-03">Demo 03</a></li>
+    <li><a href="#demo-04">Demo 04</a></li>
+    <li><a href="#ci-metrics-trend">CI Metrics</a></li>
+    <li><a href="#weekly-summary">Weekly Summary</a></li>
+    <li><a href="#evidence-library">Evidence Library</a></li>
+    <li><a href="#operations-notes">運用メモ</a></li>
+  </ul>
+</nav>
+
 > [English version]({{ '/en/' | relative_url }})
 
 
@@ -11,7 +68,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 >
 > 🚀 Fresh CI signals in English: [JUnit digest]({{ '/reports/junit/index.html' | relative_url }}) / [Flaky leaderboard]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage dashboard]({{ '/reports/coverage/index.html' | relative_url }})
 
-# Demos
+# Demos {#demos}
 
 <div class="demo-grid">
   <article class="demo-card" id="demo-01">
@@ -67,11 +124,11 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
   </article>
 </div>
 
-## CI Metrics Trend
+## CI Metrics Trend {#ci-metrics-trend}
 
 ![CI pass rate and flaky trend]({{ '/assets/metrics/ci-pass-rate-flaky.svg' | relative_url }})
 
-## Weekly Summary
+## Weekly Summary {#weekly-summary}
 
 {% include weekly-summary-card.md %}
 
@@ -98,7 +155,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 
 [週次サマリの一覧を見る &rarr;]({{ '/weekly-summary.html' | relative_url }})
 
-## Evidence Library
+## Evidence Library {#evidence-library}
 
 - [QA Evidence Catalog](./evidence/README.md)
 - [テスト計画書](./test-plan.md)
