@@ -26,6 +26,16 @@
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
 
+### Quick glance (EN)
+
+Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuously published via GitHub Pages.
+
+- `just setup` — Initialize Node.js/Python dependencies and Playwright stubs.
+- `just test` — Execute combined regression across Node and Python projects.
+- `just lint` — Run JavaScript linting and Python bytecode validation.
+- `just report` — Generate pytest coverage reports for the Python adapter.
+- GitHub Pages: <https://ryosuke4219.github.io/portfolio/>
+
 > [!TIP] Quick Start
 > `just setup` — Node.js / Python 依存と Playwright スタブを初期化します。
 > `just test` — Node＋Python の回帰テストを一括で実行します。
@@ -252,6 +262,6 @@ just test
 
 * 各プロジェクトのサンプルコードを追加
 * メトリクスや成果（工数削減、安定化率など）をREADME内に明記
-* 英語READMEやデモ動画を追加予定
+* 英語ツアー動画と GitHub Pages での追加デモを整備
 
-*Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and prepare an English-only README + demo video in the future.*
+*Add more sample code for each project, include metrics/results (e.g., effort reduction, stability rate), and produce English walkthrough videos plus extra demos on GitHub Pages.*
