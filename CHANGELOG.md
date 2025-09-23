@@ -13,6 +13,22 @@
 ### Fixed
 - 修正予定があればここに追記します。
 
+## [v1.0.0] - 2025-09-23
+
+### Highlights
+- **Demo 01 – Spec to Cases**
+  - Markdown 仕様書から JSON テストケースを生成し、スキーマ検証と type-preserving 変換で品質を担保する CLI を整備。
+  - スモールスタート向けにサンプル spec / cases と検証・実行スクリプトを同梱し、即座にパイプラインを再現可能に。
+- **Demo 02 – LLM to Playwright**
+  - LLM が受け入れ基準を補完した Blueprint から Playwright テストを自動生成し、data-testid ベースの堅牢なセレクタ戦略を実装。
+  - CSV/JSON ドライバによるデータ駆動テストと a11y スキャンを統合し、スタブランナーで決定的な E2E 実行を再現。
+- **Demo 03 – CI Flaky Analyzer**
+  - JUnit XML をストリーミング解析して履歴 JSONL を構築し、HTML・CSV・JSON のマルチフォーマットレポートを一括生成。
+  - GitHub Issue テンプレートと週次サマリを自動出力し、CI での flaky 検知と追跡をワンコマンド化。
+- **Demo 04 – LLM Adapter — Shadow Execution**
+  - プライマリ応答と並走する影プロバイダの差分をメトリクス収集し、JSONL に蓄積するシャドー実行アダプタを実装。
+  - タイムアウト／レート制限／形式不正などの障害注入とフォールバック鎖をモックで再現し、pytest で検証。
+
 ## [v0.1] - 2025-09-23
 
 ### Added
