@@ -6,31 +6,49 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: '20 14 * * 1'
+    - cron: '20 14 * * 1'  # Mon 23:20 JST
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
+    name: Analyze
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
       security-events: write
+      actions: read
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript', 'python' ]
+        language: [ "javascript-typescript" ]  # adjust if you add other languages
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Optional: setup Node if your repo needs install/build for better analysis quality
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+        continue-on-error: true
+
+      # - run: npm ci  # uncomment if your analysis benefits from deps
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
