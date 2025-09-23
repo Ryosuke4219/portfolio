@@ -4,6 +4,8 @@ title: LLM to Playwright
 description: 受け入れ基準を拡張して自動生成 Playwright テストへ落とし込む PoC のハイライト
 ---
 
+> [English version]({{ '/en/evidence/llm2pw.html' | relative_url }})
+
 # LLM to Playwright
 
 要求仕様の文章を LLM が補完し、Playwright テストコードへ自動変換する PoC です。堅牢なセレクタ戦略と a11y スキャン、データ駆動実行を最小構成で確認できます。

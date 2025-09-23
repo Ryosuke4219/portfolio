@@ -24,3 +24,5 @@
 - テスト計画: `../docs/test-plan.md`
 - 欠陥レポ例: `../docs/defect-report-sample.md`
 - 週次サマリ: `../docs/weekly-summary.md`
+
+> [English version]({{ '/en/evidence/README.html' | relative_url }})

@@ -4,11 +4,7 @@ title: Portfolio Hub
 description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯瞰できるポータル
 ---
 
-<div class="button-group">
-  <a class="button button--github" href="https://github.com/Ryosuke4219/portfolio" target="_blank" rel="noopener">GitHub Repository</a>
-  <a class="button button--evidence" href="{{ '/evidence/README.md' | relative_url }}">Evidence Catalog</a>
-  <a class="button button--weekly" href="{{ '/weekly-summary.html' | relative_url }}">週次サマリ</a>
-</div>
+> [English version]({{ '/en/' | relative_url }})
 
 
 > 🔎 最新CIレポート: [JUnit要約]({{ '/reports/junit/index.html' | relative_url }}) / [Flakyランキング]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage HTML]({{ '/reports/coverage/index.html' | relative_url }})
