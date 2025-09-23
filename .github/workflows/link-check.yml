@@ -1,29 +1,39 @@
 name: Link Check
 
 on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
   pull_request:
   schedule:
-    - cron: '0 1 * * 1'
-  workflow_dispatch:
+    - cron: '0 1 * * 1' # 毎週月曜 01:00 UTC（日本時間: 月曜10:00）
+
+permissions:
+  contents: read
 
 jobs:
-  link-check:
+  lychee:
+    name: Run lychee link checker
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Run lychee link checker
-        id: lychee
-        uses: lycheeverse/lychee-action@v1
+      - name: Run lychee
+        uses: lycheeverse/lychee-action@v1.8.0
         with:
           args: >-
             --verbose
             --no-progress
-            --exclude [{]{2}[^}]*relative_url[^}]*[}]{2}
+            --exclude '\{\{[^}]*relative_url[^}]*\}\}'
+            --exclude-file .lycheeignore
             README.md
-            docs/
+            docs/**/*.md
+            projects/**/*.md
           fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload lychee report
         if: failure()

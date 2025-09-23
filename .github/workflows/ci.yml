@@ -60,6 +60,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Python
+        if: always()
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        if: always()
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r projects/04-llm-adapter-shadow/requirements.txt
+
+      - name: Run pytest with coverage HTML
+        if: always()
+        run: |
+          pytest \
+            --cov=projects/04-llm-adapter-shadow \
+            --cov-report=xml:projects/04-llm-adapter-shadow/coverage.xml \
+            --cov-report=html:projects/04-llm-adapter-shadow/htmlcov \
+            --cov-report=term-missing \
+            projects/04-llm-adapter-shadow/tests
+
       - name: Upload artifacts (JUnit, DB, raw results)
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,3 +91,14 @@ jobs:
             junit-results.xml
             database.json
             test-results/**
+
+      - name: Build CI reports bundle
+        if: always()
+        run: node scripts/build-ci-reports.mjs
+
+      - name: Upload CI reports for Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v4
+        with:
+          name: ci-reports
+          path: reports
