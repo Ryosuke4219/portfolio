@@ -1,5 +1,12 @@
+> ℹ️ 事前準備とチェックリストは [CONTRIBUTING.md](../CONTRIBUTING.md) を参照してください。
+
+## 事前チェック / Pre-flight Checklist
+- [ ] `just lint`
+- [ ] `just test`
+- [ ] `just report`（Python を変更した場合）
+
 ## 変更概要 / Summary of Changes
-- 
+-
 
 ## テスト結果 / Test Results
 - [ ] テスト未実施 / Not run

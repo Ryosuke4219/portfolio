@@ -47,6 +47,7 @@ Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuous
 > `just report` — Python プロジェクトのテスト＋カバレッジレポートを生成します。
 >
 > ✅ 詳細手順は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) を参照してください。
+> 🤝 コントリビューション規約と PR チェックリストは [CONTRIBUTING.md](./CONTRIBUTING.md) にまとまっています。
 
 ---
 
@@ -241,6 +242,8 @@ Quick Start で触れた `just` コマンドを詳しく説明します。セッ
 3. `just lint` / `just report` でワンコマンド lint / カバレッジ計測が可能です。
 
 VS Code Dev Container を利用する場合は `devcontainer.json` の postCreateCommand で自動的に `just setup` が走ります。
+
+より詳細な手順や PR 前チェックリスト、ブランチ運用ポリシーは [CONTRIBUTING.md](./CONTRIBUTING.md) を参照してください。
 
 ## 環境 (Environment)
 
