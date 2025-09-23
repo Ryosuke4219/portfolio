@@ -47,7 +47,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
 ### 1. 仕様書テキスト → 構造化テストケース → CLIで自動実行
 
-* `projects/01-spec2cases/spec.sample.md` のような Markdown からテストケース JSON を生成。
+* `docs/examples/spec2cases/spec.sample.md` のような Markdown からテストケース JSON を生成。
 
   ```bash
   npm run spec:generate
@@ -69,7 +69,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
 ### 2. LLM設計 → Playwright E2E テスト自動生成
 
-* `projects/02-llm-to-playwright/blueprint.sample.json` をもとにテストコードを自動生成。
+* `docs/examples/llm2pw/blueprint.sample.json` をもとにテストコードを自動生成。
 
   ```bash
   npm run e2e:gen
