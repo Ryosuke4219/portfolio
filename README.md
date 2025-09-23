@@ -3,6 +3,7 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
 [![Lint](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint)](https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml)
 [![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
+[![Release](https://img.shields.io/github/v/release/Ryosuke4219/portfolio?display_name=tag&sort=semver)](https://github.com/Ryosuke4219/portfolio/releases)
 [![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest.html)
 
 <!-- qa-metrics:start -->
@@ -30,6 +31,7 @@
 - **行動規範:** [Contributor Covenant v2.1](CODE_OF_CONDUCT.md)
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
+- **Quick Start:** `just setup && just test && just report`
 
 ### Quick glance (EN)
 
@@ -86,6 +88,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
    * *Minimal adapter showcasing shadow execution (metrics-only background run) and deterministic error-case fallbacks.*
 
 ### 1. 仕様書テキスト → 構造化テストケース → CLIで自動実行
+[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 * `docs/examples/spec2cases/spec.sample.md` のような Markdown からテストケース JSON を生成。
 
@@ -110,6 +113,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 → 詳細: [Spec2Cases CLI README](projects/01-spec2cases/README.md)
 
 ### 2. LLM設計 → Playwright E2E テスト自動生成
+[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 * `docs/examples/llm2pw/blueprint.sample.json` をもとにテストコードを自動生成。
 
@@ -132,6 +136,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 → 詳細: [LLM → Playwright Pipeline README](projects/02-llm-to-playwright/README.md)
 
 ### 3. CI ログ解析と flaky テスト検出
+[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 * JUnit XML を解析して履歴 DB (`database.json`) を更新。
 
@@ -154,6 +159,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 → 詳細: [Flaky Analyzer CLI README](projects/03-ci-flaky/README.md)
 
 ### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
+[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 **概要**
 プライマリの応答はそのまま返しつつ、同一プロンプトを**別プロバイダで影（shadow）実行**して差分メトリクスを**JSONL**に収集。`TIMEOUT / RATELIMIT / INVALID_JSON` は**障害注入**（モック／ラッパ）で再現し、**フォールバックの連鎖**を最小構成で検証できる。
