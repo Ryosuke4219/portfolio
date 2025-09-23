@@ -13,6 +13,7 @@
 | 最終更新 | 2025-09-23T05:31:45Z |
 | レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest.html) |
 
+
 <!-- qa-metrics:end -->
 <sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
 
