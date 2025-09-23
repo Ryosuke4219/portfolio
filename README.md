@@ -2,8 +2,9 @@
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
 [![Lint](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint)](https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://ryosuke4219.github.io/portfolio/reports/coverage/badge.json)](https://ryosuke4219.github.io/portfolio/reports/coverage/index.html)
-[![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest)
+[![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
+[![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest.html)
+
 
 <!-- qa-metrics:start -->
 | 指標 | 値 |
@@ -11,7 +12,7 @@
 | Pass Rate | 40.00% (2/5) |
 | Top Flaky | 1. ui-e2e.LoginFlow.spec.should show error for invalid user (score 0.71)<br/>2. ui-e2e.LoginFlow.spec.should login with valid user (score 0.58)<br/>3. api-report.ReportJob.test.generates flaky summary (score 0.46) |
 | 最終更新 | 2025-09-21T03:44:09Z |
-| レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest/) |
+| レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest.html) |
 
 <!-- qa-metrics:end -->
 <sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
@@ -177,6 +178,13 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 ---
 
 ## リリース (Releases)
+
+リリース作業は [Issue #2](https://github.com/Ryosuke4219/portfolio/issues/2) を親チケットとして運用します。各マイルストーンで実施する手順は次のとおりです。
+
+1. `CHANGELOG.md` の `Unreleased` セクションに直近の変更点を箇条書きで集約する。
+2. Issue #2 で対象バージョンを宣言し、`Unreleased` の内容を新しいバージョンセクション（例: `v0.2 - 2025-10-xx`）へ移動して日付を確定する。
+3. リリース PR では上記変更とテスト結果をあわせて共有し、マージ後に Git タグと GitHub Release を作成する。
+4. 次サイクルのために `Unreleased` セクションを空にしておく。
 
 - GitHub Releases でマイルストーン単位の成果をタグ付けします。
 - 例: `v0.1 – 初期プロジェクト群`, `v0.2 – flaky検出＋週次サマリ`, `v0.3 – LLMアダプタ（shadow/fallback）最小版`。
