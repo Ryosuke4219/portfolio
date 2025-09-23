@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="playwright-stub" tests="6" failures="0" time="0.002">
+  <testcase classname="generated" name="data-driven login — happy path" time="0.001"/>
+  <testcase classname="generated" name="data-driven login — invalid password" time="0.000"/>
+  <testcase classname="generated" name="dashboard visual smoke snapshot" time="0.000"/>
+  <testcase classname="generated" name="axe accessibility scan — Login" time="0.001"/>
+  <testcase classname="generated" name="axe accessibility scan — Dashboard" time="0.000"/>
+  <testcase classname="generated" name="axe accessibility scan — Invalid credentials" time="0.000"/>
+</testsuite>
