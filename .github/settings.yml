@@ -5,6 +5,8 @@ repository:
     - qa
     - sdet
     - playwright
-    - testing
     - llm
-    - ci
+    - pytest
+    - github-actions
+    - devcontainers
+    - codeql
