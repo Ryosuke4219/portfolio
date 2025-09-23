@@ -3,7 +3,7 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
 [![Lint](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint)](https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml)
 [![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
-[![Release](https://img.shields.io/github/v/release/Ryosuke4219/portfolio?display_name=tag&sort=semver)](https://github.com/Ryosuke4219/portfolio/releases/tag/v1.0.0)
+[![Release](https://img.shields.io/github/v/release/Ryosuke4219/portfolio?display_name=tag&sort=semver)](https://github.com/Ryosuke4219/portfolio/releases)
 [![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest.html)
 
 <!-- qa-metrics:start -->
@@ -216,7 +216,7 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 
 ## リリース (Releases)
 
-- 最新: [v1.0.0 – ポートフォリオ統合リリース](https://github.com/Ryosuke4219/portfolio/releases/tag/v1.0.0)
+- 最新: [v1.0.0 – ポートフォリオ統合リリース](docs/releases/v1.0.0.md) — [GitHub Releases 一覧](https://github.com/Ryosuke4219/portfolio/releases)
 
 ### マイルストーン一覧
 
