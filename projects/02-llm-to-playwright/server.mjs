@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import url from 'url';
 
-const port = Number(process.env.PORT || 4173);
-const rootDir = path.resolve(process.cwd(), 'docs/examples/llm2pw/demo');
+import { LLM2PW_DEMO_DIR } from '../../scripts/paths.mjs';
 
+const port = Number(process.env.PORT || 4173);
 const mimeTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'],

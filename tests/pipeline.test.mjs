@@ -9,6 +9,10 @@ import { spawnSync } from 'child_process';
 import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases/scripts/spec2cases.mjs';
 import { generateTestsFromBlueprint } from '../projects/02-llm-to-playwright/scripts/blueprint_to_code.mjs';
 import { analyzeJUnitReport } from '../projects/03-ci-flaky/scripts/analyze-junit.mjs';
+import {
+  LLM2PW_SAMPLE_BLUEPRINT_PATH,
+  SPEC2CASES_SAMPLE_SPEC_TXT_PATH,
+} from '../scripts/paths.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,8 +23,6 @@ function readJson(filePath) {
 }
 
 test('spec text is converted into structured cases', () => {
-  const specPath = path.join(rootDir, 'docs/examples/spec2cases/spec.sample.txt');
-  const result = parseSpecFile(specPath);
   assert.equal(result.suite, 'ログイン機能');
   assert.equal(result.cases.length, 2);
   assert.deepEqual(result.cases[0].steps, ['ログイン画面にアクセス', 'ID/PWを入力', 'ログインを押下']);
@@ -29,7 +31,6 @@ test('spec text is converted into structured cases', () => {
 });
 
 test('blueprint is rendered into playwright spec files', () => {
-  const blueprint = readJson(path.join(rootDir, 'docs/examples/llm2pw/blueprint.sample.json'));
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'playwright-gen-'));
   const files = generateTestsFromBlueprint(blueprint, tmpDir);
   assert.equal(files.length, blueprint.scenarios.length);

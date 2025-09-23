@@ -1,17 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-// __dirname for ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '../../..');
-const defaultSampleCasesPath = path.join(repoRoot, 'docs/examples/spec2cases/cases.sample.json');
-
-function usage() {
-  console.error('Usage: node spec2cases.mjs <input.(json|txt|md)> [output.json]');
-  console.error(`       (no args) -> defaults to ${defaultSampleCasesPath}`);
 }
 
 function readFile(filePath) {
@@ -270,9 +259,6 @@ function main(argv) {
 
   // Default to sample file if no input provided (retains main-branch behavior)
   if (!inputPath) {
-    if (fs.existsSync(defaultSampleCasesPath)) {
-      console.log(`ℹ️  No path provided. Defaulting to sample cases: ${defaultSampleCasesPath}`);
-      inputPath = defaultSampleCasesPath;
     } else {
       usage();
       process.exit(2);
