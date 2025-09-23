@@ -28,8 +28,8 @@ description: QA × SDET × LLM の成果物と週次サマリをまとめた常�
 
 ### 03. CI Flaky Analyzer
 - CIログからflakyテストを検知し再実行・自動起票までを一気通貫にする仕組み。
-- 成果物: [out/index.html](https://github.com/Ryosuke4219/portfolio/blob/main/projects/03-ci-flaky/out/index.html)
-- 解析サンプル: [demo/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/03-ci-flaky/demo)
+- 成果物: `npx flaky analyze` 実行時に `projects/03-ci-flaky/out/index.html`（HTML/CSV/JSON）が生成され、CI ではアーティファクトとして取得。
+- 解析サンプル: 任意の JUnit XML を `npx flaky parse --input <path-to-xml>` で取り込み、履歴ストアに蓄積。
 
 ### 04. LLM Adapter — Shadow Execution
 - プライマリと影（shadow）実行を並走させ、差分メトリクスを収集するLLMアダプタの最小実装。
@@ -44,4 +44,4 @@ description: QA × SDET × LLM の成果物と週次サマリをまとめた常�
 ## 運用メモ
 - `weekly-qa-summary.yml` ワークフローが `docs/weekly-summary.md` を自動更新。
 - `tools/generate_gallery_snippets.py` が週次サマリからハイライトカードを生成。
-- `pages.yaml` ワークフローが `docs/` 配下を GitHub Pages に公開。
+- `.github/workflows/pages.yml` が `docs/` 配下を GitHub Pages にデプロイ（別途 publish-docs ワークフローは廃止済み）。

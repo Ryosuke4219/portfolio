@@ -34,7 +34,7 @@
 * 代表フロー：
 
   1. `run_compare.py` で 2プロバイダ×2プロンプト×N回 実行
-  2. `runs-metrics.jsonl` を `metrics_to_html.py` で **`/reports/index.html`** に可視化
+  2. `runs-metrics.jsonl` を `metrics_to_html.py` で **`/reports/index.html`** に可視化（生成物は Git 管理外）
   3. `just golden` で **baseline vs 最新** の回帰比較を HTML に差し込む
 
 ---
@@ -59,6 +59,8 @@
 /data/
   └─ runs-metrics.jsonl                 # 実行ログ（追記）
 ```
+
+> ℹ️ `/data/runs-metrics.jsonl` や `/reports/index.html` はランを実行した際に生成される成果物であり、Git では管理しない（CI アーティファクトやローカル出力で随時再生成）。
 
 ---
 
@@ -200,7 +202,7 @@ overrides:
 ### 7.1 ツール（`/tools/report/metrics_to_html.py`）
 
 * 入力：`/data/runs-metrics.jsonl`、（任意）`/datasets/golden/baseline/*`
-* 出力：`/reports/index.html`（単一ファイル）
+* 出力：`/reports/index.html`（単一ファイル、必要なときに再生成）
 * 要件（最低限）：
 
   * **Overview**：総試行数、成功率（ok率）、平均/中央値 latency、合計/平均 cost
@@ -328,7 +330,7 @@ python tools/report/metrics_to_html.py \
 
 ## 15. 受け入れ基準（DoD）
 
-* **B1**：`/reports/index.html` に **2プロバイダ×2プロンプト**の **latency / tokens / cost / diff率 / 失敗分類** が**表とグラフ**で表示される。
+* **B1**：`/reports/index.html` に **2プロバイダ×2プロンプト**の **latency / tokens / cost / diff率 / 失敗分類** が**表とグラフ**で表示される（レポートは都度生成して参照）。
 * **B2**：同条件反復で**決定性ゲート**評価が行われ、**95%同一結果**相当のしきい（§9.2）に従ってレポに**PASS/警告**が出る。
 * **B3**：`just golden`（または同等コマンド）で **baseline vs 最新** の**回帰表**が HTML に差し込まれる。
 * **B4**：`failure_kind` が記録され、**週次サマリ**に Top3 種別が反映される。

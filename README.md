@@ -7,6 +7,7 @@
 > QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines.
 
 - **Website:** <https://ryosuke4219.github.io/portfolio/> — Portfolio Gallery on GitHub Pages
+- **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
 
 ---
@@ -92,8 +93,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 * JUnit XML を解析して履歴 DB (`database.json`) を更新。
 
   ```bash
-  npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-fail.xml
-  npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-pass.xml
+  npx flaky parse --input path/to/junit-xml/ --run-id demo_001 --branch main --commit deadbeef
   ```
 
   * Node.js のみで動作する軽量 XML パーサーを実装し、外部依存なしでレポートを吸収。
@@ -101,10 +101,12 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
   * 直近で fail→pass したテストを Markdown で出力し、Issue 化に利用。
 
   ```bash
+  npx flaky analyze --config projects/03-ci-flaky/config/flaky.yml
   npm run ci:issue
   ```
 
   * 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
+  * 解析結果は `projects/03-ci-flaky/out/`（HTML/CSV/JSON）に出力され、CI 実行時はアーティファクトとして取得できる。
 
 ### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
 

@@ -15,8 +15,8 @@
 ## 03. CI Flaky Analyzer
 - プロダクト README: `../projects/03-ci-flaky/README.md`
 - 仕様書: `../projects/03-ci-flaky/docs/spec_flaky_analyzer.md`
-- デモ JUnit: `../projects/03-ci-flaky/demo/junit-run-fail.xml`
-- サマリ HTML: `../projects/03-ci-flaky/out/index.html`
+- 解析ストア: `../projects/03-ci-flaky/data/runs.jsonl` — `npx flaky parse --input <junit-xml>` で追記
+- サマリ HTML: `npx flaky analyze` で生成される `../projects/03-ci-flaky/out/index.html`（CI からダウンロード可能）
 
 ## Docs Cross Reference
 - テスト計画: `../docs/test-plan.md`
