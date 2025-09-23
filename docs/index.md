@@ -4,6 +4,8 @@ title: Portfolio Hub
 description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯瞰できるポータル
 ---
 
+> [English version]({{ '/en/' | relative_url }})
+
 > 🔎 最新CIレポート: [JUnit要約]({{ '/reports/junit/index.html' | relative_url }}) / [Flakyランキング]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage HTML]({{ '/reports/coverage/index.html' | relative_url }})
 
 # Demos

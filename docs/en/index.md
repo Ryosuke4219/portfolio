@@ -1,0 +1,104 @@
+---
+layout: default
+title: Portfolio Hub (EN)
+description: A portal showcasing QA / SDET / LLM highlights with weekly summaries in English
+---
+
+> [日本語版はこちら]({{ '/' | relative_url }})
+
+> 🔎 Latest CI reports: [JUnit summary]({{ '/reports/junit/index.html' | relative_url }}) / [Flaky ranking]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage HTML]({{ '/reports/coverage/index.html' | relative_url }})
+
+# Demos
+
+<div class="demo-grid">
+  <article class="demo-card">
+    <header>
+      <p class="demo-card__id">01</p>
+      <h2><a href="{{ '/en/evidence/spec2cases.html' | relative_url }}">Spec to Cases</a></h2>
+    </header>
+    <p>A pipeline that turns specification Markdown into test case JSON with LLM drafting and rule-based post-processing.</p>
+    <ul>
+      <li>Schema validation and type-preserving transformation logic.</li>
+      <li>CLI helpers and JSON samples for quick onboarding.</li>
+    </ul>
+    <p><a class="demo-card__link" href="{{ '/en/evidence/spec2cases.html' | relative_url }}">Evidence &rarr;</a></p>
+  </article>
+
+  <article class="demo-card">
+    <header>
+      <p class="demo-card__id">02</p>
+      <h2><a href="{{ '/en/evidence/llm2pw.html' | relative_url }}">LLM to Playwright</a></h2>
+    </header>
+    <p>A proof of concept where an LLM expands acceptance criteria and generates Playwright tests automatically.</p>
+    <ul>
+      <li>Robust selector strategy based on <code>data-testid</code> with a11y scanning baked in.</li>
+      <li>Data-driven tests via JSON / CSV drivers for a minimal setup.</li>
+    </ul>
+    <p><a class="demo-card__link" href="{{ '/en/evidence/llm2pw.html' | relative_url }}">Evidence &rarr;</a></p>
+  </article>
+
+  <article class="demo-card">
+    <header>
+      <p class="demo-card__id">03</p>
+      <h2><a href="{{ '/en/evidence/flaky.html' | relative_url }}">CI Flaky Analyzer</a></h2>
+    </header>
+    <p>A CLI that detects flaky tests from CI logs and automatically produces HTML reports and ticket templates.</p>
+    <ul>
+      <li>Streaming analysis for large JUnit XML files with scoring stored as JSONL / HTML.</li>
+      <li>One-command generation of HTML reports, JSONL history, and GitHub Issue templates.</li>
+    </ul>
+    <p><a class="demo-card__link" href="{{ '/en/evidence/flaky.html' | relative_url }}">Evidence &rarr;</a></p>
+  </article>
+
+  <article class="demo-card">
+    <header>
+      <p class="demo-card__id">04</p>
+      <h2><a href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Shadow Execution</a></h2>
+    </header>
+    <p>An adapter that runs a shadow provider alongside the primary LLM to capture anomalies while keeping the main response.</p>
+    <ul>
+      <li>Collects shadow diff metrics as JSONL for vendor comparison.</li>
+      <li>Mocks timeouts, rate limits, and malformed responses to validate fallbacks.</li>
+    </ul>
+    <p><a class="demo-card__link" href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
+  </article>
+</div>
+
+## Weekly Summary
+
+{% include weekly-summary-card.md %}
+
+### 01. Spec to Cases
+- Minimal pipeline that generates test cases from specification Markdown.
+- Deliverable: [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/spec2cases/cases.sample.json)
+- Extra materials: [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/spec2cases/spec.sample.md)
+
+### 02. LLM to Playwright
+- PoC that enriches acceptance criteria with an LLM and auto-generates Playwright tests.
+- Deliverables: [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-llm-to-playwright/tests/generated)
+- Samples: [blueprint.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/llm2pw/blueprint.sample.json) / [demo/](https://github.com/Ryosuke4219/portfolio/tree/main/docs/examples/llm2pw/demo)
+- References: [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/tests/README.md)
+
+### 03. CI Flaky Analyzer
+- Detects flaky tests from CI logs and enables re-runs and automated ticketing end-to-end.
+- Deliverable: Running `npx flaky analyze` generates `projects/03-ci-flaky/out/index.html` (HTML/CSV/JSON) retrievable from CI artifacts.
+- Sample workflow: Ingest any JUnit XML via `npx flaky parse --input <path-to-xml>` and store the history for later analysis.
+
+### 04. LLM Adapter — Shadow Execution
+- Runs a shadow provider in parallel, records response diffs as JSONL, and visualizes the findings.
+- Recreates timeout, rate limit, and malformed responses with mocks to verify fallback design.
+- Reference: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
+
+[View all weekly summaries &rarr;]({{ '/weekly-summary.html' | relative_url }})
+
+## Evidence Library
+
+- [QA Evidence Catalog]({{ '/en/evidence/README.html' | relative_url }})
+- [Test Plan]({{ '/test-plan.html' | relative_url }})
+- [Defect Report Sample]({{ '/defect-report-sample.html' | relative_url }})
+
+## Operations Notes
+
+- The `weekly-qa-summary.yml` workflow automatically updates `docs/weekly-summary.md`.
+- `tools/generate_gallery_snippets.py` generates highlight cards from the weekly summary.
+- `.github/workflows/pages.yml` deploys everything under `docs/` to GitHub Pages.
