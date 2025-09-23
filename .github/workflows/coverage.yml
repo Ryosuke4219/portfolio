@@ -1,12 +1,8 @@
 name: Coverage
-
 on:
   push:
     branches: [ main ]
   pull_request:
-
-permissions:
-  contents: read
 
 jobs:
   coverage:
@@ -27,34 +23,21 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest -q \
-            --cov=projects/04-llm-adapter-shadow/src \
+            --cov=projects/04-llm-adapter-shadow \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \
             projects/04-llm-adapter-shadow/tests
 
-      - name: Prepare coverage bundle
+      - name: Pack coverage artifacts
         if: always()
         run: |
-          set -euo pipefail
           mkdir -p reports/coverage
-          if [ -d htmlcov ]; then
-            cp -a htmlcov/. reports/coverage/
-          fi
-          if [ -f coverage.xml ]; then
-            cp coverage.xml reports/coverage/coverage.xml
-          fi
+          [ -d htmlcov ] && cp -a htmlcov/. reports/coverage/
+          [ -f coverage.xml ] && cp coverage.xml reports/coverage/coverage.xml
 
-      - name: Upload coverage XML
+      - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: python-coverage
-          path: reports/coverage/coverage.xml
-          if-no-files-found: warn
-
-      - name: Upload coverage Pages artifact
-        if: always()
-        uses: actions/upload-pages-artifact@v4
-        with:
-          name: coverage-report
-          path: reports
+          path: reports/coverage
