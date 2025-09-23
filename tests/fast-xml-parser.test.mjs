@@ -1,5 +1,6 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
 import { XMLParser } from 'fast-xml-parser';
 
 test('XMLParser parses basic junit suite with attributes and text content', () => {
