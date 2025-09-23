@@ -14,12 +14,29 @@ const accessibilityTargets = parseCsv(a11yCsv);
 for (const scenario of loginCases) {
   test(`data-driven login — ${scenario.name}`, async ({ page }) => {
     await page.goto('/index.html');
-    await page.getByTestId('login-username').fill(scenario.username);
-    await page.getByTestId('login-password').fill(scenario.password);
-    await page.getByTestId('login-submit').click();
+    if (typeof page.waitForLoadState === 'function') {
+      await page.waitForLoadState('networkidle');
+    }
 
-    await expect(page).toHaveURL(new RegExp(scenario.expected.urlPattern));
-    await expect(page.getByTestId(scenario.expected.bannerTestId)).toBeVisible();
+    const usernameField = page.getByTestId('login-username');
+    const passwordField = page.getByTestId('login-password');
+    const submitButton = page.getByTestId('login-submit');
+    await usernameField.fill(scenario.username);
+    await passwordField.fill(scenario.password);
+    await submitButton.click();
+
+    if (typeof page.waitForLoadState === 'function') {
+      await page.waitForLoadState('networkidle');
+    }
+
+    const expectedUrlPattern = new RegExp(scenario.expected.urlPattern);
+    if (typeof page.waitForURL === 'function') {
+      await page.waitForURL(expectedUrlPattern);
+    }
+    await expect(page).toHaveURL(expectedUrlPattern);
+
+    const banner = page.getByTestId(scenario.expected.bannerTestId);
+    await expect(banner).toBeVisible();
   });
 }
 

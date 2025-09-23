@@ -8,9 +8,9 @@
 <!-- qa-metrics:start -->
 | 指標 | 値 |
 |------|----|
-| Pass Rate | 40.00% (2/5) |
-| Top Flaky | 1. ui-e2e.LoginFlow.spec.should show error for invalid user (score 0.71)<br/>2. ui-e2e.LoginFlow.spec.should login with valid user (score 0.58)<br/>3. api-report.ReportJob.test.generates flaky summary (score 0.46) |
-| 最終更新 | 2025-09-21T03:44:09Z |
+| Pass Rate | 100.00% (5/5) |
+| Top Flaky | データなし |
+| 最終更新 | 2025-09-23T05:31:45Z |
 | レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest.html) |
 
 <!-- qa-metrics:end -->

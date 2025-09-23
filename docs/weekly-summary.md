@@ -8,29 +8,25 @@ description: 直近7日間のQA状況サマリ
 
 ## Overview (last 7 days)
 - TotalTests: 5
-- PassRate: 40.00%
+- PassRate: 100.00%
 - NewDefects: 0
-- TopFailureKinds: timeout 1 / guard_violation 1 / infra 1
+- TopFailureKinds: -
 
 ## Top Flaky (score)
 | Rank | Canonical ID | Attempts | p_fail | Score |
 |-----:|--------------|---------:|------:|------:|
-| 1 | ui-e2e.LoginFlow.spec.should show error for invalid user | 8 | 0.38 | 0.71 |
-| 2 | ui-e2e.LoginFlow.spec.should login with valid user | 8 | 0.25 | 0.58 |
-| 3 | api-report.ReportJob.test.generates flaky summary | 5 | 0.20 | 0.46 |
-| 4 | ui-e2e.Dashboard.spec.should render analytics widgets | 4 | 0.10 | 0.30 |
+| - | データなし | 0 | 0.00 | 0.00 |
 
 ## Week-over-Week
-- PassRate Δ: -26.67pp
-- Entered: ui-e2e.LoginFlow.spec.should show error for invalid user, ui-e2e.LoginFlow.spec.should login with valid user, api-report.ReportJob.test.generates flaky summary, ui-e2e.Dashboard.spec.should render analytics widgets
+- PassRate Δ: +33.33pp
+- Entered: なし
 - Exited: なし
 
 ## Notes
-- PassRate WoW: -26.67pp (prev 66.67%).
-- Top Flaky 新規: ui-e2e.LoginFlow.spec.should show error for invalid user, ui-e2e.LoginFlow.spec.should login with valid user, api-report.ReportJob.test.generates flaky summary, ui-e2e.Dashboard.spec.should render analytics widgets
+- PassRate WoW: +33.33pp (prev 66.67%).
 
 <details><summary>Method</summary>
-データソース: projects/03-ci-flaky/data/runs.jsonl / projects/03-ci-flaky/data/flaky_rank.csv / 欠陥: docs/defect-report-sample.md
+データソース: projects/03-ci-flaky/data/runs.jsonl / projects/03-ci-flaky/out/flaky_rank.csv / 欠陥: docs/defect-report-sample.md
 期間: 直近7日 / 比較対象: その前の7日
 再計算: 毎週月曜 09:00 JST (GitHub Actions)
 </details>
