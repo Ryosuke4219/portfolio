@@ -2,7 +2,7 @@ name: Coverage
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -14,130 +14,31 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r projects/04-llm-adapter-shadow/requirements.txt
+          pip install -r projects/04-llm-adapter-shadow/requirements.txt pytest pytest-cov
 
       - name: Run tests with coverage
         run: |
-          pytest \
-            --cov=projects/04-llm-adapter-shadow \
-            --cov-report=xml:coverage.xml \
-            --cov-report=html \
-            --cov-report=term-missing \
+          mkdir -p reports/coverage
+          pytest -q \
+            --cov=projects/04-llm-adapter-shadow/src \
+            --cov-report=xml:reports/coverage/coverage.xml \
+            --cov-report=html:reports/coverage/html \
             projects/04-llm-adapter-shadow/tests
 
-      - name: Prepare coverage Pages bundle
-        if: always()
-        run: |
-          set -euo pipefail
-          reports_dir="reports/coverage"
-          rm -rf "${reports_dir}"
-          mkdir -p "${reports_dir}"
-          if [ -d htmlcov ]; then
-            cp -a htmlcov/. "${reports_dir}/"
-          fi
-          if [ -f coverage.xml ]; then
-            cp coverage.xml "${reports_dir}/coverage.xml"
-          fi
-          python - <<'PY'
-            import json
-            import pathlib
-            import xml.etree.ElementTree as ET
-            from datetime import datetime, timezone
-
-            reports_dir = pathlib.Path('reports/coverage')
-            reports_dir.mkdir(parents=True, exist_ok=True)
-            coverage_xml = reports_dir / 'coverage.xml'
-            badge_path = reports_dir / 'badge.json'
-            summary_path = reports_dir / 'summary.json'
-
-            def pick_color(rate: float) -> str:
-                if rate >= 90:
-                    return 'brightgreen'
-                if rate >= 80:
-                    return 'green'
-                if rate >= 70:
-                    return 'yellowgreen'
-                if rate >= 60:
-                    return 'yellow'
-                if rate >= 50:
-                    return 'orange'
-                return 'red'
-
-            line_rate = None
-            branch_rate = None
-            lines_valid = None
-            lines_covered = None
-            branches_valid = None
-            branches_covered = None
-            timestamp = None
-
-            if coverage_xml.exists():
-                try:
-                    root = ET.parse(coverage_xml).getroot()
-                except ET.ParseError:
-                    root = None
-                if root is not None:
-                    line_rate = round(float(root.attrib.get('line-rate', '0')) * 100, 2)
-                    branch_rate = round(float(root.attrib.get('branch-rate', '0')) * 100, 2)
-                    lines_valid = int(float(root.attrib.get('lines-valid', '0')))
-                    lines_covered = int(float(root.attrib.get('lines-covered', '0')))
-                    branches_valid = int(float(root.attrib.get('branches-valid', '0')))
-                    branches_covered = int(float(root.attrib.get('branches-covered', '0')))
-                    timestamp = root.attrib.get('timestamp')
-                    generated_at = None
-                    if timestamp:
-                        try:
-                            ts_value = float(timestamp)
-                        except ValueError:
-                            generated_at = timestamp
-                        else:
-                            if ts_value > 1e12:
-                                ts_value /= 1000
-                            generated_at = datetime.fromtimestamp(ts_value, tz=timezone.utc).isoformat()
-                    if generated_at is None:
-                        generated_at = datetime.now(timezone.utc).isoformat()
-                    summary = {
-                        'line_rate': line_rate,
-                        'branch_rate': branch_rate,
-                        'lines_valid': lines_valid,
-                        'lines_covered': lines_covered,
-                        'branches_valid': branches_valid,
-                        'branches_covered': branches_covered,
-                        'generated_at': generated_at,
-                    }
-                    summary_path.write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
-
-            if line_rate is None:
-                badge = {
-                    'schemaVersion': 1,
-                    'label': 'coverage',
-                    'message': 'error',
-                    'color': 'lightgrey',
-                }
-            else:
-                badge = {
-                    'schemaVersion': 1,
-                    'label': 'coverage',
-                    'message': f"{line_rate:.1f}%",
-                    'color': pick_color(line_rate),
-                }
-
-            badge_path.write_text(json.dumps(badge, indent=2) + '\n', encoding='utf-8')
-          PY
-
-      - name: Upload coverage report
+      - name: Upload coverage XML
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: python-coverage
-          path: coverage.xml
+          path: reports/coverage/coverage.xml
+          if-no-files-found: warn
 
-      - name: Upload coverage report for Pages
+      - name: Upload coverage Pages artifact
         if: always()
         uses: actions/upload-pages-artifact@v4
         with:
