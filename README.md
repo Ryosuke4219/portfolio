@@ -17,6 +17,8 @@
 <sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
 
 
+> 🔎 最新CIレポート: [JUnit要約](https://ryosuke4219.github.io/portfolio/reports/junit/index.html) / [Flakyランキング](https://ryosuke4219.github.io/portfolio/reports/flaky/index.html) / [Coverage HTML](https://ryosuke4219.github.io/portfolio/reports/coverage/index.html)
+
 > QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines.
 
 - **Website:** <https://ryosuke4219.github.io/portfolio/> — Portfolio Gallery on GitHub Pages
