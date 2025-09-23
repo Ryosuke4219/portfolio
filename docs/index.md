@@ -4,82 +4,12 @@ title: Portfolio Hub
 description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯瞰できるポータル
 ---
 
-<nav class="page-toc" aria-label="ページ内ナビゲーション">
-  <p class="page-toc__title">Jump to</p>
-  <ul class="page-toc__list">
-    <li><a href="#demos">Demos</a>
-      <ul>
-        <li><a href="#demo-01">01. Spec to Cases</a></li>
-        <li><a href="#demo-02">02. LLM to Playwright</a></li>
-        <li><a href="#demo-03">03. CI Flaky Analyzer</a></li>
-        <li><a href="#demo-04">04. LLM Adapter — Shadow Execution</a></li>
-      </ul>
-    </li>
-    <li><a href="#weekly-summary">Weekly Summary</a></li>
-    <li><a href="#evidence-library">Evidence Library</a></li>
-    <li><a href="#operations-notes">運用メモ</a></li>
-  </ul>
-</nav>
+<div class="button-group">
+  <a class="button button--github" href="https://github.com/Ryosuke4219/portfolio" target="_blank" rel="noopener">GitHub Repository</a>
+  <a class="button button--evidence" href="{{ '/evidence/README.md' | relative_url }}">Evidence Catalog</a>
+  <a class="button button--weekly" href="{{ '/weekly-summary.html' | relative_url }}">週次サマリ</a>
+</div>
 
-<style>
-.page-toc {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  margin: 1rem 0;
-  padding: 0.75rem 1rem;
-  background-color: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(27, 31, 35, 0.15);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 12px rgba(31, 41, 55, 0.08);
-  backdrop-filter: blur(6px);
-}
-
-.page-toc__title {
-  margin: 0 0 0.5rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  color: #4a5568;
-}
-
-.page-toc__list,
-.page-toc__list ul {
-  list-style: none;
-  margin: 0;
-  padding-left: 0;
-}
-
-.page-toc__list > li {
-  margin-bottom: 0.25rem;
-}
-
-.page-toc__list ul {
-  margin-top: 0.25rem;
-  padding-left: 1rem;
-  font-size: 0.95rem;
-}
-
-.page-toc a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.page-toc a:hover,
-.page-toc a:focus {
-  text-decoration: underline;
-}
-
-@media (max-width: 600px) {
-  .page-toc {
-    top: -1px;
-    margin-left: -1rem;
-    margin-right: -1rem;
-    border-radius: 0;
-  }
-}
-</style>
 
 > 🔎 最新CIレポート: [JUnit要約]({{ '/reports/junit/index.html' | relative_url }}) / [Flakyランキング]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage HTML]({{ '/reports/coverage/index.html' | relative_url }})
 >
