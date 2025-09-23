@@ -19,7 +19,7 @@ function readJson(filePath) {
 }
 
 test('spec text is converted into structured cases', () => {
-  const specPath = path.join(rootDir, 'projects/01-spec2cases/spec.sample.txt');
+  const specPath = path.join(rootDir, 'docs/examples/spec2cases/spec.sample.txt');
   const result = parseSpecFile(specPath);
   assert.equal(result.suite, 'ログイン機能');
   assert.equal(result.cases.length, 2);
@@ -29,7 +29,7 @@ test('spec text is converted into structured cases', () => {
 });
 
 test('blueprint is rendered into playwright spec files', () => {
-  const blueprint = readJson(path.join(rootDir, 'projects/02-llm-to-playwright/blueprint.sample.json'));
+  const blueprint = readJson(path.join(rootDir, 'docs/examples/llm2pw/blueprint.sample.json'));
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'playwright-gen-'));
   const files = generateTestsFromBlueprint(blueprint, tmpDir);
   assert.equal(files.length, blueprint.scenarios.length);

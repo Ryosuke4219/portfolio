@@ -4,7 +4,7 @@ import path from 'path';
 import url from 'url';
 
 const port = Number(process.env.PORT || 4173);
-const rootDir = path.resolve(process.cwd(), 'projects/02-llm-to-playwright/demo');
+const rootDir = path.resolve(process.cwd(), 'docs/examples/llm2pw/demo');
 
 const mimeTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],

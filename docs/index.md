@@ -18,8 +18,8 @@ description: QA × SDET × LLM の成果物と週次サマリをまとめた常�
 
 ### 01. Spec to Cases
 - 仕様書からテストケースを自動生成するパイプラインの最小構成。
-- 成果物: [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/cases.sample.json)
-- 追加資料: [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/spec.sample.md)
+- 成果物: [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/spec2cases/cases.sample.json)
+- 追加資料: [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/spec2cases/spec.sample.md)
 
 ### 02. LLM to Playwright
 - LLMで受け入れ基準を拡張し、Playwrightテストを自動生成するPoC。

@@ -3,9 +3,9 @@
 本カタログは RTM に記載された `EvidenceLink` の遷移先をまとめ、検証時に参照する一次情報を一覧化する。
 
 ## 01. Spec to Cases
-- ケース設計テンプレ: `../projects/01-spec2cases/spec.sample.md`
+- ケース設計テンプレ: `docs/examples/spec2cases/spec.sample.md`
 - 自動生成スクリプト: `../projects/01-spec2cases/scripts/spec2cases.mjs`
-- サンプルケース: `../projects/01-spec2cases/cases.sample.json`
+- サンプルケース: `docs/examples/spec2cases/cases.sample.json`
 
 ## 02. LLM to Playwright
 - テスト概要: `../projects/02-llm-to-playwright/tests/README.md`

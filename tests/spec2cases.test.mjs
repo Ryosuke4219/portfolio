@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 test('markdown specs with headings are parsed into cases', () => {
-  const specPath = path.join(rootDir, 'projects/01-spec2cases/spec.sample.md');
+  const specPath = path.join(rootDir, 'docs/examples/spec2cases/spec.sample.md');
   const result = parseSpecFile(specPath);
 
   assert.equal(result.suite, 'ログイン機能');

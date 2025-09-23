@@ -6,7 +6,7 @@ import url from 'node:url';
 import vm from 'node:vm';
 
 const projectRoot = process.cwd();
-const demoDir = path.resolve(projectRoot, 'projects/02-llm-to-playwright/demo');
+const demoDir = path.resolve(projectRoot, 'docs/examples/llm2pw/demo');
 const generatedDir = path.resolve(projectRoot, 'projects/02-llm-to-playwright/tests/generated');
 const snapshotDir = path.join(generatedDir, '__snapshots__');
 const junitPath = path.resolve(projectRoot, 'junit-results.xml');

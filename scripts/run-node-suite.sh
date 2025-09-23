@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 pushd "${REPO_ROOT}" > /dev/null
 
-node scripts/serve-static.mjs projects/02-llm-to-playwright/demo 5173 &
+node scripts/serve-static.mjs docs/examples/llm2pw/demo 5173 &
 SERVER_PID=$!
 
 cleanup() {

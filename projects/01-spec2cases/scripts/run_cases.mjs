@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, '../../..');
+const sampleCasesPath = path.join(repoRoot, 'docs/examples/spec2cases/cases.sample.json');
 
 const args = process.argv.slice(2);
 if (!args.length) {
@@ -33,7 +35,7 @@ for (let i = 0; i < args.length; i += 1) {
   process.exit(2);
 }
 
-const defaultCasesPath = path.join(__dirname, '../cases.sample.json');
+const defaultCasesPath = sampleCasesPath;
 const resolvedCasesPath = casesPath ? path.resolve(process.cwd(), casesPath) : defaultCasesPath;
 
 if (!fs.existsSync(resolvedCasesPath)) {
