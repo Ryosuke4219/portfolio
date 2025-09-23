@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence, Union
 
-from .provider_spi import ProviderSPI, ProviderRequest, ProviderResponse
-from .errors import TimeoutError, RateLimitError, RetriableError
-from .shadow import run_with_shadow, DEFAULT_METRICS_PATH
+from .errors import RateLimitError, RetriableError, TimeoutError
 from .metrics import log_event
+from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from .shadow import DEFAULT_METRICS_PATH, run_with_shadow
 from .utils import content_hash
 
-MetricsPath = Optional[Union[str, Path]]
+MetricsPath = str | Path | None
 
 
 class Runner:
@@ -21,12 +21,12 @@ class Runner:
     def __init__(self, providers: Sequence[ProviderSPI]):
         if not providers:
             raise ValueError("Runner requires at least one provider")
-        self.providers: List[ProviderSPI] = list(providers)
+        self.providers: list[ProviderSPI] = list(providers)
 
     def run(
         self,
         request: ProviderRequest,
-        shadow: Optional[ProviderSPI] = None,
+        shadow: ProviderSPI | None = None,
         shadow_metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
     ) -> ProviderResponse:
         """Execute ``request`` with fallback semantics.
@@ -42,7 +42,7 @@ class Runner:
             JSONL file path for recording metrics. ``None`` disables logging.
         """
 
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
         request_fingerprint = content_hash(
             "runner", request.prompt, request.options, request.max_tokens

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
-import fs from 'node:fs/promises';
 
 const [,, dirArg = 'public', portArg = '5173'] = process.argv;
 const rootDir = path.resolve(process.cwd(), dirArg);
