@@ -3,7 +3,8 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
 [![Lint](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint)](https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml)
 [![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
-[![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest)
+[![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest.html)
+
 
 <!-- qa-metrics:start -->
 | 指標 | 値 |
@@ -11,7 +12,7 @@
 | Pass Rate | 40.00% (2/5) |
 | Top Flaky | 1. ui-e2e.LoginFlow.spec.should show error for invalid user (score 0.71)<br/>2. ui-e2e.LoginFlow.spec.should login with valid user (score 0.58)<br/>3. api-report.ReportJob.test.generates flaky summary (score 0.46) |
 | 最終更新 | 2025-09-21T03:44:09Z |
-| レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest/) |
+| レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest.html) |
 
 <!-- qa-metrics:end -->
 <sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
@@ -192,6 +193,7 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 2. 対象コミットに注釈付きタグを作成: `git tag -a v0.x <commit> -m "v0.x – サマリ"`
 3. `gh release create v0.x --verify-tag --notes-file docs/releases/v0.x.md` で GitHub Releases を公開し、README の最新リンクを更新。
 4. タグと README 更新を `git push --follow-tags` で共有。
+
 
 ---
 
