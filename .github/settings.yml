@@ -1,5 +1,5 @@
 repository:
-  description: "> QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines."
+  description: "QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines."
   homepage: https://ryosuke4219.github.io/portfolio/
   topics:
     - qa
