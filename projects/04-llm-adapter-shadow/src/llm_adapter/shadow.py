@@ -5,17 +5,17 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Any
 
-from .provider_spi import ProviderSPI, ProviderRequest, ProviderResponse
 from .metrics import log_event
+from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .utils import content_hash
 
-MetricsPath = Optional[Union[str, Path]]
+MetricsPath = str | Path | None
 DEFAULT_METRICS_PATH = "artifacts/runs-metrics.jsonl"
 
 
-def _to_path_str(path: MetricsPath) -> Optional[str]:
+def _to_path_str(path: MetricsPath) -> str | None:
     if path is None:
         return None
     return str(Path(path))
@@ -23,7 +23,7 @@ def _to_path_str(path: MetricsPath) -> Optional[str]:
 
 def run_with_shadow(
     primary: ProviderSPI,
-    shadow: Optional[ProviderSPI],
+    shadow: ProviderSPI | None,
     req: ProviderRequest,
     metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
 ) -> ProviderResponse:
@@ -34,9 +34,9 @@ def run_with_shadow(
     so they can be analysed offline.
     """
 
-    shadow_thread: Optional[threading.Thread] = None
-    shadow_payload: Dict[str, Any] = {}
-    shadow_name: Optional[str] = None
+    shadow_thread: threading.Thread | None = None
+    shadow_payload: dict[str, Any] = {}
+    shadow_name: str | None = None
     metrics_path_str = _to_path_str(metrics_path)
 
     if shadow is not None:
@@ -89,7 +89,7 @@ def run_with_shadow(
             request_fingerprint = content_hash(
                 "runner", req.prompt, req.options, req.max_tokens
             )
-            record: Dict[str, Any] = {
+            record: dict[str, Any] = {
                 "request_hash": content_hash(
                     primary.name(), req.prompt, req.options, req.max_tokens
                 ),

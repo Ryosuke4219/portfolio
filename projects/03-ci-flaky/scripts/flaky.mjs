@@ -1,17 +1,17 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { spawn } from 'node:child_process';
 
+import { loadWindowRuns, computeAggregates, determineFlaky, summarise } from '../src/analyzer.js';
+import { createFailureSignature } from '../src/classification.js';
 import { parseArgs } from '../src/cli-args.js';
 import { loadConfig, resolveConfigPaths } from '../src/config.js';
-import { parseJUnitFile, parseJUnitStream } from '../src/junit-parser.js';
-import { createFailureSignature } from '../src/classification.js';
-import { appendAttempts } from '../src/store.js';
 import { ensureDir } from '../src/fs-utils.js';
-import { loadWindowRuns, computeAggregates, determineFlaky, summarise } from '../src/analyzer.js';
+import { parseJUnitFile, parseJUnitStream } from '../src/junit-parser.js';
 import { writeCsv, writeJson, generateHtmlReport } from '../src/report.js';
+import { appendAttempts } from '../src/store.js';
 
 const DEFAULT_CONFIG_PATHS = [
   'projects/03-ci-flaky/config/flaky.yml',
