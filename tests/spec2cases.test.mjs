@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+
 import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases/scripts/spec2cases.mjs';
 import { SPEC2CASES_SAMPLE_SPEC_MD_PATH } from '../scripts/paths.mjs';
 
