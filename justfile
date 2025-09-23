@@ -4,6 +4,7 @@ set shell := ["bash", "-c"]
 default:
 	just --list
 
+# 依存関係とブラウザスタブをまとめて初期化
 setup:
 	set -euo pipefail
 	if [ "${OS:-}" = "Windows_NT" ]; then
@@ -17,19 +18,22 @@ setup:
 	fi
 
 node-test:
-	set -euo pipefail
-	npm run spec:validate
-	npm run e2e:gen
-	bash scripts/run-node-suite.sh
-	npm run ci:analyze
-	npm run ci:issue
+        set -euo pipefail
+        npm run spec:validate
+        npm run e2e:gen
+        bash scripts/run-node-suite.sh
+        npm run ci:analyze
+        npm run ci:issue
+        node --test tests/e2e-shadow.test.mjs
 
 python-test:
 	set -euo pipefail
 	./.venv/bin/pytest -q projects/04-llm-adapter-shadow/tests
 
+# Node と Python のテストスイートを一括実行
 test: node-test python-test
 
+# JS 構文チェックと Python バイトコード検証
 lint:
 	set -euo pipefail
 	JS_FILES=$(find . -type f \( -name '*.mjs' -o -name '*.js' \))
@@ -42,6 +46,7 @@ lint:
 	fi
 	./.venv/bin/python -m compileall projects/04-llm-adapter-shadow
 
+# Python プロジェクトのカバレッジ付きレポート生成
 report:
 	set -euo pipefail
 	./.venv/bin/pytest --cov=projects/04-llm-adapter-shadow --cov-report=xml --cov-report=term-missing projects/04-llm-adapter-shadow/tests
