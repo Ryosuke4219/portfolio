@@ -25,6 +25,14 @@
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
 
+> [!TIP] Quick Start
+> `just setup` — Node.js / Python 依存と Playwright スタブを初期化します。
+> `just test` — Node＋Python の回帰テストを一括で実行します。
+> `just lint` — JavaScript の構文チェックと Python バイトコード検証を行います。
+> `just report` — Python プロジェクトのテスト＋カバレッジレポートを生成します。
+>
+> ✅ 詳細手順は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) を参照してください。
+
 ---
 
 ## 概要 (Overview)
@@ -197,6 +205,8 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 ---
 
 ## ローカルセットアップ (Local onboarding)
+
+Quick Start で触れた `just` コマンドを詳しく説明します。セットアップの前後関係や内部で呼び出すスクリプトの構成を把握したい場合に参照してください。
 
 1. `just setup` で Node.js / Python 依存と Playwright ブラウザスタブをまとめて初期化します。
    * `.cache/` を共有キャッシュとして利用し、npm と pip のダウンロードを再利用します。
