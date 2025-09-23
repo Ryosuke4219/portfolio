@@ -1,11 +1,13 @@
+"""Utility helpers for hashing request payloads."""
+
 import hashlib
-from typing import Dict, Any
+from typing import Any
 
 
 def content_hash(
     provider: str,
     prompt: str,
-    options: Dict[str, Any] | None = None,
+    options: dict[str, Any] | None = None,
     max_tokens: int | None = None,
 ) -> str:
     h = hashlib.sha256()

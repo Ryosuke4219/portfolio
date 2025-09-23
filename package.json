@@ -12,7 +12,10 @@
     "e2e:gen": "node projects/02-llm-to-playwright/scripts/blueprint_to_code.mjs docs/examples/llm2pw/blueprint.sample.json",
     "test": "node ./packages/playwright-test-stub/bin/playwright.js test -c projects/02-llm-to-playwright/playwright.config.ts",
     "ci:analyze": "node projects/03-ci-flaky/scripts/flaky.mjs analyze",
-    "ci:issue": "node projects/03-ci-flaky/scripts/flaky.mjs issue"
+    "ci:issue": "node projects/03-ci-flaky/scripts/flaky.mjs issue",
+    "lint:js": "eslint . --ext .js,.cjs,.mjs",
+    "format": "prettier --write \"**/*.{cjs,js,mjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{cjs,js,mjs,json,md,yml,yaml}\""
   },
   "bin": {
     "flaky": "./projects/03-ci-flaky/scripts/flaky.mjs"
@@ -21,6 +24,10 @@
     "fast-xml-parser": "file:packages/fast-xml-parser"
   },
   "devDependencies": {
-    "@playwright/test": "file:packages/playwright-test-stub"
+    "@playwright/test": "file:packages/playwright-test-stub",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.3.3"
   }
 }
