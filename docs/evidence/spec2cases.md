@@ -4,6 +4,8 @@ title: Spec to Cases
 description: 仕様書からテストケースを抽出する LLM × スキーマ駆動パイプラインのハイライト
 ---
 
+> [English version]({{ '/en/evidence/spec2cases.html' | relative_url }})
+
 # Spec to Cases
 
 仕様書 Markdown を入力として、LLM のドラフトとルールベース整形を組み合わせたテストケース生成パイプラインです。ケースは JSON Schema で検証し、既存のテスト管理や自動化フレームワークへ取り込みやすい構造を維持します。

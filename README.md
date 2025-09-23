@@ -8,15 +8,11 @@
 <!-- qa-metrics:start -->
 | 指標 | 値 |
 |------|----|
-| Pass Rate | 40.00% (2/5) |
-| Top Flaky | 1. ui-e2e.LoginFlow.spec.should show error for invalid user (score 0.71)<br/>2. ui-e2e.LoginFlow.spec.should login with valid user (score 0.58)<br/>3. api-report.ReportJob.test.generates flaky summary (score 0.46) |
-| 最終更新 | 2025-09-21T03:44:09Z |
-| レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest/) |
+| Pass Rate | 100.00% (5/5) |
+| Top Flaky | データなし |
+| 最終更新 | 2025-09-23T05:31:45Z |
+| レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest.html) |
 
-直近3回の差分:
-- gh_20250921_01 (2025-09-21T03:42:12Z): Pass Rate 50.00% (-50.00pp) / Flaky 2件 (±0)
-- gh_20250919_03 (2025-09-19T10:12:44Z): Pass Rate 100.00% (+100.00pp) / Flaky 2件 (±0)
-- gh_20250918_02 (2025-09-18T08:51:05Z): Pass Rate 0.00% (±0.00pp) / Flaky 2件 (+1)
 
 <!-- qa-metrics:end -->
 <sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
@@ -29,6 +25,14 @@
 - **Website:** <https://ryosuke4219.github.io/portfolio/> — Portfolio Gallery on GitHub Pages
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
+
+> [!TIP] Quick Start
+> `just setup` — Node.js / Python 依存と Playwright スタブを初期化します。
+> `just test` — Node＋Python の回帰テストを一括で実行します。
+> `just lint` — JavaScript の構文チェックと Python バイトコード検証を行います。
+> `just report` — Python プロジェクトのテスト＋カバレッジレポートを生成します。
+>
+> ✅ 詳細手順は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) を参照してください。
 
 ---
 
@@ -88,6 +92,8 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
   * `--tag` や `--id` で絞り込めるため、スモークテスト／個別ケースを即座に確認可能。
   * 期待値や手順が欠落している場合は失敗としてサマリに計上し、仕様漏れを検知。
 
+→ 詳細: [Spec2Cases CLI README](projects/01-spec2cases/README.md)
+
 ### 2. LLM設計 → Playwright E2E テスト自動生成
 
 * `docs/examples/llm2pw/blueprint.sample.json` をもとにテストコードを自動生成。
@@ -108,6 +114,8 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
   * CI ではこれらの成果物を `npm run ci:analyze` / `npm run ci:issue` へ渡して履歴管理を行う。
   * `projects/02-llm-to-playwright/tests/README.md` にテスト生成時の**セレクタ・ガード方針**や**ビジュアル／a11y スモーク**の運用メモを記載。`login-cases.json` / `a11y-pages.csv` を編集するだけでデータドリブンにシナリオを増やせる構成とした。
 
+→ 詳細: [LLM → Playwright Pipeline README](projects/02-llm-to-playwright/README.md)
+
 ### 3. CI ログ解析と flaky テスト検出
 
 * JUnit XML を解析して履歴 DB (`database.json`) を更新。
@@ -127,6 +135,8 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
   * 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
   * 解析結果は `projects/03-ci-flaky/out/`（HTML/CSV/JSON）に出力され、CI 実行時はアーティファクトとして取得できる。
+
+→ 詳細: [Flaky Analyzer CLI README](projects/03-ci-flaky/README.md)
 
 ### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
 
@@ -163,6 +173,8 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 
 **記録フォーマット（例）**
 
+→ 詳細: [LLM Adapter (Core) README](projects/04-llm-adapter/README.md) / [Shadow Adapter README](projects/04-llm-adapter-shadow/README.md)
+
 ```json
 {
   "trace_id": "2025-09-21T02:10:33.412Z-7f2c",
@@ -183,25 +195,28 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 
 ## リリース (Releases)
 
-- 最新: [v0.3 – flaky検出＋週次サマリ](https://github.com/Ryosuke4219/portfolio/releases/tag/v0.3)
+- 最新: [v1.0 – ポートフォリオ統合リリース](https://github.com/Ryosuke4219/portfolio/releases/tag/v1.0)
 
 ### マイルストーン一覧
 
-1. **[v0.3 – flaky検出＋週次サマリ](docs/releases/v0.3.md)** — 週次 QA サマリ（README 自動更新）と CI レポート公開を整備し、Pages／Releases から参照できるようにしました。
-2. **[v0.2 – LLMアダプタ（shadow/fallback）最小版](docs/releases/v0.2.md)** — Python 製 LLM アダプタを追加し、shadow 実行とフォールバック検証を pytest / GitHub Actions で自動化しました。
-3. **[v0.1 – 初期プロジェクト群](docs/releases/v0.1.md)** — テキスト仕様 → テストケース生成、LLM→Playwright 自動化、CI ログ解析の 3 パイプラインを公開しました。
+1. **[v1.0 – ポートフォリオ統合リリース](docs/releases/v1.0.md)** — 4 本の自動化パイプラインと CI / Pages / Releases の公開フローを整備し、ポートフォリオ全体を横断的に参照できるようにしました。
+2. **[v0.3 – flaky検出＋週次サマリ](docs/releases/v0.3.md)** — 週次 QA サマリ（README 自動更新）と CI レポート公開を整備し、Pages／Releases から参照できるようにしました。
+3. **[v0.2 – LLMアダプタ（shadow/fallback）最小版](docs/releases/v0.2.md)** — Python 製 LLM アダプタを追加し、shadow 実行とフォールバック検証を pytest / GitHub Actions で自動化しました。
+4. **[v0.1 – 初期プロジェクト群](docs/releases/v0.1.md)** — テキスト仕様 → テストケース生成、LLM→Playwright 自動化、CI ログ解析の 3 パイプラインを公開しました。
 
 ### リリース運用手順
 
 1. 直近のマイルストーンを `docs/releases/` に追記し、変更点・テスト・関連ドキュメントを整理。
-2. 対象コミットに注釈付きタグを作成: `git tag -a v0.x <commit> -m "v0.x – サマリ"`
-3. `gh release create v0.x --verify-tag --notes-file docs/releases/v0.x.md` で GitHub Releases を公開し、README の最新リンクを更新。
+2. 対象コミットに注釈付きタグを作成: `git tag -a vX.Y <commit> -m "vX.Y – サマリ"`
+3. `gh release create vX.Y --verify-tag --notes-file docs/releases/vX.Y.md` で GitHub Releases を公開し、README の最新リンクを更新。
 4. タグと README 更新を `git push --follow-tags` で共有。
 
 
 ---
 
 ## ローカルセットアップ (Local onboarding)
+
+Quick Start で触れた `just` コマンドを詳しく説明します。セットアップの前後関係や内部で呼び出すスクリプトの構成を把握したい場合に参照してください。
 
 1. `just setup` で Node.js / Python 依存と Playwright ブラウザスタブをまとめて初期化します。
    * `.cache/` を共有キャッシュとして利用し、npm と pip のダウンロードを再利用します。

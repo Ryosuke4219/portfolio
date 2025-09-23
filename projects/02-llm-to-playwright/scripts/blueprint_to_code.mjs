@@ -87,7 +87,13 @@ function buildAssert(assertion) {
     return '  // skipped: unsupported assertion';
   }
   if (assertion.startsWith('url:')) {
-    return `  await expect(page).toHaveURL(${toUrlRegex(assertion)});`;
+    const urlRegex = toUrlRegex(assertion);
+    return [
+      "  if (typeof page.waitForURL === 'function') {",
+      `    await page.waitForURL(${urlRegex});`,
+      '  }',
+      `  await expect(page).toHaveURL(${urlRegex});`,
+    ].join('\n');
   }
   if (assertion.startsWith('text:')) {
     const raw = assertion.split(':', 2)[1] ?? '';
@@ -109,9 +115,15 @@ function renderScenario(scenario) {
     '',
     `test(${toSingleQuoted(`${scenario.id} ${scenario.title}`)}, async ({ page }) => {`,
     `  await page.goto(${toQuoted(startUrl)});`,
+    "  if (typeof page.waitForLoadState === 'function') {",
+    "    await page.waitForLoadState('networkidle');",
+    '  }',
     `  await page.fill(${toQuoted(selectors.user)}, ${toQuoted(data.user)});`,
     `  await page.fill(${toQuoted(selectors.pass)}, ${toQuoted(data.pass)});`,
     `  await page.click(${toQuoted(selectors.submit)});`,
+    "  if (typeof page.waitForLoadState === 'function') {",
+    "    await page.waitForLoadState('networkidle');",
+    '  }',
   ];
 
   if (assertLines.length > 0) {

@@ -4,6 +4,8 @@ title: LLM Adapter — Shadow Execution
 description: 影実行でメトリクスを収集し異常系も再現する LLM アダプタのハイライト
 ---
 
+> [English version]({{ '/en/evidence/llm-adapter.html' | relative_url }})
+
 # LLM Adapter — Shadow Execution
 
 メインの LLM プロバイダを維持したまま、影（shadow）実行で別プロバイダを並走させるアダプタです。レスポンス差分や異常系イベントを JSONL に記録し、フォールバックやベンダ比較のための計測基盤を最小構成で提供します。

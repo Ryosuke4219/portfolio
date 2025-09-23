@@ -1,78 +1,15 @@
 {
-  "generated_at": "2025-09-23T05:48:44.925881Z",
+
+  "generated_at": "2025-09-23T05:49:36.211938Z",
   "window_days": 7,
   "totals": {
-    "passes": 2,
-    "fails": 2,
-    "errors": 1,
+    "passes": 5,
+    "fails": 0,
+    "errors": 0,
     "executions": 5
   },
-  "pass_rate": 0.4,
-  "failure_kinds": [
-    {
-      "kind": "timeout",
-      "count": 1
-    },
-    {
-      "kind": "guard_violation",
-      "count": 1
-    },
-    {
-      "kind": "infra",
-      "count": 1
-    }
-  ],
-  "top_flaky": [
-    {
-      "rank": 1,
-      "canonical_id": "ui-e2e.LoginFlow.spec.should show error for invalid user",
-      "attempts": 8,
-      "p_fail": 0.38,
-      "score": 0.71,
-      "as_of": "2025-09-22T00:00:00Z"
-    },
-    {
-      "rank": 2,
-      "canonical_id": "ui-e2e.LoginFlow.spec.should login with valid user",
-      "attempts": 8,
-      "p_fail": 0.25,
-      "score": 0.58,
-      "as_of": "2025-09-22T00:00:00Z"
-    },
-    {
-      "rank": 3,
-      "canonical_id": "api-report.ReportJob.test.generates flaky summary",
-      "attempts": 5,
-      "p_fail": 0.2,
-      "score": 0.46,
-      "as_of": "2025-09-22T00:00:00Z"
-    }
-  ],
-  "last_updated": "2025-09-21T03:44:09Z",
-  "recent_runs": [
-    {
-      "run_id": "gh_20250918_02",
-      "ts": "2025-09-18T08:51:05Z",
-      "pass_rate": 0.0,
-      "pass_rate_delta": 0.0,
-      "flaky_count": 2,
-      "flaky_delta": 1
-    },
-    {
-      "run_id": "gh_20250919_03",
-      "ts": "2025-09-19T10:12:44Z",
-      "pass_rate": 1.0,
-      "pass_rate_delta": 1.0,
-      "flaky_count": 2,
-      "flaky_delta": 0
-    },
-    {
-      "run_id": "gh_20250921_01",
-      "ts": "2025-09-21T03:42:12Z",
-      "pass_rate": 0.5,
-      "pass_rate_delta": -0.5,
-      "flaky_count": 2,
-      "flaky_delta": 0
-    }
-  ]
+  "pass_rate": 1.0,
+  "failure_kinds": [],
+  "top_flaky": [],
+  "last_updated": "2025-09-23T05:31:45Z"
 }

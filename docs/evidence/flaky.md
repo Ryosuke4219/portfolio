@@ -4,6 +4,8 @@ title: CI Flaky Analyzer
 description: CI ログから Flaky テストを検知・可視化する CLI のハイライト
 ---
 
+> [English version]({{ '/en/evidence/flaky.html' | relative_url }})
+
 # CI Flaky Analyzer
 
 JUnit 形式のテスト結果を継続取り込みし、Flaky テストをスコアリングして可視化する CLI ツールです。CI パイプラインでの自動実行を想定した npm スクリプトと、週次レポート連携までを一気通貫で提供します。
