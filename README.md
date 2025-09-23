@@ -186,19 +186,20 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 
 ## リリース (Releases)
 
-- 最新: [v0.3 – flaky検出＋週次サマリ](https://github.com/Ryosuke4219/portfolio/releases/tag/v0.3)
+- 最新: [v1.0 – ポートフォリオ統合リリース](https://github.com/Ryosuke4219/portfolio/releases/tag/v1.0)
 
 ### マイルストーン一覧
 
-1. **[v0.3 – flaky検出＋週次サマリ](docs/releases/v0.3.md)** — 週次 QA サマリ（README 自動更新）と CI レポート公開を整備し、Pages／Releases から参照できるようにしました。
-2. **[v0.2 – LLMアダプタ（shadow/fallback）最小版](docs/releases/v0.2.md)** — Python 製 LLM アダプタを追加し、shadow 実行とフォールバック検証を pytest / GitHub Actions で自動化しました。
-3. **[v0.1 – 初期プロジェクト群](docs/releases/v0.1.md)** — テキスト仕様 → テストケース生成、LLM→Playwright 自動化、CI ログ解析の 3 パイプラインを公開しました。
+1. **[v1.0 – ポートフォリオ統合リリース](docs/releases/v1.0.md)** — 4 本の自動化パイプラインと CI / Pages / Releases の公開フローを整備し、ポートフォリオ全体を横断的に参照できるようにしました。
+2. **[v0.3 – flaky検出＋週次サマリ](docs/releases/v0.3.md)** — 週次 QA サマリ（README 自動更新）と CI レポート公開を整備し、Pages／Releases から参照できるようにしました。
+3. **[v0.2 – LLMアダプタ（shadow/fallback）最小版](docs/releases/v0.2.md)** — Python 製 LLM アダプタを追加し、shadow 実行とフォールバック検証を pytest / GitHub Actions で自動化しました。
+4. **[v0.1 – 初期プロジェクト群](docs/releases/v0.1.md)** — テキスト仕様 → テストケース生成、LLM→Playwright 自動化、CI ログ解析の 3 パイプラインを公開しました。
 
 ### リリース運用手順
 
 1. 直近のマイルストーンを `docs/releases/` に追記し、変更点・テスト・関連ドキュメントを整理。
-2. 対象コミットに注釈付きタグを作成: `git tag -a v0.x <commit> -m "v0.x – サマリ"`
-3. `gh release create v0.x --verify-tag --notes-file docs/releases/v0.x.md` で GitHub Releases を公開し、README の最新リンクを更新。
+2. 対象コミットに注釈付きタグを作成: `git tag -a vX.Y <commit> -m "vX.Y – サマリ"`
+3. `gh release create vX.Y --verify-tag --notes-file docs/releases/vX.Y.md` で GitHub Releases を公開し、README の最新リンクを更新。
 4. タグと README 更新を `git push --follow-tags` で共有。
 
 
