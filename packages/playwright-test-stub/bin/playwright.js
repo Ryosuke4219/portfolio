@@ -5,8 +5,10 @@ import process from 'node:process';
 import url from 'node:url';
 import vm from 'node:vm';
 
+import { LLM2PW_DEMO_DIR } from '../../../scripts/paths.mjs';
+
 const projectRoot = process.cwd();
-const demoDir = path.resolve(projectRoot, 'projects/02-llm-to-playwright/demo');
+const demoDir = LLM2PW_DEMO_DIR;
 const generatedDir = path.resolve(projectRoot, 'projects/02-llm-to-playwright/tests/generated');
 const snapshotDir = path.join(generatedDir, '__snapshots__');
 const junitPath = path.resolve(projectRoot, 'junit-results.xml');

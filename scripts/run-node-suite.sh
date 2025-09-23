@@ -3,10 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DEMO_DIR="${REPO_ROOT}/docs/examples/llm2pw/demo"
 
 pushd "${REPO_ROOT}" > /dev/null
 
-node scripts/serve-static.mjs projects/02-llm-to-playwright/demo 5173 &
+node scripts/serve-static.mjs "${DEMO_DIR}" 5173 &
 SERVER_PID=$!
 
 cleanup() {

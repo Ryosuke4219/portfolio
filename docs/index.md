@@ -64,6 +64,27 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 
 {% include weekly-summary-card.md %}
 
+### 01. Spec to Cases
+- 仕様書からテストケースを自動生成するパイプラインの最小構成。
+- 成果物: [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/spec2cases/cases.sample.json)
+- 追加資料: [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/spec2cases/spec.sample.md)
+
+### 02. LLM to Playwright
+- LLMで受け入れ基準を拡張し、Playwrightテストを自動生成するPoC。
+- 成果物: [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-llm-to-playwright/tests/generated)
+- サンプル: [blueprint.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/llm2pw/blueprint.sample.json) / [demo/](https://github.com/Ryosuke4219/portfolio/tree/main/docs/examples/llm2pw/demo)
+- 参考資料: [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/tests/README.md)
+
+### 03. CI Flaky Analyzer
+- CIログからflakyテストを検知し再実行・自動起票までを一気通貫にする仕組み。
+- 成果物: `npx flaky analyze` 実行時に `projects/03-ci-flaky/out/index.html`（HTML/CSV/JSON）が生成され、CI ではアーティファクトとして取得。
+- 解析サンプル: 任意の JUnit XML を `npx flaky parse --input <path-to-xml>` で取り込み、履歴ストアに蓄積。
+
+### 04. LLM Adapter — Shadow Execution
+- 影プロバイダを並走させ、応答差分をメトリクス化（JSONL収集）して可視化。
+- 異常系（タイムアウト、レート制限、フォーマット不正）をモックで再現し、フォールバック設計を検証。
+- 参考資料: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
+
 [週次サマリの一覧を見る &rarr;]({{ '/weekly-summary.html' | relative_url }})
 
 ## Evidence Library
@@ -76,4 +97,4 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 
 - `weekly-qa-summary.yml` ワークフローが `docs/weekly-summary.md` を自動更新。
 - `tools/generate_gallery_snippets.py` が週次サマリからハイライトカードを生成。
-- `pages.yaml` ワークフローが `docs/` 配下を GitHub Pages に公開。
+- `.github/workflows/pages.yml` が `docs/` 配下を GitHub Pages にデプロイ（別途 publish-docs ワークフローは廃止済み）。
