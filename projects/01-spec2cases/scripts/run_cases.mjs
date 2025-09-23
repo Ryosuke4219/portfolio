@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
 import { SPEC2CASES_SAMPLE_CASES_PATH } from '../../../scripts/paths.mjs';
 
 const args = process.argv.slice(2);

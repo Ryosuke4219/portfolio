@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  lint:
+  javascript:
+    name: JavaScript lint & format check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,26 +15,36 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
-      - name: Check JavaScript modules
-        run: |
-          set -euo pipefail
-          files=$(find . -type f \( -name '*.mjs' -o -name '*.js' \))
-          if [ -z "$files" ]; then
-            echo "No JavaScript modules found"
-          else
-            for file in $files; do
-              echo "Checking $file"
-              node --check "$file"
-            done
-          fi
+      - name: Install dependencies
+        run: npm install --no-progress
+
+      - name: Run ESLint
+        run: npm run lint:js
+
+      - name: Verify formatting
+        run: npm run format:check
+
+  python:
+    name: Python lint & type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Check Python modules
+      - name: Install dependencies
         run: |
-          python -m compileall projects/04-llm-adapter-shadow
+          python -m pip install --upgrade pip
+          pip install -r projects/04-llm-adapter-shadow/requirements.txt
+          pip install ruff mypy
+
+      - name: Ruff lint
+        run: ruff check projects/04-llm-adapter-shadow/src --output-format=full
+
+      - name: Mypy type check
+        run: mypy projects/04-llm-adapter-shadow/src --pretty
