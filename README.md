@@ -8,11 +8,15 @@
 <!-- qa-metrics:start -->
 | 指標 | 値 |
 |------|----|
-| Pass Rate | 100.00% (5/5) |
+| Pass Rate | 100.00% (126/126) |
 | Top Flaky | データなし |
-| 最終更新 | 2025-09-23T05:31:45Z |
+| 最終更新 | 2025-09-23T07:46:06.005000Z |
 | レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest.html) |
 
+直近3回の差分:
+- local_20250923T074605Z_20_20250923074606 (2025-09-23T07:46:06.005000Z): Pass Rate 100.00% (±0.00pp) / Flaky 0件 (±0)
+- local_20250923T074604Z_19_20250923074604 (2025-09-23T07:46:04.396000Z): Pass Rate 100.00% (±0.00pp) / Flaky 0件 (±0)
+- local_20250923T074602Z_18_20250923074602 (2025-09-23T07:46:02.920000Z): Pass Rate 100.00% (±0.00pp) / Flaky 0件 (±0)
 
 <!-- qa-metrics:end -->
 <sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
