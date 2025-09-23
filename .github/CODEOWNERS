@@ -1,0 +1,11 @@
+# このファイルは主要ディレクトリのコードオーナーを定義します
+# 行の形式: <パターン> <オーナー>
+
+* @Ryosuke4219
+/.github @Ryosuke4219
+/docs @Ryosuke4219
+/packages @Ryosuke4219
+/projects @Ryosuke4219
+/scripts @Ryosuke4219
+/tests @Ryosuke4219
+/tools @Ryosuke4219
