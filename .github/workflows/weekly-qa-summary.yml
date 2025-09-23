@@ -20,16 +20,32 @@ jobs:
         run: |
           python tools/weekly_summary.py \
             --runs projects/03-ci-flaky/data/runs.jsonl \
-            --flaky projects/03-ci-flaky/out/flaky_rank.csv \
+            --flaky projects/03-ci-flaky/data/flaky_rank.csv \
             --out docs/weekly-summary.md \
             --days 7
       - name: Refresh gallery snippet
         run: |
           python tools/generate_gallery_snippets.py
+      - name: Generate CI reliability snapshot
+        run: |
+          python tools/generate_ci_report.py \
+            --runs projects/03-ci-flaky/data/runs.jsonl \
+            --flaky projects/03-ci-flaky/data/flaky_rank.csv \
+            --out-markdown docs/reports/latest.md \
+            --out-json docs/reports/latest.json \
+            --index docs/reports/index.md \
+            --days 7
+      - name: Update README metrics table
+        run: |
+          python tools/update_readme_metrics.py \
+            --readme README.md \
+            --source docs/reports/latest.json \
+            --report-url https://ryosuke4219.github.io/portfolio/reports/latest/
       - name: Commit summary
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/weekly-summary.md docs/_includes/weekly-summary-card.md
+          git add README.md docs/weekly-summary.md docs/_includes/weekly-summary-card.md \
+            docs/reports/index.md docs/reports/latest.md docs/reports/latest.json
           git commit -m "chore(docs): update weekly QA summary" || echo "no changes"
           git push
