@@ -25,6 +25,16 @@
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
 
+### Quick glance (EN)
+
+This hub curates hands-on QA, SDET, and LLM automation assets—pipelines, PoCs, and reports—that you can remix for your own delivery workflows.
+
+```bash
+just test
+```
+
+[Browse the live Portfolio Gallery →](https://ryosuke4219.github.io/portfolio/)
+
 ---
 
 ## 概要 (Overview)

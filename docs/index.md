@@ -5,6 +5,8 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 ---
 
 > 🔎 最新CIレポート: [JUnit要約]({{ '/reports/junit/index.html' | relative_url }}) / [Flakyランキング]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage HTML]({{ '/reports/coverage/index.html' | relative_url }})
+>
+> 🚀 Fresh CI signals in English: [JUnit digest]({{ '/reports/junit/index.html' | relative_url }}) / [Flaky leaderboard]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage dashboard]({{ '/reports/coverage/index.html' | relative_url }})
 
 # Demos
 
