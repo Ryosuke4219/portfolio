@@ -107,6 +107,31 @@ const escapeXml = (value) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+const isRegExp = (value) => Object.prototype.toString.call(value) === '[object RegExp]';
+
+const urlMatches = (actualUrl, expected) => {
+  if (!actualUrl) {
+    return false;
+  }
+  if (isRegExp(expected)) {
+    return expected.test(actualUrl);
+  }
+  if (typeof expected === 'string') {
+    if (actualUrl === expected) {
+      return true;
+    }
+    if (/^\/.+\/$/.test(expected)) {
+      try {
+        const pattern = new RegExp(expected.slice(1, -1));
+        return pattern.test(actualUrl);
+      } catch (error) {
+        return false;
+      }
+    }
+  }
+  return false;
+};
+
 const ensureDir = (target) => {
   fs.mkdirSync(path.dirname(target), { recursive: true });
 };
@@ -169,6 +194,19 @@ const createPage = () => {
       const destination = pass === 'wrong' ? '/invalid.html' : '/dashboard.html';
       const absolute = new url.URL(destination, `${base.protocol}//${base.host}`).toString();
       await this.goto(absolute);
+    },
+    async waitForLoadState(state = 'load') {
+      const allowed = new Set(['load', 'domcontentloaded', 'networkidle']);
+      if (!allowed.has(state)) {
+        throw new Error(`[playwright-stub] waitForLoadState("${state}") is not supported in the stub environment.`);
+      }
+      // no-op: HTML is loaded synchronously in the stub
+    },
+    async waitForURL(expected) {
+      const currentUrl = state.url;
+      if (!urlMatches(currentUrl, expected)) {
+        throw new Error(`Expected navigation to match ${expected}, current URL ${currentUrl}`);
+      }
     },
     getByText(text) {
       return {
@@ -294,18 +332,16 @@ const deepEqual = (a, b) => {
 const expect = (actual) => ({
   async toHaveURL(expected) {
     const urlValue = typeof actual?._getURL === 'function' ? actual._getURL() : actual;
-    const isRegex = Object.prototype.toString.call(expected) === '[object RegExp]';
-    const match = isRegex ? expected.test(urlValue) : urlValue === expected;
     if (process.env.DEBUG_PLAYWRIGHT_STUB === '1') {
-      console.log('[expect.toHaveURL]', { urlValue, expectedType: typeof expected, isRegex, expected: String(expected), match });
+      console.log('[expect.toHaveURL]', {
+        urlValue,
+        expectedType: typeof expected,
+        isRegex: isRegExp(expected),
+        expected: String(expected),
+        match: urlMatches(urlValue, expected),
+      });
     }
-    if (!match) {
-      if (!isRegex && typeof expected === 'string' && /^\/.+\/$/.test(expected)) {
-        const pattern = new RegExp(expected.slice(1, -1));
-        if (pattern.test(urlValue)) {
-          return;
-        }
-      }
+    if (!urlMatches(urlValue, expected)) {
       throw new Error(`Expected URL to match ${expected}, received ${urlValue}`);
     }
   },
