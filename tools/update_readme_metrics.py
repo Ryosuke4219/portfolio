@@ -47,9 +47,44 @@ def format_top_flaky(rows: List[Dict[str, Any]]) -> str:
     return "<br/>".join(formatted)
 
 
+def format_pass_rate_delta(value: Optional[float]) -> str:
+    if value is None:
+        return " (基準なし)"
+    if abs(value) < 1e-9:
+        return " (±0.00pp)"
+    sign = "+" if value > 0 else "-"
+    return f" ({sign}{abs(value) * 100:.2f}pp)"
+
+
+def format_int_delta(value: Optional[int]) -> str:
+    if value is None:
+        return " (基準なし)"
+    if value == 0:
+        return " (±0)"
+    sign = "+" if value > 0 else "-"
+    return f" ({sign}{abs(value)})"
+
+
+def format_recent_runs(items: List[Dict[str, Any]]) -> List[str]:
+    if not items:
+        return []
+    lines = ["直近3回の差分:"]
+    for item in reversed(items):  # 最新順
+        run_id = item.get("run_id") or "-"
+        ts = item.get("ts") or "N/A"
+        pass_rate = format_pass_rate(item.get("pass_rate"))
+        pass_delta = format_pass_rate_delta(item.get("pass_rate_delta"))
+        flaky_count = item.get("flaky_count") or 0
+        flaky_delta = format_int_delta(item.get("flaky_delta"))
+        lines.append(
+            f"- {run_id} ({ts}): Pass Rate {pass_rate}{pass_delta} / Flaky {flaky_count}件{flaky_delta}"
+        )
+    return lines
+
+
 def build_table(payload: Optional[Dict[str, Any]], report_url: str) -> List[str]:
     if payload is None:
-        rows = [
+        table = [
             "| 指標 | 値 |",
             "|------|----|",
             "| Pass Rate | N/A |",
@@ -57,7 +92,7 @@ def build_table(payload: Optional[Dict[str, Any]], report_url: str) -> List[str]
             "| 最終更新 | N/A |",
             f"| レポート | [最新レポートを見る]({report_url}) |",
         ]
-        return rows
+        return table
 
     totals = payload.get("totals", {})
     executions = totals.get("executions") or 0
@@ -73,7 +108,7 @@ def build_table(payload: Optional[Dict[str, Any]], report_url: str) -> List[str]
         except ValueError:
             pass
 
-    rows = [
+    table = [
         "| 指標 | 値 |",
         "|------|----|",
         f"| Pass Rate | {format_pass_rate(pass_rate)} ({passes}/{executions}) |",
@@ -81,7 +116,11 @@ def build_table(payload: Optional[Dict[str, Any]], report_url: str) -> List[str]
         f"| 最終更新 | {last_updated} |",
         f"| レポート | [最新レポートを見る]({report_url}) |",
     ]
-    return rows
+    recent_lines = format_recent_runs(payload.get("recent_runs") or [])
+    if recent_lines:
+        table.append("")
+        table.extend(recent_lines)
+    return table
 
 
 def replace_section(text: str, new_lines: List[str]) -> str:

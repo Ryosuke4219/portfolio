@@ -10,6 +10,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ci_metrics import compute_recent_deltas, compute_run_history
 from weekly_summary import (  # type: ignore
     aggregate_status,
     filter_by_window,
@@ -109,6 +110,7 @@ def build_json_payload(
     failure_kinds: List[dict],
     flaky_rows: List[dict],
     last_updated: Optional[str],
+    recent_runs: List[dict],
 ) -> Dict[str, Any]:
     total = passes + fails + errors
     pass_rate = (passes / total) if total else None
@@ -125,6 +127,7 @@ def build_json_payload(
         "failure_kinds": failure_kinds,
         "top_flaky": flaky_rows,
         "last_updated": last_updated,
+        "recent_runs": recent_runs,
     }
 
 
@@ -234,6 +237,8 @@ def main() -> None:
     flaky_rows = load_flaky(args.flaky) if args.flaky.exists() else []
 
     filtered_runs = filter_by_window(runs, start, now)
+    run_history = compute_run_history(runs)
+    recent_runs = compute_recent_deltas(run_history, limit=3)
     passes, fails, errors = aggregate_status(filtered_runs)
     failure_kinds = summarize_failure_kinds(filtered_runs)
 
@@ -251,6 +256,7 @@ def main() -> None:
         failure_kinds=failure_kinds,
         flaky_rows=normalized_flaky,
         last_updated=last_updated,
+        recent_runs=recent_runs,
     )
 
     args.out_json.parent.mkdir(parents=True, exist_ok=True)

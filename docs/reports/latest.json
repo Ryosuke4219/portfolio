@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-23T01:52:24.413926Z",
+  "generated_at": "2025-09-23T05:48:44.925881Z",
   "window_days": 7,
   "totals": {
     "passes": 2,
@@ -48,5 +48,31 @@
       "as_of": "2025-09-22T00:00:00Z"
     }
   ],
-  "last_updated": "2025-09-21T03:44:09Z"
+  "last_updated": "2025-09-21T03:44:09Z",
+  "recent_runs": [
+    {
+      "run_id": "gh_20250918_02",
+      "ts": "2025-09-18T08:51:05Z",
+      "pass_rate": 0.0,
+      "pass_rate_delta": 0.0,
+      "flaky_count": 2,
+      "flaky_delta": 1
+    },
+    {
+      "run_id": "gh_20250919_03",
+      "ts": "2025-09-19T10:12:44Z",
+      "pass_rate": 1.0,
+      "pass_rate_delta": 1.0,
+      "flaky_count": 2,
+      "flaky_delta": 0
+    },
+    {
+      "run_id": "gh_20250921_01",
+      "ts": "2025-09-21T03:42:12Z",
+      "pass_rate": 0.5,
+      "pass_rate_delta": -0.5,
+      "flaky_count": 2,
+      "flaky_delta": 0
+    }
+  ]
 }

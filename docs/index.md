@@ -62,6 +62,10 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
   </article>
 </div>
 
+## CI Metrics Trend
+
+![CI pass rate and flaky trend]({{ '/assets/metrics/ci-pass-rate-flaky.svg' | relative_url }})
+
 ## Weekly Summary
 
 {% include weekly-summary-card.md %}
