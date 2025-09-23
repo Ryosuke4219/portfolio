@@ -10,12 +10,15 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
   <a class="button button--weekly" href="{{ '/weekly-summary.html' | relative_url }}">週次サマリ</a>
 </div>
 
+
 > 🔎 最新CIレポート: [JUnit要約]({{ '/reports/junit/index.html' | relative_url }}) / [Flakyランキング]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage HTML]({{ '/reports/coverage/index.html' | relative_url }})
+>
+> 🚀 Fresh CI signals in English: [JUnit digest]({{ '/reports/junit/index.html' | relative_url }}) / [Flaky leaderboard]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage dashboard]({{ '/reports/coverage/index.html' | relative_url }})
 
 # Demos
 
 <div class="demo-grid">
-  <article class="demo-card">
+  <article class="demo-card" id="demo-01">
     <header>
       <p class="demo-card__id">01</p>
       <h2><a href="{{ '/evidence/spec2cases.html' | relative_url }}">Spec to Cases</a></h2>
@@ -28,7 +31,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
     <p><a class="demo-card__link" href="{{ '/evidence/spec2cases.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
 
-  <article class="demo-card">
+  <article class="demo-card" id="demo-02">
     <header>
       <p class="demo-card__id">02</p>
       <h2><a href="{{ '/evidence/llm2pw.html' | relative_url }}">LLM to Playwright</a></h2>
@@ -41,7 +44,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
     <p><a class="demo-card__link" href="{{ '/evidence/llm2pw.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
 
-  <article class="demo-card">
+  <article class="demo-card" id="demo-03">
     <header>
       <p class="demo-card__id">03</p>
       <h2><a href="{{ '/evidence/flaky.html' | relative_url }}">CI Flaky Analyzer</a></h2>
@@ -54,7 +57,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
     <p><a class="demo-card__link" href="{{ '/evidence/flaky.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
 
-  <article class="demo-card">
+  <article class="demo-card" id="demo-04">
     <header>
       <p class="demo-card__id">04</p>
       <h2><a href="{{ '/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Shadow Execution</a></h2>
@@ -101,7 +104,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 - [テスト計画書](./test-plan.md)
 - [欠陥レポートサンプル](./defect-report-sample.md)
 
-## 運用メモ
+## 運用メモ {#operations-notes}
 
 - `weekly-qa-summary.yml` ワークフローが `docs/weekly-summary.md` を自動更新。
 - `tools/generate_gallery_snippets.py` が週次サマリからハイライトカードを生成。
