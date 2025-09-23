@@ -72,6 +72,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r projects/04-llm-adapter-shadow/requirements.txt
 
+      - name: Run shadow pipeline integration test
+        if: always()
+        run: node --test tests/e2e-shadow.test.mjs
+
       - name: Run pytest with coverage HTML
         if: always()
         run: |

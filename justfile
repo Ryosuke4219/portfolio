@@ -17,12 +17,13 @@ setup:
 	fi
 
 node-test:
-	set -euo pipefail
-	npm run spec:validate
-	npm run e2e:gen
-	bash scripts/run-node-suite.sh
-	npm run ci:analyze
-	npm run ci:issue
+        set -euo pipefail
+        npm run spec:validate
+        npm run e2e:gen
+        bash scripts/run-node-suite.sh
+        npm run ci:analyze
+        npm run ci:issue
+        node --test tests/e2e-shadow.test.mjs
 
 python-test:
 	set -euo pipefail
