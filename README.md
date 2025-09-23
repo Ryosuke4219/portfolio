@@ -4,6 +4,8 @@
 [![Lint](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint)](https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml)
 [![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
 
+> 🔎 最新CIレポート: [JUnit要約](https://ryosuke4219.github.io/portfolio/reports/junit/index.html) / [Flakyランキング](https://ryosuke4219.github.io/portfolio/reports/flaky/index.html) / [Coverage HTML](https://ryosuke4219.github.io/portfolio/reports/coverage/index.html)
+
 > QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines.
 
 - **Website:** <https://ryosuke4219.github.io/portfolio/> — Portfolio Gallery on GitHub Pages
