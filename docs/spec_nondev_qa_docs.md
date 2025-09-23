@@ -173,8 +173,8 @@ REQ-REPORT-001,JUnitを解析して失敗傾向を把握できる,M,M,T-03-REPOR
 
 #### 入力データ
 
-- `projects/03-ci-flaky/data/runs.jsonl`
-- `projects/03-ci-flaky/out/flaky_rank.csv`
+- `projects/03-ci-flaky/data/runs.jsonl`（`npm run ci:analyze` / `just test` で生成、リポジトリには含めない）
+- `projects/03-ci-flaky/out/flaky_rank.csv`（同上、詳細は `../docs/examples/ci-flaky/README.md`）
 - 必要に応じて `junit/**/*.xml`
 
 #### 指標（過去7日, デフォルト）
@@ -207,6 +207,7 @@ REQ-REPORT-001,JUnitを解析して失敗傾向を把握できる,M,M,T-03-REPOR
 
 <details><summary>Method</summary>
 データソース: runs.jsonl, flaky_rank.csv / 期間: 直近7日 / 再計算: 毎週月曜 09:00 JST
+※ `runs.jsonl` と `flaky_rank.csv` は `npm run ci:analyze` で生成する一時ファイル。コミット対象外のため `docs/examples/ci-flaky/README.md` を参照し再生成する。
 </details>
 ```
 
@@ -221,7 +222,7 @@ REQ-REPORT-001,JUnitを解析して失敗傾向を把握できる,M,M,T-03-REPOR
 ```
 weekly_summary.py
   --runs <path to runs.jsonl>
-  --flaky <path to flaky_rank.csv>
+  --flaky <path to flaky_rank.csv>   # 生成手順: docs/examples/ci-flaky/README.md
   --out  <path to weekly-summary.md>
   --days <int, default=7>
 ```

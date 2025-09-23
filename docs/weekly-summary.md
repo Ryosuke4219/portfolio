@@ -31,6 +31,7 @@ description: 直近7日間のQA状況サマリ
 
 <details><summary>Method</summary>
 データソース: projects/03-ci-flaky/data/runs.jsonl / projects/03-ci-flaky/out/flaky_rank.csv / 欠陥: docs/defect-report-sample.md
+※ `runs.jsonl` と `out/*.csv` は `npm run ci:analyze`（`just test` 内）で再生成され、リポジトリには含めない。生成手順は `docs/examples/ci-flaky/README.md` を参照。
 期間: 直近7日 / 比較対象: その前の7日
 再計算: 毎週月曜 09:00 JST (GitHub Actions)
 </details>

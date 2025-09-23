@@ -19,7 +19,7 @@
 - トレーサビリティ: RTMとテスト計画の要求対応状況。
 - 欠陥レポ品質: テンプレ適用、証跡リンクの有効性。
 - 自動化: weekly_summary スクリプトの入出力、エラー時のフォールバック。
-- データ品質: runs.jsonl / flaky_rank.csv の期間・フォーマット妥当性。
+- データ品質: runs.jsonl / flaky_rank.csv の期間・フォーマット妥当性（`npm run ci:analyze` で再生成可能）。
 - ガバナンス: GitHub Actionsのスケジュール、権限、コミットポリシー。
 
 ## 5. リスクと対策（Top3）
@@ -30,7 +30,7 @@
 ## 6. 実行体制（Roles / Env / Data）
 - Roles: QA=Y. Sato, SDET=K. Arai、Reviewer=M. Chen。
 - Env: GitHub Codespaces / Node.js 20 / Python 3.11。
-- Data: `projects/03-ci-flaky/data/runs.jsonl`、`projects/03-ci-flaky/out/flaky_rank.csv`、欠陥レポ証跡。
+- Data: `projects/03-ci-flaky/data/runs.jsonl`、`projects/03-ci-flaky/out/flaky_rank.csv`（いずれも `docs/examples/ci-flaky/README.md` 記載の手順で生成）、欠陥レポ証跡。
 
 ## 7. トレーサビリティ
 - RTM: `./rtm.csv`（Req⇄Testの対応）

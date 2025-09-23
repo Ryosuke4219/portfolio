@@ -28,12 +28,12 @@ description: QA × SDET × LLM の成果物と週次サマリをまとめた常�
 
 ### 03. CI Flaky Analyzer
 - CIログからflakyテストを検知し再実行・自動起票までを一気通貫にする仕組み。
-- 成果物: [out/index.html](https://github.com/Ryosuke4219/portfolio/blob/main/projects/03-ci-flaky/out/index.html)
-- 解析サンプル: [demo/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/03-ci-flaky/demo)
+- 生成手順と最新スクショ: [docs/examples/ci-flaky/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/ci-flaky/README.md)
+- CLI: [`projects/03-ci-flaky/scripts/flaky.mjs`](https://github.com/Ryosuke4219/portfolio/blob/main/projects/03-ci-flaky/scripts/flaky.mjs)
 
 ### 04. LLM Adapter — Shadow Execution
 - プライマリと影（shadow）実行を並走させ、差分メトリクスを収集するLLMアダプタの最小実装。
-- 成果物: [artifacts/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/04-llm-adapter-shadow/artifacts)
+- 生成手順と最新スクショ: [docs/examples/llm-adapter/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/llm-adapter/README.md)
 - 詳細資料: [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/README.md)
 
 ## Evidence Library
@@ -42,6 +42,6 @@ description: QA × SDET × LLM の成果物と週次サマリをまとめた常�
 - [欠陥レポートサンプル](./defect-report-sample.md)
 
 ## 運用メモ
-- `weekly-qa-summary.yml` ワークフローが `docs/weekly-summary.md` を自動更新。
+- `weekly-qa-summary.yml` ワークフローが `docs/weekly-summary.md` を自動更新（入力データは `docs/examples/ci-flaky/README.md` 記載の手順で生成）。
 - `tools/generate_gallery_snippets.py` が週次サマリからハイライトカードを生成。
 - `pages.yaml` ワークフローが `docs/` 配下を GitHub Pages に公開。

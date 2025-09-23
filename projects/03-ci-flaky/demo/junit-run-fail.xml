@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="demo" tests="2" failures="1" time="0.45">
-  <testcase classname="auth.Login" name="should_login" time="0.20" />
-  <testcase classname="auth.Login" name="should_lock_after_fail" time="0.25">
-    <failure message="Expected lock icon">UI element missing</failure>
-  </testcase>
-</testsuite>

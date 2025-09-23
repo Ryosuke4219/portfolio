@@ -78,6 +78,8 @@ CI/E2E実行で生成される **JUnit 形式のテスト結果** を継続収�
 * **週次Markdown**：`/docs/weekly-summary.md`
 * **GitHub起票プレビュー**：`/out/issues/*.md`（Dry-run時）
 
+> **運用方針**: `out/` 以下と `data/runs.jsonl` は `.gitignore` 登録済み。レポートは `npm run ci:analyze` 実行時に生成し、静的サンプルは [`docs/examples/ci-flaky/README.md`](../../../docs/examples/ci-flaky/README.md) にまとめる。
+
 ---
 
 ## 5. データモデル（JSONL スキーマ）
@@ -256,7 +258,7 @@ flaky weekly --since 14d
 
 * コマンド 5種が README の例通りに動作
 * 100MB JUnit を所定時間・メモリ内で解析（CI ログに実測値を残す）
-* `summary.json / flaky_rank.csv / index.html / weekly-summary.md` が生成
+* `summary.json / flaky_rank.csv / index.html / weekly-summary.md` が生成（成果物はコミットせず、`docs/examples/ci-flaky/README.md` に記載の手順で再作成）
 * `threshold` を変更するとランキングが反映
 * `dry_run issue` でテンプレが作成され、**重複起票の抑止（signature重複）**が効く
 

@@ -60,6 +60,8 @@
   └─ runs-metrics.jsonl                 # 実行ログ（追記）
 ```
 
+> **運用メモ**: `/data/` と `/reports/` 配下の生成物は `.gitignore` に登録し、GitHub にはコミットしない。ローカルでの再現手順とスクリーンショットは [`docs/examples/llm-adapter/README.md`](../../../docs/examples/llm-adapter/README.md) にまとめる。
+
 ---
 
 ## 4. データモデル
@@ -200,7 +202,7 @@ overrides:
 ### 7.1 ツール（`/tools/report/metrics_to_html.py`）
 
 * 入力：`/data/runs-metrics.jsonl`、（任意）`/datasets/golden/baseline/*`
-* 出力：`/reports/index.html`（単一ファイル）
+* 出力：`/reports/index.html`（単一ファイル、`.gitignore` 対象 — 生成手順は `docs/examples/llm-adapter/README.md`）
 * 要件（最低限）：
 
   * **Overview**：総試行数、成功率（ok率）、平均/中央値 latency、合計/平均 cost
@@ -305,7 +307,7 @@ python adapter/run_compare.py \
 python tools/report/metrics_to_html.py \
   --metrics data/runs-metrics.jsonl \
   --golden datasets/golden \
-  --out reports/index.html
+  --out reports/index.html    # 生成物はコミットせず `.gitignore` 管理
 ```
 
 ---

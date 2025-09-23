@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">CI Flaky Analyzer Dashboard Snapshot</title>
+  <desc id="desc">Simplified mock screenshot showing flaky ranking cards and charts.</desc>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3c72"/>
+      <stop offset="100%" stop-color="#2a5298"/>
+    </linearGradient>
+    <style>
+      text { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; }
+      .card { fill: #0f172a; opacity: 0.85; stroke: rgba(255,255,255,0.18); stroke-width: 1; }
+      .label { fill: #cbd5f5; font-size: 18px; }
+      .value { fill: #f8fafc; font-size: 42px; font-weight: 600; }
+      .table-header { fill: #1f2937; }
+      .table-row:nth-child(even) { fill: rgba(15,23,42,0.55); }
+      .table-row:nth-child(odd) { fill: rgba(15,23,42,0.35); }
+      .table-text { fill: #e2e8f0; font-size: 18px; }
+      .sparkline { fill: none; stroke: #38bdf8; stroke-width: 3; }
+      .chip { fill: rgba(59,130,246,0.12); stroke: #38bdf8; stroke-width: 1; rx: 8; }
+      .chip-text { fill: #bfdbfe; font-size: 16px; }
+    </style>
+  </defs>
+  <rect width="960" height="540" fill="url(#grad)"/>
+  <rect x="40" y="40" width="880" height="460" rx="24" fill="rgba(15,23,42,0.72)" stroke="rgba(148,163,184,0.4)" stroke-width="2"/>
+  <text x="80" y="110" fill="#bfdbfe" font-size="48" font-weight="600">CI Flaky Analyzer — Demo Snapshot</text>
+
+  <g transform="translate(80,140)">
+    <rect class="card" width="220" height="120" rx="16"/>
+    <text class="label" x="20" y="46">New Flaky</text>
+    <text class="value" x="20" y="96">3</text>
+  </g>
+
+  <g transform="translate(320,140)">
+    <rect class="card" width="220" height="120" rx="16"/>
+    <text class="label" x="20" y="46">Top Failure Kind</text>
+    <text class="value" x="20" y="96">timeout</text>
+  </g>
+
+  <g transform="translate(560,140)">
+    <rect class="card" width="220" height="120" rx="16"/>
+    <text class="label" x="20" y="46">Pass Rate</text>
+    <text class="value" x="20" y="96">71.4%</text>
+  </g>
+
+  <g transform="translate(80,280)">
+    <rect width="720" height="40" class="table-header" rx="12"/>
+    <text class="table-text" x="20" y="30">#</text>
+    <text class="table-text" x="80" y="30">Canonical ID</text>
+    <text class="table-text" x="420" y="30">Attempts</text>
+    <text class="table-text" x="540" y="30">p_fail</text>
+    <text class="table-text" x="650" y="30">Score</text>
+  </g>
+
+  <g transform="translate(80,330)">
+    <rect width="720" height="46" class="table-row" rx="10"/>
+    <text class="table-text" x="20" y="30">1</text>
+    <text class="table-text" x="80" y="30">ui-e2e.LoginFlow.should login with valid user</text>
+    <text class="table-text" x="420" y="30">12</text>
+    <text class="table-text" x="540" y="30">0.42</text>
+    <text class="table-text" x="650" y="30">0.78</text>
+  </g>
+
+  <g transform="translate(80,382)">
+    <rect width="720" height="46" class="table-row" rx="10"/>
+    <text class="table-text" x="20" y="30">2</text>
+    <text class="table-text" x="80" y="30">api-report.ReportJob.test generates flaky summary</text>
+    <text class="table-text" x="420" y="30">9</text>
+    <text class="table-text" x="540" y="30">0.33</text>
+    <text class="table-text" x="650" y="30">0.66</text>
+  </g>
+
+  <g transform="translate(80,434)">
+    <rect width="720" height="46" class="table-row" rx="10"/>
+    <text class="table-text" x="20" y="30">3</text>
+    <text class="table-text" x="80" y="30">ui-e2e.Dashboard.spec should render analytics widgets</text>
+    <text class="table-text" x="420" y="30">7</text>
+    <text class="table-text" x="540" y="30">0.29</text>
+    <text class="table-text" x="650" y="30">0.59</text>
+  </g>
+
+  <path class="sparkline" d="M640 200 Q660 170 680 190 T720 210 T760 180"/>
+  <rect class="chip" x="640" y="220" width="160" height="32"/>
+  <text class="chip-text" x="660" y="242">Window: last 20 runs</text>
+</svg>

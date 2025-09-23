@@ -16,6 +16,8 @@
 QA × SDET × LLM を軸にした実践的ポートフォリオで、テスト自動化やLLM活用のPoCを継続的に追加していきます。
 GitHub Pages の [Portfolio Gallery](docs/index.md) ではサマリと成果物を常時公開しています。
 
+生成手順や最新スクショは [`docs/examples/README.md`](docs/examples/README.md) に整理しています（生成物はリポジトリへコミットしません）。
+
 Practical portfolio focusing on **QA × SDET × LLM**.
 New automation pipelines and LLM-driven PoCs are published regularly, with a persistent [Portfolio Gallery](docs/index.md) available via GitHub Pages.
 
@@ -92,8 +94,9 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 * JUnit XML を解析して履歴 DB (`database.json`) を更新。
 
   ```bash
-  npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-fail.xml
-  npm run ci:analyze -- projects/03-ci-flaky/demo/junit-run-pass.xml
+  # デモデータは `just test` で自動生成（`projects/03-ci-flaky/junit/**/*.xml`）
+  npm run ci:analyze
+  # => projects/03-ci-flaky/out/ 配下に HTML / CSV / JSON が生成（未コミット）
   ```
 
   * Node.js のみで動作する軽量 XML パーサーを実装し、外部依存なしでレポートを吸収。
@@ -104,7 +107,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
   npm run ci:issue
   ```
 
-  * 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
+* 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。生成手順と最新スクショは [docs/examples/ci-flaky/README.md](docs/examples/ci-flaky/README.md) に集約。
 
 ### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
 
@@ -130,6 +133,8 @@ pip install -r requirements.txt
 python demo_shadow.py
 # => artifacts/runs-metrics.jsonl に1行/リクエストで追記
 ```
+
+> `projects/04-llm-adapter` の比較ランナーと HTML レポートの再現手順・最新スクショは [docs/examples/llm-adapter/README.md](docs/examples/llm-adapter/README.md) を参照。
 
 **異常系テストとCI**
 

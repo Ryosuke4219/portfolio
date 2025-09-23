@@ -10,9 +10,16 @@ projects/02-llm-to-playwright/tests/generated
 !projects/02-llm-to-playwright/tests/generated/__snapshots__/
 !projects/02-llm-to-playwright/tests/generated/__snapshots__/**
 projects/01-spec2cases/cases.generated.json
+projects/03-ci-flaky/out/
+projects/03-ci-flaky/junit/
+projects/03-ci-flaky/demo/
+projects/03-ci-flaky/data/*.jsonl
+!projects/03-ci-flaky/data/runs.jsonl
 junit-results.xml
 database.json
 .venv
 .cache
 coverage.xml
 coverage/
+projects/04-llm-adapter/data/*.jsonl
+projects/04-llm-adapter/reports/

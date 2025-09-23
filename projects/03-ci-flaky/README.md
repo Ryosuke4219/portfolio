@@ -38,10 +38,10 @@ flaky issue --top-n 10
 
 ## 生成物
 
-- `data/runs.jsonl` : 履歴ストア（1 Attempt = 1 行）
+- `data/runs.jsonl` : 履歴ストア（1 Attempt = 1 行）※ `.gitignore` 対象
 - `out/summary.json` / `out/summary.csv`
 - `out/flaky_rank.json` / `out/flaky_rank.csv`
 - `out/index.html`
 - `out/issues/*.md` （Dry-run 時）
 
-CI での利用例は `npm run ci:analyze` および `npm run ci:issue` を参照してください。
+上記はすべて **実行時に再生成される成果物** であり、リポジトリにはコミットしません。ローカル確認手順と最新スクショは [`docs/examples/ci-flaky/README.md`](../../docs/examples/ci-flaky/README.md) を参照してください。CI での利用例は `npm run ci:analyze` および `npm run ci:issue` を参照してください。

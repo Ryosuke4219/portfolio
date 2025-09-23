@@ -15,8 +15,14 @@
 ## 03. CI Flaky Analyzer
 - プロダクト README: `../projects/03-ci-flaky/README.md`
 - 仕様書: `../projects/03-ci-flaky/docs/spec_flaky_analyzer.md`
-- デモ JUnit: `../projects/03-ci-flaky/demo/junit-run-fail.xml`
-- サマリ HTML: `../projects/03-ci-flaky/out/index.html`
+- 生成手順と最新スクショ: `../docs/examples/ci-flaky/README.md`
+- 実行時に生成される成果物: `../projects/03-ci-flaky/out/`（`just test` または `npm run ci:analyze`）
+
+## 04. LLM Adapter Lab
+- プロダクト README: `../projects/04-llm-adapter-shadow/README.md`
+- 実験仕様: `../projects/04-llm-adapter/docs/spec_adapter_lab.md`
+- 生成手順と最新スクショ: `../docs/examples/llm-adapter/README.md`
+- 実行時に生成される成果物: `../projects/04-llm-adapter/data/`・`../projects/04-llm-adapter/reports/`
 
 ## Docs Cross Reference
 - テスト計画: `../docs/test-plan.md`
