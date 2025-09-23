@@ -83,6 +83,8 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
   * `--tag` や `--id` で絞り込めるため、スモークテスト／個別ケースを即座に確認可能。
   * 期待値や手順が欠落している場合は失敗としてサマリに計上し、仕様漏れを検知。
 
+→ 詳細: [Spec2Cases CLI README](projects/01-spec2cases/README.md)
+
 ### 2. LLM設計 → Playwright E2E テスト自動生成
 
 * `docs/examples/llm2pw/blueprint.sample.json` をもとにテストコードを自動生成。
@@ -103,6 +105,8 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
   * CI ではこれらの成果物を `npm run ci:analyze` / `npm run ci:issue` へ渡して履歴管理を行う。
   * `projects/02-llm-to-playwright/tests/README.md` にテスト生成時の**セレクタ・ガード方針**や**ビジュアル／a11y スモーク**の運用メモを記載。`login-cases.json` / `a11y-pages.csv` を編集するだけでデータドリブンにシナリオを増やせる構成とした。
 
+→ 詳細: [LLM → Playwright Pipeline README](projects/02-llm-to-playwright/README.md)
+
 ### 3. CI ログ解析と flaky テスト検出
 
 * JUnit XML を解析して履歴 DB (`database.json`) を更新。
@@ -122,6 +126,8 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
   * 失敗率や平均時間、直近 10 実行のタイムラインを含むレポートを生成。
   * 解析結果は `projects/03-ci-flaky/out/`（HTML/CSV/JSON）に出力され、CI 実行時はアーティファクトとして取得できる。
+
+→ 詳細: [Flaky Analyzer CLI README](projects/03-ci-flaky/README.md)
 
 ### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
 
@@ -157,6 +163,8 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 * `[TIMEOUT]` / `[RATELIMIT]` / `[INVALID_JSON]` を含むプロンプトで異常系を明示的に再現し、フォールバック挙動を検証。
 
 **記録フォーマット（例）**
+
+→ 詳細: [LLM Adapter (Core) README](projects/04-llm-adapter/README.md) / [Shadow Adapter README](projects/04-llm-adapter-shadow/README.md)
 
 ```json
 {
