@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
 import { classifyFailureByMessage, createFailureSignature, applyTimeoutClassification } from './classification.js';
 
 const ATTRIBUTE_REGEX = /([:\w.-]+)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s'"=<>`]+)))?/g;

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import random
 import time
-from typing import Iterable, Optional, Set
+from collections.abc import Iterable
 
-from ..provider_spi import ProviderSPI, ProviderRequest, ProviderResponse, TokenUsage
-from ..errors import TimeoutError, RateLimitError, RetriableError
+from ..errors import AdapterError, RateLimitError, RetriableError, TimeoutError
+from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
 
-_MARKER_TO_ERROR = {
+ErrorSpec = tuple[type[AdapterError], str]
+_ERROR_BY_MARKER: dict[str, ErrorSpec] = {
     "[TIMEOUT]": (TimeoutError, "simulated timeout"),
     "[RATELIMIT]": (RateLimitError, "simulated rate limit"),
     "[INVALID_JSON]": (RetriableError, "simulated invalid JSON"),
@@ -23,25 +24,27 @@ class MockProvider(ProviderSPI):
         self,
         name: str,
         base_latency_ms: int = 50,
-        error_markers: Optional[Iterable[str]] = None,
+        error_markers: Iterable[str] | None = None,
     ) -> None:
         self._name = name
         self.base_latency_ms = base_latency_ms
         if error_markers is None:
-            self._error_markers: Set[str] = set(_MARKER_TO_ERROR)
+            self._error_markers: set[str] = set(_ERROR_BY_MARKER)
         else:
-            self._error_markers = {marker for marker in error_markers if marker in _MARKER_TO_ERROR}
+            self._error_markers = {
+                marker for marker in error_markers if marker in _ERROR_BY_MARKER
+            }
 
     def name(self) -> str:
         return self._name
 
-    def capabilities(self) -> set:
+    def capabilities(self) -> set[str]:
         return {"chat"}
 
     def _maybe_raise_error(self, text: str) -> None:
         for marker in self._error_markers:
             if marker in text:
-                exc_cls, message = _MARKER_TO_ERROR[marker]
+                exc_cls, message = _ERROR_BY_MARKER[marker]
                 raise exc_cls(message)
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
