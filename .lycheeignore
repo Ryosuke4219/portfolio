@@ -1,0 +1,3 @@
+# Ignore Jekyll Liquid placeholders that are resolved at build time.
+# These appear as invalid URLs like "{{ '/path' | relative_url }}" during static analysis.
+regex:\{\{[^}]+relative_url[^}]*\}\}

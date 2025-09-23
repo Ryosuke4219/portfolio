@@ -17,7 +17,12 @@ jobs:
         id: lychee
         uses: lycheeverse/lychee-action@v1
         with:
-          args: --verbose --no-progress README.md docs/
+          args: >-
+            --verbose
+            --no-progress
+            --exclude [{]{2}[^}]*relative_url[^}]*[}]{2}
+            README.md
+            docs/
           fail: true
 
       - name: Upload lychee report
