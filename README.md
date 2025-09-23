@@ -174,6 +174,13 @@ pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
 
 ---
 
+## メンテナンス運用 (Maintenance)
+
+- **Dependabot** — `.github/dependabot.yml` でルートの `npm` と `projects/04-llm-adapter-shadow/requirements.txt`（`pip`）を週次（JST 月曜03:00）でチェックし、更新 PR を自動生成します。
+- **リンクチェック** — `.github/workflows/link-check.yml` で README と `docs/` 配下のリンクを対象に、PR 作成時と週次スケジュールで `lycheeverse/lychee-action` による検証を実行します。失敗時はレポートをアーティファクトとして保存し、リンク切れの可視化を維持します。
+
+---
+
 ## リリース (Releases)
 
 - GitHub Releases でマイルストーン単位の成果をタグ付けします。
