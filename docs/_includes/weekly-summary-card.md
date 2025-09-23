@@ -1,8 +1,8 @@
-### Weekly QA Snapshot — 2025-09-22
+### Weekly QA Snapshot — 2025-09-23
 
-- TotalTests: 5
-- PassRate: 40.00%
+- TotalTests: 126
+- PassRate: 100.00%
 - NewDefects: 0
-- TopFailureKinds: timeout 1 / guard_violation 1 / infra 1
+- TopFailureKinds: -
 
 [週次サマリを詳しく読む →]({{ '/weekly-summary.html' | relative_url }})
