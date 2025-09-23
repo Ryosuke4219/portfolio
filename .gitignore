@@ -16,3 +16,9 @@ database.json
 .cache
 coverage.xml
 coverage/
+docs/evidence/*.log
+docs/evidence/*-log.txt
+projects/03-ci-flaky/demo/junit-run-*.xml
+projects/03-ci-flaky/out/
+projects/04-llm-adapter/data/*.jsonl
+projects/04-llm-adapter/reports/*.html

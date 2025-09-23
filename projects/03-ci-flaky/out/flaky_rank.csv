@@ -1,7 +1,0 @@
-rank,canonical_id,suite,class,name,attempts,passes,fails,p_fail,intermittency,recency,impact,score,avg_duration_ms,failure_top_k,as_of
-1,ui-e2e.LoginFlow.spec.should show error for invalid user,ui-e2e,LoginFlow.spec,should show error for invalid user,8,5,3,0.38,0.75,0.68,0.42,0.71,52123,"timeout:3",2025-09-21
-2,ui-e2e.LoginFlow.spec.should login with valid user,ui-e2e,LoginFlow.spec,should login with valid user,8,6,2,0.25,0.50,0.61,0.37,0.58,34261,"guard_violation:1",2025-09-21
-3,api-report.ReportJob.test.generates flaky summary,api-report,ReportJob.test,generates flaky summary,5,4,1,0.20,0.40,0.55,0.24,0.46,7011,"infra:1",2025-09-21
-1,ui-e2e.LoginFlow.spec.should show error for invalid user,ui-e2e,LoginFlow.spec,should show error for invalid user,6,4,2,0.33,0.67,0.54,0.41,0.62,50210,"timeout:2",2025-09-14
-2,api-report.ReportJob.test.generates flaky summary,api-report,ReportJob.test,generates flaky summary,4,3,1,0.25,0.50,0.49,0.21,0.51,6890,"infra:1",2025-09-14
-3,ui-e2e.Dashboard.spec.should render analytics widgets,ui-e2e,Dashboard.spec,should render analytics widgets,4,4,0,0.00,0.00,0.40,0.15,0.32,25500,"",2025-09-14

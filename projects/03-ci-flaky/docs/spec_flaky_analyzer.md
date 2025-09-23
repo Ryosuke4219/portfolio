@@ -78,6 +78,8 @@ CI/E2E実行で生成される **JUnit 形式のテスト結果** を継続収�
 * **週次Markdown**：`/docs/weekly-summary.md`
 * **GitHub起票プレビュー**：`/out/issues/*.md`（Dry-run時）
 
+> ℹ️ `/out/*.html|csv|json` は解析コマンド実行時に生成される成果物で、リポジトリには含めていません。CI アーティファクトやローカル実行で適宜取得します。
+
 ---
 
 ## 5. データモデル（JSONL スキーマ）

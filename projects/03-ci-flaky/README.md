@@ -21,9 +21,9 @@ npm install
 ## 代表的な使い方
 
 ```bash
-# 1. JUnit XML を取り込む
-flaky parse --input ./projects/03-ci-flaky/demo/junit-run-fail.xml \
-  --run-id demo_001 --branch main --commit deadbeef
+# 1. JUnit XML を取り込む（CI から取得した XML or ローカルの `test-results/**/*.xml` を指定）
+flaky parse --input ./path/to/junit-xml/ \
+  --run-id ci_2025_001 --branch main --commit deadbeef
 
 # 2. 解析・レポート生成
 flaky analyze --config projects/03-ci-flaky/config/flaky.yml
@@ -45,3 +45,5 @@ flaky issue --top-n 10
 - `out/issues/*.md` （Dry-run 時）
 
 CI での利用例は `npm run ci:analyze` および `npm run ci:issue` を参照してください。
+
+> ℹ️ `out/` 配下の HTML/CSV はコマンド実行時に生成される成果物であり、リポジトリには含めていません。必要に応じて CI アーティファクトやローカル実行で再取得してください。

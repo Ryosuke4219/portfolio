@@ -43,7 +43,7 @@
 2) テスト完了を待機する。
 - 期待値: 認証後3秒以内にダッシュボードが表示され、`data-testid="dashboard-card"` を検出できる。
 - 実際値: スピナーが永続化し、`locator.waitFor()` が60秒でタイムアウト。
-- 証拠: `./evidence/login-error-log.txt`
+- 証拠: ローカル再現ログ（`npm run test:e2e` の実行結果を保存したテキスト）
 
 ## 3. 原因分析（5Whys/図解は任意）
 - 直接原因: E2Eテストがモーダルクローズを待たずにダッシュボード遷移を開始した。
@@ -58,4 +58,4 @@
 ## 5. 検証・完了条件（DoD）
 - 再現テスト: `T-02-E2E-LOGIN-INVALID` と `T-02-E2E-LOGIN-VALID` を回し再発しないこと。
 - 回帰: `T-03-FLAKY-RANK` で新規Flaky登録が増加していないこと。
-- 閉塞条件を満たす証跡: `../projects/03-ci-flaky/out/index.html`
+- 閉塞条件を満たす証跡: `npx flaky analyze` で生成した Flaky レポート（`projects/03-ci-flaky/out/index.html`）
