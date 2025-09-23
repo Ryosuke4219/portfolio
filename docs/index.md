@@ -72,6 +72,12 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
   </ul>
 </nav>
 
+## このポートフォリオで分かること
+
+- QA 自動化パイプラインの組み立てと運用ノウハウ
+- LLM 活用によるテスト生成と評価の実践知
+- CI パイプラインの可観測性・改善サイクルの設計
+
 <div class="button-group">
   <a class="button button--github" href="https://github.com/Ryosuke4219/portfolio">GitHubリポジトリ</a>
   <a class="button button--evidence" href="{{ '/evidence/README.html' | relative_url }}">Evidence Catalog</a>
