@@ -1,4 +1,5 @@
 name: CodeQL
+
 on:
   push:
     branches: [main]
@@ -6,8 +7,22 @@ on:
     branches: [main]
   schedule:
     - cron: '20 14 * * 1'
+
 jobs:
   analyze:
-    uses: github/codeql-action/.github/workflows/codeql.yml@v3
-    with:
-      languages: javascript, python
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, python
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
