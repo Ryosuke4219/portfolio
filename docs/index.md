@@ -5,6 +5,8 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 ---
 
 <style>
+  html { scroll-behavior: smooth; }
+
   .page-nav {
     display: flex;
     flex-wrap: wrap;
@@ -15,35 +17,44 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
     border: 1px solid rgba(15, 76, 129, 0.12);
     border-radius: 0.75rem;
   }
-
-  .page-nav ul {
-    display: contents;
-  }
-
-  .page-nav li {
-    list-style: none;
-  }
-
+  .page-nav ul { display: contents; }
+  .page-nav li { list-style: none; }
   .page-nav a {
     font-weight: 600;
     color: #0f4c81;
     text-decoration: none;
   }
-
   .page-nav a:focus,
-  .page-nav a:hover {
-    text-decoration: underline;
+  .page-nav a:hover { text-decoration: underline; }
+
+  .button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 0 0 1.5rem;
   }
+  .button-group .button {
+    display: inline-block;
+    padding: 0.5rem 0.9rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(0,0,0,0.08);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .button--github    { background: #f6f8fa; }
+  .button--evidence  { background: #eef7ff; }
+  .button--weekly    { background: #f5f0ff; }
 
   @media (prefers-color-scheme: dark) {
     .page-nav {
       background: rgba(124, 196, 255, 0.12);
       border-color: rgba(124, 196, 255, 0.32);
     }
-
-    .page-nav a {
-      color: #7cc4ff;
-    }
+    .page-nav a { color: #7cc4ff; }
+    .button-group .button { border-color: rgba(255,255,255,0.15); }
+    .button--github   { background: rgba(255,255,255,0.06); }
+    .button--evidence { background: rgba(124,196,255,0.12); }
+    .button--weekly   { background: rgba(180,124,255,0.12); }
   }
 </style>
 
@@ -61,8 +72,13 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
   </ul>
 </nav>
 
-> [English version]({{ '/en/' | relative_url }})
+<div class="button-group">
+  <a class="button button--github" href="https://github.com/Ryosuke4219/portfolio">GitHubリポジトリ</a>
+  <a class="button button--evidence" href="{{ '/evidence/README.html' | relative_url }}">Evidence Catalog</a>
+  <a class="button button--weekly" href="{{ '/weekly-summary.html' | relative_url }}">Weekly Summary</a>
+</div>
 
+> [English version]({{ '/en/' | relative_url }})
 
 > 🔎 最新CIレポート: [JUnit要約]({{ '/reports/junit/index.html' | relative_url }}) / [Flakyランキング]({{ '/reports/flaky/index.html' | relative_url }}) / [Coverage HTML]({{ '/reports/coverage/index.html' | relative_url }})
 >
