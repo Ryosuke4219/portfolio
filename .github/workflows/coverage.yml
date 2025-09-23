@@ -44,91 +44,91 @@ jobs:
             cp coverage.xml "${reports_dir}/coverage.xml"
           fi
           python - <<'PY'
-import json
-import pathlib
-import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+            import json
+            import pathlib
+            import xml.etree.ElementTree as ET
+            from datetime import datetime, timezone
 
-reports_dir = pathlib.Path('reports/coverage')
-reports_dir.mkdir(parents=True, exist_ok=True)
-coverage_xml = reports_dir / 'coverage.xml'
-badge_path = reports_dir / 'badge.json'
-summary_path = reports_dir / 'summary.json'
+            reports_dir = pathlib.Path('reports/coverage')
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            coverage_xml = reports_dir / 'coverage.xml'
+            badge_path = reports_dir / 'badge.json'
+            summary_path = reports_dir / 'summary.json'
 
-def pick_color(rate: float) -> str:
-    if rate >= 90:
-        return 'brightgreen'
-    if rate >= 80:
-        return 'green'
-    if rate >= 70:
-        return 'yellowgreen'
-    if rate >= 60:
-        return 'yellow'
-    if rate >= 50:
-        return 'orange'
-    return 'red'
+            def pick_color(rate: float) -> str:
+                if rate >= 90:
+                    return 'brightgreen'
+                if rate >= 80:
+                    return 'green'
+                if rate >= 70:
+                    return 'yellowgreen'
+                if rate >= 60:
+                    return 'yellow'
+                if rate >= 50:
+                    return 'orange'
+                return 'red'
 
-line_rate = None
-branch_rate = None
-lines_valid = None
-lines_covered = None
-branches_valid = None
-branches_covered = None
-timestamp = None
+            line_rate = None
+            branch_rate = None
+            lines_valid = None
+            lines_covered = None
+            branches_valid = None
+            branches_covered = None
+            timestamp = None
 
-if coverage_xml.exists():
-    try:
-        root = ET.parse(coverage_xml).getroot()
-    except ET.ParseError:
-        root = None
-    if root is not None:
-        line_rate = round(float(root.attrib.get('line-rate', '0')) * 100, 2)
-        branch_rate = round(float(root.attrib.get('branch-rate', '0')) * 100, 2)
-        lines_valid = int(float(root.attrib.get('lines-valid', '0')))
-        lines_covered = int(float(root.attrib.get('lines-covered', '0')))
-        branches_valid = int(float(root.attrib.get('branches-valid', '0')))
-        branches_covered = int(float(root.attrib.get('branches-covered', '0')))
-        timestamp = root.attrib.get('timestamp')
-        generated_at = None
-        if timestamp:
-            try:
-                ts_value = float(timestamp)
-            except ValueError:
-                generated_at = timestamp
+            if coverage_xml.exists():
+                try:
+                    root = ET.parse(coverage_xml).getroot()
+                except ET.ParseError:
+                    root = None
+                if root is not None:
+                    line_rate = round(float(root.attrib.get('line-rate', '0')) * 100, 2)
+                    branch_rate = round(float(root.attrib.get('branch-rate', '0')) * 100, 2)
+                    lines_valid = int(float(root.attrib.get('lines-valid', '0')))
+                    lines_covered = int(float(root.attrib.get('lines-covered', '0')))
+                    branches_valid = int(float(root.attrib.get('branches-valid', '0')))
+                    branches_covered = int(float(root.attrib.get('branches-covered', '0')))
+                    timestamp = root.attrib.get('timestamp')
+                    generated_at = None
+                    if timestamp:
+                        try:
+                            ts_value = float(timestamp)
+                        except ValueError:
+                            generated_at = timestamp
+                        else:
+                            if ts_value > 1e12:
+                                ts_value /= 1000
+                            generated_at = datetime.fromtimestamp(ts_value, tz=timezone.utc).isoformat()
+                    if generated_at is None:
+                        generated_at = datetime.now(timezone.utc).isoformat()
+                    summary = {
+                        'line_rate': line_rate,
+                        'branch_rate': branch_rate,
+                        'lines_valid': lines_valid,
+                        'lines_covered': lines_covered,
+                        'branches_valid': branches_valid,
+                        'branches_covered': branches_covered,
+                        'generated_at': generated_at,
+                    }
+                    summary_path.write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
+
+            if line_rate is None:
+                badge = {
+                    'schemaVersion': 1,
+                    'label': 'coverage',
+                    'message': 'error',
+                    'color': 'lightgrey',
+                }
             else:
-                if ts_value > 1e12:
-                    ts_value /= 1000
-                generated_at = datetime.fromtimestamp(ts_value, tz=timezone.utc).isoformat()
-        if generated_at is None:
-            generated_at = datetime.now(timezone.utc).isoformat()
-        summary = {
-            'line_rate': line_rate,
-            'branch_rate': branch_rate,
-            'lines_valid': lines_valid,
-            'lines_covered': lines_covered,
-            'branches_valid': branches_valid,
-            'branches_covered': branches_covered,
-            'generated_at': generated_at,
-        }
-        summary_path.write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
+                badge = {
+                    'schemaVersion': 1,
+                    'label': 'coverage',
+                    'message': f"{line_rate:.1f}%",
+                    'color': pick_color(line_rate),
+                }
 
-if line_rate is None:
-    badge = {
-        'schemaVersion': 1,
-        'label': 'coverage',
-        'message': 'error',
-        'color': 'lightgrey',
-    }
-else:
-    badge = {
-        'schemaVersion': 1,
-        'label': 'coverage',
-        'message': f"{line_rate:.1f}%",
-        'color': pick_color(line_rate),
-    }
-
-badge_path.write_text(json.dumps(badge, indent=2) + '\n', encoding='utf-8')
-PY
+            badge_path.write_text(json.dumps(badge, indent=2) + '\n', encoding='utf-8')
+          PY
 
       - name: Upload coverage report
         if: always()
