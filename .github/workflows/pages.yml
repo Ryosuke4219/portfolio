@@ -24,6 +24,14 @@ jobs:
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
+      - name: Copy bundled CI reports
+        run: |
+          for dir in coverage flaky junit; do
+            if [ -d "docs/reports/${dir}" ]; then
+              mkdir -p "_site/reports/${dir}"
+              rsync -av --delete --omit-dir-times --no-perms "docs/reports/${dir}/" "_site/reports/${dir}/"
+            fi
+          done
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
