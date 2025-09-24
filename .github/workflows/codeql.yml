@@ -1,3 +1,4 @@
+# .github/workflows/codeql.yml
 name: CodeQL
 
 on:
@@ -24,20 +25,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ "javascript-typescript" ]  # adjust if you add other languages
+        language: [ "javascript-typescript" ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Optional: setup Node if your repo needs install/build for better analysis quality
+      # 依存解決が必要な場合のみ活かす（なくても動く）
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
         continue-on-error: true
-
-      # - run: npm ci  # uncomment if your analysis benefits from deps
+      # - run: npm ci  # 必要ならアンコメント
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
