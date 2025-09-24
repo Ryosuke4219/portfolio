@@ -8,6 +8,9 @@ from collections.abc import Iterable, Mapping
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
+from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+
 
 class _ResponseProtocol(Protocol):
     status_code: int
@@ -15,7 +18,7 @@ class _ResponseProtocol(Protocol):
     def close(self) -> None:
         ...
 
-    def __enter__(self) -> "_ResponseProtocol":
+    def __enter__(self) -> _ResponseProtocol:
         ...
 
     def __exit__(
@@ -78,7 +81,7 @@ else:  # pragma: no cover - allow running without the optional dependency
             def close(self) -> None:  # pragma: no cover - trivial stub
                 return None
 
-            def __enter__(self) -> "Response":  # pragma: no cover - stub
+            def __enter__(self) -> Response:  # pragma: no cover - stub
                 return self
 
             def __exit__(
@@ -100,11 +103,8 @@ else:  # pragma: no cover - allow running without the optional dependency
                 return []
     else:
         requests = cast(Any, _requests_module)
-        Response = cast(type[_ResponseProtocol], getattr(_requests_module, "Response"))
-        requests_exceptions = cast(Any, getattr(_requests_module, "exceptions"))
-
-from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
-from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+        Response = cast(type[_ResponseProtocol], _requests_module.Response)
+        requests_exceptions = cast(Any, _requests_module.exceptions)
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 __all__ = ["OllamaProvider", "DEFAULT_HOST"]
