@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>JUnit Summary</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        margin: 2rem;
+        color: #1f2933;
+        background: #f8fafc;
+      }
+      h1 {
+        margin-bottom: 0.5rem;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+      }
+      .metric {
+        background: #fff;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+      }
+      .metric__label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+        margin-bottom: 0.25rem;
+      }
+      .metric__value {
+        font-size: 1.75rem;
+        font-weight: 600;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+      }
+      thead {
+        background: #0f172a;
+        color: #f8fafc;
+      }
+      th, td {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      tr:nth-child(even) {
+        background: #f1f5f9;
+      }
+      tr:hover {
+        background: #e2e8f0;
+      }
+      .status-passed { color: #0f766e; }
+      .status-failed { color: #b91c1c; }
+      .status-error { color: #b45309; }
+      .status-skipped { color: #475569; }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, SFMono, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+        font-size: 0.75rem;
+        color: #334155;
+        background: #e2e8f0;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+      }
+      .numeric { text-align: right; }
+      .meta {
+        color: #475569;
+        margin-top: 1rem;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>JUnit Summary</h1>
+    <p class="meta">生成日時: 2025-09-24T01:32:16.655Z / 実行時間合計: 0.004 秒</p>
+    <section class="summary">
+      <div class="metric"><p class="metric__label">Total</p><p class="metric__value">6</p></div>
+      <div class="metric"><p class="metric__label">Passed</p><p class="metric__value">6</p></div>
+      <div class="metric"><p class="metric__label">Failed</p><p class="metric__value">0</p></div>
+      <div class="metric"><p class="metric__label">Errors</p><p class="metric__value">0</p></div>
+      <div class="metric"><p class="metric__label">Skipped</p><p class="metric__value">0</p></div>
+      <div class="metric"><p class="metric__label">Suites</p><p class="metric__value">1</p></div>
+    </section>
+    <table>
+      <thead>
+        <tr>
+          <th>Suite</th>
+          <th>Class</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th class="numeric">Duration (ms)</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="status-passed">
+          <td>playwright-stub</td>
+          <td>generated</td>
+          <td>data-driven login — happy path</td>
+          <td>passed</td>
+          <td class="numeric">3</td>
+          <td></td>
+        </tr>
+        <tr class="status-passed">
+          <td>playwright-stub</td>
+          <td>generated</td>
+          <td>data-driven login — invalid password</td>
+          <td>passed</td>
+          <td class="numeric">1</td>
+          <td></td>
+        </tr>
+        <tr class="status-passed">
+          <td>playwright-stub</td>
+          <td>generated</td>
+          <td>dashboard visual smoke snapshot</td>
+          <td>passed</td>
+          <td class="numeric">0</td>
+          <td></td>
+        </tr>
+        <tr class="status-passed">
+          <td>playwright-stub</td>
+          <td>generated</td>
+          <td>axe accessibility scan — Login</td>
+          <td>passed</td>
+          <td class="numeric">0</td>
+          <td></td>
+        </tr>
+        <tr class="status-passed">
+          <td>playwright-stub</td>
+          <td>generated</td>
+          <td>axe accessibility scan — Dashboard</td>
+          <td>passed</td>
+          <td class="numeric">0</td>
+          <td></td>
+        </tr>
+        <tr class="status-passed">
+          <td>playwright-stub</td>
+          <td>generated</td>
+          <td>axe accessibility scan — Invalid credentials</td>
+          <td>passed</td>
+          <td class="numeric">0</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

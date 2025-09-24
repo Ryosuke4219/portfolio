@@ -1,0 +1,6 @@
+metric,value
+total_tests,6
+flaky_count,0
+new_flaky_count,0
+most_common_failure_kind,
+window_runs,20

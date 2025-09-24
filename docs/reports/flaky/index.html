@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Flaky Analyzer Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; background: #f9fafb; color: #1f2933; }
+    h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+    h2 { margin-top: 2rem; }
+    .overview { display: flex; gap: 2rem; flex-wrap: wrap; }
+    .card { background: #fff; padding: 1rem 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+    table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: #fff; }
+    th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; vertical-align: middle; }
+    th { background: #f1f5f9; position: sticky; top: 0; z-index: 1; }
+    tr:hover { background: #f8fafc; }
+    code { font-family: 'SFMono-Regular', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 0.85rem; }
+    .badge { background: #16a34a; color: #fff; padding: 0.2rem 0.4rem; border-radius: 0.4rem; font-size: 0.7rem; margin-left: 0.3rem; }
+    .spark { width: 120px; height: 40px; stroke: #3b82f6; stroke-width: 2; fill: none; }
+    .run { background: #e2e8f0; border-radius: 0.4rem; padding: 0.1rem 0.4rem; margin: 0 0.1rem; display: inline-block; font-size: 0.75rem; }
+    footer { margin-top: 3rem; font-size: 0.85rem; color: #64748b; }
+    .failure-card { flex: 1 1 260px; }
+    .failure-chart { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+    .failure-chart li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+    .failure-chart .label { flex: 0 0 140px; font-weight: 600; }
+    .failure-chart .bar { flex: 1; background: #e2e8f0; border-radius: 999px; overflow: hidden; height: 0.6rem; }
+    .failure-chart .bar span { display: block; height: 100%; background: #6366f1; }
+    .failure-chart .value { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    section article { background: #fff; border-radius: 0.75rem; padding: 1rem 1.25rem; margin-bottom: 1rem; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06); }
+    pre { background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.85rem; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>Flaky Analyzer Report</h1>
+  <section class="overview">
+    <div class="card">
+      <h2>Overview</h2>
+      <ul>
+        <li>Total Tests: <strong>6</strong></li>
+<li>Flaky Tests: <strong>0</strong></li>
+<li>Newly Detected (last 20 runs window): <strong>0</strong></li>
+<li>Most common failure kind: <strong>N/A</strong></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Runs (latest first)</h2>
+      <ol>
+        <li>local_20250923T074536Z_1_20250923074536 — 2025-09-23T07:45:36.920Z</li>
+<li>local_20250923T074538Z_2_20250923074538 — 2025-09-23T07:45:38.464Z</li>
+<li>local_20250923T074539Z_3_20250923074539 — 2025-09-23T07:45:39.986Z</li>
+<li>local_20250923T074541Z_4_20250923074541 — 2025-09-23T07:45:41.557Z</li>
+<li>local_20250923T074542Z_5_20250923074543 — 2025-09-23T07:45:43.065Z</li>
+<li>local_20250923T074544Z_6_20250923074544 — 2025-09-23T07:45:44.597Z</li>
+<li>local_20250923T074546Z_7_20250923074546 — 2025-09-23T07:45:46.225Z</li>
+<li>local_20250923T074547Z_8_20250923074547 — 2025-09-23T07:45:47.842Z</li>
+<li>local_20250923T074549Z_9_20250923074549 — 2025-09-23T07:45:49.376Z</li>
+<li>local_20250923T074550Z_10_20250923074550 — 2025-09-23T07:45:50.920Z</li>
+<li>local_20250923T074552Z_11_20250923074552 — 2025-09-23T07:45:52.450Z</li>
+<li>local_20250923T074553Z_12_20250923074553 — 2025-09-23T07:45:53.952Z</li>
+<li>local_20250923T074555Z_13_20250923074555 — 2025-09-23T07:45:55.483Z</li>
+<li>local_20250923T074556Z_14_20250923074556 — 2025-09-23T07:45:56.950Z</li>
+<li>local_20250923T074558Z_15_20250923074558 — 2025-09-23T07:45:58.427Z</li>
+<li>local_20250923T074559Z_16_20250923074559 — 2025-09-23T07:45:59.925Z</li>
+<li>local_20250923T074601Z_17_20250923074601 — 2025-09-23T07:46:01.426Z</li>
+<li>local_20250923T074602Z_18_20250923074602 — 2025-09-23T07:46:02.920Z</li>
+<li>local_20250923T074604Z_19_20250923074604 — 2025-09-23T07:46:04.396Z</li>
+<li>local_20250923T074605Z_20_20250923074606 — 2025-09-23T07:46:06.005Z</li>
+      </ol>
+    </div>
+    <div class="card failure-card">
+      <h2>Failure kinds</h2>
+      <p>No failure kinds recorded.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Top Flaky Tests</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Test</th>
+          <th>Attempts</th>
+          <th>Pass</th>
+          <th>Fail</th>
+          <th>p_fail</th>
+          <th>Intermittency</th>
+          <th>Recency</th>
+          <th>Impact</th>
+          <th>Score</th>
+          <th>Avg Dur (ms)</th>
+          <th>Failure kinds</th>
+          <th>Trend</th>
+          <th>Recent runs</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+      </tbody>
+    </table>
+  </section>
+  
+  <footer>Generated on 2025-09-24T01:31:51.490Z</footer>
+</body>
+</html>
