@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from types import ModuleType
 from typing import Any, Protocol, cast
 
 try:  # pragma: no cover - import guard for offline test environments
-    from google import genai
+    from google import genai as _genai_module
 except ModuleNotFoundError:  # pragma: no cover - fallback when SDK is unavailable
-    genai = None
+    genai: ModuleType | None = None
+else:
+    genai = cast(ModuleType, _genai_module)
 
 from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
@@ -168,7 +171,8 @@ class GeminiProvider(ProviderSPI):
                 raise ImportError(
                     "google-genai is not installed; provide a pre-configured client"
                 )
-            client = genai.Client()
+            module = cast(Any, genai)
+            client = cast(_GeminiClient, module.Client())
         self._client: _GeminiClient = cast(_GeminiClient, client)
         self._generation_config = dict(generation_config or {})
         self._safety_settings = list(safety_settings or [])
