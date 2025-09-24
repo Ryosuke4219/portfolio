@@ -4,15 +4,15 @@
 
 ## 01. Spec to Cases
 - ケース設計テンプレ: `../examples/spec2cases/spec.sample.md`
-- 自動生成スクリプト: `../projects/01-spec2cases/scripts/spec2cases.mjs`
+- 自動生成スクリプト: `../projects/01-spec2cases-md2json/scripts/spec2cases.mjs`
 - サンプルケース: `../examples/spec2cases/cases.sample.json`
 
 ## 02. LLM to Playwright
-- テスト概要: `../projects/02-llm-to-playwright/tests/README.md`
+- テスト概要: `../projects/02-blueprint-to-playwright/tests/README.md`
 - サンプルブループリント: `../examples/llm2pw/blueprint.sample.json`
 - デモHTML: `../examples/llm2pw/demo`
-- 自動生成シナリオ: `../projects/02-llm-to-playwright/tests/generated`
-- ビジュアル差分: `../projects/02-llm-to-playwright/tests/generated/__snapshots__`
+- 自動生成シナリオ: `../projects/02-blueprint-to-playwright/tests/generated`
+- ビジュアル差分: `../projects/02-blueprint-to-playwright/tests/generated/__snapshots__`
 
 ## 03. CI Flaky Analyzer
 - プロダクト README: `../projects/03-ci-flaky/README.md`

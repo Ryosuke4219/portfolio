@@ -6,8 +6,8 @@ import path from 'path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases/scripts/spec2cases.mjs';
-import { generateTestsFromBlueprint } from '../projects/02-llm-to-playwright/scripts/blueprint_to_code.mjs';
+import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases-md2json/scripts/spec2cases.mjs';
+import { generateTestsFromBlueprint } from '../projects/02-blueprint-to-playwright/scripts/blueprint_to_code.mjs';
 import { analyzeJUnitReport } from '../projects/03-ci-flaky/scripts/analyze-junit.mjs';
 import {
   LLM2PW_SAMPLE_BLUEPRINT_PATH,

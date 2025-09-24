@@ -18,14 +18,14 @@ description: 仕様書からテストケースを抽出する LLM × スキー�
 
 ## Key Artifacts
 
-- [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/spec.sample.md) — 入力となる仕様書サンプル。
-- [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/cases.sample.json) — 生成されたテストケースの完成形。
-- [schema.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/schema.json) — 出力 JSON のバリデーション用スキーマ。
-- [scripts/convert.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/scripts/convert.py) — 変換 CLI のエントリポイント。
+- [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/spec.sample.md) — 入力となる仕様書サンプル。
+- [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/cases.sample.json) — 生成されたテストケースの完成形。
+- [schema.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/schema.json) — 出力 JSON のバリデーション用スキーマ。
+- [scripts/convert.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/scripts/convert.py) — 変換 CLI のエントリポイント。
 
 ## How to Reproduce
 
-1. `projects/01-spec2cases/` 配下で必要な Python 依存関係（`jsonschema` など）をインストール。
+1. `projects/01-spec2cases-md2json/` 配下で必要な Python 依存関係（`jsonschema` など）をインストール。
 2. `scripts/convert.py --spec spec.sample.md --output cases.sample.json` を実行し、サンプル出力を再生成。
 3. 生成物はスキーマで検証され、不一致がある場合は CLI がエラーを返します。
 

@@ -7,7 +7,7 @@
 - **Form 操作は locator 経由**: `page.getByTestId()` で locator を作り、その API 経由で `fill` / `click` を実行。CSS セレクタを直接使うのは一時的なデバッグ用途に限定。
 
 ## ビジュアル差分（スモーク）
-- `projects/02-llm-to-playwright/tests/generated/__snapshots__/` にゴールデンファイルを保持。
+- `projects/02-blueprint-to-playwright/tests/generated/__snapshots__/` にゴールデンファイルを保持。
 - スモーク用途としてダッシュボード1枚のみを対象とし、最小限の差分検知にとどめる。
 - 変更が正当な場合はゴールデンファイルを更新し、差分は `test-results/snapshot-diffs/` にテキスト形式で出力される。
 

@@ -8,7 +8,7 @@ function usage() {
   console.error('Usage: node blueprint_to_code.mjs <blueprint.json> [outputDir]');
 }
 
-const defaultOutputDir = path.join(process.cwd(), 'projects/02-llm-to-playwright/tests/generated');
+const defaultOutputDir = path.join(process.cwd(), 'projects/02-blueprint-to-playwright/tests/generated');
 
 // ---- IO Helpers ----
 function readJson(filePath) {

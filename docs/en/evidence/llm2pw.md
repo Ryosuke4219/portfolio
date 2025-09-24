@@ -18,14 +18,14 @@ This proof of concept lets an LLM enrich acceptance criteria and convert them in
 
 ## Key Artifacts
 
-- [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-llm-to-playwright/tests/generated) — Auto-generated Playwright suites.
-- [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/tests/README.md) — Notes on selectors, snapshots, and a11y policy.
-- [blueprint.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/blueprint.sample.json) — Sample source data enriched by the LLM.
-- [scripts/generate-tests.mjs](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/scripts/generate-tests.mjs) — Driver script orchestrating LLM calls and code generation.
+- [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-blueprint-to-playwright/tests/generated) — Auto-generated Playwright suites.
+- [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-blueprint-to-playwright/tests/README.md) — Notes on selectors, snapshots, and a11y policy.
+- [blueprint.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-blueprint-to-playwright/blueprint.sample.json) — Sample source data enriched by the LLM.
+- [scripts/generate-tests.mjs](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-blueprint-to-playwright/scripts/generate-tests.mjs) — Driver script orchestrating LLM calls and code generation.
 
 ## How to Reproduce
 
-1. In `projects/02-llm-to-playwright/`, run `npm install` to fetch dependencies.
+1. In `projects/02-blueprint-to-playwright/`, run `npm install` to fetch dependencies.
 2. Execute `npm run generate` (sample configuration) to regenerate the Playwright suites.
 3. Run `npx playwright test` to execute generated tests with accessibility and snapshot checks.
 
