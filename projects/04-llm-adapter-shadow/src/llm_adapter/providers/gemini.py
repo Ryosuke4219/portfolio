@@ -4,17 +4,33 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
-from typing import Any
+from typing import Any, Protocol, cast
 
 try:  # pragma: no cover - import guard for offline test environments
-    from google import genai  # type: ignore[import]
+    from google import genai
 except ModuleNotFoundError:  # pragma: no cover - fallback when SDK is unavailable
-    genai = None  # type: ignore[assignment]
+    genai = None
 
 from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
 
 __all__ = ["GeminiProvider", "parse_gemini_messages"]
+
+
+class _GeminiResponsesAPI(Protocol):
+    def generate(
+        self,
+        *,
+        model: str,
+        input: Sequence[Mapping[str, Any]] | None,
+        config: Mapping[str, Any] | None = None,
+        safety_settings: Sequence[Mapping[str, Any]] | None = None,
+    ) -> Any:
+        ...
+
+
+class _GeminiClient(Protocol):
+    responses: _GeminiResponsesAPI
 
 
 def _coerce_usage(value: Any) -> TokenUsage:
@@ -141,7 +157,7 @@ class GeminiProvider(ProviderSPI):
         model: str,
         *,
         name: str | None = None,
-        client: Any | None = None,
+        client: _GeminiClient | None = None,
         generation_config: Mapping[str, Any] | None = None,
         safety_settings: Sequence[Mapping[str, Any]] | None = None,
     ) -> None:
@@ -153,7 +169,7 @@ class GeminiProvider(ProviderSPI):
                     "google-genai is not installed; provide a pre-configured client"
                 )
             client = genai.Client()
-        self._client = client
+        self._client: _GeminiClient = cast(_GeminiClient, client)
         self._generation_config = dict(generation_config or {})
         self._safety_settings = list(safety_settings or [])
 
@@ -196,7 +212,7 @@ class GeminiProvider(ProviderSPI):
 
         ts0 = time.time()
         try:
-            response = self._client.responses.generate(  # type: ignore[no-untyped-call]
+            response = self._client.responses.generate(
                 model=self._model,
                 input=messages,
                 config=config,
