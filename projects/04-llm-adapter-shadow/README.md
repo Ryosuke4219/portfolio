@@ -57,6 +57,15 @@ python demo_shadow.py
 
 標準出力でプライマリ結果を確認しつつ、影実行のメトリクスが `artifacts/runs-metrics.jsonl` に追記されます。
 
+### Provider configuration
+
+- `PRIMARY_PROVIDER` — 形式は `"<prefix>:<model-id>"`。デフォルトは `gemini:gemini-2.5-flash`。
+- `SHADOW_PROVIDER` — 影実行用。デフォルトは `ollama:gemma3n:e2b`。`none` や空文字で無効化できます。
+- `OLLAMA_HOST` — Ollama API のベースURL（未指定時は `http://127.0.0.1:11434`）。
+- `GEMINI_API_KEY` — Gemini SDK が自動検出するAPIキー。環境にセットしておくと `GeminiProvider` が利用します。
+
+プロバイダ文字列は最初のコロンのみを区切り文字として扱うため、`ollama:gemma3n:e2b` のようにモデルIDにコロンを含めても問題ありません。`mock:foo` を指定するとモックプロバイダで簡易動作確認が可能です。
+
 ### Run the tests
 
 ```bash
