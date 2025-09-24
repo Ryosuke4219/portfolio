@@ -5,7 +5,7 @@ const path = require('node:path');
 const axe = require('axe-core');
 
 const projectRoot = process.cwd();
-const dataDir = path.resolve(projectRoot, 'projects/02-llm-to-playwright/tests/generated/data');
+const dataDir = path.resolve(projectRoot, 'projects/02-blueprint-to-playwright/tests/generated/data');
 
 const loginCases = JSON.parse(readFileSync(path.join(dataDir, 'login-cases.json'), 'utf8'));
 const a11yCsv = readFileSync(path.join(dataDir, 'a11y-pages.csv'), 'utf8');

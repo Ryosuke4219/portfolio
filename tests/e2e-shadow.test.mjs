@@ -6,8 +6,8 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { parseSpecFile } from '../projects/01-spec2cases/scripts/spec2cases.mjs';
-import { generateTestsFromBlueprint } from '../projects/02-llm-to-playwright/scripts/blueprint_to_code.mjs';
+import { parseSpecFile } from '../projects/01-spec2cases-md2json/scripts/spec2cases.mjs';
+import { generateTestsFromBlueprint } from '../projects/02-blueprint-to-playwright/scripts/blueprint_to_code.mjs';
 import { analyzeJUnitReport } from '../projects/03-ci-flaky/scripts/analyze-junit.mjs';
 import {
   LLM2PW_SAMPLE_BLUEPRINT_PATH,
@@ -33,7 +33,13 @@ async function waitForFile(targetPath, { timeoutMs = 1000, intervalMs = 25 } = {
 
 test('spec → playwright → junit → python metrics pipeline', async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'shadow-pipeline-'));
-  const generatedDir = path.join(tmpRoot, 'projects', '02-llm-to-playwright', 'tests', 'generated');
+  const generatedDir = path.join(
+    tmpRoot,
+    'projects',
+    '02-blueprint-to-playwright',
+    'tests',
+    'generated',
+  );
   fs.mkdirSync(generatedDir, { recursive: true });
 
   const cases = parseSpecFile(SPEC2CASES_SAMPLE_SPEC_TXT_PATH);

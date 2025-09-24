@@ -19,20 +19,20 @@ Node.js 18+ を想定しています。リポジトリ直下で `npm install` �
 | `npm run spec:validate -- <path>` | JSON 定義をスキーマチェックします。引数なしの場合はサンプルを使用。 |
 | `npm run spec:run -- <cases.json> [--tag <tag>] [--id <id>]` | テストケースを読み込み、タグ/IDでフィルタしながら擬似実行レポートを表示します。 |
 
-> CLI を直接利用する場合は `projects/01-spec2cases/scripts/*.mjs` を `node` で呼び出せます。
+> CLI を直接利用する場合は `projects/01-spec2cases-md2json/scripts/*.mjs` を `node` で呼び出せます。
 
 ## 代表的な使い方
 
 ```bash
 # 1. Markdown仕様からケースを生成（sample を上書き）
 npm run spec:generate
-# => projects/01-spec2cases/cases.generated.json
+# => projects/01-spec2cases-md2json/cases.generated.json
 
 # 2. 生成物のスキーマを検証（期待・手順欠落を検出）
-npm run spec:validate -- projects/01-spec2cases/cases.generated.json
+npm run spec:validate -- projects/01-spec2cases-md2json/cases.generated.json
 
 # 3. タグでフィルタして擬似実行
-npm run spec:run -- projects/01-spec2cases/cases.generated.json --tag smoke
+npm run spec:run -- projects/01-spec2cases-md2json/cases.generated.json --tag smoke
 ```
 
 * `spec2cases.mjs` は Markdown/テキスト/JSON を自動判別し、必要に応じて JSON を標準出力へ書き出します。
@@ -40,7 +40,7 @@ npm run spec:run -- projects/01-spec2cases/cases.generated.json --tag smoke
 
 ## 生成物
 
-- `projects/01-spec2cases/cases.generated.json` : Markdown仕様から生成された最新テストケース。
+- `projects/01-spec2cases-md2json/cases.generated.json` : Markdown仕様から生成された最新テストケース。
 - `docs/examples/spec2cases/cases.sample.json` : テキスト仕様から生成されるサンプル出力。
 - CLI 実行ログ : `spec:run` 実行時のサマリ (標準出力)。
 

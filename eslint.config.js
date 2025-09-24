@@ -11,7 +11,7 @@ export default [
       'coverage/**',
       'projects/04-llm-adapter-shadow/**',
       'tests/playwright-report/**',
-      'projects/02-llm-to-playwright/tests/generated/**',
+      'projects/02-blueprint-to-playwright/tests/generated/**',
       '**/*.ts',
       '**/*.tsx',
     ],

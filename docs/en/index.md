@@ -75,9 +75,9 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 
 ### 02. LLM to Playwright
 - PoC that enriches acceptance criteria with an LLM and auto-generates Playwright tests.
-- Deliverables: [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-llm-to-playwright/tests/generated)
+- Deliverables: [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-blueprint-to-playwright/tests/generated)
 - Samples: [blueprint.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/docs/examples/llm2pw/blueprint.sample.json) / [demo/](https://github.com/Ryosuke4219/portfolio/tree/main/docs/examples/llm2pw/demo)
-- References: [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/tests/README.md)
+- References: [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-blueprint-to-playwright/tests/README.md)
 
 ### 03. CI Flaky Analyzer
 - Detects flaky tests from CI logs and enables re-runs and automated ticketing end-to-end.

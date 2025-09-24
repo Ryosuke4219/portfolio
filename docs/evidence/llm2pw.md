@@ -18,14 +18,14 @@ description: 受け入れ基準を拡張して自動生成 Playwright テスト�
 
 ## Key Artifacts
 
-- [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-llm-to-playwright/tests/generated) — 自動生成された Playwright テスト群。
-- [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/tests/README.md) — セレクタ / スナップショット / a11y 方針の詳細メモ。
-- [blueprint.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/blueprint.sample.json) — LLM が拡張する元データのサンプル。
-- [scripts/generate-tests.mjs](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-llm-to-playwright/scripts/generate-tests.mjs) — LLM 呼び出しとコード生成のドライバ。
+- [tests/generated/](https://github.com/Ryosuke4219/portfolio/tree/main/projects/02-blueprint-to-playwright/tests/generated) — 自動生成された Playwright テスト群。
+- [tests/README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-blueprint-to-playwright/tests/README.md) — セレクタ / スナップショット / a11y 方針の詳細メモ。
+- [blueprint.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-blueprint-to-playwright/blueprint.sample.json) — LLM が拡張する元データのサンプル。
+- [scripts/generate-tests.mjs](https://github.com/Ryosuke4219/portfolio/blob/main/projects/02-blueprint-to-playwright/scripts/generate-tests.mjs) — LLM 呼び出しとコード生成のドライバ。
 
 ## How to Reproduce
 
-1. `projects/02-llm-to-playwright/` で `npm install` を実行して依存関係を取得。
+1. `projects/02-blueprint-to-playwright/` で `npm install` を実行して依存関係を取得。
 2. `npm run generate`（サンプル設定）で Playwright テストを再生成。
 3. `npx playwright test` で自動生成テストを実行し、a11y / スナップショット検証を確認。
 

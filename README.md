@@ -70,27 +70,24 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
 ## プロジェクト一覧 (Projects)
 
-1. **仕様書テキスト → 構造化テストケース → CLIで自動実行** 【決定的生成】
+1. **01: spec2cases-md2json — Markdown → JSON（決定的）**  
+   LLMを使わず、Markdown仕様を**決定的に**テストケースJSONへ変換します。
 
-   * 確定した仕様から**機械的にテストケースを生成**し、CIで回す最小パイプライン。
-   * 人手が介在しないため再現性が高く、決定的（deterministic）な結果を得られる。
-   * *Convert plain-text specs into structured test cases, execute automatically via CLI and CI pipeline.*
+2. **02: blueprint-to-playwright — Blueprint → Playwright（決定的）**  
+   受け入れ基準の blueprint から、**決定的に** `.spec.ts` を生成しスタブ実行します。
 
-2. **要件定義・受け入れ基準をLLMで拡張 → PlaywrightのE2Eテスト自動生成PoC** 【HITL支援】
+3. **03: ci-flaky-analyzer — JUnit → HTML/CSV（決定的）**  
+   CIのJUnitログを取り込み、flaky挙動を集計・可視化します。
 
-   * LLMを使って**受け入れ基準（AC）の補足・拡張を支援**し、E2Eテスト雛形を自動生成。  
-   * 要件定義の代替ではなく、人間のレビュー（HITL）を前提とした“効率化PoC”。  
-   * *Leverage LLM to expand acceptance criteria and generate Playwright-based E2E tests (HITL-oriented PoC).*
+4. **04: llm-adapter-shadow — LLMモデル選択/比較（唯一のLLM使用箇所）**  
+   *primary* と *shadow* の2系統LLMを並走させ、差分・フォールバック・異常系を検証します。
 
-3. **CIログ解析 → 不安定テストの検知・再実行・タグ付け/自動起票**
+### LLM使用ポリシー（重要）
 
-   * CIの信頼性を高めるため、flaky test を自動処理する仕組み。
-   * *Analyze CI logs to detect flaky tests, auto-rerun, tag, or create tickets automatically.*
-
-4. **LLM Adapter — Shadow Execution & Error Handling (Minimal)**
-
-   * プライマリ結果はそのまま採用しつつ、影（shadow）実行で別プロバイダを並走させ、差分メトリクスをJSONLに記録・可視化。
-   * *Minimal adapter showcasing shadow execution (metrics-only background run) and deterministic error-case fallbacks.*
+- **01 / 02 / 03 は LLM を使用しません（決定的処理）**  
+  同じ入力から常に同じ出力が得られます。CI向きです。
+- **LLM を使うのは 04 のみ**  
+  モデル選択・比較・フォールバック・shadow実行など、確率的要素は **04 に集約**しています。
 
 ### 1. 仕様書テキスト → 構造化テストケース → CLIで自動実行
 [詳しい解説はこちら → （Zenn 記事予定地）]()
@@ -99,23 +96,23 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
   ```bash
   npm run spec:generate
-  # => projects/01-spec2cases/cases.generated.json を出力
+  # => projects/01-spec2cases-md2json/cases.generated.json を出力
   ```
 * 内蔵の軽量バリデータで JSON 構造を検証。
 
   ```bash
-  npm run spec:validate -- projects/01-spec2cases/cases.generated.json
+  npm run spec:validate -- projects/01-spec2cases-md2json/cases.generated.json
   ```
 * CLI からテストケースを読み込み、タグや ID でフィルタして擬似実行。
 
   ```bash
-  npm run spec:run -- projects/01-spec2cases/cases.generated.json --tag smoke
+  npm run spec:run -- projects/01-spec2cases-md2json/cases.generated.json --tag smoke
   ```
 
   * `--tag` や `--id` で絞り込めるため、スモークテスト／個別ケースを即座に確認可能。
   * 期待値や手順が欠落している場合は失敗としてサマリに計上し、仕様漏れを検知。
 
-→ 詳細: [Spec2Cases CLI README](projects/01-spec2cases/README.md)
+→ 詳細: [Spec2Cases CLI README](projects/01-spec2cases-md2json/README.md)
 
 ### 2. LLM設計 → Playwright E2E テスト自動生成
 [詳しい解説はこちら → （Zenn 記事予定地）]()
@@ -128,7 +125,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
   * シナリオごとに ID/タイトル・セレクタ・テストデータ・アサーションをチェックし、欠損時は即エラー。
   * `url:`/`text:` 形式のアサーションはそれぞれ `toHaveURL`／`getByText().toBeVisible()` に変換。
-* 生成されたテストは `projects/02-llm-to-playwright/tests/generated/` に配置され、同梱の Playwright 互換スタブでシナリオを検証。
+* 生成されたテストは `projects/02-blueprint-to-playwright/tests/generated/` に配置され、同梱の Playwright 互換スタブでシナリオを検証。
 
   ```bash
   npm test
@@ -136,9 +133,9 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
   * スタブランナーは静的デモの遷移と文言を解析し、`junit-results.xml` / `test-results/` を生成。
   * CI ではこれらの成果物を `npm run ci:analyze` / `npm run ci:issue` へ渡して履歴管理を行う。
-  * `projects/02-llm-to-playwright/tests/README.md` にテスト生成時の**セレクタ・ガード方針**や**ビジュアル／a11y スモーク**の運用メモを記載。`login-cases.json` / `a11y-pages.csv` を編集するだけでデータドリブンにシナリオを増やせる構成とした。
+  * `projects/02-blueprint-to-playwright/tests/README.md` にテスト生成時の**セレクタ・ガード方針**や**ビジュアル／a11y スモーク**の運用メモを記載。`login-cases.json` / `a11y-pages.csv` を編集するだけでデータドリブンにシナリオを増やせる構成とした。
 
-→ 詳細: [LLM → Playwright Pipeline README](projects/02-llm-to-playwright/README.md)
+→ 詳細: [LLM → Playwright Pipeline README](projects/02-blueprint-to-playwright/README.md)
 
 ### 3. CI ログ解析と flaky テスト検出
 [詳しい解説はこちら → （Zenn 記事予定地）]()

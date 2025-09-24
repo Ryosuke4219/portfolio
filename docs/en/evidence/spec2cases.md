@@ -18,14 +18,14 @@ This pipeline ingests specification Markdown, combines LLM drafting with rule-ba
 
 ## Key Artifacts
 
-- [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/spec.sample.md) — Sample specification input.
-- [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/cases.sample.json) — Generated test cases.
-- [schema.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/schema.json) — Validation schema for the output JSON.
-- [scripts/convert.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases/scripts/convert.py) — CLI entry point for the conversion.
+- [spec.sample.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/spec.sample.md) — Sample specification input.
+- [cases.sample.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/cases.sample.json) — Generated test cases.
+- [schema.json](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/schema.json) — Validation schema for the output JSON.
+- [scripts/convert.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/01-spec2cases-md2json/scripts/convert.py) — CLI entry point for the conversion.
 
 ## How to Reproduce
 
-1. In `projects/01-spec2cases/`, install required Python dependencies such as `jsonschema`.
+1. In `projects/01-spec2cases-md2json/`, install required Python dependencies such as `jsonschema`.
 2. Run `scripts/convert.py --spec spec.sample.md --output cases.sample.json` to regenerate the sample output.
 3. The CLI validates the generated content; mismatches against the schema will raise an error.
 

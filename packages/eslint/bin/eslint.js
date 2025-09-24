@@ -24,7 +24,7 @@ const IGNORED_DIR_NAMES = new Set([
 
 const IGNORED_PATH_PATTERNS = [
   `${path.sep}projects${path.sep}04-llm-adapter-shadow${path.sep}`,
-  `${path.sep}projects${path.sep}02-llm-to-playwright${path.sep}tests${path.sep}generated${path.sep}`,
+  `${path.sep}projects${path.sep}02-blueprint-to-playwright${path.sep}tests${path.sep}generated${path.sep}`,
   `${path.sep}tests${path.sep}playwright-report${path.sep}`,
 ];
 

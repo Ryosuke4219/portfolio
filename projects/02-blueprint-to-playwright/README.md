@@ -16,7 +16,7 @@ Node.js 18+ を想定。依存解決後は `npm run e2e:gen` / `npm test` など
 | --- | --- |
 | `npm run e2e:gen` | ブループリント (`blueprint.sample.json`) を検証し、Playwright テストコードを `tests/generated/` に生成します。 |
 | `npm test` | Playwright スタブランナーで生成済みテストを実行し、`junit-results.xml` / `test-results/` を出力します。 |
-| `node projects/02-llm-to-playwright/server.mjs` | デモ HTML をローカル配信し、UI/セレクタの挙動をブラウザで確認できます。 |
+| `node projects/02-blueprint-to-playwright/server.mjs` | デモ HTML をローカル配信し、UI/セレクタの挙動をブラウザで確認できます。 |
 
 > `scripts/blueprint_to_code.mjs` を直接実行すると、任意のブループリントファイルを指定してコード生成できます。
 
@@ -29,8 +29,8 @@ Node.js 18+ を想定。依存解決後は `npm run e2e:gen` / `npm test` など
 
 ## 生成物
 
-- `projects/02-llm-to-playwright/tests/generated/*.spec.ts` : ブループリントから生成された Playwright テスト。
-- `projects/02-llm-to-playwright/tests/generated/__snapshots__/` : ビジュアルスモークのゴールデンファイル。
+- `projects/02-blueprint-to-playwright/tests/generated/*.spec.ts` : ブループリントから生成された Playwright テスト。
+- `projects/02-blueprint-to-playwright/tests/generated/__snapshots__/` : ビジュアルスモークのゴールデンファイル。
 - `junit-results.xml`, `test-results/` : スタブランナーによる実行ログ (CI でアーティファクト化)。
 
 詳細なセレクタガイドや a11y/ビジュアル運用メモは [`tests/README.md`](tests/README.md) を参照してください。

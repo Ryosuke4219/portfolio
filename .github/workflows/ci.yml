@@ -36,7 +36,7 @@ jobs:
 
       - name: Start demo server
         run: |
-          npx -y http-server projects/02-llm-to-playwright/demo -p 5173 -c-1 &
+          npx -y http-server projects/02-blueprint-to-playwright/demo -p 5173 -c-1 &
           for i in {1..30}; do
             if curl -sSf http://localhost:5173 > /dev/null; then
               echo "Demo server is up";

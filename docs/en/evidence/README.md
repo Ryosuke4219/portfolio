@@ -4,15 +4,15 @@ This catalog lists the primary sources referenced by the `EvidenceLink` entries 
 
 ## 01. Spec to Cases
 - Template for case design: `../examples/spec2cases/spec.sample.md`
-- Automation script: `../projects/01-spec2cases/scripts/spec2cases.mjs`
+- Automation script: `../projects/01-spec2cases-md2json/scripts/spec2cases.mjs`
 - Sample cases: `../examples/spec2cases/cases.sample.json`
 
 ## 02. LLM to Playwright
-- Test overview: `../projects/02-llm-to-playwright/tests/README.md`
+- Test overview: `../projects/02-blueprint-to-playwright/tests/README.md`
 - Sample blueprint: `../examples/llm2pw/blueprint.sample.json`
 - Demo HTML: `../examples/llm2pw/demo`
-- Generated scenarios: `../projects/02-llm-to-playwright/tests/generated`
-- Visual diffs: `../projects/02-llm-to-playwright/tests/generated/__snapshots__`
+- Generated scenarios: `../projects/02-blueprint-to-playwright/tests/generated`
+- Visual diffs: `../projects/02-blueprint-to-playwright/tests/generated/__snapshots__`
 
 ## 03. CI Flaky Analyzer
 - Product README: `../projects/03-ci-flaky/README.md`
