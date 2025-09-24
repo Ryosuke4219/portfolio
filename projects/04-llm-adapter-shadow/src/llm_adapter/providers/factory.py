@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Callable, Mapping
+from collections.abc import Callable, Mapping
 
 from ..provider_spi import ProviderSPI
 from .gemini import GeminiProvider

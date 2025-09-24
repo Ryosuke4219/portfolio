@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 try:  # pragma: no cover - allow running without the optional dependency
     import requests  # type: ignore[import]

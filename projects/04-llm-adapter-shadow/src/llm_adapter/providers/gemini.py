@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from typing import Any
 
 try:  # pragma: no cover - import guard for offline test environments
     from google import genai  # type: ignore[import]
