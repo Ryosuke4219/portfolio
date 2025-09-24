@@ -1,4 +1,3 @@
-# .github/workflows/codeql.yml
 name: CodeQL
 
 on:
@@ -25,19 +24,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ "javascript-typescript" ]
+        language: [ "javascript", "python" ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # 依存解決が必要な場合のみ活かす（なくても動く）
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-        continue-on-error: true
-      # - run: npm ci  # 必要ならアンコメント
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
