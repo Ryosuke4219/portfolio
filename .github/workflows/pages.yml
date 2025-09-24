@@ -30,6 +30,7 @@ jobs:
             if [ -d "docs/reports/${dir}" ]; then
               mkdir -p "_site/reports/${dir}"
               rsync -av --delete --omit-dir-times --no-perms "docs/reports/${dir}/" "_site/reports/${dir}/"
+
             fi
           done
       - name: Upload artifact
