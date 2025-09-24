@@ -288,22 +288,19 @@ just test
 ## AI利用に関する開示 / AI Usage Disclosure
 
 ### 日本語
-
-本リポジトリに収録されたコードおよびドキュメントのは AI の支援を受けて作成しています（例：GitHub Copilot、ChatGPT など）。  
-設計・統合・最終判断の責任は作者にあり、**コミット前に人手でレビュー・編集・検証**を行っています。出力物は CI（テスト／Lint／CodeQL 等）で継続的に確認しています。
+本リポジトリのコードおよびドキュメントは、**AI支援**（GitHub Copilot、ChatGPT 等）を用いて作成しています。  
+設計・統合・最終判断は作者が行い、**コミット前に人手でレビュー・編集・検証**しています。出力は CI（テスト／Lint／CodeQL 等）で継続的に確認しています。
 
 - **機密・個人情報**は AI ツールに投入していません。
 - **ライセンス適合・重複**については可能な範囲で確認しています。
 - 外部成果物やプロンプト由来の要素がある場合は、必要に応じて **CREDITS.md／LICENSE** に出所を記載します。
-- 必要に応じ、コミット末尾に由来を示すトレーラー（例：`AI-Generated: partial|substantial` / `AI-Tools: copilot, chatgpt`）を付すことがあります。
+- 必要に応じ、コミット末尾に由来を示すトレーラー（例：`AI-Generated: partial|substantial` / `AI-Tools: copilot, chatgpt`）を付すことがあります.
 
 ### English
-
-A **significant portion** of the code and documentation in this repository was produced **with AI assistance** (e.g., GitHub Copilot, ChatGPT).  
-Design, integration, and final decisions remain the author’s responsibility. **All changes are human-reviewed and validated** prior to commit, and are continuously checked in CI (tests/lint/CodeQL).
+Code and documents in this repository are created **with AI assistance** (e.g., GitHub Copilot, ChatGPT).  
+Design, integration, and final decisions remain the author’s responsibility. **All changes are human-reviewed and validated** prior to commit and continuously checked in CI (tests/lint/CodeQL).
 
 - **No proprietary or personal data** is provided to AI tools.
 - **License compliance and duplication** are checked to a reasonable extent.
 - Where appropriate, sources are noted in **CREDITS.md / LICENSE**.
 - Commit trailers may be used to indicate provenance (e.g., `AI-Generated: partial|substantial`, `AI-Tools: copilot, chatgpt`).
-
