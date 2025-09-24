@@ -12,5 +12,11 @@ description: Snapshot reports generated from CI telemetry
   - [Source JSON](./latest.json)
   - 更新元: tools/generate_ci_report.py
 
-過去分の保管が必要になった場合は、このフォルダに日付別のMarkdown/JSONを追加してください。
+個別レポートへのダイレクトリンク:
+
+- [JUnit要約](./junit/)
+- [Flakyランキング](./flaky/)
+- [Coverage HTML](./coverage/)
+
+過去分の保管が必要になった場合は、このフォルダに日付別のMarkdown/JSONやHTMLを追加してください。
 
