@@ -90,7 +90,6 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
   モデル選択・比較・フォールバック・shadow実行など、確率的要素は **04 に集約**しています。
 
 ### 1. 仕様書テキスト → 構造化テストケース → CLIで自動実行
-[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 * `docs/examples/spec2cases/spec.sample.md` のような Markdown からテストケース JSON を生成。
 
@@ -115,7 +114,6 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 → 詳細: [Spec2Cases CLI README](projects/01-spec2cases-md2json/README.md)
 
 ### 2. LLM設計 → Playwright E2E テスト自動生成
-[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 * `docs/examples/llm2pw/blueprint.sample.json` をもとにテストコードを自動生成。
 
@@ -138,7 +136,6 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 → 詳細: [LLM → Playwright Pipeline README](projects/02-blueprint-to-playwright/README.md)
 
 ### 3. CI ログ解析と flaky テスト検出
-[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 * JUnit XML を解析して履歴 DB (`database.json`) を更新。
 
@@ -161,7 +158,6 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 → 詳細: [Flaky Analyzer CLI README](projects/03-ci-flaky/README.md)
 
 ### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
-[詳しい解説はこちら → （Zenn 記事予定地）]()
 
 **概要**
 プライマリの応答はそのまま返しつつ、同一プロンプトを**別プロバイダで影（shadow）実行**して差分メトリクスを**JSONL**に収集。`TIMEOUT / RATELIMIT / INVALID_JSON` は**障害注入**（モック／ラッパ）で再現し、**フォールバックの連鎖**を最小構成で検証できる。
