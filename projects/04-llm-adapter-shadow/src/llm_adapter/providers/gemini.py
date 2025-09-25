@@ -20,7 +20,19 @@ from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, Token
 __all__ = ["GeminiProvider", "parse_gemini_messages"]
 
 
-class _GeminiResponsesAPI(Protocol):
+class _GeminiModelsAPI(Protocol):
+    def generate_content(
+        self,
+        *,
+        model: str,
+        contents: Sequence[Mapping[str, Any]] | None,
+        config: Mapping[str, Any] | None = None,
+        safety_settings: Sequence[Mapping[str, Any]] | None = None,
+    ) -> Any:
+        ...
+
+
+class _GeminiResponsesAPI(Protocol):  # pragma: no cover - legacy fallback
     def generate(
         self,
         *,
@@ -33,7 +45,8 @@ class _GeminiResponsesAPI(Protocol):
 
 
 class _GeminiClient(Protocol):
-    responses: _GeminiResponsesAPI
+    models: _GeminiModelsAPI | None
+    responses: _GeminiResponsesAPI | None
 
 
 def _coerce_usage(value: Any) -> TokenUsage:
@@ -70,15 +83,33 @@ def _coerce_usage(value: Any) -> TokenUsage:
 
 
 def _coerce_output_text(response: Any) -> str:
-    text = getattr(response, "output_text", None)
-    if isinstance(text, str):
+    text = getattr(response, "text", None)
+    if isinstance(text, str) and text:
         return text
+
+    text = getattr(response, "output_text", None)
+    if isinstance(text, str) and text:
+        return text
+
+    candidates = getattr(response, "candidates", None)
+    if isinstance(candidates, Iterable):
+        for candidate in candidates:
+            if isinstance(candidate, Mapping):
+                candidate_text = candidate.get("text")
+                if isinstance(candidate_text, str) and candidate_text:
+                    return candidate_text
+            text_attr = getattr(candidate, "text", None)
+            if isinstance(text_attr, str) and text_attr:
+                return text_attr
 
     if hasattr(response, "to_dict"):
         payload = response.to_dict()
         if isinstance(payload, Mapping):
+            text = payload.get("text")
+            if isinstance(text, str) and text:
+                return text
             text = payload.get("output_text")
-            if isinstance(text, str):
+            if isinstance(text, str) and text:
                 return text
 
     return ""
@@ -139,6 +170,34 @@ def _merge_generation_config(
     return config or None
 
 
+def _invoke_gemini(
+    client: _GeminiClient,
+    model: str,
+    contents: Sequence[Mapping[str, Any]] | None,
+    config: Mapping[str, Any] | None,
+    safety_settings: Sequence[Mapping[str, Any]] | None,
+) -> Any:
+    models_api = getattr(client, "models", None)
+    if models_api and hasattr(models_api, "generate_content"):
+        return models_api.generate_content(
+            model=model,
+            contents=contents,
+            config=config,
+            safety_settings=safety_settings,
+        )
+
+    responses_api = getattr(client, "responses", None)
+    if responses_api and hasattr(responses_api, "generate"):
+        return responses_api.generate(
+            model=model,
+            input=contents,
+            config=config,
+            safety_settings=safety_settings,
+        )
+
+    raise AttributeError("Gemini client does not provide a supported generate method")
+
+
 def _select_safety_settings(
     base_settings: Sequence[Mapping[str, Any]] | None,
     request: ProviderRequest,
@@ -153,7 +212,7 @@ def _select_safety_settings(
 
 
 class GeminiProvider(ProviderSPI):
-    """Provider implementation backed by the Gemini Responses API."""
+    """Provider implementation backed by the Gemini SDK (models API)."""
 
     def __init__(
         self,
@@ -216,12 +275,7 @@ class GeminiProvider(ProviderSPI):
 
         ts0 = time.time()
         try:
-            response = self._client.responses.generate(
-                model=self._model,
-                input=messages,
-                config=config,
-                safety_settings=safety_settings,
-            )
+            response = _invoke_gemini(self._client, self._model, messages, config, safety_settings)
         except Exception as exc:  # pragma: no cover - translated in unit tests
             translated = self._translate_error(exc)
             raise translated from exc

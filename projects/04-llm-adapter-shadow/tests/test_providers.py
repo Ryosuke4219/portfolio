@@ -111,18 +111,18 @@ class _RecordClient:
     def __init__(self):
         self.calls = []
 
-        class _Responses:
+        class _Models:
             def __init__(self, outer):
                 self._outer = outer
 
-            def generate(self, **kwargs):
+            def generate_content(self, **kwargs):
                 self._outer.calls.append(kwargs)
                 return SimpleNamespace(
-                    output_text="こんにちは",
+                    text="こんにちは",
                     usage_metadata=SimpleNamespace(input_tokens=12, output_tokens=7),
                 )
 
-        self.responses = _Responses(self)
+        self.models = _Models(self)
 
 
 def test_gemini_provider_invokes_client_with_config():
@@ -147,19 +147,19 @@ def test_gemini_provider_invokes_client_with_config():
     assert recorded["model"] == "gemini-2.5-flash"
     assert recorded["config"]["temperature"] == 0.2
     assert recorded["config"]["max_output_tokens"] == 128
-    assert isinstance(recorded["input"], list)
+    assert isinstance(recorded["contents"], list)
 
 
 def test_gemini_provider_translates_rate_limit():
-    class _FailingResponses:
-        def generate(self, **kwargs):
+    class _FailingModels:
+        def generate_content(self, **kwargs):
             err = Exception("rate limited")
             setattr(err, "status", "RESOURCE_EXHAUSTED")
             raise err
 
     class _Client:
         def __init__(self):
-            self.responses = _FailingResponses()
+            self.models = _FailingModels()
 
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 

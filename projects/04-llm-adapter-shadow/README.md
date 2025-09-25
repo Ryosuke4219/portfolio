@@ -6,6 +6,8 @@
 
 **EN:** Minimal adapter that keeps the primary response, mirrors the request on a shadow provider for metrics only, and purposefully reproduces timeout / rate limit / malformed-response failures.
 
+> ℹ️ **本ポートフォリオで外部LLM APIを利用するのはこの04プロジェクトのみです。** 01〜03は決定的なスタブ／ルールベース処理で完結し、ネットワークやAPIキーを必要としません。
+
 ## Motivation
 
 - 本番の意思決定を変えずに品質・レイテンシ差分を継続測定 → ベンダ選定や回帰検知に活用。
@@ -66,6 +68,23 @@ python demo_shadow.py
 
 プロバイダ文字列は最初のコロンのみを区切り文字として扱うため、`ollama:gemma3n:e2b` のようにモデルIDにコロンを含めても問題ありません。`mock:foo` を指定するとモックプロバイダで簡易動作確認が可能です。
 
+#### よく使う環境変数例
+
+```bash
+export PRIMARY_PROVIDER="gemini:gemini-2.5-flash"
+export SHADOW_PROVIDER="ollama:gemma3n:e2b"
+export GEMINI_API_KEY="<YOUR_GEMINI_KEY>"
+export OLLAMA_HOST="http://127.0.0.1:11434"
+```
+
+ルート直下の `.env.example` をコピーして `.env` を作成すると、上記の雛形をそのまま利用できます。
+
+Gemini の構造化出力を利用したい場合は、`generation_config` に
+`{"response_mime_type": "application/json"}` や
+`{"response_schema": {...}}` を指定すると JSON 固定のレスポンスを要求できます。
+`demo_shadow.py` の `request_options` を編集するか、環境変数で
+`PRIMARY_OPTIONS` を与えて `ProviderRequest.options` に受け渡してください。
+
 ### Run the tests
 
 ```bash
@@ -115,7 +134,8 @@ pytest -q
 
 ## Notes
 
-- 実プロバイダ統合は意図的に含めていません（**軽量のまま**にするため）。
+- ポートフォリオ全体を通じて、実LLMプロバイダ統合はこの04だけに閉じています。他のチャプターは決定的（deterministic）な処理で構成されています。
+- 実プロバイダ統合は Gemini（Google AI Studio）とローカル Ollama の最小構成に限定し、Mock プロバイダでネットワーク無しのテストも維持しています。
 - メトリクスは JSONL に追記するだけの最小構成です。
 - 後続の LLM Adapter OSS 本体とは**独立**して動作する、ポートフォリオ用サンプルです。
 
