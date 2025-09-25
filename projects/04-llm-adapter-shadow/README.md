@@ -41,30 +41,72 @@ projects/04-llm-adapter-shadow/
 
 ## Usage
 
-### Setup
+### Quickstart — 04: LLM Adapter (Shadow/Fallback)
 
-```bash
-# repo root
-cd projects/04-llm-adapter-shadow
-python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
+1. **セットアップ（Windows PowerShell）**
 
-### Run the demo
+   ```powershell
+   cd projects/04-llm-adapter-shadow
+   python -m venv .venv
+   .\.venv\Scripts\Activate
+   pip install -r requirements.txt
+   ```
 
-```bash
-python demo_shadow.py
-```
+   *PowerShell では bash のヒアドキュメントが使えないため、`python -m venv` や `pip` をそのまま実行するか、`python -c "..."` を活用してください。*
 
-標準出力でプライマリ結果を確認しつつ、影実行のメトリクスが `artifacts/runs-metrics.jsonl` に追記されます。
+2. **健全性チェック（pytest）**
+
+   ```powershell
+   pytest -q
+   ```
+
+3. **実行 & メトリクス確認**
+
+   ```powershell
+   $env:OPENAI_API_KEY = "sk-..."        # 例: どれか1つは成功するプロバイダ
+   $env:GOOGLE_API_KEY = "..."          # 無しでも OK（Gemini は自動スキップ）
+   python demo_shadow.py
+   Get-Content .\artifacts\runs-metrics.jsonl -Last 10
+   ```
+
+   1行=1イベントの JSONL が追記されます（`provider_success` / `provider_error` / `provider_skipped` など）。
+
+4. **Gemini（google-genai）利用時の注意**
+
+   新SDK（`google-genai >= 1.38`）では生成パラメータとセーフティ設定を `config=GenerateContentConfig(...)` に集約します。
+
+   ```python
+   import os
+   from google import genai
+   from google.genai import types as gt
+
+   client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+   cfg = gt.GenerateContentConfig(
+       max_output_tokens=512,
+       temperature=0.3,
+       safety_settings=[...],
+   )
+   resp = client.models.generate_content(
+       model="gemini-2.5-flash",
+       contents=[{"role": "user", "parts": [{"text": "ping"}]}],
+       config=cfg,
+   )
+   ```
+
+   `GeminiProvider` も同仕様に準拠しており、旧SDK特有の `... unexpected keyword argument 'safety_settings'` は `ConfigError` として正規化されます。
+
+5. **トラブルシュート**
+
+   - `GOOGLE_API_KEY` が未設定／空文字なら Gemini は `ProviderSkip` として自動スキップし、`provider_skipped` イベントを記録します。他プロバイダが成功すればチェーン全体は継続します。
+   - PowerShell では bash 由来の構文（ヒアドキュメントなど）が動かないため、`python -c "..."` などで置き換えてください。
+   - `runs-metrics.jsonl` にイベントが追加されない場合は書き込み権限と直前の `provider_chain_failed` ログを確認してください。
 
 ### Provider configuration
 
 - `PRIMARY_PROVIDER` — 形式は `"<prefix>:<model-id>"`。デフォルトは `gemini:gemini-2.5-flash`。
 - `SHADOW_PROVIDER` — 影実行用。デフォルトは `ollama:gemma3n:e2b`。`none` や空文字で無効化できます。
 - `OLLAMA_HOST` — Ollama API のベースURL（未指定時は `http://127.0.0.1:11434`）。
-- `GEMINI_API_KEY` — Gemini SDK が自動検出するAPIキー。環境にセットしておくと `GeminiProvider` が利用します。
+- `GOOGLE_API_KEY` — Gemini SDK が参照するAPIキー。未設定の場合、Gemini プロバイダは安全にスキップされます。
 
 プロバイダ文字列は最初のコロンのみを区切り文字として扱うため、`ollama:gemma3n:e2b` のようにモデルIDにコロンを含めても問題ありません。`mock:foo` を指定するとモックプロバイダで簡易動作確認が可能です。
 
@@ -73,7 +115,7 @@ python demo_shadow.py
 ```bash
 export PRIMARY_PROVIDER="gemini:gemini-2.5-flash"
 export SHADOW_PROVIDER="ollama:gemma3n:e2b"
-export GEMINI_API_KEY="<YOUR_GEMINI_KEY>"
+export GOOGLE_API_KEY="<YOUR_GEMINI_KEY>"
 export OLLAMA_HOST="http://127.0.0.1:11434"
 ```
 

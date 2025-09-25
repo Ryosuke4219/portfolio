@@ -27,6 +27,18 @@ class FatalError(AdapterError):
     """Raised for unrecoverable issues that should halt the runner."""
 
 
+class ProviderSkip(AdapterError):
+    """Raised when a provider should be skipped without counting as a failure."""
+
+    def __init__(self, message: str, *, reason: str | None = None) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+class ConfigError(AdapterError):
+    """Raised when a provider is misconfigured."""
+
+
 __all__ = [
     "AdapterError",
     "TimeoutError",
@@ -34,4 +46,6 @@ __all__ = [
     "AuthError",
     "RetriableError",
     "FatalError",
+    "ProviderSkip",
+    "ConfigError",
 ]

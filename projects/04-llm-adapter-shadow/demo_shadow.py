@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 
+from src.llm_adapter.errors import ProviderSkip
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.factory import provider_from_environment
 from src.llm_adapter.runner import Runner
@@ -25,6 +26,9 @@ if __name__ == "__main__":
 
     try:
         response = runner.run(request, shadow=shadow)
+    except ProviderSkip as exc:  # pragma: no cover - configuration guard
+        print(f"Provider skipped: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
     except Exception as exc:  # pragma: no cover - demo script resilience
         print(f"Provider execution failed: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
-from src.llm_adapter.errors import AuthError, RateLimitError
+from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderSPI
 from src.llm_adapter.providers.factory import (
     create_provider_from_spec,
@@ -116,6 +118,11 @@ class _RecordClient:
                 self._outer = outer
 
             def generate_content(self, **kwargs):
+                config_obj = kwargs.get("config")
+                if config_obj is not None:
+                    to_dict = getattr(config_obj, "to_dict", None)
+                    if callable(to_dict):
+                        kwargs["_config_dict"] = to_dict()
                 self._outer.calls.append(kwargs)
                 return SimpleNamespace(
                     text="こんにちは",
@@ -145,9 +152,45 @@ def test_gemini_provider_invokes_client_with_config():
 
     recorded = client.calls.pop()
     assert recorded["model"] == "gemini-2.5-flash"
-    assert recorded["config"]["temperature"] == 0.2
-    assert recorded["config"]["max_output_tokens"] == 128
+    recorded_config = recorded["config"]
+    config_view: dict[str, Any] = {}
+    config_dict = recorded.get("_config_dict")
+    if isinstance(config_dict, Mapping):
+        config_view.update(config_dict)
+    to_dict = getattr(recorded_config, "to_dict", None)
+    if callable(to_dict):
+        maybe = to_dict()
+        if isinstance(maybe, Mapping):
+            config_view.update(maybe)
+    if isinstance(recorded_config, Mapping):
+        config_view.update(recorded_config)
+
+    temperature = config_view.get("temperature")
+    if temperature is None and hasattr(recorded_config, "temperature"):
+        temperature = getattr(recorded_config, "temperature")
+    max_tokens = config_view.get("max_output_tokens")
+    if max_tokens is None and hasattr(recorded_config, "max_output_tokens"):
+        max_tokens = getattr(recorded_config, "max_output_tokens")
+
+    assert temperature == 0.2
+    assert max_tokens == 128
     assert isinstance(recorded["contents"], list)
+
+
+def test_gemini_provider_skips_without_api_key(monkeypatch):
+    from src.llm_adapter.providers import gemini as gemini_module
+
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    stub_module = SimpleNamespace(Client=lambda **_: SimpleNamespace(models=None, responses=None))
+    monkeypatch.setattr(gemini_module, "genai", stub_module, raising=False)
+
+    provider = GeminiProvider("gemini-2.5-flash")
+
+    with pytest.raises(ProviderSkip) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+    assert excinfo.value.reason == "no_api_key"
 
 
 def test_gemini_provider_translates_rate_limit():
