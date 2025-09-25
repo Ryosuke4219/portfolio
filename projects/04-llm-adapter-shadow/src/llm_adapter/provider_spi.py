@@ -27,6 +27,18 @@ class ProviderResponse:
     token_usage: TokenUsage
     latency_ms: int
 
+    @property
+    def output_text(self) -> str:
+        return self.text
+
+    @property
+    def input_tokens(self) -> int:
+        return self.token_usage.prompt
+
+    @property
+    def output_tokens(self) -> int:
+        return self.token_usage.completion
+
 
 class ProviderSPI(Protocol):
     def name(self) -> str:

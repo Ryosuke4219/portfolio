@@ -6,7 +6,7 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Type
+from typing import Any, Dict, Type
 
 from ..config import ProviderConfig
 
@@ -18,10 +18,25 @@ class ProviderResponse:
     """LLM 呼び出しの結果。"""
 
     output_text: str
-    input_tokens: int
-    output_tokens: int
-    latency_ms: int
-    raw_output: Optional[dict] = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_ms: int = 0
+    raw_output: Any = None
+
+    # --- compatibility aliases (shadow 互換) ---
+    @property
+    def text(self) -> str:
+        return self.output_text
+
+    @property
+    def token_usage(self):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            prompt=self.input_tokens,
+            completion=self.output_tokens,
+            total=(self.input_tokens + self.output_tokens),
+        )
 
 
 class BaseProvider:

@@ -71,26 +71,26 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = _parse_args()
-    logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO))
+def _default_budgets_path() -> Path:
+    return Path(__file__).resolve().parent / "config" / "budgets.yaml"
 
-    provider_paths = [Path(p.strip()).expanduser().resolve() for p in args.providers.split(",") if p.strip()]
-    if not provider_paths:
-        raise SystemExit("--providers に有効なパスが指定されていません")
-    prompt_path = Path(args.prompts).expanduser().resolve()
-    if not prompt_path.exists():
-        raise SystemExit(f"ゴールデンタスクが見つかりません: {prompt_path}")
-    budgets_path = (
-        Path(args.budgets).expanduser().resolve()
-        if args.budgets
-        else Path(__file__).resolve().parent / "config" / "budgets.yaml"
-    )
-    metrics_path = (
-        Path(args.metrics).expanduser().resolve()
-        if args.metrics
-        else Path(__file__).resolve().parent.parent / "data" / "runs-metrics.jsonl"
-    )
+
+def _default_metrics_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "data" / "runs-metrics.jsonl"
+
+
+def _run(
+    provider_paths: list[Path],
+    prompt_path: Path,
+    budgets_path: Path,
+    metrics_path: Path,
+    *,
+    repeat: int,
+    mode: str,
+    allow_overrun: bool,
+    log_level: str,
+) -> int:
+    logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO))
 
     provider_configs = load_provider_configs(provider_paths)
     tasks = load_golden_tasks(prompt_path)
@@ -102,11 +102,64 @@ def main() -> int:
         tasks,
         budget_manager,
         metrics_path,
-        allow_overrun=args.allow_overrun,
+        allow_overrun=allow_overrun,
     )
-    results = runner.run(repeat=max(args.repeat, 1), mode=args.mode)
+    results = runner.run(repeat=max(repeat, 1), mode=mode)
     LOGGER.info("%d 件の試行を記録しました", len(results))
     return 0
+
+
+def run_batch(provider_specs: list[str], prompts_path: str) -> int:
+    provider_paths = [Path(spec).expanduser().resolve() for spec in provider_specs if spec]
+    if not provider_paths:
+        raise ValueError("provider_specs must include at least one path")
+    prompt_path = Path(prompts_path).expanduser().resolve()
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"ゴールデンタスクが見つかりません: {prompt_path}")
+    budgets_path = _default_budgets_path()
+    metrics_path = _default_metrics_path()
+    return _run(
+        provider_paths,
+        prompt_path,
+        budgets_path,
+        metrics_path,
+        repeat=1,
+        mode="parallel",
+        allow_overrun=False,
+        log_level="INFO",
+    )
+
+
+def main() -> int:
+    args = _parse_args()
+
+    provider_paths = [Path(p.strip()).expanduser().resolve() for p in args.providers.split(",") if p.strip()]
+    if not provider_paths:
+        raise SystemExit("--providers に有効なパスが指定されていません")
+    prompt_path = Path(args.prompts).expanduser().resolve()
+    if not prompt_path.exists():
+        raise SystemExit(f"ゴールデンタスクが見つかりません: {prompt_path}")
+    budgets_path = (
+        Path(args.budgets).expanduser().resolve()
+        if args.budgets
+        else _default_budgets_path()
+    )
+    metrics_path = (
+        Path(args.metrics).expanduser().resolve()
+        if args.metrics
+        else _default_metrics_path()
+    )
+
+    return _run(
+        provider_paths,
+        prompt_path,
+        budgets_path,
+        metrics_path,
+        repeat=args.repeat,
+        mode=args.mode,
+        allow_overrun=args.allow_overrun,
+        log_level=args.log_level,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI エントリポイント
