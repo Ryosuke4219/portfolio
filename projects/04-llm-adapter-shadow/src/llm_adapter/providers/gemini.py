@@ -179,21 +179,39 @@ def _invoke_gemini(
 ) -> Any:
     models_api = getattr(client, "models", None)
     if models_api and hasattr(models_api, "generate_content"):
-        return models_api.generate_content(
-            model=model,
-            contents=contents,
-            config=config,
-            safety_settings=safety_settings,
-        )
+        try:
+            return models_api.generate_content(
+                model=model,
+                contents=contents,
+                config=config,
+                safety_settings=safety_settings,
+            )
+        except TypeError as exc:  # pragma: no cover - legacy SDK fallback
+            if safety_settings and "safety_settings" in str(exc):
+                return models_api.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                )
+            raise
 
     responses_api = getattr(client, "responses", None)
     if responses_api and hasattr(responses_api, "generate"):
-        return responses_api.generate(
-            model=model,
-            input=contents,
-            config=config,
-            safety_settings=safety_settings,
-        )
+        try:
+            return responses_api.generate(
+                model=model,
+                input=contents,
+                config=config,
+                safety_settings=safety_settings,
+            )
+        except TypeError as exc:  # pragma: no cover - legacy SDK fallback
+            if safety_settings and "safety_settings" in str(exc):
+                return responses_api.generate(
+                    model=model,
+                    input=contents,
+                    config=config,
+                )
+            raise
 
     raise AttributeError("Gemini client does not provide a supported generate method")
 
