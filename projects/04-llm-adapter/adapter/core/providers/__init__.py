@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Optional, Type
 
-from .config import ProviderConfig
+from ..config import ProviderConfig
 
 LOGGER = logging.getLogger(__name__)
 
@@ -64,9 +64,7 @@ class SimulatedProvider(BaseProvider):
 class ProviderFactory:
     """プロバイダ生成のためのファクトリ。"""
 
-    _registry: Dict[str, Type[BaseProvider]] = {
-        "simulated": SimulatedProvider,
-    }
+    _registry: Dict[str, Type[BaseProvider]] = {"simulated": SimulatedProvider}
 
     @classmethod
     def register(cls, provider_name: str, provider_cls: Type[BaseProvider]) -> None:
@@ -81,3 +79,18 @@ class ProviderFactory:
             )
             provider_cls = SimulatedProvider
         return provider_cls(config)
+
+
+try:  # pragma: no cover - optional依存の存在に応じて処理
+    from .gemini import GeminiProvider
+except Exception:  # pragma: no cover - 依存不足時は gemini を登録しない
+    GeminiProvider = None  # type: ignore[assignment]
+else:  # pragma: no cover - 実行時に gemini プロバイダを登録
+    ProviderFactory.register("gemini", GeminiProvider)
+
+try:  # pragma: no cover - optional依存の存在に応じて処理
+    from .openai import OpenAIProvider
+except Exception:  # pragma: no cover - 依存不足時は openai を登録しない
+    OpenAIProvider = None  # type: ignore[assignment]
+else:  # pragma: no cover - 実行時に openai プロバイダを登録
+    ProviderFactory.register("openai", OpenAIProvider)

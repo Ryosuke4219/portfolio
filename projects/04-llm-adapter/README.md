@@ -13,6 +13,33 @@ pip install -r requirements.txt
 
 Python 3.10+ を想定。仮想環境下で CLI (`adapter/run_compare.py`) やレポート生成ツールを利用します。
 
+### Google Gemini を利用する
+
+
+実プロバイダとして Google Gemini を呼び出す場合は、API キーを `GOOGLE_API_KEY` に設定し、Gemini 用の設定ファイルを指定します。
+
+```bash
+export GOOGLE_API_KEY="<取得したAPIキー>"
+python adapter/run_compare.py \
+  --providers adapter/config/providers/gemini.yaml \
+  --prompts datasets/golden/tasks.jsonl
+```
+
+`adapter/config/providers/gemini.yaml` では `model: gemini-1.5-flash` を既定とし、料金（入力 0.00035 USD/1k tokens、出力 0.00105 USD/1k tokens）やレートリミット（60 rpm / 60k tpm）を設定済みです。追加の `generation_config` や `safety_settings` を調整したい場合は YAML を編集してください。SDK が `safety_settings` 引数を受け付けない旧バージョンでも、自動的に同引数を除外して再試行します。
+
+### OpenAI を利用する
+
+OpenAI API を利用する場合は、`OPENAI_API_KEY` を設定し OpenAI 用の設定ファイルを指定します。
+
+```bash
+export OPENAI_API_KEY="<取得したAPIキー>"
+python adapter/run_compare.py \
+  --providers adapter/config/providers/openai.yaml \
+  --prompts datasets/golden/tasks.jsonl
+```
+
+`adapter/config/providers/openai.yaml` では `model: gpt-4o-mini` を既定とし、Responses API を優先的に呼び出します。旧 Chat Completion API しか利用できない SDK バージョンでも自動的にフォールバックします。料金（入力 0.00015 USD/1k tokens、出力 0.00060 USD/1k tokens）やレートリミット（5k rpm / 500k tpm）は目安値です。Azure OpenAI 等でエンドポイントが異なる場合は `endpoint` や `request_kwargs` を適宜上書きしてください。
+
 ## コマンド一覧
 
 | コマンド | 説明 |
