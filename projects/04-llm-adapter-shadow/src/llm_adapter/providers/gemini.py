@@ -238,10 +238,10 @@ def _invoke_gemini(
     models_api = getattr(client, "models", None)
     if models_api and hasattr(models_api, "generate_content"):
         try:
-            kwargs = {"model": model, "contents": contents}
+            model_kwargs: dict[str, Any] = {"model": model, "contents": contents}
             if config_obj is not None:
-                kwargs["config"] = config_obj
-            return models_api.generate_content(**kwargs)
+                model_kwargs["config"] = config_obj
+            return models_api.generate_content(**model_kwargs)
         except TypeError as exc:  # pragma: no cover - legacy SDK fallback
             if "safety_settings" in str(exc):
                 raise ConfigError(
@@ -254,10 +254,10 @@ def _invoke_gemini(
     responses_api = getattr(client, "responses", None)
     if responses_api and hasattr(responses_api, "generate"):
         try:
-            kwargs = {"model": model, "input": contents}
+            response_kwargs: dict[str, Any] = {"model": model, "input": contents}
             if config_payload is not None:
-                kwargs["config"] = config_payload
-            return responses_api.generate(**kwargs)
+                response_kwargs["config"] = config_payload
+            return responses_api.generate(**response_kwargs)
         except TypeError as exc:  # pragma: no cover - legacy SDK fallback
             if "safety_settings" in str(exc):
                 raise ConfigError(
