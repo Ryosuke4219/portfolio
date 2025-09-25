@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Tuple, Union
 
 try:  # pragma: no cover - 依存がある場合はこちらを利用
     import yaml  # type: ignore
@@ -83,7 +83,8 @@ class BudgetBook:
     overrides: Mapping[str, BudgetRule]
 
 
-def _load_yaml(path: Path) -> MutableMapping[str, Any]:
+def _load_yaml(path: Union[str, Path]) -> MutableMapping[str, Any]:
+    path = Path(path)
     text = path.read_text(encoding="utf-8")
     if yaml is not None:
         data = yaml.safe_load(text)
@@ -142,9 +143,10 @@ def _load_yaml_without_dependency(text: str, path: Path) -> MutableMapping[str, 
     return root
 
 
-def load_provider_config(path: Path) -> ProviderConfig:
+def load_provider_config(path: Union[str, Path]) -> ProviderConfig:
     """単一のプロバイダ設定を読み込む。"""
 
+    path = Path(path)
     data = _load_yaml(path)
     retries = data.get("retries", {})
     pricing = data.get("pricing", {})

@@ -24,7 +24,9 @@ def _resolve_api_key(env_name: str | None) -> str:
         )
     value = os.getenv(env_name)
     if not value:
-        raise RuntimeError(f"OpenAI API キーが環境変数 '{env_name}' に見つかりません")
+        raise RuntimeError(
+            f"Environment variable {env_name!r} is not set. OpenAI API キーを設定してください。"
+        )
     return value
 
 
@@ -32,6 +34,25 @@ def _coerce_mapping(value: Any) -> MutableMapping[str, Any]:
     if isinstance(value, Mapping):
         return dict(value)
     return {}
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    rate_limit_cls = getattr(_openai, "RateLimitError", None)
+    if rate_limit_cls is not None and isinstance(exc, rate_limit_cls):
+        return True
+    return exc.__class__.__name__ == "RateLimitError"
+
+
+def _split_endpoint(value: str | None) -> tuple[str | None, str | None]:
+    if not isinstance(value, str):
+        return None, None
+    stripped = value.strip()
+    if not stripped:
+        return None, None
+    lowered = stripped.lower()
+    if lowered in {"responses", "chat_completions", "completions"}:
+        return lowered, None
+    return None, stripped
 
 
 def _prepare_common_kwargs(config: ProviderConfig) -> MutableMapping[str, Any]:
@@ -218,18 +239,22 @@ class OpenAIProvider(BaseProvider):
         api_key = _resolve_api_key(config.auth_env)
         self._model = config.model
         self._system_prompt = config.raw.get("system_prompt") if isinstance(config.raw.get("system_prompt"), str) else None
-        self._preferred_modes: tuple[str, ...] = self._determine_modes(config)
+        endpoint_mode, endpoint_url = _split_endpoint(config.endpoint)
+        self._endpoint_url = endpoint_url
+        self._preferred_modes: tuple[str, ...] = self._determine_modes(config, endpoint_mode)
         base_kwargs = _prepare_common_kwargs(config)
         self._request_kwargs = dict(base_kwargs)
         response_format = config.raw.get("response_format")
         self._response_format = dict(response_format) if isinstance(response_format, Mapping) else None
         self._client = self._create_client(api_key, config)
 
-    def _determine_modes(self, config: ProviderConfig) -> tuple[str, ...]:
+    def _determine_modes(self, config: ProviderConfig, endpoint_mode: str | None) -> tuple[str, ...]:
         preferred = config.raw.get("api")
         modes: list[str] = []
         if isinstance(preferred, str) and preferred.strip():
             modes.append(preferred.strip().lower())
+        if endpoint_mode:
+            modes.append(endpoint_mode)
         modes.extend(["responses", "chat_completions", "completions"])
         # 順序は維持しつつ重複を排除
         seen: set[str] = set()
@@ -244,7 +269,7 @@ class OpenAIProvider(BaseProvider):
         return tuple(ordered)
 
     def _create_client(self, api_key: str, config: ProviderConfig) -> Any:
-        endpoint = config.endpoint
+        endpoint = self._endpoint_url
         organization = config.raw.get("organization") if isinstance(config.raw.get("organization"), str) else None
         default_headers = _coerce_mapping(config.raw.get("default_headers"))
         if hasattr(_openai, "OpenAI"):
@@ -278,6 +303,10 @@ class OpenAIProvider(BaseProvider):
                     continue
                 break
             except Exception as exc:  # pragma: no cover - 実行時エラーを保持して次のモードへ
+                if _is_rate_limit_error(exc):
+                    raise RuntimeError(
+                        "OpenAI quota exceeded. ダッシュボードで請求/使用量を確認。"
+                    ) from exc
                 last_error = exc
         else:
             if last_error:

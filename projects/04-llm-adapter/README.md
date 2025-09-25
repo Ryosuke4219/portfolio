@@ -2,6 +2,16 @@
 
 複数プロバイダの LLM 応答を比較・記録・可視化する実験用アダプタです。Shadow 実行なしで本番想定のリクエストを発行し、コスト/レイテンシ/差分率・失敗分類などを JSONL に追記します。`datasets/golden/` のゴールデンタスクと `config/providers/*.yaml` を組み合わせ、基準データに対する回帰テストを高速に行えます。
 
+## Windows PowerShell での文字化け対策
+
+PowerShell から実行する場合は、最初に次の 3 行を流し込んで入出力の文字コードを UTF-8 に揃えてください。
+
+```powershell
+[Console]::InputEncoding  = [System.Text.UTF8Encoding]::new()
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$env:PYTHONIOENCODING="utf-8"
+```
+
 ## セットアップ
 
 ```bash
@@ -12,6 +22,17 @@ pip install -r requirements.txt
 ```
 
 Python 3.10+ を想定。仮想環境下で CLI (`adapter/run_compare.py`) やレポート生成ツールを利用します。
+
+### 最短コマンドで試す
+
+`pip install -e .` でパッケージをインストールすると、`llm-adapter` コマンドから即座にプロバイダを叩けます。
+
+```bash
+pip install -e .
+llm-adapter --provider adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して"
+```
+
+JSONL のバッチを動かしたい場合は `--prompts` を指定します（内部で `adapter/run_compare.py` を呼び出します）。
 
 ### Google Gemini を利用する
 

@@ -61,7 +61,11 @@ def create_provider_from_spec(
     try:
         factory = default_factories[prefix]
     except KeyError as exc:  # pragma: no cover - defensive guard
-        raise ValueError(f"unsupported provider prefix: {prefix}") from exc
+        supported = ", ".join(sorted(default_factories))
+        raise ValueError(
+            f"unsupported provider prefix: {prefix}. supported: {supported}. "
+            "OpenAI は無印、Gemini は google-genai を導入してください。"
+        ) from exc
 
     return factory(remainder)
 

@@ -1,5 +1,5 @@
 provider: openai
-endpoint: null
+endpoint: responses
 model: gpt-4o-mini
 auth_env: OPENAI_API_KEY
 seed: 0
@@ -20,7 +20,6 @@ rate_limit:
 quality_gates:
   determinism_diff_rate_max: 0.15
   determinism_len_stdev_max: 40
-api: responses
 system_prompt: "You are a helpful assistant."
 response_format:
   type: text
