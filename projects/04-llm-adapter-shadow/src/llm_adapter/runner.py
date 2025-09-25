@@ -6,7 +6,7 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-from .errors import RateLimitError, RetriableError, TimeoutError
+from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from .metrics import log_event
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow
@@ -65,9 +65,30 @@ class Runner:
                 error_message=str(err),
             )
 
+        def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
+            if not metrics_path_str:
+                return
+            log_event(
+                "provider_skipped",
+                metrics_path_str,
+                request_fingerprint=request_fingerprint,
+                request_hash=content_hash(
+                    provider.name(), request.prompt, request.options, request.max_tokens
+                ),
+                provider=provider.name(),
+                attempt=attempt,
+                total_providers=len(self.providers),
+                reason=getattr(err, "reason", None),
+                error_message=str(err),
+            )
+
         for attempt_index, provider in enumerate(self.providers, start=1):
             try:
                 response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
+            except ProviderSkip as err:
+                last_err = err
+                _record_skip(err, attempt_index, provider)
+                continue
             except RateLimitError as err:
                 last_err = err
                 _record_error(err, attempt_index, provider)

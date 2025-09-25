@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from types import ModuleType
@@ -9,13 +10,42 @@ from typing import Any, Protocol, cast
 
 try:  # pragma: no cover - import guard for offline test environments
     from google import genai as _genai_module
+    from google.genai import types as _genai_types
 except ModuleNotFoundError:  # pragma: no cover - fallback when SDK is unavailable
     genai: ModuleType | None = None
+    gt: Any | None = None
 else:
     genai = cast(ModuleType, _genai_module)
+    gt = cast(Any, _genai_types)
 
-from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
-from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+if gt is None:  # pragma: no cover - stub for unit tests without the SDK
+
+    class _GenerateContentConfig(dict):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+
+        def to_dict(self) -> dict[str, Any]:
+            return dict(self)
+
+    class _TypesModule:
+        GenerateContentConfig = _GenerateContentConfig
+
+    gt = cast(Any, _TypesModule())
+
+from ..errors import (
+    AuthError,
+    ConfigError,
+    ProviderSkip,
+    RateLimitError,
+    RetriableError,
+    TimeoutError,
+)
+from ..provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    ProviderSPI,
+    TokenUsage,
+)
 
 __all__ = ["GeminiProvider", "parse_gemini_messages"]
 
@@ -27,7 +57,6 @@ class _GeminiModelsAPI(Protocol):
         model: str,
         contents: Sequence[Mapping[str, Any]] | None,
         config: Mapping[str, Any] | None = None,
-        safety_settings: Sequence[Mapping[str, Any]] | None = None,
     ) -> Any:
         ...
 
@@ -39,7 +68,6 @@ class _GeminiResponsesAPI(Protocol):  # pragma: no cover - legacy fallback
         model: str,
         input: Sequence[Mapping[str, Any]] | None,
         config: Mapping[str, Any] | None = None,
-        safety_settings: Sequence[Mapping[str, Any]] | None = None,
     ) -> Any:
         ...
 
@@ -170,6 +198,35 @@ def _merge_generation_config(
     return config or None
 
 
+def _prepare_generation_config(
+    base_config: Mapping[str, Any] | None,
+    safety_settings: Sequence[Mapping[str, Any]] | None,
+) -> tuple[Any | None, Mapping[str, Any] | None]:
+    merged: dict[str, Any] = {}
+    if base_config:
+        merged.update(base_config)
+    if safety_settings:
+        merged["safety_settings"] = list(safety_settings)
+
+    config_obj: Any | None = None
+    if gt is not None:
+        config_obj = gt.GenerateContentConfig(**merged)
+    elif merged:
+        config_obj = merged
+
+    config_payload: Mapping[str, Any] | None = None
+    if config_obj is not None:
+        to_dict = getattr(config_obj, "to_dict", None)
+        if callable(to_dict):
+            payload = to_dict()
+            if isinstance(payload, Mapping) and payload:
+                config_payload = payload
+    if config_payload is None and merged:
+        config_payload = merged
+
+    return config_obj, config_payload
+
+
 def _invoke_gemini(
     client: _GeminiClient,
     model: str,
@@ -177,40 +234,37 @@ def _invoke_gemini(
     config: Mapping[str, Any] | None,
     safety_settings: Sequence[Mapping[str, Any]] | None,
 ) -> Any:
+    config_obj, config_payload = _prepare_generation_config(config, safety_settings)
     models_api = getattr(client, "models", None)
     if models_api and hasattr(models_api, "generate_content"):
         try:
-            return models_api.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-                safety_settings=safety_settings,
-            )
+            model_kwargs: dict[str, Any] = {"model": model, "contents": contents}
+            if config_obj is not None:
+                model_kwargs["config"] = config_obj
+            return models_api.generate_content(**model_kwargs)
         except TypeError as exc:  # pragma: no cover - legacy SDK fallback
-            if safety_settings and "safety_settings" in str(exc):
-                return models_api.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=config,
-                )
+            if "safety_settings" in str(exc):
+                raise ConfigError(
+                    "google-genai: use config=GenerateContentConfig(...)"
+                ) from exc
+            if "config" in str(exc) and config_payload is not None:
+                return models_api.generate_content(model=model, contents=contents)
             raise
 
     responses_api = getattr(client, "responses", None)
     if responses_api and hasattr(responses_api, "generate"):
         try:
-            return responses_api.generate(
-                model=model,
-                input=contents,
-                config=config,
-                safety_settings=safety_settings,
-            )
+            response_kwargs: dict[str, Any] = {"model": model, "input": contents}
+            if config_payload is not None:
+                response_kwargs["config"] = config_payload
+            return responses_api.generate(**response_kwargs)
         except TypeError as exc:  # pragma: no cover - legacy SDK fallback
-            if safety_settings and "safety_settings" in str(exc):
-                return responses_api.generate(
-                    model=model,
-                    input=contents,
-                    config=config,
-                )
+            if "safety_settings" in str(exc):
+                raise ConfigError(
+                    "google-genai: use config=GenerateContentConfig(...)"
+                ) from exc
+            if "config" in str(exc):
+                return responses_api.generate(model=model, input=contents)
             raise
 
     raise AttributeError("Gemini client does not provide a supported generate method")
@@ -243,14 +297,16 @@ class GeminiProvider(ProviderSPI):
     ) -> None:
         self._model = model
         self._name = name or f"gemini:{model}"
+        self._client: _GeminiClient | None = None
+        self._client_module: Any | None = None
         if client is None:
             if genai is None:  # pragma: no cover - defensive branch
                 raise ImportError(
                     "google-genai is not installed; provide a pre-configured client"
                 )
-            module = cast(Any, genai)
-            client = cast(_GeminiClient, module.Client())
-        self._client: _GeminiClient = cast(_GeminiClient, client)
+            self._client_module = cast(Any, genai)
+        else:
+            self._client = cast(_GeminiClient, client)
         self._generation_config = dict(generation_config or {})
         self._safety_settings = list(safety_settings or [])
 
@@ -261,6 +317,8 @@ class GeminiProvider(ProviderSPI):
         return {"chat"}
 
     def _translate_error(self, exc: Exception) -> Exception:
+        if isinstance(exc, ConfigError):
+            return exc
         status = getattr(exc, "status", "") or getattr(exc, "code", "")
         status_text = str(status).upper()
 
@@ -293,7 +351,10 @@ class GeminiProvider(ProviderSPI):
 
         ts0 = time.time()
         try:
-            response = _invoke_gemini(self._client, self._model, messages, config, safety_settings)
+            client = self._resolve_client()
+            response = _invoke_gemini(client, self._model, messages, config, safety_settings)
+        except ProviderSkip:
+            raise
         except Exception as exc:  # pragma: no cover - translated in unit tests
             translated = self._translate_error(exc)
             raise translated from exc
@@ -303,3 +364,22 @@ class GeminiProvider(ProviderSPI):
         text = _coerce_output_text(response)
 
         return ProviderResponse(text=text, token_usage=usage, latency_ms=latency_ms)
+
+    def _resolve_client(self) -> _GeminiClient:
+        if self._client is not None:
+            return self._client
+        if self._client_module is None:  # pragma: no cover - defensive guard
+            raise RuntimeError("Gemini client factory is unavailable")
+
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if api_key is None:
+            raise ProviderSkip("gemini: GOOGLE_API_KEY not set", reason="no_api_key")
+
+        api_key_value = api_key.strip()
+        if not api_key_value:
+            raise ProviderSkip("gemini: GOOGLE_API_KEY not set", reason="no_api_key")
+
+        module = cast(Any, self._client_module)
+        client = cast(_GeminiClient, module.Client(api_key=api_key_value))
+        self._client = client
+        return client
