@@ -32,8 +32,20 @@ if gt is None:  # pragma: no cover - stub for unit tests without the SDK
 
     gt = cast(Any, _TypesModule())
 
-from ..errors import AuthError, ConfigError, ProviderSkip, RateLimitError, RetriableError, TimeoutError
-from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+from ..errors import (
+    AuthError,
+    ConfigError,
+    ProviderSkip,
+    RateLimitError,
+    RetriableError,
+    TimeoutError,
+)
+from ..provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    ProviderSPI,
+    TokenUsage,
+)
 
 __all__ = ["GeminiProvider", "parse_gemini_messages"]
 
