@@ -208,7 +208,7 @@ class OllamaProvider(ProviderSPI):
                 pass
 
         # Verify again with a short retry window.
-        for _ in range(3):
+        for _ in range(10):
             show_after = self._request("/api/show", {"model": self._model})
             if show_after.status_code == 200:
                 self._model_ready = True
