@@ -6,7 +6,55 @@ import hashlib
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from statistics import median
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence
+
+from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:  # pragma: no cover - 循環参照の回避
+    from .config import ProviderConfig
+    from .providers import ProviderResponse
+
+
+class RunMetric(BaseModel):
+    """シンプルなランメトリクス表現。"""
+
+    provider: str
+    model: str
+    endpoint: str
+    latency_ms: int
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float = 0.0
+    status: str = "ok"
+    error: Optional[str] = None
+    prompt_sha256: str = Field(..., description="content hash without secrets")
+
+    @classmethod
+    def from_resp(
+        cls,
+        cfg: "ProviderConfig",
+        resp: "ProviderResponse",
+        prompt: str,
+        *,
+        cost_usd: float = 0.0,
+        error: str | None = None,
+    ) -> "RunMetric":
+        latency_ms = getattr(resp, "latency_ms", 0)
+        input_tokens = getattr(resp, "input_tokens", 0)
+        output_tokens = getattr(resp, "output_tokens", 0)
+        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+        return cls(
+            provider=cfg.provider,
+            model=cfg.model,
+            endpoint=(cfg.endpoint or "responses"),
+            latency_ms=int(latency_ms),
+            input_tokens=int(input_tokens),
+            output_tokens=int(output_tokens),
+            cost_usd=float(cost_usd),
+            status="error" if error else "ok",
+            error=error,
+            prompt_sha256=digest,
+        )
 
 
 @dataclass
@@ -79,6 +127,23 @@ def compute_cost_usd(prompt_tokens: int, completion_tokens: int, prompt_price: f
     prompt_cost = (prompt_tokens / 1000.0) * prompt_price
     completion_cost = (completion_tokens / 1000.0) * completion_price
     return round(prompt_cost + completion_cost, 6)
+
+
+def estimate_cost(config: "ProviderConfig", input_tokens: int, output_tokens: int) -> float:
+    """プロバイダ設定に基づいて概算コストを算出する。"""
+
+    pricing = getattr(config, "pricing", None)
+    if pricing is None:
+        return 0.0
+    input_per_million = float(getattr(pricing, "input_per_million", 0.0) or 0.0)
+    output_per_million = float(getattr(pricing, "output_per_million", 0.0) or 0.0)
+    if input_per_million or output_per_million:
+        cost = (input_tokens / 1_000_000.0) * input_per_million
+        cost += (output_tokens / 1_000_000.0) * output_per_million
+        return round(cost, 6)
+    prompt_price = float(getattr(pricing, "prompt_usd", 0.0) or 0.0)
+    completion_price = float(getattr(pricing, "completion_usd", 0.0) or 0.0)
+    return compute_cost_usd(input_tokens, output_tokens, prompt_price, completion_price)
 
 
 def tokenize(text: str) -> List[str]:

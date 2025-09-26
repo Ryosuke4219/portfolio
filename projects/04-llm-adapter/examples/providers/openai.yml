@@ -1,3 +1,4 @@
+# サンプル: OpenAI Responses API 用プロバイダ設定
 provider: openai
 endpoint: responses
 model: gpt-4o-mini
@@ -20,6 +21,3 @@ rate_limit:
 quality_gates:
   determinism_diff_rate_max: 0.15
   determinism_len_stdev_max: 40
-system_prompt: "You are a helpful assistant."
-response_format:
-  type: text

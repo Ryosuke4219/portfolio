@@ -1,0 +1,22 @@
+# サンプル: Google Gemini API 用プロバイダ設定
+provider: gemini
+model: gemini-1.5-flash
+auth_env: GOOGLE_API_KEY
+seed: 0
+temperature: 0.2
+top_p: 1.0
+max_tokens: 1024
+timeout_s: 60
+retries:
+  max: 2
+  backoff_s: 1.0
+persist_output: true
+pricing:
+  prompt_usd: 0.00035
+  completion_usd: 0.00105
+rate_limit:
+  rpm: 60
+  tpm: 60000
+quality_gates:
+  determinism_diff_rate_max: 0.2
+  determinism_len_stdev_max: 80

@@ -1,6 +1,29 @@
 # LLM Adapter (Core)
 
+- [概要](#概要)
+- [Windows PowerShell での文字化け対策](#windows-powershell-での文字化け対策)
+- [セットアップ](#セットアップ)
+- [CLI クイックスタート](#cli-クイックスタート)
+- [サンプル設定とプロンプト](#サンプル設定とプロンプト)
+- [Troubleshooting](#troubleshooting)
+- [コマンド一覧](#コマンド一覧)
+- [代表的な使い方](#代表的な使い方)
+- [生成物](#生成物)
+- [拡張ポイント](#拡張ポイント)
+
+# 概要
+
 複数プロバイダの LLM 応答を比較・記録・可視化する実験用アダプタです。Shadow 実行なしで本番想定のリクエストを発行し、コスト/レイテンシ/差分率・失敗分類などを JSONL に追記します。`datasets/golden/` のゴールデンタスクと `config/providers/*.yaml` を組み合わせ、基準データに対する回帰テストを高速に行えます。
+
+## Windows PowerShell での文字化け対策
+
+PowerShell から実行する場合は、最初に次の 3 行を流し込んで入出力の文字コードを UTF-8 に揃えてください。
+
+```powershell
+[Console]::InputEncoding  = [System.Text.UTF8Encoding]::new()
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$env:PYTHONIOENCODING="utf-8"
+```
 
 ## セットアップ
 
@@ -12,6 +35,76 @@ pip install -r requirements.txt
 ```
 
 Python 3.10+ を想定。仮想環境下で CLI (`adapter/run_compare.py`) やレポート生成ツールを利用します。
+
+## CLI クイックスタート
+
+`pip install -e .` でパッケージをインストールすると、`llm-adapter` コマンドから即座にプロバイダを叩けます。
+
+```bash
+pip install -e .
+llm-adapter --provider adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して"
+```
+
+### 出力フォーマットを選ぶ
+
+`--format {text,json,jsonl}` で出力形式を選択できます（既定: `text`）。`json`/`jsonl` では `provider` / `model` / `endpoint` / `latency_ms` / `input_tokens` / `output_tokens` / `cost_usd` / `status` / `error` / `prompt_sha256` を含むメトリクスを出力します。
+
+```bash
+llm-adapter --provider adapter/config/providers/openai.yaml \
+  --prompt "関西弁で今日の天気を一言" --format json
+```
+
+### ログと保存をまとめる
+
+- `--json-logs` : 標準エラーに JSON 形式の進捗ログを出力。
+- `--out out/` : `out/metrics.jsonl` にメトリクスを追記。
+- `--log-prompts` : JSON/JSONL 出力やメトリクス書き出しにプロンプト本文を含める（既定では非表示）。
+
+```bash
+llm-adapter --provider adapter/config/providers/openai.yaml \
+  --prompts examples/prompts/ja_one_liner.jsonl \
+  --format jsonl --out out --json-logs
+```
+
+### プロンプト入力の選択肢
+
+- `--prompt` : コマンドラインで直接指定。
+- `--prompt-file` : テキストファイル全体を 1 プロンプトとして送信。
+- `--prompts` : JSONL ファイルから複数プロンプトを読み込む（`{"prompt": "..."}` 形式）。
+
+いずれも内部で同じ処理パイプラインに流れ、メトリクスを取得します。
+
+### プロンプトを安全に扱う
+
+既定では JSON/JSONL やログにプロンプト本文を出力せず、`prompt_sha256` のみを公開します。後続処理で本文が必要な場合は `--log-prompts` を明示してください。例外ログ内の URL クエリや Authorization ヘッダは自動的にマスクされます。
+
+### 並列実行とレート制御
+
+- `--parallel` : CPU コア数に合わせて最大 8 並列で実行。
+- `--rpm 60` : 1 分あたりの実行回数を制限（トークンベースの制御は今後追加予定）。
+
+### .env の読み込み
+
+Windows で環境変数を毎回設定する手間を省くため、`--env .env` で必要なキーを読み込み可能です。`python-dotenv` が未インストールの場合は、インストール方法を案内します。
+
+### エラーメッセージの言語切替
+
+`--lang ja|en` または環境変数 `LLM_ADAPTER_LANG` で CLI のメッセージを日本語/英語に切り替えられます。ログを共有する際に便利です。
+
+### 既知の落とし穴を自動検知
+
+- API キー未設定時には、必要な環境変数名を明示。
+- OpenAI の 429 / quota 超過時には、請求・使用量・プロジェクトキーの確認ポイントを案内。
+
+失敗してもメトリクスは `status=error` として記録され、JSON 出力や `--out` から後続処理に利用できます。
+
+### 環境診断（doctor）
+
+`llm-adapter doctor` で Python バージョン・仮想環境・API キー・DNS/HTTPS 接続・エンコーディング・`.env` 依存関係・RPM 上限を一括チェックできます。問題が見つかると ❌ と対処法を 1 行で表示し、終了コード 3 を返します。
+
+### JSONL バッチ（run_compare 併用）
+
+既存の比較ランナーを流用したい場合は `--prompts` とともに `adapter/run_compare.py` のバッチ実行が可能です。
 
 ### Google Gemini を利用する
 
@@ -39,6 +132,35 @@ python adapter/run_compare.py \
 ```
 
 `adapter/config/providers/openai.yaml` では `model: gpt-4o-mini` を既定とし、Responses API を優先的に呼び出します。旧 Chat Completion API しか利用できない SDK バージョンでも自動的にフォールバックします。料金（入力 0.00015 USD/1k tokens、出力 0.00060 USD/1k tokens）やレートリミット（5k rpm / 500k tpm）は目安値です。Azure OpenAI 等でエンドポイントが異なる場合は `endpoint` や `request_kwargs` を適宜上書きしてください。
+
+## サンプル設定とプロンプト
+
+- `examples/providers/openai.yml` : OpenAI Responses API 用の最小構成。
+- `examples/providers/gemini.yml` : Gemini 1.5 Flash 用のサンプル。
+- `examples/prompts/ja_one_liner.jsonl` : 日本語 1 行プロンプトの JSONL テンプレート。
+- `scripts/windows/setup.ps1` : UTF-8 設定・仮想環境作成・`pip install -e .`・サンプル実行までを 1 コマンドで整える PowerShell スクリプト。
+
+必要な API キーは `.env.example` をコピーして `.env` を作成し、`--env .env` で読み込むと便利です。
+
+## Troubleshooting
+
+- **事前に `llm-adapter doctor` を実行**: ネットワークや API キー、エンコーディング設定を自動チェックできます。
+- **API キーが未設定**: `RuntimeError` を検出すると、CLI が「環境変数 `<KEY>` を設定してください」と案内します。`.env` を作成し `--env .env` で読み込みましょう。
+- **OpenAI の quota / 429**: `OpenAI quota exceeded` エラー時は、ダッシュボードの請求・使用量・プロジェクトキーのクォータを確認してください。CLI も同旨のメッセージを表示します。
+- **Windows での文字化け**: 冒頭の UTF-8 設定を実施するか、`scripts/windows/setup.ps1` を実行します。
+- **PYTHONPATH の設定が必要?**: `pip install -e .` 済みなら不要です。CLI も仮想環境内から直接利用できます。
+- **Gemini での safety_settings エラー**: 旧 SDK では自動で該当引数を除外して再試行します。それでも失敗する場合は `adapter/config/providers/gemini.yaml` の設定を調整してください。
+
+## 終了コード早見表
+
+| Exit Code | 意味 |
+| --- | --- |
+| 0 | 正常終了 |
+| 2 | 入力エラー（引数やファイル不備） |
+| 3 | 環境問題（API キー未設定など） |
+| 4 | ネットワーク障害 |
+| 5 | プロバイダ起因の失敗 |
+| 6 | レート/クォータ上限に到達 |
 
 ## コマンド一覧
 
