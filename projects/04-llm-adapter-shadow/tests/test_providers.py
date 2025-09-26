@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError
+from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderSPI
 from src.llm_adapter.providers.factory import (
     create_provider_from_spec,
@@ -207,6 +207,54 @@ def test_gemini_provider_translates_rate_limit():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(RateLimitError):
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+
+def test_gemini_provider_translates_rate_limit_status_object():
+    class _StatusCode:
+        def __init__(self, name: str):
+            self.name = name
+
+        def __str__(self) -> str:  # pragma: no cover - for defensive normalization
+            return f"StatusCode.{self.name}"
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            err = Exception("rate limited")
+            setattr(err, "status", _StatusCode("RESOURCE_EXHAUSTED"))
+            raise err
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(RateLimitError):
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+
+def test_gemini_provider_translates_timeout_status_object():
+    class _StatusCode:
+        def __init__(self, name: str):
+            self.name = name
+
+        def __str__(self) -> str:  # pragma: no cover - for defensive normalization
+            return f"StatusCode.{self.name}"
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            err = Exception("timeout")
+            setattr(err, "code", _StatusCode("DEADLINE_EXCEEDED"))
+            raise err
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(TimeoutError):
         provider.invoke(ProviderRequest(prompt="hello"))
 
 

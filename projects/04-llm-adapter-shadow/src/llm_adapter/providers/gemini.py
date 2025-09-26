@@ -319,8 +319,30 @@ class GeminiProvider(ProviderSPI):
     def _translate_error(self, exc: Exception) -> Exception:
         if isinstance(exc, ConfigError):
             return exc
-        status = getattr(exc, "status", "") or getattr(exc, "code", "")
-        status_text = str(status).upper()
+        def _normalize_status(value: Any) -> str:
+            if not value:
+                return ""
+
+            if hasattr(value, "name"):
+                name = getattr(value, "name")
+                if isinstance(name, str) and name.strip():
+                    value = name
+
+            if not isinstance(value, str):
+                value = str(value)
+
+            text = value.strip()
+            if not text:
+                return ""
+
+            token = text.split()[0]
+            if "." in token:
+                token = token.split(".")[-1]
+            token = token.strip(" <>:,'\"")
+            return token.upper()
+
+        status = getattr(exc, "status", None) or getattr(exc, "code", None)
+        status_text = _normalize_status(status)
 
         if status_text in {"UNAUTHENTICATED", "PERMISSION_DENIED"}:
             return AuthError(str(exc))
