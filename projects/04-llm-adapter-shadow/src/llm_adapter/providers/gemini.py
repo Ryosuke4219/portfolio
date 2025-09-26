@@ -33,6 +33,7 @@ if gt is None:  # pragma: no cover - stub for unit tests without the SDK
     gt = cast(Any, _TypesModule())
 
 from ..errors import (
+    AdapterError,
     AuthError,
     ConfigError,
     ProviderSkip,
@@ -318,6 +319,9 @@ class GeminiProvider(ProviderSPI):
 
     def _translate_error(self, exc: Exception) -> Exception:
         if isinstance(exc, ConfigError):
+            return exc
+
+        if isinstance(exc, AdapterError) and not isinstance(exc, ProviderSkip):
             return exc
 
         def _has_timeout_marker(value: Any) -> bool:
