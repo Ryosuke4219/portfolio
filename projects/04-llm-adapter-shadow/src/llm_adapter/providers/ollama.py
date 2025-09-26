@@ -202,7 +202,17 @@ class OllamaProvider(ProviderSPI):
             stream=True,
             timeout=self._pull_timeout,
         ) as pull_response:
-            pull_response.raise_for_status()
+            try:
+                pull_response.raise_for_status()
+            except requests_exceptions.HTTPError as exc:
+                status = pull_response.status_code
+                if status in {401, 403}:
+                    raise AuthError(str(exc)) from exc
+                if status == 429:
+                    raise RateLimitError(str(exc)) from exc
+                if status == 408:
+                    raise TimeoutError(str(exc)) from exc
+                raise RetriableError(str(exc)) from exc
             # Drain the streaming response to complete the pull.
             for _ in pull_response.iter_lines():  # pragma: no cover - network interaction
                 pass
