@@ -8,7 +8,7 @@ from collections.abc import Iterable, Mapping
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
+from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
 
 
@@ -138,7 +138,9 @@ class OllamaProvider(ProviderSPI):
     ) -> None:
         self._model = model
         self._name = name or f"ollama:{model}"
-        env_host = os.environ.get("OLLAMA_HOST")
+        env_host = os.environ.get("OLLAMA_BASE_URL")
+        if not env_host:
+            env_host = os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
         if session is None:
             if requests is None:  # pragma: no cover - defensive branch
@@ -246,11 +248,27 @@ class OllamaProvider(ProviderSPI):
             "stream": False,
         }
 
+        timeout_override: float | None = None
         if request.options and isinstance(request.options, Mapping):
-            payload.update({k: v for k, v in request.options.items() if k not in {"prompt"}})
+            option_items = dict(request.options.items())
+            timeout_keys = ("request_timeout_s", "REQUEST_TIMEOUT_S")
+            for key in timeout_keys:
+                if key in option_items:
+                    raw_timeout = option_items.pop(key)
+                    if raw_timeout is not None:
+                        try:
+                            timeout_override = float(raw_timeout)
+                        except (TypeError, ValueError) as exc:
+                            raise ConfigError(
+                                "request_timeout_s must be a number"
+                            ) from exc
+                    break
+
+            option_items.pop("prompt", None)
+            payload.update(option_items)
 
         ts0 = time.time()
-        response = self._request("/api/chat", payload)
+        response = self._request("/api/chat", payload, timeout=timeout_override)
         try:
             try:
                 response.raise_for_status()
