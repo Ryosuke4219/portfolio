@@ -49,12 +49,12 @@ LANG_MESSAGES: Dict[str, Dict[str, str]] = {
         "interrupt": "ユーザー操作により中断しました",
         "env_missing": ".env ファイルが見つかりません: {path}",
         "prompt_errors": "一部のプロンプトでエラーが発生しました",
-        "doctor_header": "環境診断を開始します",  # additional context strings for doctor
+        "doctor_header": "環境診断を開始します",
         "doctor_ok": "✅ {name}: {detail}",
         "doctor_fail": "❌ {name}: {detail}",
         "doctor_warn": "⚠️ {name}: {detail}",
-        "doctor_summary_ok": "すべてのチェックを通過しました", 
-        "doctor_summary_fail": "一部のチェックで問題が見つかりました", 
+        "doctor_summary_ok": "すべてのチェックを通過しました",
+        "doctor_summary_fail": "一部のチェックで問題が見つかりました",
         "doctor_name_python": "Python バージョン",
         "doctor_name_os": "OS / 仮想環境",
         "doctor_name_api": "API キー",
@@ -64,7 +64,7 @@ LANG_MESSAGES: Dict[str, Dict[str, str]] = {
         "doctor_name_env_file": ".env 依存関係",
         "doctor_name_rpm": "RPM 上限設定",
         "doctor_info_os": "OS={os}, venv={venv}",
-        "doctor_fix_python": "Python {required} 以上をインストールしてください", 
+        "doctor_fix_python": "Python {required} 以上をインストールしてください",
         "doctor_fix_api": "OPENAI_API_KEY などの API キーを環境変数で設定してください",
         "doctor_fix_dns": "api.openai.com への DNS/HTTPS を確認してください（プロキシ/ファイアウォール）",
         "doctor_fix_encoding": "PowerShell などで PYTHONIOENCODING=utf-8 を設定してください",
@@ -130,7 +130,6 @@ def _msg(lang: str, key: str, **params: object) -> str:
     catalog = LANG_MESSAGES.get(lang) or LANG_MESSAGES["ja"]
     template = catalog.get(key) or LANG_MESSAGES["en"].get(key) or key
     return template.format(**params)
-
 
 
 _SENSITIVE_ENV_PATTERNS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "BEARER")
@@ -527,8 +526,7 @@ def _doctor_check_windows_encoding(lang: str) -> Tuple[str, str, str]:
 def _doctor_check_env_dependency(lang: str) -> Tuple[str, str, str]:
     env_path = Path.cwd() / ".env"
     try:
-        import dotenv  # type: ignore # pragma: no cover - optional
-
+        import dotenv  # type: ignore  # pragma: no cover - optional
         has_dotenv = True
     except Exception:  # pragma: no cover - optional依存
         has_dotenv = False
