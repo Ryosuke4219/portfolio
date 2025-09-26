@@ -331,14 +331,24 @@ def test_ollama_provider_auto_pull_and_chat():
 
 def test_ollama_provider_maps_auth_error():
     class Session(_FakeSession):
+        def __init__(self):
+            super().__init__()
+            self.last_chat_response: _FakeResponse | None = None
+
         def post(self, url, json=None, stream=False, timeout=None):
             if url.endswith("/api/show"):
                 return _FakeResponse(status_code=200, payload={})
             if url.endswith("/api/chat"):
-                return _FakeResponse(status_code=401, payload={})
+                response = _FakeResponse(status_code=401, payload={})
+                self.last_chat_response = response
+                return response
             raise AssertionError(f"unexpected url: {url}")
 
-    provider = OllamaProvider("gemma3n:e2b", session=Session(), host="http://localhost")
+    session = Session()
+    provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
     with pytest.raises(AuthError):
         provider.invoke(ProviderRequest(prompt="hello"))
+
+    assert session.last_chat_response is not None
+    assert session.last_chat_response.closed
