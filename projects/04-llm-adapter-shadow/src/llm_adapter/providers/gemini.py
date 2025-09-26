@@ -507,13 +507,13 @@ class GeminiProvider(ProviderSPI):
         if self._client_module is None:  # pragma: no cover - defensive guard
             raise RuntimeError("Gemini client factory is unavailable")
 
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY")
         if api_key is None:
-            raise ProviderSkip("gemini: GOOGLE_API_KEY not set", reason="no_api_key")
+            raise ProviderSkip("gemini: GEMINI_API_KEY not set", reason="missing_gemini_api_key")
 
         api_key_value = api_key.strip()
         if not api_key_value:
-            raise ProviderSkip("gemini: GOOGLE_API_KEY not set", reason="no_api_key")
+            raise ProviderSkip("gemini: GEMINI_API_KEY not set", reason="missing_gemini_api_key")
 
         module = cast(Any, self._client_module)
         client = cast(_GeminiClient, module.Client(api_key=api_key_value))
