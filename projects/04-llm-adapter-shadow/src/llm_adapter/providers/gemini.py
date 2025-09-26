@@ -144,6 +144,47 @@ def _coerce_output_text(response: Any) -> str:
     return ""
 
 
+def _coerce_finish_reason(response: Any) -> str | None:
+    def _normalize(value: Any) -> str | None:
+        if value is None:
+            return None
+        if hasattr(value, "name"):
+            candidate = value.name
+            if isinstance(candidate, str):
+                value = candidate
+        if isinstance(value, str):
+            text = value.strip()
+            return text or None
+        return None
+
+    candidates = getattr(response, "candidates", None)
+    first_candidate: Any | None = None
+    if isinstance(candidates, Iterable):
+        for candidate in candidates:
+            first_candidate = candidate
+            break
+
+    if first_candidate is None and hasattr(response, "to_dict"):
+        payload = response.to_dict()
+        if isinstance(payload, Mapping):
+            candidates = payload.get("candidates")
+            if isinstance(candidates, Iterable):
+                for candidate in candidates:
+                    first_candidate = candidate
+                    break
+
+    if first_candidate is None:
+        return None
+
+    if isinstance(first_candidate, Mapping):
+        finish = _normalize(first_candidate.get("finish_reason"))
+        if finish:
+            return finish
+
+    finish_attr = getattr(first_candidate, "finish_reason", None)
+    return _normalize(finish_attr)
+
+
 def parse_gemini_messages(messages: Sequence[Mapping[str, Any]] | None) -> list[Mapping[str, Any]]:
     """Convert chat-style messages into Gemini "Content" entries.
 
@@ -195,6 +236,15 @@ def _merge_generation_config(
 
     if request.max_tokens and "max_output_tokens" not in config:
         config["max_output_tokens"] = int(request.max_tokens)
+
+    if request.temperature is not None and "temperature" not in config:
+        config["temperature"] = float(request.temperature)
+
+    if request.top_p is not None and "top_p" not in config:
+        config["top_p"] = float(request.top_p)
+
+    if request.stop and "stop_sequences" not in config:
+        config["stop_sequences"] = list(request.stop)
 
     return config or None
 
@@ -396,19 +446,32 @@ class GeminiProvider(ProviderSPI):
         return RetriableError(message)
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        messages = []
-        if request.options and isinstance(request.options, Mapping):
+        messages = parse_gemini_messages(request.chat_messages)
+
+        if not messages and request.options and isinstance(request.options, Mapping):
             messages = parse_gemini_messages(request.options.get("messages"))
-            system_message = request.options.get("system")
-            if isinstance(system_message, str) and system_message.strip():
-                system_content = system_message.strip()
-                if messages:
-                    messages.insert(0, {"role": "system", "parts": [{"text": system_content}]})
-                else:
-                    messages = [{"role": "system", "parts": [{"text": system_content}]}]
+
+        system_message = None
+        containers: list[Mapping[str, Any]] = []
+        if isinstance(request.metadata, Mapping):
+            containers.append(request.metadata)
+        if request.options and isinstance(request.options, Mapping):
+            containers.append(request.options)
+        for container in containers:
+            candidate = container.get("system")
+            if isinstance(candidate, str) and candidate.strip():
+                system_message = candidate.strip()
+                break
+
+        if system_message:
+            has_system = any(entry.get("role") == "system" for entry in messages)
+            if has_system:
+                messages = [entry for entry in messages if entry.get("role") != "system"]
+            system_entry = {"role": "system", "parts": [{"text": system_message}]}
+            messages.insert(0, system_entry)
 
         if not messages:
-            messages = [{"role": "user", "parts": [{"text": request.prompt}]}]
+            messages = [{"role": "user", "parts": [{"text": request.prompt_text}]}]
 
         config = _merge_generation_config(self._generation_config, request)
         safety_settings = _select_safety_settings(self._safety_settings, request)
@@ -416,7 +479,8 @@ class GeminiProvider(ProviderSPI):
         ts0 = time.time()
         try:
             client = self._resolve_client()
-            response = _invoke_gemini(client, self._model, messages, config, safety_settings)
+            model_name = request.model or self._model
+            response = _invoke_gemini(client, model_name, messages, config, safety_settings)
         except ProviderSkip:
             raise
         except Exception as exc:  # pragma: no cover - translated in unit tests
@@ -426,8 +490,16 @@ class GeminiProvider(ProviderSPI):
         latency_ms = int((time.time() - ts0) * 1000)
         usage = _coerce_usage(response)
         text = _coerce_output_text(response)
+        finish_reason = _coerce_finish_reason(response)
 
-        return ProviderResponse(text=text, token_usage=usage, latency_ms=latency_ms)
+        return ProviderResponse(
+            text=text,
+            token_usage=usage,
+            latency_ms=latency_ms,
+            model=(request.model or self._model),
+            finish_reason=finish_reason,
+            raw=response,
+        )
 
     def _resolve_client(self) -> _GeminiClient:
         if self._client is not None:
