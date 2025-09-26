@@ -234,6 +234,25 @@ def test_gemini_provider_translates_rate_limit_status_object():
         provider.invoke(ProviderRequest(prompt="hello"))
 
 
+def test_gemini_provider_preserves_rate_limit_error_instances():
+    raised_error = RateLimitError("rate limited")
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise raised_error
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(RateLimitError) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+    assert excinfo.value is raised_error
+
+
 def test_gemini_provider_translates_timeout_status_object():
     class _StatusCode:
         def __init__(self, name: str):
@@ -255,6 +274,70 @@ def test_gemini_provider_translates_timeout_status_object():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(TimeoutError):
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+
+def test_gemini_provider_preserves_timeout_error_instances():
+    raised_error = TimeoutError("took too long")
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise raised_error
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(TimeoutError) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+    assert excinfo.value is raised_error
+
+
+@pytest.mark.parametrize(
+    "code_name, expected",
+    [
+        ("RESOURCE_EXHAUSTED", RateLimitError),
+        ("DEADLINE_EXCEEDED", TimeoutError),
+    ],
+)
+def test_gemini_provider_translates_callable_code_status(
+    code_name: str, expected: type[Exception]
+):
+    class _StatusCode:
+        def __init__(self, name: str):
+            self.name = name
+
+        def __str__(self) -> str:  # pragma: no cover - for defensive normalization
+            return f"StatusCode.{self.name}"
+
+    class _ApiError(Exception):
+        def __init__(self, name: str):
+            super().__init__(f"{name.lower()}")
+            self._status_code = _StatusCode(name)
+
+        def code(self) -> _StatusCode:
+            return self._status_code
+
+    class _FailingModels:
+        def __init__(self, error: Exception):
+            self._error = error
+
+        def generate_content(self, **kwargs):
+            raise self._error
+
+    class _Client:
+        def __init__(self, error: Exception):
+            self.models = _FailingModels(error)
+
+    provider = GeminiProvider(
+        "gemini-2.5-flash",
+        client=_Client(_ApiError(code_name)),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(expected):
         provider.invoke(ProviderRequest(prompt="hello"))
 
 
@@ -283,6 +366,7 @@ def test_gemini_provider_translates_named_timeout_exception():
         (401, AuthError),
         (403, AuthError),
         (408, TimeoutError),
+        (504, TimeoutError),
     ],
 )
 def test_gemini_provider_translates_http_errors(status_code: int, expected: type[Exception]):
@@ -353,6 +437,7 @@ def test_ollama_provider_auto_pull_and_chat():
         (401, AuthError),
         (429, RateLimitError),
         (408, TimeoutError),
+        (504, TimeoutError),
     ],
 )
 def test_ollama_provider_auto_pull_error_mapping(status_code: int, expected: type[Exception]):
@@ -386,7 +471,14 @@ def test_ollama_provider_auto_pull_error_mapping(status_code: int, expected: typ
     assert session.pull_response.closed
 
 
-def test_ollama_provider_maps_auth_error():
+@pytest.mark.parametrize(
+    "status_code, expected",
+    [
+        (401, AuthError),
+        (504, TimeoutError),
+    ],
+)
+def test_ollama_provider_maps_auth_error(status_code: int, expected: type[Exception]):
     class Session(_FakeSession):
         def __init__(self):
             super().__init__()
@@ -396,7 +488,7 @@ def test_ollama_provider_maps_auth_error():
             if url.endswith("/api/show"):
                 return _FakeResponse(status_code=200, payload={})
             if url.endswith("/api/chat"):
-                response = _FakeResponse(status_code=401, payload={})
+                response = _FakeResponse(status_code=status_code, payload={})
                 self.last_chat_response = response
                 return response
             raise AssertionError(f"unexpected url: {url}")
@@ -404,7 +496,7 @@ def test_ollama_provider_maps_auth_error():
     session = Session()
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
-    with pytest.raises(AuthError):
+    with pytest.raises(expected):
         provider.invoke(ProviderRequest(prompt="hello"))
 
     assert session.last_chat_response is not None

@@ -33,6 +33,7 @@ if gt is None:  # pragma: no cover - stub for unit tests without the SDK
     gt = cast(Any, _TypesModule())
 
 from ..errors import (
+    AdapterError,
     AuthError,
     ConfigError,
     ProviderSkip,
@@ -320,6 +321,9 @@ class GeminiProvider(ProviderSPI):
         if isinstance(exc, ConfigError):
             return exc
 
+        if isinstance(exc, AdapterError) and not isinstance(exc, ProviderSkip):
+            return exc
+
         def _has_timeout_marker(value: Any) -> bool:
             return isinstance(value, str) and "timeout" in value.lower()
 
@@ -357,8 +361,21 @@ class GeminiProvider(ProviderSPI):
             token = token.strip(" <>:,'\"")
             return token.upper()
 
-        status = getattr(exc, "status", None) or getattr(exc, "code", None)
-        status_text = _normalize_status(status)
+        status_value: Any = None
+        for attr_name in ("status", "code"):
+            candidate = getattr(exc, attr_name, None)
+            if candidate is None:
+                continue
+            if callable(candidate):
+                original = candidate
+                try:
+                    candidate = candidate()
+                except Exception:  # pragma: no cover - defensive fallback
+                    candidate = original
+            if candidate:
+                status_value = candidate
+                break
+        status_text = _normalize_status(status_value)
 
         response = getattr(exc, "response", None)
         status_code = getattr(response, "status_code", None)
@@ -373,7 +390,7 @@ class GeminiProvider(ProviderSPI):
             return AuthError(message)
         if status_text in {"RESOURCE_EXHAUSTED", "QUOTA_EXCEEDED"} or http_status == 429:
             return RateLimitError(message)
-        if status_text in {"DEADLINE_EXCEEDED", "GATEWAY_TIMEOUT"} or http_status == 408:
+        if status_text in {"DEADLINE_EXCEEDED", "GATEWAY_TIMEOUT"} or http_status in {408, 504}:
             return TimeoutError(message)
 
         return RetriableError(message)

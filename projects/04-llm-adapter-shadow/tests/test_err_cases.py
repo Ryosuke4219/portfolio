@@ -1,5 +1,7 @@
-import json  # Required for json.loads in _read_metrics
 
+import json
+from pathlib import Path
+from typing import Any
 import pytest
 
 from src.llm_adapter.errors import TimeoutError
@@ -14,7 +16,7 @@ def _providers_for(marker: str):
     return failing, fallback
 
 
-def _read_metrics(path):
+def _read_metrics(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
