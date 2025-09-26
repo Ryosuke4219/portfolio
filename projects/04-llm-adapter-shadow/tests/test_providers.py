@@ -180,8 +180,8 @@ def test_gemini_provider_invokes_client_with_config():
 def test_gemini_provider_skips_without_api_key(monkeypatch):
     from src.llm_adapter.providers import gemini as gemini_module
 
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     stub_module = SimpleNamespace(Client=lambda **_: SimpleNamespace(models=None, responses=None))
     monkeypatch.setattr(gemini_module, "genai", stub_module, raising=False)
 
@@ -190,7 +190,7 @@ def test_gemini_provider_skips_without_api_key(monkeypatch):
     with pytest.raises(ProviderSkip) as excinfo:
         provider.invoke(ProviderRequest(prompt="hello"))
 
-    assert excinfo.value.reason == "no_api_key"
+    assert excinfo.value.reason == "missing_gemini_api_key"
 
 
 def test_gemini_provider_translates_rate_limit():
