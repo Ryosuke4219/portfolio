@@ -13,9 +13,11 @@ from .datasets import GoldenTask, load_golden_tasks  # noqa: F401
 from .metrics import (  # noqa: F401
     BudgetSnapshot,
     EvalMetrics,
+    RunMetric,
     RunMetrics,
     compute_cost_usd,
     compute_diff_rate,
+    estimate_cost,
     hash_text,
     now_ts,
 )
@@ -34,9 +36,11 @@ __all__ = [
     "load_golden_tasks",
     "BudgetSnapshot",
     "EvalMetrics",
+    "RunMetric",
     "RunMetrics",
     "compute_cost_usd",
     "compute_diff_rate",
+    "estimate_cost",
     "hash_text",
     "now_ts",
     "ProviderFactory",

@@ -26,6 +26,8 @@ class PricingConfig:
 
     prompt_usd: float = 0.0
     completion_usd: float = 0.0
+    input_per_million: float = 0.0
+    output_per_million: float = 0.0
 
 
 @dataclass
@@ -171,6 +173,8 @@ def load_provider_config(path: Union[str, Path]) -> ProviderConfig:
         pricing=PricingConfig(
             prompt_usd=float(pricing.get("prompt_usd", 0.0)),
             completion_usd=float(pricing.get("completion_usd", 0.0)),
+            input_per_million=float(pricing.get("input_per_million", 0.0)),
+            output_per_million=float(pricing.get("output_per_million", 0.0)),
         ),
         rate_limit=RateLimitConfig(
             rpm=int(rate_limit.get("rpm", 0)),

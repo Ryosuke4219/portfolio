@@ -86,13 +86,19 @@ class ProviderFactory:
         cls._registry[provider_name] = provider_cls
 
     @classmethod
+    def available(cls) -> tuple[str, ...]:
+        return tuple(sorted(cls._registry))
+
+    @classmethod
     def create(cls, config: ProviderConfig) -> BaseProvider:
         provider_cls = cls._registry.get(config.provider)
         if provider_cls is None:
-            LOGGER.warning(
-                "未知のプロバイダ '%s' が指定されたため simulated にフォールバックします", config.provider
+            supported = ", ".join(cls.available())
+            raise ValueError(
+                "unsupported provider prefix: "
+                f"{config.provider}. supported: {supported}. "
+                "OpenAI は無印、Gemini は google-genai を導入してください。"
             )
-            provider_cls = SimulatedProvider
         return provider_cls(config)
 
 

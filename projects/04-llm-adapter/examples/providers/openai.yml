@@ -1,0 +1,23 @@
+# サンプル: OpenAI Responses API 用プロバイダ設定
+provider: openai
+endpoint: responses
+model: gpt-4o-mini
+auth_env: OPENAI_API_KEY
+seed: 0
+temperature: 0.2
+top_p: 1.0
+max_tokens: 1024
+timeout_s: 30
+retries:
+  max: 2
+  backoff_s: 1.0
+persist_output: true
+pricing:
+  prompt_usd: 0.00015
+  completion_usd: 0.00060
+rate_limit:
+  rpm: 5000
+  tpm: 500000
+quality_gates:
+  determinism_diff_rate_max: 0.15
+  determinism_len_stdev_max: 40

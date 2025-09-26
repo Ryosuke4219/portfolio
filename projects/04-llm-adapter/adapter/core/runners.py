@@ -19,8 +19,8 @@ from .metrics import (
     BudgetSnapshot,
     EvalMetrics,
     RunMetrics,
-    compute_cost_usd,
     compute_diff_rate,
+    estimate_cost,
     hash_text,
     now_ts,
 )
@@ -108,12 +108,7 @@ class CompareRunner:
         ):
             status = "error"
             failure_kind = "timeout"
-        cost_usd = compute_cost_usd(
-            input_tokens,
-            output_tokens,
-            provider_config.pricing.prompt_usd,
-            provider_config.pricing.completion_usd,
-        )
+        cost_usd = estimate_cost(provider_config, input_tokens, output_tokens)
         run_budget_limit = self.budget_manager.run_budget(provider_config.provider)
         run_budget_hit = run_budget_limit > 0 and cost_usd > run_budget_limit
         daily_stop_required = not self.budget_manager.notify_cost(
