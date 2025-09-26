@@ -386,7 +386,7 @@ class GeminiProvider(ProviderSPI):
             return AuthError(message)
         if status_text in {"RESOURCE_EXHAUSTED", "QUOTA_EXCEEDED"} or http_status == 429:
             return RateLimitError(message)
-        if status_text in {"DEADLINE_EXCEEDED", "GATEWAY_TIMEOUT"} or http_status == 408:
+        if status_text in {"DEADLINE_EXCEEDED", "GATEWAY_TIMEOUT"} or http_status in {408, 504}:
             return TimeoutError(message)
 
         return RetriableError(message)
