@@ -234,6 +234,25 @@ def test_gemini_provider_translates_rate_limit_status_object():
         provider.invoke(ProviderRequest(prompt="hello"))
 
 
+def test_gemini_provider_preserves_rate_limit_error_instances():
+    raised_error = RateLimitError("rate limited")
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise raised_error
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(RateLimitError) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+    assert excinfo.value is raised_error
+
+
 def test_gemini_provider_translates_timeout_status_object():
     class _StatusCode:
         def __init__(self, name: str):
@@ -256,6 +275,25 @@ def test_gemini_provider_translates_timeout_status_object():
 
     with pytest.raises(TimeoutError):
         provider.invoke(ProviderRequest(prompt="hello"))
+
+
+def test_gemini_provider_preserves_timeout_error_instances():
+    raised_error = TimeoutError("took too long")
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise raised_error
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(TimeoutError) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+    assert excinfo.value is raised_error
 
 
 @pytest.mark.parametrize(
