@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 
 from ..errors import AdapterError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
@@ -47,8 +47,22 @@ class MockProvider(ProviderSPI):
                 exc_cls, message = _ERROR_BY_MARKER[marker]
                 raise exc_cls(message)
 
+    def _merge_message_content(self, messages: Sequence[Mapping[str, object]]) -> str:
+        parts: list[str] = []
+        for message in messages:
+            content = message.get("content")
+            if isinstance(content, str):
+                parts.append(content)
+            elif isinstance(content, Sequence):
+                for entry in content:
+                    if isinstance(entry, str):
+                        parts.append(entry)
+        return "\n".join(parts)
+
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        text = request.prompt
+        text = request.prompt_text
+        if not text:
+            text = self._merge_message_content(request.chat_messages)
         self._maybe_raise_error(text)
 
         latency = self.base_latency_ms + int(random.random() * 20)
@@ -59,8 +73,14 @@ class MockProvider(ProviderSPI):
 
         return ProviderResponse(
             text=f"echo({self._name}): {text}",
-            token_usage=TokenUsage(prompt=prompt_tokens, completion=completion_tokens),
             latency_ms=latency,
+            token_usage=TokenUsage(prompt=prompt_tokens, completion=completion_tokens),
+            model=request.model or self._name,
+            finish_reason="stop",
+            raw={
+                "echo": text,
+                "provider": self._name,
+            },
         )
 
 

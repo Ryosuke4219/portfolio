@@ -7,7 +7,12 @@ from typing import Any
 import pytest
 
 from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError, TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderSPI
+from src.llm_adapter.provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    ProviderSPI,
+    TokenUsage,
+)
 from src.llm_adapter.providers.factory import (
     create_provider_from_spec,
     parse_provider_spec,
@@ -27,6 +32,44 @@ def test_parse_provider_spec_allows_colons_in_model():
 def test_parse_provider_spec_requires_separator():
     with pytest.raises(ValueError):
         parse_provider_spec("gemini")
+
+
+def test_provider_request_builds_messages_from_prompt():
+    request = ProviderRequest(prompt="  hello ")
+
+    assert request.prompt_text == "hello"
+    assert request.chat_messages == [{"role": "user", "content": "hello"}]
+    assert request.stop is None
+
+
+def test_provider_request_normalizes_messages_and_stop():
+    request = ProviderRequest(
+        prompt="",
+        messages=[{"role": "User", "content": [" hi ", " there "]}],
+        stop=[" END ", ""],
+    )
+
+    assert request.prompt_text == "hi"
+    assert request.chat_messages == [{"role": "User", "content": ["hi", "there"]}]
+    assert request.stop == ("END",)
+
+
+def test_provider_response_populates_token_usage_from_inputs():
+    response = ProviderResponse(text="ok", latency_ms=10, tokens_in=3, tokens_out=4)
+
+    assert response.token_usage.prompt == 3
+    assert response.token_usage.completion == 4
+    assert response.input_tokens == 3
+    assert response.output_tokens == 4
+
+
+def test_provider_response_uses_token_usage_if_provided():
+    usage = TokenUsage(prompt=5, completion=7)
+    response = ProviderResponse(text="ok", latency_ms=10, token_usage=usage)
+
+    assert response.tokens_in == 5
+    assert response.tokens_out == 7
+    assert response.token_usage is usage
 
 
 class DummyProvider(ProviderSPI):
@@ -141,7 +184,12 @@ def test_gemini_provider_invokes_client_with_config():
     )
 
     request = ProviderRequest(
-        prompt="テスト", max_tokens=128, options={"system": "you are helpful"}
+        prompt="テスト",
+        max_tokens=128,
+        metadata={"system": "you are helpful"},
+        temperature=0.4,
+        top_p=0.85,
+        stop=["END"],
     )
     response = provider.invoke(request)
 
@@ -149,9 +197,17 @@ def test_gemini_provider_invokes_client_with_config():
     assert response.token_usage.prompt == 12
     assert response.token_usage.completion == 7
     assert response.latency_ms >= 0
+    assert response.model == "gemini-2.5-flash"
+    assert response.tokens_in == 12
+    assert response.tokens_out == 7
+    assert response.finish_reason is None
+    assert response.raw is not None
 
     recorded = client.calls.pop()
     assert recorded["model"] == "gemini-2.5-flash"
+    assert recorded["contents"][0]["role"] == "system"
+    assert recorded["contents"][0]["parts"][0]["text"] == "you are helpful"
+    assert recorded["contents"][1]["role"] == "user"
     recorded_config = recorded["config"]
     config_view: dict[str, Any] = {}
     config_dict = recorded.get("_config_dict")
@@ -172,9 +228,51 @@ def test_gemini_provider_invokes_client_with_config():
     if max_tokens is None and hasattr(recorded_config, "max_output_tokens"):
         max_tokens = getattr(recorded_config, "max_output_tokens")
 
+    stop_sequences = config_view.get("stop_sequences")
+    top_p = config_view.get("top_p")
+    if top_p is None and hasattr(recorded_config, "top_p"):
+        top_p = getattr(recorded_config, "top_p")
+    if stop_sequences is None and hasattr(recorded_config, "stop_sequences"):
+        stop_sequences = getattr(recorded_config, "stop_sequences")
+
     assert temperature == 0.2
+    assert top_p == pytest.approx(0.85)
+    assert stop_sequences == ["END"]
     assert max_tokens == 128
     assert isinstance(recorded["contents"], list)
+
+
+def test_gemini_provider_uses_request_model_override_and_finish_reason():
+    class _Client:
+        def __init__(self):
+            self.calls = []
+
+            class _Models:
+                def __init__(self, outer):
+                    self._outer = outer
+
+                def generate_content(self, **kwargs):
+                    self._outer.calls.append(kwargs)
+                    return SimpleNamespace(
+                        text="ok",
+                        usage_metadata=SimpleNamespace(input_tokens=2, output_tokens=3),
+                        candidates=[SimpleNamespace(finish_reason="STOP")],
+                    )
+
+            self.models = _Models(self)
+
+    client = _Client()
+    provider = GeminiProvider("gemini-1.5-pro", client=client)  # type: ignore[arg-type]
+
+    request = ProviderRequest(prompt="hello", model="gemini-1.5-pro-exp")
+    response = provider.invoke(request)
+
+    recorded = client.calls.pop()
+    assert recorded["model"] == "gemini-1.5-pro-exp"
+    assert response.model == "gemini-1.5-pro-exp"
+    assert response.finish_reason == "STOP"
+    assert response.tokens_in == 2
+    assert response.tokens_out == 3
 
 
 def test_gemini_provider_skips_without_api_key(monkeypatch):
@@ -412,6 +510,7 @@ def test_ollama_provider_auto_pull_and_chat():
                         "message": {"content": "hello"},
                         "prompt_eval_count": 3,
                         "eval_count": 5,
+                        "done_reason": "stop",
                     },
                 )
             raise AssertionError(f"unexpected url: {url}")
@@ -425,10 +524,62 @@ def test_ollama_provider_auto_pull_and_chat():
     assert response.token_usage.prompt == 3
     assert response.token_usage.completion == 5
     assert response.latency_ms >= 0
+    assert response.model == "gemma3n:e2b"
+    assert response.tokens_in == 3
+    assert response.tokens_out == 5
+    assert response.finish_reason == "stop"
+    assert response.raw["message"]["content"] == "hello"
     assert session._chat_called
 
     show_calls = [url for url, *_ in session.calls if url.endswith("/api/show")]
     assert len(show_calls) == 2  # first miss + verification after pull
+
+    chat_payload = next(payload for url, payload, _ in session.calls if url.endswith("/api/chat"))
+    assert chat_payload["model"] == "gemma3n:e2b"
+    assert chat_payload["messages"] == [{"role": "user", "content": "hello"}]
+    assert chat_payload["stream"] is False
+
+
+def test_ollama_provider_merges_request_options():
+    class Session(_FakeSession):
+        def post(self, url, json=None, stream=False, timeout=None):
+            self.calls.append((url, json, stream))
+            if url.endswith("/api/show"):
+                return _FakeResponse(status_code=200, payload={})
+            if url.endswith("/api/chat"):
+                return _FakeResponse(
+                    status_code=200,
+                    payload={
+                        "message": {"content": "hi"},
+                        "prompt_eval_count": 1,
+                        "eval_count": 2,
+                    },
+                )
+            raise AssertionError(f"unexpected url: {url}")
+
+    session = Session()
+    provider = OllamaProvider("gemma3", session=session, host="http://localhost")
+
+    request = ProviderRequest(
+        prompt="hi",
+        max_tokens=32,
+        temperature=0.4,
+        top_p=0.9,
+        stop=["END"],
+        timeout_s=5.0,
+        options={"options": {"stop": ["ALT"], "seed": 99}, "stream": True},
+    )
+    provider.invoke(request)
+
+    chat_payload = next(payload for url, payload, _ in session.calls if url.endswith("/api/chat"))
+    assert chat_payload["stream"] is True
+    assert chat_payload["model"] == "gemma3"
+    options_payload = chat_payload["options"]
+    assert options_payload["num_predict"] == 32
+    assert options_payload["temperature"] == pytest.approx(0.4)
+    assert options_payload["top_p"] == pytest.approx(0.9)
+    assert options_payload["stop"] == ["ALT"]
+    assert options_payload["seed"] == 99
 
 
 @pytest.mark.parametrize(
