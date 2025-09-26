@@ -242,20 +242,20 @@ class OllamaProvider(ProviderSPI):
         ts0 = time.time()
         response = self._request("/api/chat", payload)
         try:
-            response.raise_for_status()
-        except requests_exceptions.HTTPError as exc:
-            status = response.status_code
-            if status in {401, 403}:
-                raise AuthError(str(exc)) from exc
-            if status == 429:
-                raise RateLimitError(str(exc)) from exc
-            if status == 408:
-                raise TimeoutError(str(exc)) from exc
-            if status >= 500:
+            try:
+                response.raise_for_status()
+            except requests_exceptions.HTTPError as exc:
+                status = response.status_code
+                if status in {401, 403}:
+                    raise AuthError(str(exc)) from exc
+                if status == 429:
+                    raise RateLimitError(str(exc)) from exc
+                if status == 408:
+                    raise TimeoutError(str(exc)) from exc
+                if status >= 500:
+                    raise RetriableError(str(exc)) from exc
                 raise RetriableError(str(exc)) from exc
-            raise RetriableError(str(exc)) from exc
 
-        try:
             payload_json = response.json()
         except ValueError as exc:
             raise RetriableError("invalid JSON from Ollama") from exc
