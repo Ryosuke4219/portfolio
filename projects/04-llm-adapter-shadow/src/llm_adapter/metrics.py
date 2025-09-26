@@ -5,9 +5,13 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from threading import Lock
 from typing import Any, Union
 
 PathLike = Union[str, "Path"]
+
+
+_LOG_LOCK = Lock()
 
 
 def _ensure_dir(path: Path) -> None:
@@ -31,5 +35,6 @@ def log_event(event_type: str, path: PathLike, **fields: Any) -> None:
     record = {"ts": int(time.time() * 1000), "event": event_type}
     record.update(fields)
 
-    with target.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    with _LOG_LOCK:
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
