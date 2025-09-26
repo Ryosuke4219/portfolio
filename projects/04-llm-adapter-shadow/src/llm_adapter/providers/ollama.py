@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -15,33 +15,21 @@ from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, Token
 class _ResponseProtocol(Protocol):
     status_code: int
 
-    def close(self) -> None:
-        ...
-
-    def __enter__(self) -> _ResponseProtocol:
-        ...
-
+    def close(self) -> None: ...
+    def __enter__(self) -> _ResponseProtocol: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         tb: TracebackType | None,
-    ) -> bool | None:
-        ...
-
-    def json(self) -> Any:
-        ...
-
-    def raise_for_status(self) -> None:
-        ...
-
-    def iter_lines(self) -> Iterable[bytes]:
-        ...
+    ) -> bool | None: ...
+    def json(self) -> Any: ...
+    def raise_for_status(self) -> None: ...
+    def iter_lines(self) -> Iterable[bytes]: ...
 
 
 class _SessionProtocol(Protocol):
-    def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol:
-        ...
+    def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol: ...
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
@@ -57,12 +45,8 @@ else:  # pragma: no cover - allow running without the optional dependency
         requests = None
 
         class _FallbackRequestsExceptions:  # pragma: no cover - trivial container
-            class RequestException(Exception):
-                pass
-
-            class Timeout(RequestException):
-                pass
-
+            class RequestException(Exception): ...
+            class Timeout(RequestException): ...
             class HTTPError(RequestException):
                 def __init__(self, message: str | None = None, response: Any | None = None):
                     super().__init__(message or "HTTP error")
@@ -72,7 +56,6 @@ else:  # pragma: no cover - allow running without the optional dependency
 
         class Response:
             """Very small stub mimicking the subset of Response we rely on."""
-
             status_code: int
 
             def __init__(self, status_code: int = 200) -> None:
@@ -138,9 +121,7 @@ class OllamaProvider(ProviderSPI):
     ) -> None:
         self._model = model
         self._name = name or f"ollama:{model}"
-        env_host = os.environ.get("OLLAMA_BASE_URL")
-        if not env_host:
-            env_host = os.environ.get("OLLAMA_HOST")
+        env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
         if session is None:
             if requests is None:  # pragma: no cover - defensive branch
@@ -150,7 +131,7 @@ class OllamaProvider(ProviderSPI):
         self._timeout = timeout
         self._pull_timeout = pull_timeout
         self._auto_pull = auto_pull
-        self._model_ready = False
+        self._ready_models: set[str] = set()
 
     def name(self) -> str:
         return self._name
@@ -183,24 +164,23 @@ class OllamaProvider(ProviderSPI):
             raise RetriableError(f"Ollama request failed: {url}") from exc
         return response
 
-    def _ensure_model(self) -> None:
-        if self._model_ready:
+    def _ensure_model(self, model_name: str) -> None:
+        if model_name in self._ready_models:
             return
 
-        show_response = self._request("/api/show", {"model": self._model})
+        show_response = self._request("/api/show", {"model": model_name})
         if show_response.status_code == 200:
-            self._model_ready = True
+            self._ready_models.add(model_name)
             show_response.close()
             return
-
         show_response.close()
 
         if not self._auto_pull:
-            raise RetriableError(f"ollama model not available: {self._model}")
+            raise RetriableError(f"ollama model not available: {model_name}")
 
         with self._request(
             "/api/pull",
-            {"model": self._model},
+            {"model": model_name},
             stream=True,
             timeout=self._pull_timeout,
         ) as pull_response:
@@ -221,41 +201,78 @@ class OllamaProvider(ProviderSPI):
 
         # Verify again with a short retry window.
         for _ in range(10):
-            show_after = self._request("/api/show", {"model": self._model})
+            show_after = self._request("/api/show", {"model": model_name})
             if show_after.status_code == 200:
-                self._model_ready = True
+                self._ready_models.add(model_name)
                 show_after.close()
                 return
             show_after.close()
             time.sleep(1)
 
-        raise RetriableError(f"failed to pull ollama model: {self._model}")
+        raise RetriableError(f"failed to pull ollama model: {model_name}")
 
     # ------------------------------------------------------------------
     # ProviderSPI implementation
     # ------------------------------------------------------------------
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        self._ensure_model()
+        model_name = request.model or self._model
+        self._ensure_model(model_name)
 
-        payload = {
-            "model": self._model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": request.prompt,
-                }
-            ],
+        def _coerce_content(entry: Mapping[str, Any]) -> str:
+            content = entry.get("content")
+            if isinstance(content, str):
+                return content
+            if isinstance(content, Sequence) and not isinstance(
+                content, (bytes, bytearray)
+            ):
+                parts = [part for part in content if isinstance(part, str)]
+                return "\n".join(parts)
+            if content is None:
+                return ""
+            return str(content)
+
+        messages_payload: list[dict[str, str]] = []
+        for message in request.chat_messages:
+            if not isinstance(message, Mapping):
+                continue
+            role = str(message.get("role", "user")) or "user"
+            text = _coerce_content(message).strip()
+            if text:
+                messages_payload.append({"role": role, "content": text})
+
+        if not messages_payload and request.prompt_text:
+            messages_payload.append({"role": "user", "content": request.prompt_text})
+
+        payload: dict[str, Any] = {
+            "model": model_name,
+            "messages": messages_payload,
             "stream": False,
         }
 
+        # --- options 統合（新SPI + 互換） ---
+        options_payload: dict[str, Any] = {}
+        if request.max_tokens is not None:
+            options_payload["num_predict"] = int(request.max_tokens)
+        if request.temperature is not None:
+            options_payload["temperature"] = float(request.temperature)
+        if request.top_p is not None:
+            options_payload["top_p"] = float(request.top_p)
+        if request.stop:
+            options_payload["stop"] = list(request.stop)
+
+        # timeout の優先度: request.timeout_s > options.request_timeout_s > default
         timeout_override: float | None = None
+        if request.timeout_s is not None:
+            timeout_override = float(request.timeout_s)
+
         if request.options and isinstance(request.options, Mapping):
-            option_items = dict(request.options.items())
-            timeout_keys = ("request_timeout_s", "REQUEST_TIMEOUT_S")
-            for key in timeout_keys:
-                if key in option_items:
-                    raw_timeout = option_items.pop(key)
-                    if raw_timeout is not None:
+            opt_items = dict(request.options.items())
+
+            # timeout 上書き (options 側)
+            for key in ("request_timeout_s", "REQUEST_TIMEOUT_S"):
+                if key in opt_items:
+                    raw_timeout = opt_items.pop(key)
+                    if raw_timeout is not None and timeout_override is None:
                         try:
                             timeout_override = float(raw_timeout)
                         except (TypeError, ValueError) as exc:
@@ -264,11 +281,25 @@ class OllamaProvider(ProviderSPI):
                             ) from exc
                     break
 
-            option_items.pop("prompt", None)
-            payload.update(option_items)
+            # 衝突しうるトップレベルは除去
+            for k in ("model", "messages", "prompt"):
+                opt_items.pop(k, None)
+
+            # ネストした options をマージ
+            nested_opts = opt_items.pop("options", None)
+            if isinstance(nested_opts, Mapping):
+                options_payload.update(dict(nested_opts))
+
+            # 残りはトップレベルに反映（Ollamaが理解する追加パラメータ）
+            for k, v in opt_items.items():
+                payload[k] = v
+
+        if options_payload:
+            payload["options"] = {**options_payload, **payload.get("options", {})}
 
         ts0 = time.time()
         response = self._request("/api/chat", payload, timeout=timeout_override)
+
         try:
             try:
                 response.raise_for_status()
@@ -296,11 +327,17 @@ class OllamaProvider(ProviderSPI):
             content = message.get("content")
             if isinstance(content, str):
                 text = content
-
         if not isinstance(text, str):
             text = ""
 
         latency_ms = int((time.time() - ts0) * 1000)
         usage = _token_usage_from_payload(payload_json)
 
-        return ProviderResponse(text=text, token_usage=usage, latency_ms=latency_ms)
+        return ProviderResponse(
+            text=text,
+            token_usage=usage,
+            latency_ms=latency_ms,
+            model=model_name,
+            finish_reason=payload_json.get("done_reason"),
+            raw=payload_json,
+        )

@@ -21,6 +21,10 @@ def _to_path_str(path: MetricsPath) -> str | None:
     return str(Path(path))
 
 
+def _tokens_total(res: ProviderResponse) -> int:
+    return res.input_tokens + res.output_tokens
+
+
 def run_with_shadow(
     primary: ProviderSPI,
     shadow: ProviderSPI | None,
@@ -62,7 +66,7 @@ def run_with_shadow(
                         "provider": shadow_name,
                         "latency_ms": response.latency_ms,
                         "text_len": len(response.text),
-                        "token_usage_total": response.token_usage.total,
+                        "token_usage_total": _tokens_total(response),
                     }
                 )
             finally:
@@ -87,17 +91,17 @@ def run_with_shadow(
         if metrics_path_str:
             primary_text_len = len(primary_res.text)
             request_fingerprint = content_hash(
-                "runner", req.prompt, req.options, req.max_tokens
+                "runner", req.prompt_text, req.options, req.max_tokens
             )
             record: dict[str, Any] = {
                 "request_hash": content_hash(
-                    primary.name(), req.prompt, req.options, req.max_tokens
+                    primary.name(), req.prompt_text, req.options, req.max_tokens
                 ),
                 "request_fingerprint": request_fingerprint,
                 "primary_provider": primary.name(),
                 "primary_latency_ms": primary_res.latency_ms,
                 "primary_text_len": primary_text_len,
-                "primary_token_usage_total": primary_res.token_usage.total,
+                "primary_token_usage_total": _tokens_total(primary_res),
                 "shadow_provider": shadow_payload.get("provider", shadow_name),
                 "shadow_ok": shadow_payload.get("ok"),
                 "shadow_latency_ms": shadow_payload.get("latency_ms"),

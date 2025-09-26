@@ -29,23 +29,12 @@ class Runner:
         shadow: ProviderSPI | None = None,
         shadow_metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
     ) -> ProviderResponse:
-        """Execute ``request`` with fallback semantics.
-
-        Parameters
-        ----------
-        request:
-            The prompt/options payload shared across providers.
-        shadow:
-            Optional provider that will be executed in the background for
-            telemetry purposes.
-        shadow_metrics_path:
-            JSONL file path for recording metrics. ``None`` disables logging.
-        """
+        """Execute ``request`` with fallback semantics."""
 
         last_err: Exception | None = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
         request_fingerprint = content_hash(
-            "runner", request.prompt, request.options, request.max_tokens
+            "runner", request.prompt_text, request.options, request.max_tokens
         )
 
         def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
@@ -56,12 +45,15 @@ class Runner:
                 metrics_path_str,
                 request_fingerprint=request_fingerprint,
                 request_hash=content_hash(
-                    provider.name(), request.prompt, request.options, request.max_tokens
+                    provider.name(),
+                    request.prompt_text,
+                    request.options,
+                    request.max_tokens,
                 ),
                 provider=provider.name(),
                 attempt=attempt,
                 total_providers=len(self.providers),
-                reason=getattr(err, "reason", None),
+                reason=err.reason if hasattr(err, "reason") else None,
                 error_message=str(err),
             )
 
@@ -97,7 +89,10 @@ class Runner:
                 metrics_path_str,
                 request_fingerprint=request_fingerprint,
                 request_hash=content_hash(
-                    provider.name(), request.prompt, request.options, request.max_tokens
+                    provider.name(),
+                    request.prompt_text,
+                    request.options,
+                    request.max_tokens,
                 ),
                 provider=provider.name(),
                 model=_provider_model(provider),
@@ -166,6 +161,7 @@ class Runner:
                     error=None,
                 )
                 return response
+
         if metrics_path_str:
             log_event(
                 "provider_chain_failed",
