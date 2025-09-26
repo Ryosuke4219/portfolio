@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -148,7 +148,7 @@ class OllamaProvider(ProviderSPI):
         self._timeout = timeout
         self._pull_timeout = pull_timeout
         self._auto_pull = auto_pull
-        self._model_ready = False
+        self._ready_models: set[str] = set()
 
     def name(self) -> str:
         return self._name
@@ -181,24 +181,24 @@ class OllamaProvider(ProviderSPI):
             raise RetriableError(f"Ollama request failed: {url}") from exc
         return response
 
-    def _ensure_model(self) -> None:
-        if self._model_ready:
+    def _ensure_model(self, model_name: str) -> None:
+        if model_name in self._ready_models:
             return
 
-        show_response = self._request("/api/show", {"model": self._model})
+        show_response = self._request("/api/show", {"model": model_name})
         if show_response.status_code == 200:
-            self._model_ready = True
+            self._ready_models.add(model_name)
             show_response.close()
             return
 
         show_response.close()
 
         if not self._auto_pull:
-            raise RetriableError(f"ollama model not available: {self._model}")
+            raise RetriableError(f"ollama model not available: {model_name}")
 
         with self._request(
             "/api/pull",
-            {"model": self._model},
+            {"model": model_name},
             stream=True,
             timeout=self._pull_timeout,
         ) as pull_response:
@@ -219,38 +219,76 @@ class OllamaProvider(ProviderSPI):
 
         # Verify again with a short retry window.
         for _ in range(10):
-            show_after = self._request("/api/show", {"model": self._model})
+            show_after = self._request("/api/show", {"model": model_name})
             if show_after.status_code == 200:
-                self._model_ready = True
+                self._ready_models.add(model_name)
                 show_after.close()
                 return
             show_after.close()
             time.sleep(1)
 
-        raise RetriableError(f"failed to pull ollama model: {self._model}")
+        raise RetriableError(f"failed to pull ollama model: {model_name}")
 
     # ------------------------------------------------------------------
     # ProviderSPI implementation
     # ------------------------------------------------------------------
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        self._ensure_model()
+        model_name = request.model or self._model
+        self._ensure_model(model_name)
 
-        payload = {
-            "model": self._model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": request.prompt,
-                }
-            ],
+        def _coerce_content(entry: Mapping[str, Any]) -> str:
+            content = entry.get("content")
+            if isinstance(content, str):
+                return content
+            if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
+                parts = [part for part in content if isinstance(part, str)]
+                return "\n".join(parts)
+            if content is None:
+                return ""
+            return str(content)
+
+        messages_payload: list[dict[str, str]] = []
+        for message in request.chat_messages:
+            if not isinstance(message, Mapping):
+                continue
+            role = str(message.get("role", "user")) or "user"
+            text = _coerce_content(message).strip()
+            if text:
+                messages_payload.append({"role": role, "content": text})
+
+        if not messages_payload and request.prompt_text:
+            messages_payload.append({"role": "user", "content": request.prompt_text})
+
+        payload: dict[str, Any] = {
+            "model": model_name,
+            "messages": messages_payload,
             "stream": False,
         }
 
+        options_payload: dict[str, Any] = {}
+        if request.max_tokens is not None:
+            options_payload["num_predict"] = int(request.max_tokens)
+        if request.temperature is not None:
+            options_payload["temperature"] = float(request.temperature)
+        if request.top_p is not None:
+            options_payload["top_p"] = float(request.top_p)
+        if request.stop:
+            options_payload["stop"] = list(request.stop)
+
         if request.options and isinstance(request.options, Mapping):
-            payload.update({k: v for k, v in request.options.items() if k not in {"prompt"}})
+            for key, value in request.options.items():
+                if key in {"model", "messages"}:
+                    continue
+                if key == "options" and isinstance(value, Mapping):
+                    options_payload.update(value)
+                else:
+                    payload[key] = value
+
+        if options_payload:
+            payload["options"] = {**options_payload, **payload.get("options", {})}
 
         ts0 = time.time()
-        response = self._request("/api/chat", payload)
+        response = self._request("/api/chat", payload, timeout=request.timeout_s)
         try:
             try:
                 response.raise_for_status()
@@ -285,4 +323,11 @@ class OllamaProvider(ProviderSPI):
         latency_ms = int((time.time() - ts0) * 1000)
         usage = _token_usage_from_payload(payload_json)
 
-        return ProviderResponse(text=text, token_usage=usage, latency_ms=latency_ms)
+        return ProviderResponse(
+            text=text,
+            token_usage=usage,
+            latency_ms=latency_ms,
+            model=model_name,
+            finish_reason=payload_json.get("done_reason"),
+            raw=payload_json,
+        )
