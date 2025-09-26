@@ -210,7 +210,7 @@ class OllamaProvider(ProviderSPI):
                     raise AuthError(str(exc)) from exc
                 if status == 429:
                     raise RateLimitError(str(exc)) from exc
-                if status == 408:
+                if status in {408, 504}:
                     raise TimeoutError(str(exc)) from exc
                 raise RetriableError(str(exc)) from exc
             # Drain the streaming response to complete the pull.
@@ -260,7 +260,7 @@ class OllamaProvider(ProviderSPI):
                     raise AuthError(str(exc)) from exc
                 if status == 429:
                     raise RateLimitError(str(exc)) from exc
-                if status == 408:
+                if status in {408, 504}:
                     raise TimeoutError(str(exc)) from exc
                 if status >= 500:
                     raise RetriableError(str(exc)) from exc

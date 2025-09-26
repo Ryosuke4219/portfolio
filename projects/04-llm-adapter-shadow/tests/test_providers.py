@@ -398,6 +398,7 @@ def test_ollama_provider_auto_pull_and_chat():
         (401, AuthError),
         (429, RateLimitError),
         (408, TimeoutError),
+        (504, TimeoutError),
     ],
 )
 def test_ollama_provider_auto_pull_error_mapping(status_code: int, expected: type[Exception]):
@@ -431,7 +432,14 @@ def test_ollama_provider_auto_pull_error_mapping(status_code: int, expected: typ
     assert session.pull_response.closed
 
 
-def test_ollama_provider_maps_auth_error():
+@pytest.mark.parametrize(
+    "status_code, expected",
+    [
+        (401, AuthError),
+        (504, TimeoutError),
+    ],
+)
+def test_ollama_provider_maps_auth_error(status_code: int, expected: type[Exception]):
     class Session(_FakeSession):
         def __init__(self):
             super().__init__()
@@ -441,7 +449,7 @@ def test_ollama_provider_maps_auth_error():
             if url.endswith("/api/show"):
                 return _FakeResponse(status_code=200, payload={})
             if url.endswith("/api/chat"):
-                response = _FakeResponse(status_code=401, payload={})
+                response = _FakeResponse(status_code=status_code, payload={})
                 self.last_chat_response = response
                 return response
             raise AssertionError(f"unexpected url: {url}")
@@ -449,7 +457,7 @@ def test_ollama_provider_maps_auth_error():
     session = Session()
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
-    with pytest.raises(AuthError):
+    with pytest.raises(expected):
         provider.invoke(ProviderRequest(prompt="hello"))
 
     assert session.last_chat_response is not None
