@@ -152,6 +152,32 @@ class _FakeSession:
         raise NotImplementedError
 
 
+def test_ollama_provider_prefers_base_url_over_legacy(monkeypatch):
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://env-base")
+    monkeypatch.setenv("OLLAMA_HOST", "http://legacy-host")
+
+    provider = OllamaProvider(
+        "test-model",
+        session=_FakeSession(),
+        auto_pull=False,
+    )
+
+    assert provider._host == "http://env-base"
+
+
+def test_ollama_provider_legacy_host_fallback(monkeypatch):
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.setenv("OLLAMA_HOST", "http://legacy-host")
+
+    provider = OllamaProvider(
+        "test-model",
+        session=_FakeSession(),
+        auto_pull=False,
+    )
+
+    assert provider._host == "http://legacy-host"
+
+
 class _RecordClient:
     def __init__(self):
         self.calls = []
@@ -278,8 +304,8 @@ def test_gemini_provider_uses_request_model_override_and_finish_reason():
 def test_gemini_provider_skips_without_api_key(monkeypatch):
     from src.llm_adapter.providers import gemini as gemini_module
 
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     stub_module = SimpleNamespace(Client=lambda **_: SimpleNamespace(models=None, responses=None))
     monkeypatch.setattr(gemini_module, "genai", stub_module, raising=False)
 
@@ -288,7 +314,7 @@ def test_gemini_provider_skips_without_api_key(monkeypatch):
     with pytest.raises(ProviderSkip) as excinfo:
         provider.invoke(ProviderRequest(prompt="hello"))
 
-    assert excinfo.value.reason == "no_api_key"
+    assert excinfo.value.reason == "missing_gemini_api_key"
 
 
 def test_gemini_provider_translates_rate_limit():
@@ -492,9 +518,14 @@ def test_ollama_provider_auto_pull_and_chat():
         def __init__(self):
             super().__init__()
             self._chat_called = False
+            self.last_timeout = None
+            self.last_payload: dict | None = None
 
         def post(self, url, json=None, stream=False, timeout=None):
             self.calls.append((url, json, stream))
+            if url.endswith("/api/chat"):
+                self.last_timeout = timeout
+                self.last_payload = json
             if url.endswith("/api/show"):
                 self._show_calls += 1
                 if self._show_calls == 1:
@@ -530,6 +561,10 @@ def test_ollama_provider_auto_pull_and_chat():
     assert response.finish_reason == "stop"
     assert response.raw["message"]["content"] == "hello"
     assert session._chat_called
+    assert session.last_timeout == provider._timeout
+    assert session.last_payload is not None
+    assert "REQUEST_TIMEOUT_S" not in session.last_payload
+    assert "request_timeout_s" not in session.last_payload
 
     show_calls = [url for url, *_ in session.calls if url.endswith("/api/show")]
     assert len(show_calls) == 2  # first miss + verification after pull
@@ -620,6 +655,43 @@ def test_ollama_provider_auto_pull_error_mapping(status_code: int, expected: typ
 
     assert session.pull_response is not None
     assert session.pull_response.closed
+
+
+def test_ollama_provider_request_timeout_override():
+    class Session(_FakeSession):
+        def __init__(self):
+            super().__init__()
+            self.last_timeout = None
+            self.last_payload: dict | None = None
+
+        def post(self, url, json=None, stream=False, timeout=None):
+            if url.endswith("/api/show"):
+                return _FakeResponse(status_code=200, payload={})
+            if url.endswith("/api/chat"):
+                self.last_timeout = timeout
+                self.last_payload = json
+                return _FakeResponse(
+                    status_code=200,
+                    payload={"message": {"content": "ok"}},
+                )
+            raise AssertionError(f"unexpected url: {url}")
+
+    session = Session()
+    provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
+
+    response = provider.invoke(
+        ProviderRequest(
+            prompt="hello",
+            options={"REQUEST_TIMEOUT_S": "2.5", "extra": True},
+        )
+    )
+
+    assert response.text == "ok"
+    assert session.last_timeout == pytest.approx(2.5)
+    assert session.last_payload is not None
+    assert "REQUEST_TIMEOUT_S" not in session.last_payload
+    assert "request_timeout_s" not in session.last_payload
+    assert session.last_payload.get("extra") is True
 
 
 @pytest.mark.parametrize(

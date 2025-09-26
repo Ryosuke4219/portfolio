@@ -53,6 +53,7 @@ def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
 
 @dataclass
 class ProviderRequest:
+    # ---- 新SPI：拡張フィールド ----
     prompt: str = ""
     model: str | None = None
     messages: Sequence[Mapping[str, Any]] | None = None
@@ -65,6 +66,7 @@ class ProviderRequest:
     options: dict[str, Any] | None = field(default=None)
 
     def __post_init__(self) -> None:
+        # 正規化
         self.prompt = (self.prompt or "").strip()
 
         normalized_messages: list[Mapping[str, Any]] = []
@@ -75,14 +77,17 @@ class ProviderRequest:
                     if normalized:
                         normalized_messages.append(normalized)
 
+        # prompt のみ渡された場合は user メッセージに変換
         if not normalized_messages and self.prompt:
             normalized_messages.append({"role": "user", "content": self.prompt})
 
         self.messages = normalized_messages
 
+        # messages から代表 prompt を抽出（assistant は除外）
         if not self.prompt and normalized_messages:
             self.prompt = _extract_prompt_from_messages(normalized_messages)
 
+        # stop は空を許さずタプル化
         if self.stop is not None:
             stop_list = _ensure_list(self.stop)
             self.stop = tuple(stop_list) if stop_list else None
@@ -108,26 +113,31 @@ class TokenUsage:
 
 @dataclass
 class ProviderResponse:
+    # 本文と遅延
     text: str
     latency_ms: int
+    # 使用トークン
     token_usage: TokenUsage | None = None
-    model: str | None = None
-    finish_reason: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
+    # メタ
+    model: str | None = None
+    finish_reason: str | None = None
     raw: Any | None = None
 
     def __post_init__(self) -> None:
+        # token_usage と tokens_in/out の整合性を取る
         prompt_tokens = int(self.tokens_in or 0)
         completion_tokens = int(self.tokens_out or 0)
         if self.token_usage is not None:
-            prompt_tokens = self.token_usage.prompt
-            completion_tokens = self.token_usage.completion
+            prompt_tokens = int(self.token_usage.prompt)
+            completion_tokens = int(self.token_usage.completion)
         else:
             self.token_usage = TokenUsage(prompt=prompt_tokens, completion=completion_tokens)
         self.tokens_in = prompt_tokens
         self.tokens_out = completion_tokens
 
+    # 互換エイリアス（既存コードの呼び出しを壊さない）
     @property
     def output_text(self) -> str:
         return self.text
@@ -142,14 +152,9 @@ class ProviderResponse:
 
 
 class ProviderSPI(Protocol):
-    def name(self) -> str:
-        ...
-
-    def capabilities(self) -> set[str]:
-        ...
-
-    def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        ...
+    def name(self) -> str: ...
+    def capabilities(self) -> set[str]: ...
+    def invoke(self, request: ProviderRequest) -> ProviderResponse: ...
 
 
 __all__ = ["ProviderSPI", "ProviderRequest", "ProviderResponse", "TokenUsage"]

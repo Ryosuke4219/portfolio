@@ -58,17 +58,24 @@ def test_timeout_fallback_records_metrics(tmp_path):
     assert response.text.startswith("echo(p2):")
 
     payloads = _read_metrics(metrics_path)
-    error_event = next(item for item in payloads if item["event"] == "provider_error")
-    success_event = next(item for item in payloads if item["event"] == "provider_success")
+    call_events = [item for item in payloads if item["event"] == "provider_call"]
+    error_event = next(
+        item for item in call_events if item["provider"] == "p1" and item["status"] == "error"
+    )
+    success_event = next(
+        item for item in call_events if item["provider"] == "p2" and item["status"] == "ok"
+    )
 
     assert error_event["provider"] == "p1"
     assert error_event["attempt"] == 1
     assert error_event["error_type"] == "TimeoutError"
     assert error_event["request_fingerprint"]
+    assert error_event["latency_ms"] >= 0
 
     assert success_event["provider"] == "p2"
     assert success_event["attempt"] == 2
     assert success_event["shadow_used"] is False
+    assert success_event["tokens_out"] == response.token_usage.completion
 
 
 def test_runner_emits_chain_failed_metric(tmp_path):
@@ -86,8 +93,9 @@ def test_runner_emits_chain_failed_metric(tmp_path):
         )
 
     payloads = _read_metrics(metrics_path)
-    error_events = [item for item in payloads if item["event"] == "provider_error"]
-    assert {event["provider"] for event in error_events} == {"p1", "p2"}
+    call_events = [item for item in payloads if item["event"] == "provider_call"]
+    assert {event["provider"] for event in call_events} == {"p1", "p2"}
+    assert all(event["status"] == "error" for event in call_events)
 
     chain_event = next(item for item in payloads if item["event"] == "provider_chain_failed")
     assert chain_event["provider_attempts"] == 2

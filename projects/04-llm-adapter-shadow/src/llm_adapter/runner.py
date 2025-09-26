@@ -48,26 +48,6 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
-        def _record_error(err: Exception, attempt: int, provider: ProviderSPI) -> None:
-            if not metrics_path_str:
-                return
-            log_event(
-                "provider_error",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                request_hash=content_hash(
-                    provider.name(),
-                    request.prompt_text,
-                    request.options,
-                    request.max_tokens,
-                ),
-                provider=provider.name(),
-                attempt=attempt,
-                total_providers=len(self.providers),
-                error_type=type(err).__name__,
-                error_message=str(err),
-            )
-
         def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
             if not metrics_path_str:
                 return
@@ -88,40 +68,111 @@ class Runner:
                 error_message=str(err),
             )
 
+        def _provider_model(provider: ProviderSPI) -> str | None:
+            for attr in ("model", "_model"):
+                value = getattr(provider, attr, None)
+                if isinstance(value, str) and value:
+                    return value
+            return None
+
+        def _elapsed_ms(start_ts: float) -> int:
+            return max(0, int((time.time() - start_ts) * 1000))
+
+        def _log_provider_call(
+            provider: ProviderSPI,
+            attempt: int,
+            *,
+            status: str,
+            latency_ms: int | None,
+            tokens_in: int | None,
+            tokens_out: int | None,
+            error: Exception | None = None,
+        ) -> None:
+            if not metrics_path_str:
+                return
+
+            metadata = request.metadata or {}
+            error_type = type(error).__name__ if error is not None else None
+            error_message = str(error) if error is not None else None
+
+            log_event(
+                "provider_call",
+                metrics_path_str,
+                request_fingerprint=request_fingerprint,
+                request_hash=content_hash(
+                    provider.name(),
+                    request.prompt_text,
+                    request.options,
+                    request.max_tokens,
+                ),
+                provider=provider.name(),
+                model=_provider_model(provider),
+                attempt=attempt,
+                total_providers=len(self.providers),
+                status=status,
+                latency_ms=latency_ms,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                error_type=error_type,
+                error_message=error_message,
+                shadow_used=shadow is not None,
+                trace_id=metadata.get("trace_id"),
+                project_id=metadata.get("project_id"),
+            )
+
         for attempt_index, provider in enumerate(self.providers, start=1):
+            attempt_started = time.time()
             try:
                 response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
             except ProviderSkip as err:
                 last_err = err
                 _record_skip(err, attempt_index, provider)
+                _log_provider_call(
+                    provider,
+                    attempt_index,
+                    status="error",
+                    latency_ms=_elapsed_ms(attempt_started),
+                    tokens_in=None,
+                    tokens_out=None,
+                    error=err,
+                )
                 continue
             except RateLimitError as err:
                 last_err = err
-                _record_error(err, attempt_index, provider)
+                _log_provider_call(
+                    provider,
+                    attempt_index,
+                    status="error",
+                    latency_ms=_elapsed_ms(attempt_started),
+                    tokens_in=None,
+                    tokens_out=None,
+                    error=err,
+                )
                 time.sleep(0.05)
             except (TimeoutError, RetriableError) as err:
                 last_err = err
-                _record_error(err, attempt_index, provider)
+                _log_provider_call(
+                    provider,
+                    attempt_index,
+                    status="error",
+                    latency_ms=_elapsed_ms(attempt_started),
+                    tokens_in=None,
+                    tokens_out=None,
+                    error=err,
+                )
                 continue
             else:
-                if metrics_path_str:
-                    log_event(
-                        "provider_success",
-                        metrics_path_str,
-                        request_fingerprint=request_fingerprint,
-                        request_hash=content_hash(
-                            provider.name(),
-                            request.prompt_text,
-                            request.options,
-                            request.max_tokens,
-                        ),
-                        provider=provider.name(),
-                        attempt=attempt_index,
-                        total_providers=len(self.providers),
-                        latency_ms=response.latency_ms,
-                        shadow_used=shadow is not None,
-                    )
+                _log_provider_call(
+                    provider,
+                    attempt_index,
+                    status="ok",
+                    latency_ms=response.latency_ms,
+                    tokens_in=response.input_tokens,
+                    tokens_out=response.output_tokens,
+                    error=None,
+                )
                 return response
+
         if metrics_path_str:
             log_event(
                 "provider_chain_failed",
