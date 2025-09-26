@@ -8,40 +8,28 @@ from collections.abc import Iterable, Mapping, Sequence
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
+from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
 
 
 class _ResponseProtocol(Protocol):
     status_code: int
 
-    def close(self) -> None:
-        ...
-
-    def __enter__(self) -> _ResponseProtocol:
-        ...
-
+    def close(self) -> None: ...
+    def __enter__(self) -> _ResponseProtocol: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         tb: TracebackType | None,
-    ) -> bool | None:
-        ...
-
-    def json(self) -> Any:
-        ...
-
-    def raise_for_status(self) -> None:
-        ...
-
-    def iter_lines(self) -> Iterable[bytes]:
-        ...
+    ) -> bool | None: ...
+    def json(self) -> Any: ...
+    def raise_for_status(self) -> None: ...
+    def iter_lines(self) -> Iterable[bytes]: ...
 
 
 class _SessionProtocol(Protocol):
-    def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol:
-        ...
+    def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol: ...
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
@@ -57,12 +45,8 @@ else:  # pragma: no cover - allow running without the optional dependency
         requests = None
 
         class _FallbackRequestsExceptions:  # pragma: no cover - trivial container
-            class RequestException(Exception):
-                pass
-
-            class Timeout(RequestException):
-                pass
-
+            class RequestException(Exception): ...
+            class Timeout(RequestException): ...
             class HTTPError(RequestException):
                 def __init__(self, message: str | None = None, response: Any | None = None):
                     super().__init__(message or "HTTP error")
@@ -72,7 +56,6 @@ else:  # pragma: no cover - allow running without the optional dependency
 
         class Response:
             """Very small stub mimicking the subset of Response we rely on."""
-
             status_code: int
 
             def __init__(self, status_code: int = 200) -> None:
@@ -138,7 +121,7 @@ class OllamaProvider(ProviderSPI):
     ) -> None:
         self._model = model
         self._name = name or f"ollama:{model}"
-        env_host = os.environ.get("OLLAMA_HOST")
+        env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
         if session is None:
             if requests is None:  # pragma: no cover - defensive branch
@@ -190,7 +173,6 @@ class OllamaProvider(ProviderSPI):
             self._ready_models.add(model_name)
             show_response.close()
             return
-
         show_response.close()
 
         if not self._auto_pull:
@@ -240,7 +222,10 @@ class OllamaProvider(ProviderSPI):
             content = entry.get("content")
             if isinstance(content, str):
                 return content
-            if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
+            if isinstance(content, Sequence) and not isinstance(
+                content,
+                (bytes, bytearray),
+            ):
                 parts = [part for part in content if isinstance(part, str)]
                 return "\n".join(parts)
             if content is None:
@@ -265,6 +250,7 @@ class OllamaProvider(ProviderSPI):
             "stream": False,
         }
 
+        # --- options 統合（新SPI + 互換） ---
         options_payload: dict[str, Any] = {}
         if request.max_tokens is not None:
             options_payload["num_predict"] = int(request.max_tokens)
@@ -275,20 +261,44 @@ class OllamaProvider(ProviderSPI):
         if request.stop:
             options_payload["stop"] = list(request.stop)
 
+        # timeout の優先度: request.timeout_s > options.request_timeout_s > provider default
+        timeout_override: float | None = None
+        if request.timeout_s is not None:
+            timeout_override = float(request.timeout_s)
+
         if request.options and isinstance(request.options, Mapping):
-            for key, value in request.options.items():
-                if key in {"model", "messages"}:
-                    continue
-                if key == "options" and isinstance(value, Mapping):
-                    options_payload.update(value)
-                else:
-                    payload[key] = value
+            opt_items = dict(request.options.items())
+
+            # timeout 上書き
+            for key in ("request_timeout_s", "REQUEST_TIMEOUT_S"):
+                if key in opt_items:
+                    raw_timeout = opt_items.pop(key)
+                    if raw_timeout is not None and timeout_override is None:
+                        try:
+                            timeout_override = float(raw_timeout)
+                        except (TypeError, ValueError) as exc:
+                            raise ConfigError("request_timeout_s must be a number") from exc
+                    break
+
+            # 衝突しうるトップレベルは除去
+            for k in ("model", "messages", "prompt"):
+                opt_items.pop(k, None)
+
+            # ネストした options をマージ
+            nested_opts = opt_items.pop("options", None)
+            if isinstance(nested_opts, Mapping):
+                options_payload.update(dict(nested_opts))
+
+            # 残りはトップレベルに反映（Ollamaが理解する追加パラメータ）
+            for k, v in opt_items.items():
+                payload[k] = v
 
         if options_payload:
             payload["options"] = {**options_payload, **payload.get("options", {})}
 
         ts0 = time.time()
-        response = self._request("/api/chat", payload, timeout=request.timeout_s)
+        response = self._request("/api/chat", payload, timeout=timeout_override)
+
         try:
             try:
                 response.raise_for_status()
@@ -316,7 +326,6 @@ class OllamaProvider(ProviderSPI):
             content = message.get("content")
             if isinstance(content, str):
                 text = content
-
         if not isinstance(text, str):
             text = ""
 

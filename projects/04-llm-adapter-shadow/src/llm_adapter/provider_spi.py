@@ -27,7 +27,7 @@ def _normalize_message(entry: Mapping[str, Any]) -> Mapping[str, Any] | None:
         if not text:
             return None
         return {"role": role, "content": text}
-    if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
+    if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
         parts = [part.strip() for part in content if isinstance(part, str) and part.strip()]
         if not parts:
             return None
@@ -45,7 +45,7 @@ def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
         content = message.get("content")
         if isinstance(content, str) and content.strip():
             return content.strip()
-        if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
+        if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
             for part in content:
                 if isinstance(part, str) and part.strip():
                     return part.strip()
@@ -125,10 +125,14 @@ class ProviderResponse:
             prompt_tokens = self.token_usage.prompt
             completion_tokens = self.token_usage.completion
         else:
-            self.token_usage = TokenUsage(prompt=prompt_tokens, completion=completion_tokens)
+            self.token_usage = TokenUsage(
+                prompt=prompt_tokens,
+                completion=completion_tokens,
+            )
         self.tokens_in = prompt_tokens
         self.tokens_out = completion_tokens
 
+    # 互換エイリアス
     @property
     def output_text(self) -> str:
         return self.text
@@ -143,14 +147,9 @@ class ProviderResponse:
 
 
 class ProviderSPI(Protocol):
-    def name(self) -> str:
-        ...
-
-    def capabilities(self) -> set[str]:
-        ...
-
-    def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        ...
+    def name(self) -> str: ...
+    def capabilities(self) -> set[str]: ...
+    def invoke(self, request: ProviderRequest) -> ProviderResponse: ...
 
 
 __all__ = ["ProviderSPI", "ProviderRequest", "ProviderResponse", "TokenUsage"]
