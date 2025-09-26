@@ -324,7 +324,7 @@ class GeminiProvider(ProviderSPI):
                 return ""
 
             if hasattr(value, "name"):
-                name = getattr(value, "name")
+                name = value.name
                 if isinstance(name, str) and name.strip():
                     value = name
 
