@@ -258,6 +258,24 @@ def test_gemini_provider_translates_timeout_status_object():
         provider.invoke(ProviderRequest(prompt="hello"))
 
 
+def test_gemini_provider_translates_named_timeout_exception():
+    class Timeout(Exception):
+        """Exception with a Timeout name similar to requests.exceptions.Timeout."""
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise Timeout("network timeout")
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(TimeoutError):
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+
 @pytest.mark.parametrize(
     "status_code, expected",
     [

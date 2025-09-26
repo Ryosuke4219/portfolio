@@ -320,6 +320,21 @@ class GeminiProvider(ProviderSPI):
         if isinstance(exc, ConfigError):
             return exc
 
+        def _has_timeout_marker(value: Any) -> bool:
+            return isinstance(value, str) and "timeout" in value.lower()
+
+        exc_type = type(exc)
+        class_names = [
+            getattr(exc_type, "__qualname__", ""),
+            getattr(exc_type, "__name__", ""),
+        ]
+        module_names = [
+            getattr(exc_type, "__module__", ""),
+            getattr(exc, "__module__", ""),
+        ]
+        if any(_has_timeout_marker(name) for name in class_names + module_names):
+            return TimeoutError(str(exc))
+
         def _normalize_status(value: Any) -> str:
             if not value:
                 return ""
