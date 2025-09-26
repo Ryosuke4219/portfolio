@@ -258,6 +258,51 @@ def test_gemini_provider_translates_timeout_status_object():
         provider.invoke(ProviderRequest(prompt="hello"))
 
 
+@pytest.mark.parametrize(
+    "code_name, expected",
+    [
+        ("RESOURCE_EXHAUSTED", RateLimitError),
+        ("DEADLINE_EXCEEDED", TimeoutError),
+    ],
+)
+def test_gemini_provider_translates_callable_code_status(
+    code_name: str, expected: type[Exception]
+):
+    class _StatusCode:
+        def __init__(self, name: str):
+            self.name = name
+
+        def __str__(self) -> str:  # pragma: no cover - for defensive normalization
+            return f"StatusCode.{self.name}"
+
+    class _ApiError(Exception):
+        def __init__(self, name: str):
+            super().__init__(f"{name.lower()}")
+            self._status_code = _StatusCode(name)
+
+        def code(self) -> _StatusCode:
+            return self._status_code
+
+    class _FailingModels:
+        def __init__(self, error: Exception):
+            self._error = error
+
+        def generate_content(self, **kwargs):
+            raise self._error
+
+    class _Client:
+        def __init__(self, error: Exception):
+            self.models = _FailingModels(error)
+
+    provider = GeminiProvider(
+        "gemini-2.5-flash",
+        client=_Client(_ApiError(code_name)),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(expected):
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+
 def test_gemini_provider_translates_named_timeout_exception():
     class Timeout(Exception):
         """Exception with a Timeout name similar to requests.exceptions.Timeout."""
