@@ -64,7 +64,7 @@ projects/04-llm-adapter-shadow/
 
    ```powershell
    $env:OPENAI_API_KEY = "sk-..."        # 例: どれか1つは成功するプロバイダ
-   $env:GOOGLE_API_KEY = "..."          # 無しでも OK（Gemini は自動スキップ）
+   $env:GEMINI_API_KEY = "..."          # 無しでも OK（Gemini は自動スキップ）
    python demo_shadow.py
    Get-Content .\artifacts\runs-metrics.jsonl -Last 10
    ```
@@ -80,7 +80,7 @@ projects/04-llm-adapter-shadow/
    from google import genai
    from google.genai import types as gt
 
-   client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+   client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
    cfg = gt.GenerateContentConfig(
        max_output_tokens=512,
        temperature=0.3,
@@ -97,7 +97,7 @@ projects/04-llm-adapter-shadow/
 
 5. **トラブルシュート**
 
-   - `GOOGLE_API_KEY` が未設定／空文字なら Gemini は `ProviderSkip` として自動スキップし、`provider_skipped` イベントを記録します。他プロバイダが成功すればチェーン全体は継続します。
+   - `GEMINI_API_KEY` が未設定／空文字なら Gemini は `ProviderSkip` として自動スキップし、`provider_skipped` イベントを記録します。他プロバイダが成功すればチェーン全体は継続します。
    - PowerShell では bash 由来の構文（ヒアドキュメントなど）が動かないため、`python -c "..."` などで置き換えてください。
    - `runs-metrics.jsonl` にイベントが追加されない場合は書き込み権限と直前の `provider_chain_failed` ログを確認してください。
 
@@ -106,7 +106,7 @@ projects/04-llm-adapter-shadow/
 - `PRIMARY_PROVIDER` — 形式は `"<prefix>:<model-id>"`。デフォルトは `gemini:gemini-2.5-flash`。
 - `SHADOW_PROVIDER` — 影実行用。デフォルトは `ollama:gemma3n:e2b`。`none` や空文字で無効化できます。
 - `OLLAMA_HOST` — Ollama API のベースURL（未指定時は `http://127.0.0.1:11434`）。
-- `GOOGLE_API_KEY` — Gemini SDK が参照するAPIキー。未設定の場合、Gemini プロバイダは安全にスキップされます。
+- `GEMINI_API_KEY` — Gemini SDK が参照するAPIキー。未設定の場合、Gemini プロバイダは安全にスキップされます。
 
 プロバイダ文字列は最初のコロンのみを区切り文字として扱うため、`ollama:gemma3n:e2b` のようにモデルIDにコロンを含めても問題ありません。`mock:foo` を指定するとモックプロバイダで簡易動作確認が可能です。
 
@@ -115,7 +115,7 @@ projects/04-llm-adapter-shadow/
 ```bash
 export PRIMARY_PROVIDER="gemini:gemini-2.5-flash"
 export SHADOW_PROVIDER="ollama:gemma3n:e2b"
-export GOOGLE_API_KEY="<YOUR_GEMINI_KEY>"
+export GEMINI_API_KEY="<YOUR_GEMINI_KEY>"
 export OLLAMA_HOST="http://127.0.0.1:11434"
 ```
 
