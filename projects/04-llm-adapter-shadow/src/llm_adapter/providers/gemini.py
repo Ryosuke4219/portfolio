@@ -357,8 +357,21 @@ class GeminiProvider(ProviderSPI):
             token = token.strip(" <>:,'\"")
             return token.upper()
 
-        status = getattr(exc, "status", None) or getattr(exc, "code", None)
-        status_text = _normalize_status(status)
+        status_value: Any = None
+        for attr_name in ("status", "code"):
+            candidate = getattr(exc, attr_name, None)
+            if candidate is None:
+                continue
+            if callable(candidate):
+                original = candidate
+                try:
+                    candidate = candidate()
+                except Exception:  # pragma: no cover - defensive fallback
+                    candidate = original
+            if candidate:
+                status_value = candidate
+                break
+        status_text = _normalize_status(status_value)
 
         response = getattr(exc, "response", None)
         status_code = getattr(response, "status_code", None)
