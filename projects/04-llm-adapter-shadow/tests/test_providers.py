@@ -258,6 +258,35 @@ def test_gemini_provider_translates_timeout_status_object():
         provider.invoke(ProviderRequest(prompt="hello"))
 
 
+@pytest.mark.parametrize(
+    "status_code, expected",
+    [
+        (429, RateLimitError),
+        (401, AuthError),
+        (403, AuthError),
+        (408, TimeoutError),
+    ],
+)
+def test_gemini_provider_translates_http_errors(status_code: int, expected: type[Exception]):
+    class _HttpError(Exception):
+        def __init__(self, code: int):
+            super().__init__(f"http {code}")
+            self.response = SimpleNamespace(status_code=code)
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise _HttpError(status_code)
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(expected):
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+
 def test_ollama_provider_auto_pull_and_chat():
     class Session(_FakeSession):
         def __init__(self):

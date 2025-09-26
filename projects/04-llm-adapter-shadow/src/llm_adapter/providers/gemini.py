@@ -319,6 +319,7 @@ class GeminiProvider(ProviderSPI):
     def _translate_error(self, exc: Exception) -> Exception:
         if isinstance(exc, ConfigError):
             return exc
+
         def _normalize_status(value: Any) -> str:
             if not value:
                 return ""
@@ -344,14 +345,23 @@ class GeminiProvider(ProviderSPI):
         status = getattr(exc, "status", None) or getattr(exc, "code", None)
         status_text = _normalize_status(status)
 
-        if status_text in {"UNAUTHENTICATED", "PERMISSION_DENIED"}:
-            return AuthError(str(exc))
-        if status_text in {"RESOURCE_EXHAUSTED", "QUOTA_EXCEEDED"}:
-            return RateLimitError(str(exc))
-        if status_text in {"DEADLINE_EXCEEDED", "GATEWAY_TIMEOUT"}:
-            return TimeoutError(str(exc))
+        response = getattr(exc, "response", None)
+        status_code = getattr(response, "status_code", None)
+        try:
+            http_status = int(status_code) if status_code is not None else None
+        except (TypeError, ValueError):  # pragma: no cover - defensive fallback
+            http_status = None
 
-        return RetriableError(str(exc))
+        message = str(exc)
+
+        if status_text in {"UNAUTHENTICATED", "PERMISSION_DENIED"} or http_status in {401, 403}:
+            return AuthError(message)
+        if status_text in {"RESOURCE_EXHAUSTED", "QUOTA_EXCEEDED"} or http_status == 429:
+            return RateLimitError(message)
+        if status_text in {"DEADLINE_EXCEEDED", "GATEWAY_TIMEOUT"} or http_status == 408:
+            return TimeoutError(message)
+
+        return RetriableError(message)
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         messages = []
