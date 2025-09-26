@@ -9,6 +9,7 @@ class ProviderRequest:
     prompt: str
     max_tokens: int = 256
     options: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
