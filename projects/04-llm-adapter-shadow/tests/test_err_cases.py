@@ -1,4 +1,4 @@
-import json
+import json  # Required for json.loads in _read_metrics
 
 import pytest
 
