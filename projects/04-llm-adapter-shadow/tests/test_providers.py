@@ -328,6 +328,7 @@ def test_gemini_provider_translates_named_timeout_exception():
         (401, AuthError),
         (403, AuthError),
         (408, TimeoutError),
+        (504, TimeoutError),
     ],
 )
 def test_gemini_provider_translates_http_errors(status_code: int, expected: type[Exception]):
