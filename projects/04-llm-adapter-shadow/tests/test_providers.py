@@ -329,6 +329,45 @@ def test_ollama_provider_auto_pull_and_chat():
     assert len(show_calls) == 2  # first miss + verification after pull
 
 
+@pytest.mark.parametrize(
+    "status_code, expected",
+    [
+        (401, AuthError),
+        (429, RateLimitError),
+        (408, TimeoutError),
+    ],
+)
+def test_ollama_provider_auto_pull_error_mapping(status_code: int, expected: type[Exception]):
+    class Session(_FakeSession):
+        def __init__(self):
+            super().__init__()
+            self.pull_response: _FakeResponse | None = None
+
+        def post(self, url, json=None, stream=False, timeout=None):
+            self.calls.append((url, json, stream))
+            if url.endswith("/api/show"):
+                self._show_calls += 1
+                # First show indicates model missing, subsequent would succeed if we got that far.
+                if self._show_calls == 1:
+                    return _FakeResponse(status_code=404, payload={})
+                return _FakeResponse(status_code=200, payload={})
+            if url.endswith("/api/pull"):
+                assert stream is True
+                response = _FakeResponse(status_code=status_code, payload={})
+                self.pull_response = response
+                return response
+            raise AssertionError(f"unexpected url: {url}")
+
+    session = Session()
+    provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
+
+    with pytest.raises(expected):
+        provider.invoke(ProviderRequest(prompt="hello"))
+
+    assert session.pull_response is not None
+    assert session.pull_response.closed
+
+
 def test_ollama_provider_maps_auth_error():
     class Session(_FakeSession):
         def __init__(self):
