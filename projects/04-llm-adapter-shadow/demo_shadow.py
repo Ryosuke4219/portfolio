@@ -3,6 +3,10 @@ from __future__ import annotations
 import sys
 
 from src.llm_adapter.errors import ProviderSkip
+from src.llm_adapter.metrics import (
+    PrometheusMetricsExporter,
+    register_metrics_exporter,
+)
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.factory import provider_from_environment
 from src.llm_adapter.runner import Runner
@@ -31,6 +35,11 @@ def _resolve_model_name(provider) -> str:
 
 if __name__ == "__main__":
     try:
+        from prometheus_client import start_http_server
+    except ModuleNotFoundError:  # pragma: no cover - optional dependency
+        start_http_server = None
+
+    try:
         primary = provider_from_environment(
             "PRIMARY_PROVIDER",
             default="gemini:gemini-2.5-flash",
@@ -43,6 +52,16 @@ if __name__ == "__main__":
     except ValueError as exc:  # pragma: no cover - defensive CLI guard
         print(f"Configuration error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
+
+    if start_http_server is not None:
+        try:
+            register_metrics_exporter(PrometheusMetricsExporter())
+            start_http_server(8000)
+            print("Prometheus metrics at http://localhost:8000/metrics")
+        except RuntimeError as exc:
+            print(f"Prometheus exporter disabled: {exc}", file=sys.stderr)
+    else:
+        print("Install prometheus_client to expose /metrics (optional)")
 
     runner = Runner([primary])
 
