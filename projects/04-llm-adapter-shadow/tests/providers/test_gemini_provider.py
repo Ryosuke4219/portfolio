@@ -6,7 +6,13 @@ from typing import Any
 
 import pytest
 
-from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError, TimeoutError
+from src.llm_adapter.errors import (
+    AuthError,
+    ProviderSkip,
+    RateLimitError,
+    SkipReason,
+    TimeoutError,
+)
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.gemini import GeminiProvider
 
@@ -139,7 +145,7 @@ def test_gemini_provider_skips_without_api_key(monkeypatch, provider_request_mod
     with pytest.raises(ProviderSkip) as excinfo:
         provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
 
-    assert excinfo.value.reason == "missing_gemini_api_key"
+    assert excinfo.value.reason is SkipReason.MISSING_GEMINI_API_KEY
 
 
 def test_gemini_provider_translates_rate_limit(provider_request_model):
