@@ -54,6 +54,12 @@ def test_provider_request_normalizes_messages_and_stop():
     assert request.stop == ("END",)
 
 
+def test_provider_request_timeout_defaults_to_30_seconds():
+    request = ProviderRequest()
+
+    assert request.timeout_s == pytest.approx(30.0)
+
+
 def test_provider_response_populates_token_usage_from_inputs():
     response = ProviderResponse(text="ok", latency_ms=10, tokens_in=3, tokens_out=4)
 
@@ -561,7 +567,7 @@ def test_ollama_provider_auto_pull_and_chat():
     assert response.finish_reason == "stop"
     assert response.raw["message"]["content"] == "hello"
     assert session._chat_called
-    assert session.last_timeout == provider._timeout
+    assert session.last_timeout == pytest.approx(30.0)
     assert session.last_payload is not None
     assert "REQUEST_TIMEOUT_S" not in session.last_payload
     assert "request_timeout_s" not in session.last_payload
@@ -682,6 +688,7 @@ def test_ollama_provider_request_timeout_override():
     response = provider.invoke(
         ProviderRequest(
             prompt="hello",
+            timeout_s=None,
             options={"REQUEST_TIMEOUT_S": "2.5", "extra": True},
         )
     )

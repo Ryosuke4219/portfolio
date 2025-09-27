@@ -61,7 +61,7 @@ class ProviderRequest:
     temperature: float | None = None
     top_p: float | None = None
     stop: Sequence[str] | None = None
-    timeout_s: float | None = None
+    timeout_s: float | None = 30
     metadata: Mapping[str, Any] | None = None
     options: dict[str, Any] | None = field(default=None)
 
