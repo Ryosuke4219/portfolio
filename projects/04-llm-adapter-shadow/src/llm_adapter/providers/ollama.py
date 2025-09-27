@@ -32,7 +32,7 @@ class _ResponseProtocol(Protocol):
     def iter_lines(self) -> Iterable[bytes]: ...
 
 
-class _SessionProtocol(Protocol):
+class _SessionProtocolStub(Protocol):
     def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol: ...
 
 
@@ -43,13 +43,15 @@ class _RequestsExceptionsProtocol(Protocol):
 
 
 class _RequestsModuleProtocol(Protocol):
-    def Session(self) -> _SessionProtocol: ...
+    def Session(self) -> _SessionProtocolStub: ...
 
     exceptions: _RequestsExceptionsProtocol
     Response: type[_ResponseProtocol]
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
+    from requests import Session as _SessionProtocolType  # type: ignore[import-untyped]
+
     RequestsModule: TypeAlias = _RequestsModuleProtocol | None
     ResponseType: TypeAlias = type[_ResponseProtocol]
     RequestsExceptions: TypeAlias = _RequestsExceptionsProtocol
@@ -57,6 +59,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
     requests: RequestsModule
     Response: ResponseType
     requests_exceptions: RequestsExceptions
+    _unused_imports = (requests, Response, requests_exceptions, _SessionProtocolType)
 else:  # pragma: no cover - allow running without the optional dependency
     import importlib
 
@@ -137,7 +140,7 @@ class OllamaProvider(ProviderSPI):
         *,
         name: str | None = None,
         host: str | None = None,
-        session: _SessionProtocol | None = None,
+        session: _SessionProtocolStub | None = None,
         timeout: float = 60.0,
         pull_timeout: float = 300.0,
         auto_pull: bool = True,
