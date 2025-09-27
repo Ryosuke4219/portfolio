@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .metrics import log_event
+from .observability import EventLogger, JsonlLogger
 from .provider_spi import (
     AsyncProviderSPI,
     ProviderRequest,
@@ -38,6 +38,8 @@ def run_with_shadow(
     shadow: ProviderSPI | None,
     req: ProviderRequest,
     metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+    *,
+    logger: EventLogger | None = None,
 ) -> ProviderResponse:
     """Invoke ``primary`` while optionally mirroring the call on ``shadow``.
 
@@ -50,6 +52,8 @@ def run_with_shadow(
     shadow_payload: dict[str, Any] | None = None
     shadow_name: str | None = None
     shadow_started: float | None = None
+    if metrics_path is None:
+        logger = None
     metrics_path_str = _to_path_str(metrics_path)
 
     if shadow is not None:
@@ -141,7 +145,9 @@ def run_with_shadow(
             if shadow_payload.get("message"):
                 record["shadow_error_message"] = shadow_payload["message"]
 
-            log_event("shadow_diff", metrics_path_str, **record)
+            if logger is None:
+                logger = JsonlLogger(metrics_path_str)
+            logger.emit("shadow_diff", record)
 
     return primary_res
 
@@ -151,6 +157,8 @@ async def run_with_shadow_async(
     shadow: ProviderSPI | AsyncProviderSPI | None,
     req: ProviderRequest,
     metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+    *,
+    logger: EventLogger | None = None,
 ) -> ProviderResponse:
     primary_async = ensure_async_provider(primary)
     shadow_async = ensure_async_provider(shadow) if shadow is not None else None
@@ -159,6 +167,8 @@ async def run_with_shadow_async(
     shadow_payload: dict[str, Any] | None = None
     shadow_name: str | None = None
     shadow_started: float | None = None
+    if metrics_path is None:
+        logger = None
     metrics_path_str = _to_path_str(metrics_path)
 
     if shadow_async is not None:
@@ -253,7 +263,9 @@ async def run_with_shadow_async(
             if shadow_payload.get("message"):
                 record["shadow_error_message"] = shadow_payload["message"]
 
-            log_event("shadow_diff", metrics_path_str, **record)
+            if logger is None:
+                logger = JsonlLogger(metrics_path_str)
+            logger.emit("shadow_diff", record)
 
     return primary_res
 

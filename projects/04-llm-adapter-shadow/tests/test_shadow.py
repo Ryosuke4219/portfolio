@@ -1,11 +1,24 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
+
+
+class FakeLogger:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
+        self.events.append((event_type, dict(record)))
+
+    def of_type(self, event_type: str) -> list[dict[str, Any]]:
+        return [record for logged_event, record in self.events if logged_event == event_type]
 
 
 def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
@@ -80,6 +93,52 @@ def test_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_error"] == "TimeoutError"
     assert diff_event["shadow_error_message"] == "simulated timeout"
     assert diff_event["shadow_duration_ms"] >= 0
+
+
+def test_shadow_exec_uses_injected_logger() -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = FakeLogger()
+    runner = Runner([primary], logger=logger)
+
+    metadata = {"trace_id": "trace-logger", "project_id": "proj-logger"}
+    request = ProviderRequest(prompt="hello", metadata=metadata, model="primary-model")
+
+    response = runner.run(
+        request,
+        shadow=shadow,
+        shadow_metrics_path="memory://shadow.jsonl",
+    )
+
+    diff_event = logger.of_type("shadow_diff")[0]
+    provider_event = logger.of_type("provider_call")[0]
+
+    assert diff_event["primary_provider"] == "primary"
+    assert diff_event["shadow_provider"] == "shadow"
+    assert diff_event["shadow_ok"] is True
+    assert diff_event["primary_text_len"] == len(response.text)
+
+    token_usage = response.token_usage
+    assert token_usage is not None
+    assert diff_event["primary_token_usage_total"] == token_usage.total
+    assert provider_event["trace_id"] == metadata["trace_id"]
+    assert provider_event["project_id"] == metadata["project_id"]
+    assert provider_event["shadow_used"] is True
+
+
+def test_shadow_exec_without_metrics_path_skips_logging() -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = FakeLogger()
+    runner = Runner([primary], logger=logger)
+
+    runner.run(
+        ProviderRequest(prompt="hello", model="primary-model"),
+        shadow=shadow,
+        shadow_metrics_path=None,
+    )
+
+    assert logger.events == []
 
 
 def test_request_hash_includes_max_tokens(tmp_path: Path) -> None:

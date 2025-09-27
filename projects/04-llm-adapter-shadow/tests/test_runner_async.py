@@ -2,11 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, Runner
+
+
+class FakeLogger:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
+        self.events.append((event_type, dict(record)))
+
+    def of_type(self, event_type: str) -> list[dict[str, Any]]:
+        return [record for logged_event, record in self.events if logged_event == event_type]
 
 
 def test_async_runner_matches_sync(tmp_path: Path) -> None:
@@ -96,3 +109,48 @@ def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_error"] == "TimeoutError"
     assert diff_event["shadow_error_message"] == "simulated timeout"
     assert diff_event["shadow_duration_ms"] >= 0
+
+
+def test_async_shadow_exec_uses_injected_logger() -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = FakeLogger()
+    runner = AsyncRunner([primary], logger=logger)
+
+    metadata = {"trace_id": "trace-async-logger", "project_id": "proj-async-logger"}
+    request = ProviderRequest(prompt="hello", metadata=metadata, model="primary-model")
+
+    response = asyncio.run(
+        runner.run_async(
+            request,
+            shadow=shadow,
+            shadow_metrics_path="memory://shadow.jsonl",
+        )
+    )
+
+    diff_event = logger.of_type("shadow_diff")[0]
+    provider_event = logger.of_type("provider_call")[0]
+
+    assert diff_event["primary_provider"] == "primary"
+    assert diff_event["shadow_provider"] == "shadow"
+    assert diff_event["shadow_ok"] is True
+    assert provider_event["trace_id"] == metadata["trace_id"]
+    assert provider_event["project_id"] == metadata["project_id"]
+    assert provider_event["shadow_used"] is True
+
+
+def test_async_shadow_exec_without_metrics_path_skips_logging() -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = FakeLogger()
+    runner = AsyncRunner([primary], logger=logger)
+
+    asyncio.run(
+        runner.run_async(
+            ProviderRequest(prompt="hello", model="primary-model"),
+            shadow=shadow,
+            shadow_metrics_path=None,
+        )
+    )
+
+    assert logger.events == []
