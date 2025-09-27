@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Compat utilities for optional ``requests`` dependency."""
+
+from __future__ import annotations
 
 import importlib
 from collections.abc import Iterable
