@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -9,11 +8,7 @@ import pytest
 from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import Runner
-
-
-def _read_metrics(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-
+from tests.helpers.fakes import FakeLogger
 
 class _ErrorProvider(ProviderSPI):
     def __init__(self, name: str, exc: Exception) -> None:
@@ -70,17 +65,24 @@ class _SuccessProvider(ProviderSPI):
 def _run_and_collect(
     providers: Iterable[ProviderSPI],
     *,
-    metrics_path: Path,
+    metrics_path: str,
     prompt: str = "hello",
 ) -> tuple[ProviderResponse, list[dict[str, Any]]]:
-    runner = Runner(list(providers))
+    logger = FakeLogger()
+    runner = Runner(list(providers), logger=logger)
     request = ProviderRequest(prompt=prompt, model="demo-model")
-    response = runner.run(request, shadow_metrics_path=metrics_path)
-    return response, _read_metrics(metrics_path)
+    response = runner.run(
+        request,
+        shadow_metrics_path=metrics_path,
+        logger=logger,
+    )
+    target_path = str(Path(metrics_path))
+    records = [record for _, path, record in logger.events if path == target_path]
+    return response, records
 
 
-def test_first_failure_then_success_records_chain(tmp_path: Path) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
+def test_first_failure_then_success_records_chain() -> None:
+    metrics_path = "memory://runner-fallback"
     failing = _ErrorProvider("fail-first", RetriableError("transient"))
     succeeding = _SuccessProvider("success")
 
@@ -98,9 +100,9 @@ def test_first_failure_then_success_records_chain(tmp_path: Path) -> None:
 
 
 def test_rate_limit_triggers_backoff_and_logs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
+    metrics_path = "memory://rate-limit"
     rate_limited = _ErrorProvider("rate-limit", RateLimitError("slow down"))
     succeeding = _SuccessProvider("success")
 
@@ -123,8 +125,8 @@ def test_rate_limit_triggers_backoff_and_logs(
     assert first_call["error_type"] == "RateLimitError"
 
 
-def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
+def test_timeout_switches_to_next_provider() -> None:
+    metrics_path = "memory://timeout"
     timeouting = _ErrorProvider("slow", TimeoutError("too slow"))
     succeeding = _SuccessProvider("success")
 
@@ -146,8 +148,8 @@ def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
     assert success_event["status"] == "ok"
 
 
-def test_run_metric_contains_tokens_and_cost(tmp_path: Path) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
+def test_run_metric_contains_tokens_and_cost() -> None:
+    metrics_path = "memory://cost"
     succeeding = _SuccessProvider("success", tokens_in=21, tokens_out=9, cost_usd=0.456)
 
     _, records = _run_and_collect([succeeding], metrics_path=metrics_path)

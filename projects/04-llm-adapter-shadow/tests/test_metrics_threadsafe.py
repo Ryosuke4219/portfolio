@@ -1,15 +1,18 @@
-import json
 import threading
-from pathlib import Path
 
 import pytest
 
 from src.llm_adapter.metrics import log_event
+from tests.helpers.fakes import FakeLogger
 
 
 @pytest.mark.parametrize("thread_count,event_per_thread", [(8, 200)])
-def test_log_event_threadsafe(tmp_path: Path, thread_count: int, event_per_thread: int) -> None:
-    target = tmp_path / "events.jsonl"
+def test_log_event_threadsafe(
+    monkeypatch: pytest.MonkeyPatch, thread_count: int, event_per_thread: int
+) -> None:
+    logger = FakeLogger()
+    monkeypatch.setattr("src.llm_adapter.metrics._DEFAULT_LOGGER", logger)
+    target = "memory://events"
     start_barrier = threading.Barrier(thread_count)
 
     def worker(thread_id: int) -> None:
@@ -29,11 +32,10 @@ def test_log_event_threadsafe(tmp_path: Path, thread_count: int, event_per_threa
         t.join()
 
     expected_records = thread_count * event_per_thread
-    lines = target.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == expected_records
+    assert len(logger.events) == expected_records
 
-    for line in lines:
-        record = json.loads(line)
+    for _, path, record in logger.events:
+        assert path == target
         assert record["event"] == "test"
         assert "thread" in record
         assert "index" in record

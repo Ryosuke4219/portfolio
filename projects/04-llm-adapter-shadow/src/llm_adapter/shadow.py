@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .metrics import log_event
+from .observability import DEFAULT_LOGGER, EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .utils import content_hash
 
@@ -30,6 +30,8 @@ def run_with_shadow(
     shadow: ProviderSPI | None,
     req: ProviderRequest,
     metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+    *,
+    logger: EventLogger | None = None,
 ) -> ProviderResponse:
     """Invoke ``primary`` while optionally mirroring the call on ``shadow``.
 
@@ -43,6 +45,7 @@ def run_with_shadow(
     shadow_name: str | None = None
     shadow_started: float | None = None
     metrics_path_str = _to_path_str(metrics_path)
+    active_logger = logger or DEFAULT_LOGGER
 
     if shadow is not None:
         shadow_name = shadow.name()
@@ -100,7 +103,7 @@ def run_with_shadow(
         else:
             shadow_payload = {"provider": shadow_name, "ok": False}
 
-        if metrics_path_str:
+        if metrics_path_str and active_logger is not None:
             primary_text_len = len(primary_res.text)
             request_fingerprint = content_hash(
                 "runner", req.prompt_text, req.options, req.max_tokens
@@ -133,7 +136,7 @@ def run_with_shadow(
             if shadow_payload.get("message"):
                 record["shadow_error_message"] = shadow_payload["message"]
 
-            log_event("shadow_diff", metrics_path_str, **record)
+            active_logger.emit("shadow_diff", metrics_path_str, **record)
 
     return primary_res
 

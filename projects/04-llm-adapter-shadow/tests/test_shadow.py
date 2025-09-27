@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
+from tests.helpers.fakes import FakeLogger
 
 
-def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
+def test_shadow_exec_records_metrics() -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
-    runner = Runner([primary])
+    logger = FakeLogger()
+    runner = Runner([primary], logger=logger)
 
-    metrics_path = tmp_path / "metrics.jsonl"
+    metrics_path = "memory://shadow-success"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
 
     # モデル名は明示指定（フォールバック禁止の設計に合わせる）
@@ -22,13 +23,13 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
         request,
         shadow=shadow,
         shadow_metrics_path=metrics_path,
+        logger=logger,
     )
 
     assert response.text.startswith("echo(primary):")
     assert response.model == "primary-model"
-    assert metrics_path.exists()
-
-    payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
+    target_path = str(Path(metrics_path))
+    payloads = [record for _, path, record in logger.events if path == target_path]
     diff_event = next(item for item in payloads if item["event"] == "shadow_diff")
     call_event = next(item for item in payloads if item["event"] == "provider_call")
 
@@ -59,19 +60,22 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_text_len"] == len("echo(shadow): hello")
 
 
-def test_shadow_error_records_metrics(tmp_path: Path) -> None:
+def test_shadow_error_records_metrics() -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers={"[TIMEOUT]"})
-    runner = Runner([primary])
+    logger = FakeLogger()
+    runner = Runner([primary], logger=logger)
 
-    metrics_path = tmp_path / "metrics.jsonl"
+    metrics_path = "memory://shadow-error"
     runner.run(
         ProviderRequest(prompt="[TIMEOUT] hello", model="primary-model"),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
+        logger=logger,
     )
 
-    payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
+    target_path = str(Path(metrics_path))
+    payloads = [record for _, path, record in logger.events if path == target_path]
     diff_event = next(item for item in payloads if item["event"] == "shadow_diff")
 
     assert diff_event["shadow_ok"] is False
@@ -80,22 +84,26 @@ def test_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_duration_ms"] >= 0
 
 
-def test_request_hash_includes_max_tokens(tmp_path: Path) -> None:
+def test_request_hash_includes_max_tokens() -> None:
     provider = MockProvider("primary", base_latency_ms=1, error_markers=set())
-    runner = Runner([provider])
+    logger = FakeLogger()
+    runner = Runner([provider], logger=logger)
 
-    metrics_path = tmp_path / "metrics.jsonl"
+    metrics_path = "memory://shadow-hash"
 
     runner.run(
         ProviderRequest(prompt="hello", max_tokens=32, model="primary-model"),
         shadow_metrics_path=metrics_path,
+        logger=logger,
     )
     runner.run(
         ProviderRequest(prompt="hello", max_tokens=64, model="primary-model"),
         shadow_metrics_path=metrics_path,
+        logger=logger,
     )
 
-    payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
+    target_path = str(Path(metrics_path))
+    payloads = [record for _, path, record in logger.events if path == target_path]
     success_events = [
         item
         for item in payloads

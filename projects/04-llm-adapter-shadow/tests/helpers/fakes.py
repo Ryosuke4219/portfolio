@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -88,3 +90,18 @@ class RecordGeminiClient:
                 return SimpleNamespace(**self._outer._response_fields)
 
         self.models = _Models(self)
+
+
+class FakeLogger:
+    """In-memory logger for tests."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple[str, str, dict[str, Any]]] = []
+        self._lock = threading.Lock()
+
+    def emit(self, event_type: str, path: str | Path, **fields: Any) -> None:
+        record = dict(fields)
+        record.setdefault("ts", 0)
+        record["event"] = event_type
+        with self._lock:
+            self.events.append((event_type, str(path), record))

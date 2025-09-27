@@ -1,6 +1,5 @@
-import json
+import pytest
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -8,16 +7,13 @@ from src.llm_adapter.errors import TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
+from tests.helpers.fakes import FakeLogger
 
 
 def _providers_for(marker: str):
     failing = MockProvider("p1", base_latency_ms=5, error_markers={marker})
     fallback = MockProvider("p2", base_latency_ms=5, error_markers=set())
     return failing, fallback
-
-
-def _read_metrics(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def test_timeout_fallback():
@@ -81,20 +77,23 @@ def test_timeout_no_backoff(monkeypatch: pytest.MonkeyPatch):
     assert all(abs(delay - 0.05) > 1e-9 for delay in sleep_calls)
 
 
-def test_timeout_fallback_records_metrics(tmp_path: Path):
+def test_timeout_fallback_records_metrics():
     p1, p2 = _providers_for("[TIMEOUT]")
-    runner = Runner([p1, p2])
+    logger = FakeLogger()
+    metrics_path = "memory://fallback"
+    runner = Runner([p1, p2], logger=logger)
 
-    metrics_path = tmp_path / "fallback.jsonl"
     response = runner.run(
         ProviderRequest(prompt="[TIMEOUT] metrics", model="fallback-model"),
         shadow=None,
         shadow_metrics_path=metrics_path,
+        logger=logger,
     )
 
     assert response.text.startswith("echo(p2):")
 
-    payloads = _read_metrics(metrics_path)
+    target_path = str(Path(metrics_path))
+    payloads = [record for _, path, record in logger.events if path == target_path]
     call_events = [item for item in payloads if item["event"] == "provider_call"]
     error_event = next(
         item for item in call_events if item["provider"] == "p1" and item["status"] == "error"
@@ -115,21 +114,23 @@ def test_timeout_fallback_records_metrics(tmp_path: Path):
     assert success_event["tokens_out"] == response.token_usage.completion
 
 
-def test_runner_emits_chain_failed_metric(tmp_path: Path):
+def test_runner_emits_chain_failed_metric():
     failing1 = MockProvider("p1", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     failing2 = MockProvider("p2", base_latency_ms=5, error_markers={"[TIMEOUT]"})
-    runner = Runner([failing1, failing2])
-
-    metrics_path = tmp_path / "failure.jsonl"
+    logger = FakeLogger()
+    metrics_path = "memory://failure"
+    runner = Runner([failing1, failing2], logger=logger)
 
     with pytest.raises(TimeoutError):
         runner.run(
             ProviderRequest(prompt="[TIMEOUT] hard", model="fallback-model"),
             shadow=None,
             shadow_metrics_path=metrics_path,
+            logger=logger,
         )
 
-    payloads = _read_metrics(metrics_path)
+    target_path = str(Path(metrics_path))
+    payloads = [record for _, path, record in logger.events if path == target_path]
     call_events = [item for item in payloads if item["event"] == "provider_call"]
     assert {event["provider"] for event in call_events} == {"p1", "p2"}
     assert all(event["status"] == "error" for event in call_events)

@@ -5,9 +5,10 @@ from __future__ import annotations
 import time
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
-from .metrics import log_event
+from .observability import DEFAULT_LOGGER, EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow
 from .utils import content_hash
@@ -18,16 +19,24 @@ MetricsPath = str | Path | None
 class Runner:
     """Attempt providers sequentially until one succeeds."""
 
-    def __init__(self, providers: Sequence[ProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI],
+        *,
+        logger: EventLogger | None = None,
+    ):
         if not providers:
             raise ValueError("Runner requires at least one provider")
         self.providers: list[ProviderSPI] = list(providers)
+        self._logger = logger
 
     def run(
         self,
         request: ProviderRequest,
         shadow: ProviderSPI | None = None,
         shadow_metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+        *,
+        logger: EventLogger | None = None,
     ) -> ProviderResponse:
         """Execute ``request`` with fallback semantics."""
 
@@ -39,12 +48,16 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
-        def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
-            if not metrics_path_str:
+        active_logger = logger or self._logger or DEFAULT_LOGGER
+
+        def _emit(event_type: str, **payload: Any) -> None:
+            if not metrics_path_str or active_logger is None:
                 return
-            log_event(
+            active_logger.emit(event_type, metrics_path_str, **payload)
+
+        def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
+            _emit(
                 "provider_skipped",
-                metrics_path_str,
                 request_fingerprint=request_fingerprint,
                 request_hash=content_hash(
                     provider.name(),
@@ -79,15 +92,11 @@ class Runner:
             tokens_out: int | None,
             error: Exception | None = None,
         ) -> None:
-            if not metrics_path_str:
-                return
-
             error_type = type(error).__name__ if error is not None else None
             error_message = str(error) if error is not None else None
 
-            log_event(
+            _emit(
                 "provider_call",
-                metrics_path_str,
                 request_fingerprint=request_fingerprint,
                 request_hash=content_hash(
                     provider.name(),
@@ -130,9 +139,6 @@ class Runner:
             cost_usd: float,
             error: Exception | None,
         ) -> None:
-            if not metrics_path_str:
-                return
-
             error_type = type(error).__name__ if error else None
             error_message = str(error) if error else None
             provider_name = provider.name() if provider is not None else None
@@ -147,9 +153,8 @@ class Runner:
                 else None
             )
 
-            log_event(
+            _emit(
                 "run_metric",
-                metrics_path_str,
                 request_fingerprint=request_fingerprint,
                 request_hash=request_hash,
                 provider=provider_name,
@@ -169,7 +174,13 @@ class Runner:
         for attempt_index, provider in enumerate(self.providers, start=1):
             attempt_started = time.time()
             try:
-                response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
+                response = run_with_shadow(
+                    provider,
+                    shadow,
+                    request,
+                    metrics_path=metrics_path_str,
+                    logger=active_logger if metrics_path_str else None,
+                )
             except ProviderSkip as err:
                 last_err = err
                 _record_skip(err, attempt_index, provider)
@@ -233,9 +244,8 @@ class Runner:
                 return response
 
         if metrics_path_str:
-            log_event(
+            _emit(
                 "provider_chain_failed",
-                metrics_path_str,
                 request_fingerprint=request_fingerprint,
                 provider_attempts=len(self.providers),
                 providers=[provider.name() for provider in self.providers],
