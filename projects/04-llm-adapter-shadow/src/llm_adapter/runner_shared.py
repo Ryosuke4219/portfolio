@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from .errors import FatalError, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger, JsonlLogger
@@ -63,7 +64,7 @@ def provider_model(provider: object, *, allow_private: bool = False) -> str | No
     return None
 
 
-def _provider_name(provider: "ProviderSPI | AsyncProviderSPI | None") -> str | None:
+def _provider_name(provider: ProviderSPI | AsyncProviderSPI | None) -> str | None:
     if provider is None:
         return None
     name = getattr(provider, "name", None)
@@ -73,7 +74,7 @@ def _provider_name(provider: "ProviderSPI | AsyncProviderSPI | None") -> str | N
 
 
 def _request_hash(
-    provider_name: str | None, request: "ProviderRequest"
+    provider_name: str | None, request: ProviderRequest
 ) -> str | None:
     if provider_name is None:
         return None
@@ -89,8 +90,8 @@ def log_provider_skipped(
     event_logger: EventLogger | None,
     *,
     request_fingerprint: str,
-    provider: "ProviderSPI | AsyncProviderSPI",
-    request: "ProviderRequest",
+    provider: ProviderSPI | AsyncProviderSPI,
+    request: ProviderRequest,
     attempt: int,
     total_providers: int,
     error: SkipError,
@@ -116,8 +117,8 @@ def log_provider_call(
     event_logger: EventLogger | None,
     *,
     request_fingerprint: str,
-    provider: "ProviderSPI | AsyncProviderSPI",
-    request: "ProviderRequest",
+    provider: ProviderSPI | AsyncProviderSPI,
+    request: ProviderRequest,
     attempt: int,
     total_providers: int,
     status: str,
@@ -160,8 +161,8 @@ def log_run_metric(
     event_logger: EventLogger | None,
     *,
     request_fingerprint: str,
-    request: "ProviderRequest",
-    provider: "ProviderSPI | AsyncProviderSPI | None",
+    request: ProviderRequest,
+    provider: ProviderSPI | AsyncProviderSPI | None,
     status: str,
     attempts: int,
     latency_ms: int,
