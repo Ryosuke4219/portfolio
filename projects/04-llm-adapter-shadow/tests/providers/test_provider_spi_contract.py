@@ -36,6 +36,11 @@ def test_provider_request_rejects_empty_model():
         ProviderRequest(model="   ", prompt="hello")
 
 
+def test_provider_request_requires_model_argument():
+    with pytest.raises(ValueError):
+        ProviderRequest(prompt="hello")
+
+
 def test_provider_response_populates_token_usage_from_inputs():
     response = ProviderResponse(text="ok", latency_ms=10, tokens_in=3, tokens_out=4)
     assert response.token_usage.prompt == 3

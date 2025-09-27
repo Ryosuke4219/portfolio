@@ -54,7 +54,7 @@ def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
 
 @dataclass
 class ProviderRequest:
-    model: str
+    model: str = field(default="")
     prompt: str = ""
     messages: Sequence[Mapping[str, Any]] | None = None
     max_tokens: int | None = 256
