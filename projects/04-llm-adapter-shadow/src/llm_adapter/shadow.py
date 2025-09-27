@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
 from .metrics import log_event
-from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from .provider_spi import (
+    AsyncProviderSPI,
+    ProviderRequest,
+    ProviderResponse,
+    ProviderSPI,
+    ensure_async_provider,
+)
 from .utils import content_hash
 
 MetricsPath = str | Path | None
@@ -138,4 +146,116 @@ def run_with_shadow(
     return primary_res
 
 
-__all__ = ["run_with_shadow", "DEFAULT_METRICS_PATH"]
+async def run_with_shadow_async(
+    primary: ProviderSPI | AsyncProviderSPI,
+    shadow: ProviderSPI | AsyncProviderSPI | None,
+    req: ProviderRequest,
+    metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+) -> ProviderResponse:
+    primary_async = ensure_async_provider(primary)
+    shadow_async = ensure_async_provider(shadow) if shadow is not None else None
+
+    shadow_task: asyncio.Task[dict[str, Any]] | None = None
+    shadow_payload: dict[str, Any] | None = None
+    shadow_name: str | None = None
+    shadow_started: float | None = None
+    metrics_path_str = _to_path_str(metrics_path)
+
+    if shadow_async is not None:
+        shadow_name = shadow_async.name()
+        shadow_started = time.time()
+
+        async def _shadow_worker() -> dict[str, Any]:
+            ts0 = time.time()
+            try:
+                response = await shadow_async.invoke_async(req)
+            except Exception as exc:  # pragma: no cover - logged below
+                payload = {
+                    "ok": False,
+                    "error": type(exc).__name__,
+                    "message": str(exc),
+                    "provider": shadow_name,
+                }
+            else:
+                payload = {
+                    "ok": True,
+                    "provider": shadow_name,
+                    "latency_ms": response.latency_ms,
+                    "text_len": len(response.text),
+                    "token_usage_total": _tokens_total(response),
+                }
+            payload["duration_ms"] = int((time.time() - ts0) * 1000)
+            return payload
+
+        shadow_task = asyncio.create_task(_shadow_worker())
+
+    try:
+        primary_res = await primary_async.invoke_async(req)
+    except Exception:
+        if shadow_task is not None:
+            shadow_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await shadow_task
+        raise
+
+    if shadow_task is not None:
+        try:
+            shadow_payload = await asyncio.wait_for(shadow_task, timeout=10)
+        except asyncio.TimeoutError:
+            shadow_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await shadow_task
+            duration_ms = 0
+            if shadow_started is not None:
+                duration_ms = int((time.time() - shadow_started) * 1000)
+            shadow_payload = {
+                "provider": shadow_name,
+                "ok": False,
+                "error": "ShadowTimeout",
+                "duration_ms": duration_ms,
+            }
+        except asyncio.CancelledError:  # pragma: no cover - defensive
+            shadow_payload = {"provider": shadow_name, "ok": False}
+
+        if shadow_payload is None:
+            shadow_payload = {"provider": shadow_name, "ok": False}
+
+        if metrics_path_str:
+            primary_text_len = len(primary_res.text)
+            request_fingerprint = content_hash(
+                "runner", req.prompt_text, req.options, req.max_tokens
+            )
+            record: dict[str, Any] = {
+                "request_hash": content_hash(
+                    primary_async.name(), req.prompt_text, req.options, req.max_tokens
+                ),
+                "request_fingerprint": request_fingerprint,
+                "primary_provider": primary_async.name(),
+                "primary_latency_ms": primary_res.latency_ms,
+                "primary_text_len": primary_text_len,
+                "primary_token_usage_total": _tokens_total(primary_res),
+                "shadow_provider": shadow_payload.get("provider", shadow_name),
+                "shadow_ok": shadow_payload.get("ok"),
+                "shadow_latency_ms": shadow_payload.get("latency_ms"),
+                "shadow_duration_ms": shadow_payload.get("duration_ms"),
+                "shadow_error": shadow_payload.get("error"),
+            }
+
+            if shadow_payload.get("latency_ms") is not None:
+                record["latency_gap_ms"] = shadow_payload["latency_ms"] - primary_res.latency_ms
+
+            if shadow_payload.get("text_len") is not None:
+                record["shadow_text_len"] = shadow_payload["text_len"]
+
+            if shadow_payload.get("token_usage_total") is not None:
+                record["shadow_token_usage_total"] = shadow_payload["token_usage_total"]
+
+            if shadow_payload.get("message"):
+                record["shadow_error_message"] = shadow_payload["message"]
+
+            log_event("shadow_diff", metrics_path_str, **record)
+
+    return primary_res
+
+
+__all__ = ["run_with_shadow", "run_with_shadow_async", "DEFAULT_METRICS_PATH"]
