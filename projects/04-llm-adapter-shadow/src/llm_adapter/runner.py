@@ -7,7 +7,14 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
+from .errors import (
+    FatalError,
+    ProviderSkip,
+    RateLimitError,
+    RetryableError,
+    SkipError,
+    TimeoutError,
+)
 from .metrics import log_event
 from .provider_spi import (
     AsyncProviderSPI,
@@ -46,6 +53,19 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
+        def _error_family(error: Exception | None) -> str | None:
+            if error is None:
+                return None
+            if isinstance(error, SkipError):
+                return "skip"
+            if isinstance(error, RateLimitError):
+                return "rate_limit"
+            if isinstance(error, RetryableError):
+                return "retryable"
+            if isinstance(error, FatalError):
+                return "fatal"
+            return "unknown"
+
         def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
             if not metrics_path_str:
                 return
@@ -62,8 +82,9 @@ class Runner:
                 provider=provider.name(),
                 attempt=attempt,
                 total_providers=len(self.providers),
-                reason=err.reason if hasattr(err, "reason") else None,
+                reason=err.reason.value if getattr(err, "reason", None) else None,
                 error_message=str(err),
+                error_family=_error_family(err),
             )
 
         def _elapsed_ms(start_ts: float) -> int:
@@ -109,6 +130,7 @@ class Runner:
                 tokens_out=tokens_out,
                 error_type=error_type,
                 error_message=error_message,
+                error_family=_error_family(error),
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -165,6 +187,7 @@ class Runner:
                 cost_usd=float(cost_usd),
                 error_type=error_type,
                 error_message=error_message,
+                error_family=_error_family(error),
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -174,9 +197,10 @@ class Runner:
             attempt_started = time.time()
             try:
                 response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
-            except ProviderSkip as err:
+            except SkipError as err:
                 last_err = err
-                _record_skip(err, attempt_index, provider)
+                if isinstance(err, ProviderSkip):
+                    _record_skip(err, attempt_index, provider)
                 _log_provider_call(
                     provider,
                     attempt_index,
@@ -199,7 +223,7 @@ class Runner:
                     error=err,
                 )
                 time.sleep(0.05)
-            except (TimeoutError, RetriableError) as err:
+            except RetryableError as err:
                 last_err = err
                 _log_provider_call(
                     provider,
@@ -285,6 +309,19 @@ class AsyncRunner:
 
         shadow_async = ensure_async_provider(shadow) if shadow is not None else None
 
+        def _error_family(error: Exception | None) -> str | None:
+            if error is None:
+                return None
+            if isinstance(error, SkipError):
+                return "skip"
+            if isinstance(error, RateLimitError):
+                return "rate_limit"
+            if isinstance(error, RetryableError):
+                return "retryable"
+            if isinstance(error, FatalError):
+                return "fatal"
+            return "unknown"
+
         def _record_skip(
             err: ProviderSkip, attempt: int, provider: ProviderSPI | AsyncProviderSPI
         ) -> None:
@@ -303,8 +340,9 @@ class AsyncRunner:
                 provider=provider.name(),
                 attempt=attempt,
                 total_providers=len(self.providers),
-                reason=err.reason if hasattr(err, "reason") else None,
+                reason=err.reason.value if getattr(err, "reason", None) else None,
                 error_message=str(err),
+                error_family=_error_family(err),
             )
 
         def _provider_model(provider: ProviderSPI | AsyncProviderSPI) -> str | None:
@@ -353,6 +391,7 @@ class AsyncRunner:
                 tokens_out=tokens_out,
                 error_type=error_type,
                 error_message=error_message,
+                error_family=_error_family(error),
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -411,6 +450,7 @@ class AsyncRunner:
                 cost_usd=float(cost_usd),
                 error_type=error_type,
                 error_message=error_message,
+                error_family=_error_family(error),
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -425,9 +465,10 @@ class AsyncRunner:
                     request,
                     metrics_path=metrics_path_str,
                 )
-            except ProviderSkip as err:
+            except SkipError as err:
                 last_err = err
-                _record_skip(err, attempt_index, provider)
+                if isinstance(err, ProviderSkip):
+                    _record_skip(err, attempt_index, provider)
                 _log_provider_call(
                     provider,
                     attempt_index,
@@ -450,7 +491,7 @@ class AsyncRunner:
                     error=err,
                 )
                 await asyncio.sleep(0.05)
-            except (TimeoutError, RetriableError) as err:
+            except RetryableError as err:
                 last_err = err
                 _log_provider_call(
                     provider,

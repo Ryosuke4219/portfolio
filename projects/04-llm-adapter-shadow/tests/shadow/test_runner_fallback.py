@@ -188,6 +188,9 @@ def test_runner_fallback_paths(
     skip_events = [rec for rec in records if rec["event"] == "provider_skipped"]
     assert len(skip_events) == expected_skip_events
 
+    for event in skip_events:
+        assert event.get("error_family") == "skip"
+
     if expected_run_status == "ok":
         assert response is not None
     else:
@@ -218,6 +221,7 @@ def test_rate_limit_triggers_backoff_and_logs(
     )
     assert first_call["status"] == "error"
     assert first_call["error_type"] == "RateLimitError"
+    assert first_call["error_family"] == "rate_limit"
 
 
 def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
@@ -234,6 +238,7 @@ def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
     )
     assert timeout_event["status"] == "error"
     assert timeout_event["error_type"] == "TimeoutError"
+    assert timeout_event["error_family"] == "retryable"
 
     success_event = next(
         rec
@@ -241,6 +246,7 @@ def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
         if rec["event"] == "provider_call" and rec["provider"] == "success"
     )
     assert success_event["status"] == "ok"
+    assert success_event.get("error_family") is None
 
 
 def test_run_metric_contains_tokens_and_cost(tmp_path: Path) -> None:

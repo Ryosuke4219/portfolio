@@ -8,40 +8,70 @@ Runner retry policy:
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 
 class AdapterError(Exception):
     """Base class for errors originating from providers or the adapter."""
 
 
-class TimeoutError(AdapterError):
-    """Raised when a provider does not respond within the expected window (instant fallback)."""
+class RetryableError(AdapterError):
+    """Raised for transient issues where retrying with another provider may help."""
 
 
-class RateLimitError(AdapterError):
-    """Raised when a provider rejects the request due to rate limiting (0.05 s backoff)."""
-
-
-class AuthError(AdapterError):
-    """Raised when credentials are missing or invalid for the provider."""
-
-
-class RetriableError(AdapterError):
-    """Raised for transient issues where retrying with another provider may help.
-
-    Runner instantly falls back to the next provider when this error is encountered.
-    """
+class SkipError(AdapterError):
+    """Raised when a provider should be skipped without counting as a failure."""
 
 
 class FatalError(AdapterError):
     """Raised for unrecoverable issues that should halt the runner."""
 
 
-class ProviderSkip(AdapterError):
+class TimeoutError(RetryableError):
+    """Raised when a provider does not respond within the expected window (instant fallback)."""
+
+
+class RateLimitError(RetryableError):
+    """Raised when a provider rejects the request due to rate limiting (0.05 s backoff)."""
+
+
+class RetriableError(RetryableError):
+    """Backward-compatible alias for :class:`RetryableError`."""
+
+
+class AuthError(AdapterError):
+    """Raised when credentials are missing or invalid for the provider."""
+
+
+class ProviderSkipReason(StrEnum):
+    """Enumerates structured reasons for skipping providers."""
+
+    UNSPECIFIED = "unspecified"
+    MISSING_GEMINI_API_KEY = "missing_gemini_api_key"
+
+
+class ProviderSkip(SkipError):
     """Raised when a provider should be skipped without counting as a failure (logged only)."""
 
-    def __init__(self, message: str, *, reason: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: ProviderSkipReason | str | None = None,
+    ) -> None:
         super().__init__(message)
-        self.reason = reason
+        if reason is None:
+            self.reason: ProviderSkipReason | None = None
+        elif isinstance(reason, ProviderSkipReason):
+            self.reason = reason
+        else:
+            try:
+                self.reason = ProviderSkipReason(reason)
+            except ValueError:
+                self.reason = ProviderSkipReason.UNSPECIFIED
+
+    def __str__(self) -> str:
+        return super().__str__()
 
 
 class ConfigError(AdapterError):
@@ -50,11 +80,14 @@ class ConfigError(AdapterError):
 
 __all__ = [
     "AdapterError",
+    "RetryableError",
+    "SkipError",
+    "FatalError",
     "TimeoutError",
     "RateLimitError",
-    "AuthError",
     "RetriableError",
-    "FatalError",
+    "AuthError",
+    "ProviderSkipReason",
     "ProviderSkip",
     "ConfigError",
 ]
