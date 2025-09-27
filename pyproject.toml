@@ -26,3 +26,8 @@ ignore_missing_imports = true
 namespace_packages = true
 mypy_path = ["projects/04-llm-adapter-shadow"]
 explicit_package_bases = true
+
+[tool.pytest.ini_options]
+markers = [
+    "asyncio: tests that drive asyncio event loops",
+]
