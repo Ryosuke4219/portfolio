@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from types import TracebackType
 from typing import Any
 
 from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
@@ -32,17 +33,21 @@ class _StreamingResponseWrapper:
     def status_code(self) -> int:
         return self._response.status_code
 
+    @status_code.setter
+    def status_code(self, value: int) -> None:
+        self._response.status_code = value
+
     @property
     def closed(self) -> bool:
         return bool(getattr(self._response, "closed", False))
 
-    def json(self):
+    def json(self) -> Any:
         return self._response.json()
 
     def raise_for_status(self) -> None:
         self._response.raise_for_status()
 
-    def iter_lines(self):
+    def iter_lines(self) -> Iterable[bytes]:
         try:
             yield from self._response.iter_lines()
         except _STREAMING_ERRORS as exc:
@@ -51,11 +56,16 @@ class _StreamingResponseWrapper:
                 f"Ollama streaming failed: {self._path}"
             ) from exc
 
-    def __enter__(self):
+    def __enter__(self) -> _StreamingResponseWrapper:
         self._response.__enter__()
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool | None:
         return self._response.__exit__(exc_type, exc, tb)
 
     def __getattr__(self, name: str) -> Any:
