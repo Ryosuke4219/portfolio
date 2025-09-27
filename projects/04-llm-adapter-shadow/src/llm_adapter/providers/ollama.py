@@ -119,6 +119,7 @@ class OllamaProvider(ProviderSPI):
         pull_timeout: float = 300.0,
         auto_pull: bool = True,
     ) -> None:
+        # Factory/CLI で ``ProviderRequest.model`` に設定される推奨デフォルトを保持。
         self._model = model
         self._name = name or f"ollama:{model}"
         env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
@@ -215,7 +216,12 @@ class OllamaProvider(ProviderSPI):
     # ProviderSPI implementation
     # ------------------------------------------------------------------
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        model_name = request.model or self._model
+        model_name = request.model
+        if not isinstance(model_name, str):
+            raise ConfigError("OllamaProvider requires request.model to be set")
+        model_name = model_name.strip()
+        if not model_name:
+            raise ConfigError("OllamaProvider requires request.model to be set")
         self._ensure_model(model_name)
 
         def _coerce_content(entry: Mapping[str, Any]) -> str:

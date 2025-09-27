@@ -62,7 +62,6 @@ def test_provider_request_normalizes_messages_and_stop(provider_request_model):
 
 def test_provider_request_timeout_defaults_to_30_seconds(provider_request_model):
     request = ProviderRequest(model=provider_request_model)
-
     assert request.timeout_s == pytest.approx(30.0)
 
 
@@ -669,7 +668,7 @@ def test_ollama_provider_auto_pull_error_mapping(
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
     with pytest.raises(expected):
-        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemma3n:e2b"))
 
     assert session.pull_response is not None
     assert session.pull_response.closed

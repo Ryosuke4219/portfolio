@@ -7,25 +7,24 @@ from src.llm_adapter.runner import Runner
 from src.llm_adapter.provider_spi import ProviderRequest
 
 
-@pytest.fixture(scope="module")
-def provider_request_model() -> str:
-    return "gemini:test-model"
-
-
-def test_shadow_exec_records_metrics(tmp_path, provider_request_model):
+def test_shadow_exec_records_metrics(tmp_path):
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
     runner = Runner([primary])
 
     metrics_path = tmp_path / "metrics.jsonl"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
+
+    # モデル名は明示指定（フォールバック禁止の設計に合わせる）
+    request = ProviderRequest(prompt="hello", metadata=metadata, model="primary-model")
     response = runner.run(
-        ProviderRequest(prompt="hello", metadata=metadata, model=provider_request_model),
+        request,
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
 
     assert response.text.startswith("echo(primary):")
+    assert response.model == "primary-model"
     assert metrics_path.exists()
 
     payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
@@ -48,6 +47,7 @@ def test_shadow_exec_records_metrics(tmp_path, provider_request_model):
     assert call_event["tokens_out"] == response.token_usage.completion
     assert call_event["trace_id"] == metadata["trace_id"]
     assert call_event["project_id"] == metadata["project_id"]
+    # メトリクスに model は記録しない設計（プライバシー配慮）
     assert call_event.get("model") is None
 
     expected_tokens = max(1, len("hello") // 4) + 16
@@ -55,14 +55,14 @@ def test_shadow_exec_records_metrics(tmp_path, provider_request_model):
     assert diff_event["shadow_text_len"] == len("echo(shadow): hello")
 
 
-def test_shadow_error_records_metrics(tmp_path, provider_request_model):
+def test_shadow_error_records_metrics(tmp_path):
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     runner = Runner([primary])
 
     metrics_path = tmp_path / "metrics.jsonl"
     runner.run(
-        ProviderRequest(prompt="[TIMEOUT] hello", model=provider_request_model),
+        ProviderRequest(prompt="[TIMEOUT] hello", model="primary-model"),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
@@ -76,18 +76,18 @@ def test_shadow_error_records_metrics(tmp_path, provider_request_model):
     assert diff_event["shadow_duration_ms"] >= 0
 
 
-def test_request_hash_includes_max_tokens(tmp_path, provider_request_model):
+def test_request_hash_includes_max_tokens(tmp_path):
     provider = MockProvider("primary", base_latency_ms=1, error_markers=set())
     runner = Runner([provider])
 
     metrics_path = tmp_path / "metrics.jsonl"
 
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=32, model=provider_request_model),
+        ProviderRequest(prompt="hello", max_tokens=32, model="primary-model"),
         shadow_metrics_path=metrics_path,
     )
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=64, model=provider_request_model),
+        ProviderRequest(prompt="hello", max_tokens=64, model="primary-model"),
         shadow_metrics_path=metrics_path,
     )
 
