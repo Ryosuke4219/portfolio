@@ -268,6 +268,7 @@ Quick Start で触れた `just` コマンドを詳しく説明します。セッ
    * Node 側: 仕様ケースの検証 → E2E テスト生成 → デモサーバー起動 → Playwright スタブ実行 → JUnit 解析/レポート生成。
    * Python 側: `projects/04-llm-adapter-shadow` の pytest を実行。
 3. `just lint` / `just report` でワンコマンド lint / カバレッジ計測が可能です。
+4. `pre-commit install` で Git フックを有効化し、初回は `pre-commit run --all-files` で一括検証できます。
 
 VS Code Dev Container を利用する場合は `devcontainer.json` の postCreateCommand で自動的に `just setup` が走ります。
 
