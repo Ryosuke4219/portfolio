@@ -28,7 +28,7 @@ DEFAULT_MODEL = "test-model"
 
 
 def test_provider_request_timeout_defaults_to_30_seconds() -> None:
-    request = ProviderRequest(model=DEFAULT_MODEL)
+    request = ProviderRequest(model="test-model")
 
     assert request.timeout == 30
     assert request.timeout_s is None
