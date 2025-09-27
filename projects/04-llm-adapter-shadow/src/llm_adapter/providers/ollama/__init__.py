@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
-from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+from ...errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
+from ...provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+from .payloads import prepare_chat_payload
 
 
 class _ResponseProtocol(Protocol):
@@ -224,84 +225,11 @@ class OllamaProvider(ProviderSPI):
             raise ConfigError("OllamaProvider requires request.model to be set")
         self._ensure_model(model_name)
 
-        def _coerce_content(entry: Mapping[str, Any]) -> str:
-            content = entry.get("content")
-            if isinstance(content, str):
-                return content
-            if isinstance(content, Sequence) and not isinstance(
-                content, (bytes, bytearray)
-            ):
-                parts = [part for part in content if isinstance(part, str)]
-                return "\n".join(parts)
-            if content is None:
-                return ""
-            return str(content)
-
-        messages_payload: list[dict[str, str]] = []
-        for message in request.chat_messages:
-            if not isinstance(message, Mapping):
-                continue
-            role = str(message.get("role", "user")) or "user"
-            text = _coerce_content(message).strip()
-            if text:
-                messages_payload.append({"role": role, "content": text})
-
-        if not messages_payload and request.prompt_text:
-            messages_payload.append({"role": "user", "content": request.prompt_text})
-
-        payload: dict[str, Any] = {
-            "model": model_name,
-            "messages": messages_payload,
-            "stream": False,
-        }
-
-        # --- options 統合（新SPI + 互換） ---
-        options_payload: dict[str, Any] = {}
-        if request.max_tokens is not None:
-            options_payload["num_predict"] = int(request.max_tokens)
-        if request.temperature is not None:
-            options_payload["temperature"] = float(request.temperature)
-        if request.top_p is not None:
-            options_payload["top_p"] = float(request.top_p)
-        if request.stop:
-            options_payload["stop"] = list(request.stop)
-
-        # timeout の優先度: request.timeout_s > options.request_timeout_s > default
-        timeout_override: float | None = None
-        if request.timeout_s is not None:
-            timeout_override = float(request.timeout_s)
-
-        if request.options and isinstance(request.options, Mapping):
-            opt_items = dict(request.options.items())
-
-            # timeout 上書き (options 側)
-            for key in ("request_timeout_s", "REQUEST_TIMEOUT_S"):
-                if key in opt_items:
-                    raw_timeout = opt_items.pop(key)
-                    if raw_timeout is not None and timeout_override is None:
-                        try:
-                            timeout_override = float(raw_timeout)
-                        except (TypeError, ValueError) as exc:
-                            raise ConfigError(
-                                "request_timeout_s must be a number"
-                            ) from exc
-                    break
-
-            # 衝突しうるトップレベルは除去
-            for k in ("model", "messages", "prompt"):
-                opt_items.pop(k, None)
-
-            # ネストした options をマージ
-            nested_opts = opt_items.pop("options", None)
-            if isinstance(nested_opts, Mapping):
-                options_payload.update(dict(nested_opts))
-
-            # 残りはトップレベルに反映（Ollamaが理解する追加パラメータ）
-            for k, v in opt_items.items():
-                payload[k] = v
-
-        if options_payload:
-            payload["options"] = {**options_payload, **payload.get("options", {})}
+        payload, timeout_override = prepare_chat_payload(
+            request,
+            model_name=model_name,
+            stream=False,
+        )
 
         ts0 = time.time()
         response = self._request("/api/chat", payload, timeout=timeout_override)
