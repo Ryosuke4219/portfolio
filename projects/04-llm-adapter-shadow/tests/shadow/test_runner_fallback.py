@@ -5,15 +5,15 @@ from typing import Any
 
 import pytest
 
-hypothesis = pytest.importorskip("hypothesis")
+pytest.importorskip("hypothesis")
 from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
-
 from src.llm_adapter import provider_spi as provider_spi_module
 from src.llm_adapter.errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from src.llm_adapter.runner import Runner
+from src.llm_adapter.runner import AsyncRunner, Runner
+from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
 
 
 class FakeLogger:
@@ -98,9 +98,10 @@ def _run_and_collect(
     *,
     prompt: str = "hello",
     expect_exception: type[Exception] | None = None,
+    config: RunnerConfig | None = None,
 ) -> tuple[ProviderResponse | None, FakeLogger]:
     logger = FakeLogger()
-    runner = Runner(list(providers), logger=logger)
+    runner = Runner(list(providers), logger=logger, config=config)
     request = ProviderRequest(prompt=prompt, model="demo-model")
 
     if expect_exception is None:
@@ -134,7 +135,10 @@ def _run_and_collect(
             id="first-success",
         ),
         pytest.param(
-            [_ErrorProvider("fail-first", RetriableError("transient")), _SuccessProvider("fallback")],
+            [
+                _ErrorProvider("fail-first", RetriableError("transient")),
+                _SuccessProvider("fallback"),
+            ],
             ["error", "ok"],
             "ok",
             "fallback",
@@ -144,7 +148,10 @@ def _run_and_collect(
             id="fallback-success",
         ),
         pytest.param(
-            [_ErrorProvider("slow", TimeoutError("too slow")), _ErrorProvider("slower", TimeoutError("still slow"))],
+            [
+                _ErrorProvider("slow", TimeoutError("too slow")),
+                _ErrorProvider("slower", TimeoutError("still slow")),
+            ],
             ["error", "error"],
             "error",
             None,
@@ -210,9 +217,12 @@ def test_rate_limit_triggers_backoff_and_logs(
 
     monkeypatch.setattr("src.llm_adapter.runner.time.sleep", _fake_sleep)
 
-    _, logger = _run_and_collect([rate_limited, succeeding])
+    _, logger = _run_and_collect(
+        [rate_limited, succeeding],
+        config=RunnerConfig(backoff=BackoffPolicy(rate_limit_sleep_s=0.123)),
+    )
 
-    assert sleep_calls == [0.05]
+    assert sleep_calls == [0.123]
     first_call = next(
         record
         for record in logger.of_type("provider_call")
@@ -242,6 +252,41 @@ def test_timeout_switches_to_next_provider() -> None:
         if record["provider"] == "success"
     )
     assert success_event["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_async_rate_limit_triggers_backoff_and_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rate_limited = _ErrorProvider("rate-limit", RateLimitError("slow down"))
+    succeeding = _SuccessProvider("success")
+
+    sleep_calls: list[float] = []
+
+    async def _fake_sleep(duration: float) -> None:
+        sleep_calls.append(duration)
+
+    monkeypatch.setattr("src.llm_adapter.runner.asyncio.sleep", _fake_sleep)
+
+    logger = FakeLogger()
+    runner = AsyncRunner(
+        [rate_limited, succeeding],
+        logger=logger,
+        config=RunnerConfig(backoff=BackoffPolicy(rate_limit_sleep_s=0.321)),
+    )
+    request = ProviderRequest(prompt="hello", model="demo-model")
+
+    response = await runner.run_async(request, shadow_metrics_path=None)
+
+    assert response.text == "success:ok"
+    assert sleep_calls == [0.321]
+    first_call = next(
+        record
+        for record in logger.of_type("provider_call")
+        if record["provider"] == "rate-limit"
+    )
+    assert first_call["status"] == "error"
+    assert first_call["error_type"] == "RateLimitError"
 
 
 def test_run_metric_contains_tokens_and_cost() -> None:
@@ -316,7 +361,7 @@ def test_provider_request_normalization_boundaries(
         if isinstance(content, str):
             assert content.strip() == content
             assert content
-        elif isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray, str)):
+        elif isinstance(content, Sequence) and not isinstance(content, bytes | bytearray | str):
             assert content
             for part in content:
                 assert isinstance(part, str)
