@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from .metrics import log_event
+from .observability import EventLogger, JsonlLogger
 from .provider_spi import (
     AsyncProviderSPI,
     ProviderRequest,
@@ -40,6 +41,9 @@ class Runner:
 
         last_err: Exception | None = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
+        shadow_logger: EventLogger | None = None
+        if metrics_path_str:
+            shadow_logger = JsonlLogger(metrics_path_str)
         metadata = request.metadata or {}
         run_started = time.time()
         request_fingerprint = content_hash(
@@ -173,7 +177,13 @@ class Runner:
         for attempt_index, provider in enumerate(self.providers, start=1):
             attempt_started = time.time()
             try:
-                response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
+                response = run_with_shadow(
+                    provider,
+                    shadow,
+                    request,
+                    metrics_path=metrics_path_str,
+                    logger=shadow_logger,
+                )
             except ProviderSkip as err:
                 last_err = err
                 _record_skip(err, attempt_index, provider)
@@ -277,6 +287,9 @@ class AsyncRunner:
     ) -> ProviderResponse:
         last_err: Exception | None = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
+        shadow_logger: EventLogger | None = None
+        if metrics_path_str:
+            shadow_logger = JsonlLogger(metrics_path_str)
         metadata = request.metadata or {}
         run_started = time.time()
         request_fingerprint = content_hash(
@@ -424,6 +437,7 @@ class AsyncRunner:
                     shadow_async,
                     request,
                     metrics_path=metrics_path_str,
+                    logger=shadow_logger,
                 )
             except ProviderSkip as err:
                 last_err = err
