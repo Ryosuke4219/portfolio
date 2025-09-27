@@ -6,11 +6,9 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
-from .utils import (
-    ensure_str_list,
-    extract_prompt_from_messages as _extract_prompt_from_messages,
-    normalize_message as _normalize_message,
-)
+from .utils import ensure_str_list
+from .utils import extract_prompt_from_messages as _extract_prompt_from_messages
+from .utils import normalize_message as _normalize_message
 
 normalize_message = _normalize_message
 extract_prompt_from_messages = _extract_prompt_from_messages
