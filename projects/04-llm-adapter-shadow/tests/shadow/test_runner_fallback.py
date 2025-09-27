@@ -10,7 +10,13 @@ from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from src.llm_adapter import provider_spi as provider_spi_module
-from src.llm_adapter.errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
+from src.llm_adapter.errors import (
+    AuthError,
+    ProviderSkip,
+    RateLimitError,
+    RetriableError,
+    TimeoutError,
+)
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import AsyncRunner, Runner
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
@@ -230,6 +236,7 @@ def test_rate_limit_triggers_backoff_and_logs(
     )
     assert first_call["status"] == "error"
     assert first_call["error_type"] == "RateLimitError"
+    assert first_call["error_family"] == "rate_limit"
 
 
 def test_timeout_switches_to_next_provider() -> None:
@@ -245,6 +252,7 @@ def test_timeout_switches_to_next_provider() -> None:
     )
     assert timeout_event["status"] == "error"
     assert timeout_event["error_type"] == "TimeoutError"
+    assert timeout_event["error_family"] == "retryable"
 
     success_event = next(
         record
@@ -252,6 +260,48 @@ def test_timeout_switches_to_next_provider() -> None:
         if record["provider"] == "success"
     )
     assert success_event["status"] == "ok"
+
+
+def test_provider_skip_logs_error_family() -> None:
+    response, logger = _run_and_collect([_SkipProvider("skipped"), _SuccessProvider("active")])
+
+    assert response is not None
+    skip_event = next(
+        record for record in logger.of_type("provider_call") if record["provider"] == "skipped"
+    )
+    assert skip_event["status"] == "error"
+    assert skip_event["error_type"] == "ProviderSkip"
+    assert skip_event["error_family"] == "skip"
+
+
+def test_fatal_error_logs_error_family() -> None:
+    _, logger = _run_and_collect(
+        [_ErrorProvider("fatal", AuthError("invalid"))],
+        expect_exception=AuthError,
+    )
+
+    fatal_event = logger.of_type("provider_call")[0]
+    assert fatal_event["status"] == "error"
+    assert fatal_event["error_type"] == "AuthError"
+    assert fatal_event["error_family"] == "fatal"
+
+
+def test_provider_chain_failed_records_last_error_family() -> None:
+    _, logger = _run_and_collect(
+        [
+            _ErrorProvider("first", TimeoutError("slow")),
+            _ErrorProvider("second", RetriableError("oops")),
+        ],
+        expect_exception=RetriableError,
+    )
+
+    chain_event = logger.of_type("provider_chain_failed")[0]
+    assert chain_event["last_error_type"] == "RetriableError"
+    assert chain_event["last_error_family"] == "retryable"
+
+    run_event = logger.of_type("run_metric")[0]
+    assert run_event["status"] == "error"
+    assert run_event["error_family"] == "retryable"
 
 
 @pytest.mark.asyncio
@@ -287,7 +337,23 @@ async def test_async_rate_limit_triggers_backoff_and_logs(
     )
     assert first_call["status"] == "error"
     assert first_call["error_type"] == "RateLimitError"
+    assert first_call["error_family"] == "rate_limit"
 
+
+@pytest.mark.asyncio
+async def test_async_retryable_error_logs_family() -> None:
+    logger = FakeLogger()
+    runner = AsyncRunner([_ErrorProvider("oops", RetriableError("nope"))], logger=logger)
+    request = ProviderRequest(prompt="hello", model="demo-model")
+
+    with pytest.raises(RetriableError):
+        await runner.run_async(request, shadow_metrics_path=None)
+
+    provider_event = logger.of_type("provider_call")[0]
+    assert provider_event["error_family"] == "retryable"
+
+    chain_event = logger.of_type("provider_chain_failed")[0]
+    assert chain_event["last_error_family"] == "retryable"
 
 def test_run_metric_contains_tokens_and_cost() -> None:
     succeeding = _SuccessProvider("success", tokens_in=21, tokens_out=9, cost_usd=0.456)
