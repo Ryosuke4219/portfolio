@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
 from src.llm_adapter.provider_spi import ProviderRequest
@@ -12,6 +14,8 @@ def test_shadow_exec_records_metrics(tmp_path):
 
     metrics_path = tmp_path / "metrics.jsonl"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
+
+    # モデル名は明示指定（フォールバック禁止の設計に合わせる）
     request = ProviderRequest(prompt="hello", metadata=metadata, model="primary-model")
     response = runner.run(
         request,
@@ -43,6 +47,7 @@ def test_shadow_exec_records_metrics(tmp_path):
     assert call_event["tokens_out"] == response.token_usage.completion
     assert call_event["trace_id"] == metadata["trace_id"]
     assert call_event["project_id"] == metadata["project_id"]
+    # メトリクスに model は記録しない設計（プライバシー配慮）
     assert call_event.get("model") is None
 
     expected_tokens = max(1, len("hello") // 4) + 16

@@ -1,7 +1,7 @@
-
 import json
 from pathlib import Path
 from typing import Any
+
 import pytest
 
 from src.llm_adapter.errors import TimeoutError
@@ -26,6 +26,7 @@ def test_timeout_fallback():
 
     request = ProviderRequest(prompt="[TIMEOUT] hello", model="fallback-model")
     response = runner.run(request)
+
     assert response.text.startswith("echo(p2):")
     assert response.model == "fallback-model"
 
@@ -46,7 +47,7 @@ def test_invalid_json_fallback():
     assert response.text.startswith("echo(p2):")
 
 
-def test_timeout_fallback_records_metrics(tmp_path):
+def test_timeout_fallback_records_metrics(tmp_path: Path):
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
@@ -80,7 +81,7 @@ def test_timeout_fallback_records_metrics(tmp_path):
     assert success_event["tokens_out"] == response.token_usage.completion
 
 
-def test_runner_emits_chain_failed_metric(tmp_path):
+def test_runner_emits_chain_failed_metric(tmp_path: Path):
     failing1 = MockProvider("p1", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     failing2 = MockProvider("p2", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     runner = Runner([failing1, failing2])
