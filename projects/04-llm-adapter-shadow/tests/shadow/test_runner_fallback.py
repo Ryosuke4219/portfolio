@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
+from src.llm_adapter.errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from src.llm_adapter.runner import Runner
+from src.llm_adapter.runner import BackoffPolicy, Runner, RunnerConfig
 
 
 def _read_metrics(path: Path) -> list[dict[str, Any]]:
@@ -72,8 +72,9 @@ def _run_and_collect(
     *,
     metrics_path: Path,
     prompt: str = "hello",
+    config: RunnerConfig | None = None,
 ) -> tuple[ProviderResponse, list[dict[str, Any]]]:
-    runner = Runner(list(providers))
+    runner = Runner(list(providers), config=config)
     request = ProviderRequest(prompt=prompt, model="demo-model")
     response = runner.run(request, shadow_metrics_path=metrics_path)
     return response, _read_metrics(metrics_path)
@@ -111,9 +112,12 @@ def test_rate_limit_triggers_backoff_and_logs(
 
     monkeypatch.setattr("src.llm_adapter.runner.time.sleep", _fake_sleep)
 
-    _, records = _run_and_collect([rate_limited, succeeding], metrics_path=metrics_path)
+    config = RunnerConfig(backoff=BackoffPolicy(rate_limit_seconds=0.12))
+    _, records = _run_and_collect(
+        [rate_limited, succeeding], metrics_path=metrics_path, config=config
+    )
 
-    assert sleep_calls == [0.05]
+    assert sleep_calls == [0.12]
     first_call = next(
         rec
         for rec in records
@@ -157,3 +161,30 @@ def test_run_metric_contains_tokens_and_cost(tmp_path: Path) -> None:
     assert run_event["tokens_out"] == 9
     assert run_event["cost_usd"] == pytest.approx(0.456)
     assert succeeding.cost_calls == [(21, 9)]
+
+
+class _CountingProvider(_SuccessProvider):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.calls = 0
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        self.calls += 1
+        return super().invoke(request)
+
+
+def test_max_attempts_limits_iteration(tmp_path: Path) -> None:
+    metrics_path = tmp_path / "metrics.jsonl"
+    failing = _ErrorProvider("failing", RetriableError("boom"))
+    skipped = _ErrorProvider("skipped", ProviderSkip("skip"))
+    untouched = _CountingProvider("untouched")
+
+    runner = Runner(
+        [failing, skipped, untouched], config=RunnerConfig(max_attempts=1)
+    )
+    request = ProviderRequest(prompt="hi", model="demo-model")
+
+    with pytest.raises(RetriableError):
+        runner.run(request, shadow_metrics_path=metrics_path)
+
+    assert untouched.calls == 0
