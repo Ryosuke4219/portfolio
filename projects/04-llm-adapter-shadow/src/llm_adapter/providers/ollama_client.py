@@ -13,7 +13,14 @@ def _combine_host(base: str, path: str) -> str:
 class OllamaClient:
     __slots__ = ("_host", "_session", "_timeout", "_pull_timeout")
 
-    def __init__(self, *, host: str, session: SessionProtocol, timeout: float, pull_timeout: float) -> None:
+    def __init__(
+        self,
+        *,
+        host: str,
+        session: SessionProtocol,
+        timeout: float,
+        pull_timeout: float,
+    ) -> None:
         self._host = host
         self._session = session
         self._timeout = timeout
@@ -28,7 +35,12 @@ class OllamaClient:
             self._post("/api/pull", payload, stream=True, timeout=self._pull_timeout),
         )
 
-    def chat(self, payload: Mapping[str, object], *, timeout: float | None = None) -> ResponseProtocol:
+    def chat(
+        self,
+        payload: Mapping[str, object],
+        *,
+        timeout: float | None = None,
+    ) -> ResponseProtocol:
         return self._ensure_success(
             "/api/chat",
             self._post("/api/chat", payload, timeout=timeout),
