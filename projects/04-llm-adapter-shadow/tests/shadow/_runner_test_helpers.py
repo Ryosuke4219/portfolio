@@ -99,10 +99,12 @@ def _run_and_collect(
     runner = Runner(list(providers), logger=logger, config=config)
     request = ProviderRequest(prompt=prompt, model="demo-model")
 
+    metrics_path = "unused-metrics.jsonl"
+
     if expect_exception is None:
-        response = runner.run(request, shadow_metrics_path=None)
+        response = runner.run(request, shadow_metrics_path=metrics_path)
         return response, logger
 
     with pytest.raises(expect_exception):
-        runner.run(request, shadow_metrics_path=None)
+        runner.run(request, shadow_metrics_path=metrics_path)
     return None, logger
