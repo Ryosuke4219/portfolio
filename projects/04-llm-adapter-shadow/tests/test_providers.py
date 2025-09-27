@@ -26,6 +26,13 @@ from src.llm_adapter.providers import ollama as ollama_module
 DEFAULT_MODEL = "test-model"
 
 
+def test_provider_request_timeout_defaults_to_30_seconds():
+    request = ProviderRequest(model=DEFAULT_MODEL)
+
+    assert request.timeout == 30
+    assert request.timeout_s is None
+
+
 def test_parse_provider_spec_allows_colons_in_model():
     prefix, model = parse_provider_spec("ollama:gemma3n:e2b")
     assert prefix == "ollama"
