@@ -14,8 +14,8 @@ from ._requests_compat import (
     create_session,
     requests_exceptions,
 )
-from .ollama_client import OllamaClient
 from .base import BaseProvider
+from .ollama_client import OllamaClient
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 __all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
