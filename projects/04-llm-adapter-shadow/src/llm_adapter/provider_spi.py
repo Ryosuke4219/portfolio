@@ -4,52 +4,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-
-def _ensure_list(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        text = value.strip()
-        return [text] if text else []
-    parts: list[str] = []
-    if isinstance(value, Sequence):
-        for entry in value:
-            if isinstance(entry, str) and entry.strip():
-                parts.append(entry.strip())
-    return parts
-
-
-def _normalize_message(entry: Mapping[str, Any]) -> Mapping[str, Any] | None:
-    role = str(entry.get("role", "user")).strip() or "user"
-    content = entry.get("content")
-    if isinstance(content, str):
-        text = content.strip()
-        if not text:
-            return None
-        return {"role": role, "content": text}
-    if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
-        parts = [part.strip() for part in content if isinstance(part, str) and part.strip()]
-        if not parts:
-            return None
-        return {"role": role, "content": parts}
-    if content is None:
-        return None
-    return {"role": role, "content": content}
-
-
-def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
-    for message in reversed(messages):
-        role = str(message.get("role", "")).lower()
-        if role == "assistant":
-            continue
-        content = message.get("content")
-        if isinstance(content, str) and content.strip():
-            return content.strip()
-        if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
-            for part in content:
-                if isinstance(part, str) and part.strip():
-                    return part.strip()
-    return ""
+from .utils import (
+    ensure_str_list,
+    extract_prompt_from_messages,
+    normalize_message,
+)
 
 
 @dataclass
@@ -60,10 +19,10 @@ class ProviderRequest:
     max_tokens: int | None = 256
     temperature: float | None = None
     top_p: float | None = None
-    stop: Sequence[str] | None = None
+    stop: tuple[str, ...] | None = None
     timeout_s: float | None = 30
     metadata: Mapping[str, Any] | None = None
-    options: dict[str, Any] | None = field(default=None)
+    options: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         model = (self.model or "").strip()
@@ -73,11 +32,14 @@ class ProviderRequest:
 
         self.prompt = (self.prompt or "").strip()
 
+        if self.options is None:
+            self.options = {}
+
         normalized_messages: list[Mapping[str, Any]] = []
         if self.messages:
             for entry in self.messages:
                 if isinstance(entry, Mapping):
-                    normalized = _normalize_message(entry)
+                    normalized = normalize_message(entry)
                     if normalized:
                         normalized_messages.append(normalized)
 
@@ -87,10 +49,10 @@ class ProviderRequest:
         self.messages = normalized_messages
 
         if not self.prompt and normalized_messages:
-            self.prompt = _extract_prompt_from_messages(normalized_messages)
+            self.prompt = extract_prompt_from_messages(normalized_messages)
 
         if self.stop is not None:
-            stop_list = _ensure_list(self.stop)
+            stop_list = ensure_str_list(self.stop)
             self.stop = tuple(stop_list) if stop_list else None
 
     @property
