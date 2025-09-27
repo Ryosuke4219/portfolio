@@ -24,8 +24,11 @@ spec.loader.exec_module(module)
 ProviderRequest = module.ProviderRequest
 
 
+DEFAULT_MODEL = "test-model"
+
+
 def test_provider_request_timeout_defaults_to_30_seconds() -> None:
-    request = ProviderRequest(model="test-model")
+    request = ProviderRequest(model=DEFAULT_MODEL)
 
     assert request.timeout == 30
     assert request.timeout_s is None
