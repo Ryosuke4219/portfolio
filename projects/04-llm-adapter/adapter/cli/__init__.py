@@ -5,14 +5,11 @@ import socket as _socket
 import sys
 from typing import List, Optional
 
+from adapter.core import providers as provider_module
+
 from .doctor import run_doctor
-from .prompts import (
-    PromptResult as _PromptResult,
-    ProviderFactory as _ProviderFactory,
-    ProviderResponse as _ProviderResponse,
-    RateLimiter as _RateLimiter,
-    run_prompts,
-)
+from .prompt_runner import PromptResult as _PromptResult, RateLimiter as _RateLimiter
+from .prompts import ProviderFactory as _ProviderFactory, run_prompts
 from .utils import (
     EXIT_ENV_ERROR,
     EXIT_INPUT_ERROR,
@@ -25,7 +22,7 @@ from .utils import (
 http = _http
 socket = _socket
 ProviderFactory = _ProviderFactory
-ProviderResponse = _ProviderResponse
+ProviderResponse = provider_module.ProviderResponse
 RateLimiter = _RateLimiter
 PromptResult = _PromptResult
 
