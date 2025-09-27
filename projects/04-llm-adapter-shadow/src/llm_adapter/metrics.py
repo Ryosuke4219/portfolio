@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import time
 from collections.abc import Mapping
 from pathlib import Path
 from threading import Lock
 from types import MappingProxyType
 from typing import Any, Protocol, Union
+
+from .observability import CompositeLogger, JsonlLogger
 
 PathLike = Union[str, "Path"]
 
@@ -18,38 +19,6 @@ class MetricsExporter(Protocol):
 
     def handle_event(self, event_type: str, record: Mapping[str, Any]) -> None:
         """Process a structured metrics ``record`` for ``event_type``."""
-
-
-class EventLogger:
-    """Fan out structured events to zero or more exporters."""
-
-    def __init__(self) -> None:
-        self._exporters: list[MetricsExporter] = []
-        self._lock = Lock()
-
-    def register(self, exporter: MetricsExporter) -> None:
-        """Attach ``exporter`` for subsequent events."""
-
-        with self._lock:
-            self._exporters.append(exporter)
-
-    def clear(self) -> None:
-        """Remove all exporters (primarily for tests)."""
-
-        with self._lock:
-            self._exporters.clear()
-
-    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
-        """Notify registered exporters of ``record``."""
-
-        with self._lock:
-            exporters = tuple(self._exporters)
-
-        for exporter in exporters:
-            try:
-                exporter.handle_event(event_type, record)
-            except Exception:  # pragma: no cover - exporter isolation
-                continue
 
 
 class PrometheusMetricsExporter:
@@ -131,28 +100,38 @@ class PrometheusMetricsExporter:
                 self._run_latency_ms.labels(status=status).observe(float(latency_ms))
 
 
-_LOG_LOCK = Lock()
-_EVENT_LOGGER = EventLogger()
+class _ExporterLogger:
+    def __init__(self, exporter: MetricsExporter) -> None:
+        self._exporter = exporter
+
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
+        self._exporter.handle_event(event_type, record)
+
+
+_EXPORTER_FANOUT = CompositeLogger()
+_JSONL_LOGGERS: dict[Path, JsonlLogger] = {}
+_JSONL_LOGGERS_LOCK = Lock()
 
 
 def register_metrics_exporter(exporter: MetricsExporter) -> None:
     """Register an ``exporter`` to receive future structured events."""
 
-    _EVENT_LOGGER.register(exporter)
+    _EXPORTER_FANOUT.add(_ExporterLogger(exporter))
 
 
 def reset_metrics_exporters() -> None:
     """Remove all registered exporters."""
 
-    _EVENT_LOGGER.clear()
+    _EXPORTER_FANOUT.clear()
 
 
-def _ensure_dir(path: Path) -> None:
-    """Create the parent directory for ``path`` if it is missing."""
-
-    parent = path.parent
-    if parent != Path(""):
-        parent.mkdir(parents=True, exist_ok=True)
+def _get_jsonl_logger(path: Path) -> JsonlLogger:
+    with _JSONL_LOGGERS_LOCK:
+        logger = _JSONL_LOGGERS.get(path)
+        if logger is None:
+            logger = JsonlLogger(path)
+            _JSONL_LOGGERS[path] = logger
+    return logger
 
 
 def log_event(event_type: str, path: PathLike, **fields: Any) -> None:
@@ -163,13 +142,11 @@ def log_event(event_type: str, path: PathLike, **fields: Any) -> None:
     """
 
     target = Path(path)
-    _ensure_dir(target)
 
     record: dict[str, Any] = {"ts": int(time.time() * 1000), "event": event_type}
     record.update(fields)
 
-    with _LOG_LOCK:
-        with target.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    logger = _get_jsonl_logger(target)
+    logger.emit(event_type, record)
 
-    _EVENT_LOGGER.emit(event_type, MappingProxyType(record))
+    _EXPORTER_FANOUT.emit(event_type, MappingProxyType(record))
