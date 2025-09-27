@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import asyncio
+import inspect
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 
 def _ensure_list(value: Any) -> list[str]:
@@ -157,4 +159,59 @@ class ProviderSPI(Protocol):
     def invoke(self, request: ProviderRequest) -> ProviderResponse: ...
 
 
-__all__ = ["ProviderSPI", "ProviderRequest", "ProviderResponse", "TokenUsage"]
+class AsyncProviderSPI(Protocol):
+    def name(self) -> str: ...
+    def capabilities(self) -> set[str]: ...
+    async def invoke_async(self, request: ProviderRequest) -> ProviderResponse: ...
+
+
+class _AsyncProviderAdapter(AsyncProviderSPI):
+    def __init__(
+        self,
+        provider: ProviderSPI | AsyncProviderSPI,
+        *,
+        async_invoke: Callable[[ProviderRequest], Awaitable[ProviderResponse]] | None = None,
+    ) -> None:
+        self._provider = provider
+        self._async_invoke = async_invoke
+
+    def name(self) -> str:
+        return self._provider.name()
+
+    def capabilities(self) -> set[str]:
+        return self._provider.capabilities()
+
+    async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
+        if self._async_invoke is not None:
+            return await self._async_invoke(request)
+        invoke = getattr(self._provider, "invoke", None)
+        if not callable(invoke):
+            raise TypeError("Provider does not expose a synchronous invoke() method")
+        return await asyncio.to_thread(invoke, request)
+
+
+def ensure_async_provider(provider: ProviderSPI | AsyncProviderSPI) -> AsyncProviderSPI:
+    invoke_async = getattr(provider, "invoke_async", None)
+    if callable(invoke_async):
+        if inspect.iscoroutinefunction(invoke_async):
+            return cast(AsyncProviderSPI, provider)
+
+        async def _invoke(request: ProviderRequest) -> ProviderResponse:
+            result = invoke_async(request)
+            if inspect.isawaitable(result):
+                return cast(ProviderResponse, await cast(Awaitable[ProviderResponse], result))
+            return cast(ProviderResponse, result)
+
+        return _AsyncProviderAdapter(provider, async_invoke=_invoke)
+
+    return _AsyncProviderAdapter(provider)
+
+
+__all__ = [
+    "ProviderSPI",
+    "AsyncProviderSPI",
+    "ProviderRequest",
+    "ProviderResponse",
+    "TokenUsage",
+    "ensure_async_provider",
+]
