@@ -21,12 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Pages
+        id: pages
         uses: actions/configure-pages@v5
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
           destination: ./_site
+          base_path: ${{ steps.pages.outputs.base_path }}
       - name: Copy bundled CI reports
         run: |
           for dir in coverage flaky junit; do

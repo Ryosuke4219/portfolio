@@ -52,7 +52,7 @@ Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuous
 
 - 公開 URL: <https://ryosuke4219.github.io/portfolio/>
 - 復旧手順:
-  1. GitHub Actions → Pages ワークフローを `Run workflow` で再実行し、`Build with Jekyll` が `Completed` になることをログで確認。
+  1. GitHub Actions → Pages ワークフローを `Run workflow` で再実行し、`Build with Jekyll` と `Deploy to GitHub Pages` の両ステップが `Completed` になったことを実行ログで確認。
   2. ビルド失敗時はローカルで `bundle exec jekyll build --source docs --destination _site` を実行しエラー箇所を修正。
   3. 修正を `main` ブランチへプッシュすると自動でデプロイが再開されます。
 
@@ -89,8 +89,27 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 3. **03: ci-flaky-analyzer — JUnit → HTML/CSV（決定的）**  
    CIのJUnitログを取り込み、flaky挙動を集計・可視化します。
 
-4. **04: llm-adapter-shadow — LLMモデル選択/比較（唯一のLLM使用箇所）**  
+4. **04: llm-adapter-shadow — LLMモデル選択/比較（唯一のLLM使用箇所）**
    *primary* と *shadow* の2系統LLMを並走させ、差分・フォールバック・異常系を検証します。
+
+   **最短コマンドと入出力例:**
+
+   ```bash
+   llm-adapter --provider adapter/config/providers/openai.yaml \
+     --prompts examples/prompts/ja_one_liner.jsonl --out out.jsonl
+   ```
+
+   * `examples/prompts/ja_one_liner.jsonl`
+
+     ```jsonl
+     {"prompt": "日本語で1行、自己紹介して"}
+     ```
+
+   * `out.jsonl`（一例）
+
+     ```jsonl
+     {"provider": "openai", "model": "gpt-4o-mini", "latency_ms": 812, "status": "ok", "prompt_sha256": "d16a2c…", "output": "こんにちは、QAエンジニアのRyです。"}
+     ```
 
 ### LLM使用ポリシー（重要）
 
