@@ -3,8 +3,8 @@ repos:
     rev: v0.5.6
     hooks:
       - id: ruff
-        name: ruff import order
-        args: ["--select", "I", "--fix"]
+        name: ruff lint (fix)
+        args: ["--fix", "--exit-non-zero-on-fix"]
         files: ^projects/04-llm-adapter-shadow/src/.*\\.py$
       - id: ruff-format
         files: ^projects/04-llm-adapter-shadow/src/.*\\.py$
