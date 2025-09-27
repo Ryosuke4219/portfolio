@@ -3,6 +3,7 @@ import path from 'node:path';
 import url from 'node:url';
 import vm from 'node:vm';
 
+import { createPageFactory, isRegExp, urlMatches } from '../src/page-stub.js';
 import { createExpect } from './expectations.js';
 
 const axeCoreStub = {
@@ -56,8 +57,6 @@ const ensureDir = (target) => {
   fs.mkdirSync(path.dirname(target), { recursive: true });
 };
 
-const isRegExp = (value) => Object.prototype.toString.call(value) === '[object RegExp]';
-
 export const runPlaywrightTests = async ({
   baseURL,
   projectRoot,
@@ -87,128 +86,7 @@ export const runPlaywrightTests = async ({
     return fs.readFileSync(filePath, 'utf8');
   };
 
-  const urlMatches = (actualUrl, expected) => {
-    if (!actualUrl) {
-      return false;
-    }
-    if (isRegExp(expected)) {
-      return expected.test(actualUrl);
-    }
-    if (typeof expected === 'string') {
-      if (actualUrl === expected) {
-        return true;
-      }
-      if (/^\/.+\/$/.test(expected)) {
-        try {
-          const pattern = new RegExp(expected.slice(1, -1));
-          return pattern.test(actualUrl);
-        } catch (error) {
-          return false;
-        }
-      }
-    }
-    return false;
-  };
-
-  const createPage = () => {
-    const state = {
-      url: '',
-      content: '',
-      fields: new Map(),
-    };
-
-    const normalise = (target) => new url.URL(target, `${base.protocol}//${base.host}`).toString();
-    const selectorForTestId = (testId) => `[data-testid="${testId}"]`;
-    const hasTestId = (testId) => new RegExp(`data-testid=["']${testId}["']`).test(state.content);
-
-    return {
-      async goto(target) {
-        const absolute = normalise(target);
-        state.url = absolute;
-        state.content = readPage(absolute);
-        state.fields.clear();
-      },
-      async fill(selector, value) {
-        state.fields.set(selector, value);
-      },
-      async click(selector) {
-        const normalizedSelector = selector.startsWith('[data-testid="') ? selector : selector.trim();
-        const submitSelectors = new Set(['button[type=submit]', selectorForTestId('login-submit')]);
-        if (!submitSelectors.has(normalizedSelector)) {
-          throw new Error(`Unsupported selector for click(): ${selector}`);
-        }
-        const pass =
-          state.fields.get(selectorForTestId('login-password')) ||
-          state.fields.get('#pass') ||
-          state.fields.get('pass') ||
-          '';
-        const destination = pass === 'wrong' ? '/invalid.html' : '/dashboard.html';
-        const absolute = new url.URL(destination, `${base.protocol}//${base.host}`).toString();
-        await this.goto(absolute);
-      },
-      async waitForLoadState(state = 'load') {
-        const allowed = new Set(['load', 'domcontentloaded', 'networkidle']);
-        if (!allowed.has(state)) {
-          throw new Error(`[playwright-stub] waitForLoadState("${state}") is not supported in the stub environment.`);
-        }
-      },
-      async waitForURL(expected) {
-        const currentUrl = state.url;
-        if (!urlMatches(currentUrl, expected)) {
-          throw new Error(`Expected navigation to match ${expected}, current URL ${currentUrl}`);
-        }
-      },
-      getByText(text) {
-        return {
-          __kind: 'text-locator',
-          text,
-          check() {
-            if (!state.content.includes(text)) {
-              throw new Error(`Expected to find text "${text}" in ${state.url}`);
-            }
-          },
-        };
-      },
-      getByTestId(testId) {
-        const selector = selectorForTestId(testId);
-        return {
-          __kind: 'test-id-locator',
-          testId,
-          selector,
-          async fill(value) {
-            if (!hasTestId(testId)) {
-              throw new Error(`Expected to find data-testid="${testId}" before fill()`);
-            }
-            await this.page.fill(selector, value);
-          },
-          async click() {
-            if (!hasTestId(testId)) {
-              throw new Error(`Expected to find data-testid="${testId}" before click()`);
-            }
-            await this.page.click(selector);
-          },
-          check() {
-            if (!hasTestId(testId)) {
-              throw new Error(`Expected element with data-testid="${testId}" in ${state.url}`);
-            }
-          },
-          page: null,
-        };
-      },
-      async content() {
-        return state.content;
-      },
-      _getURL() {
-        return state.url;
-      },
-      _attach(locator) {
-        if (locator && typeof locator === 'object') {
-          locator.page = this;
-        }
-        return locator;
-      },
-    };
-  };
+  const createPage = createPageFactory({ base, readPage });
 
   const tests = [];
   let currentTestTitle = null;
