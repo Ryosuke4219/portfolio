@@ -4,29 +4,20 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import (
-    Mapping,
-    Sequence,
-)
-from typing import Any, NoReturn
+from collections.abc import Mapping, Sequence
+from typing import Any
 
-from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
+from ..errors import ConfigError, RetriableError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
 from ._requests_compat import (
-    ResponseProtocol,
     SessionProtocol,
     create_session,
     requests_exceptions,
 )
+from .ollama_client import OllamaClient
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
-__all__ = ["OllamaProvider", "DEFAULT_HOST"]
-
-
-def _combine_host(base: str, path: str) -> str:
-    if base.endswith("/"):
-        base = base[:-1]
-    return f"{base}{path}"
+__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
 
 
 def _token_usage_from_payload(payload: Mapping[str, Any]) -> TokenUsage:
@@ -45,6 +36,7 @@ class OllamaProvider(ProviderSPI):
         name: str | None = None,
         host: str | None = None,
         session: SessionProtocol | None = None,
+        client: OllamaClient | None = None,
         timeout: float = 60.0,
         pull_timeout: float = 300.0,
         auto_pull: bool = True,
@@ -54,13 +46,20 @@ class OllamaProvider(ProviderSPI):
         self._name = name or f"ollama:{model}"
         env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
-        if session is None:
-            session = create_session()
-        self._session = session
         self._timeout = timeout
         self._pull_timeout = pull_timeout
         self._auto_pull = auto_pull
         self._ready_models: set[str] = set()
+        if client is None:
+            if session is None:
+                session = create_session()
+            client = OllamaClient(
+                host=self._host,
+                session=session,
+                timeout=self._timeout,
+                pull_timeout=self._pull_timeout,
+            )
+        self._client = client
 
     def name(self) -> str:
         return self._name
@@ -68,36 +67,11 @@ class OllamaProvider(ProviderSPI):
     def capabilities(self) -> set[str]:
         return {"chat"}
 
-    # ------------------------------------------------------------------
-    # HTTP helpers
-    # ------------------------------------------------------------------
-    def _request(
-        self,
-        path: str,
-        payload: Mapping[str, Any],
-        *,
-        stream: bool = False,
-        timeout: float | None = None,
-    ) -> ResponseProtocol:
-        url = _combine_host(self._host, path)
-        try:
-            response = self._session.post(
-                url,
-                json=payload,
-                stream=stream,
-                timeout=timeout or self._timeout,
-            )
-        except requests_exceptions.Timeout as exc:  # pragma: no cover - error handling
-            raise TimeoutError(f"Ollama request timed out: {url}") from exc
-        except requests_exceptions.RequestException as exc:  # pragma: no cover
-            raise RetriableError(f"Ollama request failed: {url}") from exc
-        return response
-
     def _ensure_model(self, model_name: str) -> None:
         if model_name in self._ready_models:
             return
 
-        show_response = self._request("/api/show", {"model": model_name})
+        show_response = self._client.show({"model": model_name})
         if show_response.status_code == 200:
             self._ready_models.add(model_name)
             show_response.close()
@@ -107,23 +81,14 @@ class OllamaProvider(ProviderSPI):
         if not self._auto_pull:
             raise RetriableError(f"ollama model not available: {model_name}")
 
-        with self._request(
-            "/api/pull",
-            {"model": model_name},
-            stream=True,
-            timeout=self._pull_timeout,
-        ) as pull_response:
-            try:
-                pull_response.raise_for_status()
-            except requests_exceptions.HTTPError as exc:
-                self._handle_http_error(pull_response, exc)
+        with self._client.pull({"model": model_name}) as pull_response:
             # Drain the streaming response to complete the pull.
             for _ in pull_response.iter_lines():  # pragma: no cover - network interaction
                 pass
 
         # Verify again with a short retry window.
         for _ in range(10):
-            show_after = self._request("/api/show", {"model": model_name})
+            show_after = self._client.show({"model": model_name})
             if show_after.status_code == 200:
                 self._ready_models.add(model_name)
                 show_after.close()
@@ -223,14 +188,9 @@ class OllamaProvider(ProviderSPI):
             payload["options"] = {**options_payload, **payload.get("options", {})}
 
         ts0 = time.time()
-        response = self._request("/api/chat", payload, timeout=timeout_override)
+        response = self._client.chat(payload, timeout=timeout_override)
 
         try:
-            try:
-                response.raise_for_status()
-            except requests_exceptions.HTTPError as exc:
-                self._handle_http_error(response, exc)
-
             payload_json = response.json()
         except ValueError as exc:
             raise RetriableError("invalid JSON from Ollama") from exc
@@ -257,19 +217,4 @@ class OllamaProvider(ProviderSPI):
             finish_reason=payload_json.get("done_reason"),
             raw=payload_json,
         )
-
-    def _handle_http_error(
-        self,
-        response: ResponseProtocol,
-        exc: Exception,
-    ) -> NoReturn:
-        status = response.status_code
-        message = str(exc)
-        if status in {401, 403}:
-            raise AuthError(message) from exc
-        if status == 429:
-            raise RateLimitError(message) from exc
-        if status in {408, 504}:
-            raise TimeoutError(message) from exc
-        raise RetriableError(message) from exc
 
