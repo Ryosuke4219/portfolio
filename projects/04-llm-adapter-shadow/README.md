@@ -16,7 +16,7 @@
 ## Key Features
 
 - **Shadow execution telemetry** — `run_with_shadow` でプライマリを待ちつつ、別スレッドで影プロバイダを実行。レスポンス差分やフィンガープリントを `artifacts/runs-metrics.jsonl` へ `shadow_diff` イベントとして記録。
-- **Fallback runner** — `Runner` が `TimeoutError` / `RateLimitError` / `RetriableError` を捕捉し、次候補へ切り替え。成功時は `provider_success`、失敗時は `provider_error` / `provider_chain_failed` を発火。
+- **Fallback runner** — `Runner` が `TimeoutError` / `RateLimitError` / `RetriableError` を捕捉し、次候補へ切り替え。`RateLimitError` は 0.05 秒のバックオフを入れて再試行し、`TimeoutError` / `RetriableError` は即座に次プロバイダへ進む。成功時は `provider_success`、失敗時は `provider_error` / `provider_chain_failed` を発火。
 - **Deterministic error simulation** — `MockProvider` はプロンプト中の `[TIMEOUT]` / `[RATELIMIT]` / `[INVALID_JSON]` を検知して対応する例外を投げ、異常系をテストから容易に再現。
 
 ## Directory Layout
@@ -134,6 +134,15 @@ Gemini の構造化出力を利用したい場合は、`generation_config` に
 ```bash
 pytest -q
 ```
+
+## 例外毎の扱い早見表
+
+| 例外名 | Runner での扱い | 備考 |
+| --- | --- | --- |
+| `RateLimitError` | 0.05 秒 `time.sleep` した後に次プロバイダで再試行 | メトリクスには `provider_call` (error) として記録 |
+| `TimeoutError` | バックオフなしで次プロバイダへ即座に切り替え | 最終的に全滅した場合は `provider_chain_failed` を発火 |
+| `RetriableError` | バックオフなしで次プロバイダへ即座に切り替え | 形式不正などの一時的エラーを想定 |
+| `ProviderSkip` | スキップ理由のみ `provider_skipped` として記録し、次プロバイダへ進む | 失敗扱いにせずメトリクスで可視化 |
 
 ## Shadow Execution Metrics
 

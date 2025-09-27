@@ -39,38 +39,39 @@ def run_with_shadow(
     """
 
     shadow_thread: threading.Thread | None = None
-    shadow_payload: dict[str, Any] = {}
+    shadow_payload: dict[str, Any] | None = None
     shadow_name: str | None = None
+    shadow_started: float | None = None
     metrics_path_str = _to_path_str(metrics_path)
 
     if shadow is not None:
         shadow_name = shadow.name()
+        shadow_started = time.time()
+        payload_holder: list[dict[str, Any]] = []
 
         def _shadow_worker() -> None:
             ts0 = time.time()
+            payload: dict[str, Any]
             try:
                 response = shadow.invoke(req)
             except Exception as exc:  # pragma: no cover - error branch tested via metrics
-                shadow_payload.update(
-                    {
-                        "ok": False,
-                        "error": type(exc).__name__,
-                        "message": str(exc),
-                        "provider": shadow_name,
-                    }
-                )
+                payload = {
+                    "ok": False,
+                    "error": type(exc).__name__,
+                    "message": str(exc),
+                    "provider": shadow_name,
+                }
             else:
-                shadow_payload.update(
-                    {
-                        "ok": True,
-                        "provider": shadow_name,
-                        "latency_ms": response.latency_ms,
-                        "text_len": len(response.text),
-                        "token_usage_total": _tokens_total(response),
-                    }
-                )
+                payload = {
+                    "ok": True,
+                    "provider": shadow_name,
+                    "latency_ms": response.latency_ms,
+                    "text_len": len(response.text),
+                    "token_usage_total": _tokens_total(response),
+                }
             finally:
-                shadow_payload["duration_ms"] = int((time.time() - ts0) * 1000)
+                payload["duration_ms"] = int((time.time() - ts0) * 1000)
+                payload_holder.append(payload)
 
         shadow_thread = threading.Thread(target=_shadow_worker, daemon=True)
         shadow_thread.start()
@@ -85,8 +86,19 @@ def run_with_shadow(
     if shadow_thread is not None:
         shadow_thread.join(timeout=10)
         if shadow_thread.is_alive():
-            shadow_payload.setdefault("provider", shadow_name)
-            shadow_payload.update({"ok": False, "error": "ShadowTimeout"})
+            duration_ms = 0
+            if shadow_started is not None:
+                duration_ms = int((time.time() - shadow_started) * 1000)
+            shadow_payload = {
+                "provider": shadow_name,
+                "ok": False,
+                "error": "ShadowTimeout",
+                "duration_ms": duration_ms,
+            }
+        elif payload_holder:
+            shadow_payload = dict(payload_holder[-1])
+        else:
+            shadow_payload = {"provider": shadow_name, "ok": False}
 
         if metrics_path_str:
             primary_text_len = len(primary_res.text)
