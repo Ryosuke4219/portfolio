@@ -1,4 +1,4 @@
-const ATTRIBUTE_REGEX = /([:\\w.-]+)(?:\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s'"=<>`]+)))?/g;
+const ATTRIBUTE_REGEX = /([:\w.-]+)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s'"=<>`]+)))?/gu;
 
 function parseAttributes(raw) {
   const attrs = {};
