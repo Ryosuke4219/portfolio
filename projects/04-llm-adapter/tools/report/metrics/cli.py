@@ -15,7 +15,9 @@ from .data import (
     compute_overview,
     load_metrics,
 )
-from .render import build_regression_summary, render_html, update_weekly_summary
+from .html_report import render_html
+from .regression_summary import build_regression_summary
+from .weekly_summary import update_weekly_summary
 
 
 def generate_report(

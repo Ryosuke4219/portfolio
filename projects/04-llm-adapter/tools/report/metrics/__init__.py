@@ -10,11 +10,9 @@ from .data import (
     load_baseline_expectations,
     load_metrics,
 )
-from .render import (
-    build_regression_summary,
-    render_html,
-    update_weekly_summary,
-)
+from .html_report import render_html
+from .regression_summary import build_regression_summary
+from .weekly_summary import update_weekly_summary
 from .cli import generate_report, main
 
 __all__ = [
