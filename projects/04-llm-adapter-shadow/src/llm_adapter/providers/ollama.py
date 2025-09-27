@@ -41,10 +41,23 @@ class _SessionProtocol(Protocol):
     def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol: ...
 
 
+class _RequestsExceptionsProtocol(Protocol):
+    Timeout: type[Exception]
+    RequestException: type[Exception]
+    HTTPError: type[Exception]
+
+
+class _RequestsModuleProtocol(Protocol):
+    def Session(self) -> _SessionProtocol: ...
+
+    exceptions: _RequestsExceptionsProtocol
+    Response: type[_ResponseProtocol]
+
+
 if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
-    requests: Any
-    Response = _ResponseProtocol
-    requests_exceptions: Any
+    requests: _RequestsModuleProtocol | None
+    Response: type[_ResponseProtocol]
+    requests_exceptions: _RequestsExceptionsProtocol
 else:  # pragma: no cover - allow running without the optional dependency
     import importlib
 
@@ -61,7 +74,9 @@ else:  # pragma: no cover - allow running without the optional dependency
                     super().__init__(message or "HTTP error")
                     self.response = response
 
-        requests_exceptions = _FallbackRequestsExceptions()
+        requests_exceptions = cast(
+            _RequestsExceptionsProtocol, _FallbackRequestsExceptions()
+        )
 
         class Response:
             """Very small stub mimicking the subset of Response we rely on."""
@@ -94,9 +109,9 @@ else:  # pragma: no cover - allow running without the optional dependency
             def iter_lines(self) -> Iterable[bytes]:  # pragma: no cover - stub
                 return []
     else:
-        requests = cast(Any, _requests_module)
+        requests = cast(_RequestsModuleProtocol, _requests_module)
         Response = cast(type[_ResponseProtocol], _requests_module.Response)
-        requests_exceptions = cast(Any, _requests_module.exceptions)
+        requests_exceptions = cast(_RequestsExceptionsProtocol, _requests_module.exceptions)
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 __all__ = ["OllamaProvider", "DEFAULT_HOST"]
