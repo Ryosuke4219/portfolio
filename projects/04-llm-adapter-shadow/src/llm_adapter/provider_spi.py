@@ -27,7 +27,7 @@ def _normalize_message(entry: Mapping[str, Any]) -> Mapping[str, Any] | None:
         if not text:
             return None
         return {"role": role, "content": text}
-    if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
+    if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
         parts = [part.strip() for part in content if isinstance(part, str) and part.strip()]
         if not parts:
             return None
@@ -45,7 +45,7 @@ def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
         content = message.get("content")
         if isinstance(content, str) and content.strip():
             return content.strip()
-        if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
+        if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
             for part in content:
                 if isinstance(part, str) and part.strip():
                     return part.strip()
@@ -54,8 +54,8 @@ def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
 
 @dataclass
 class ProviderRequest:
+    model: str
     prompt: str = ""
-    model: str | None = None
     messages: Sequence[Mapping[str, Any]] | None = None
     max_tokens: int | None = 256
     temperature: float | None = None
@@ -66,6 +66,11 @@ class ProviderRequest:
     options: dict[str, Any] | None = field(default=None)
 
     def __post_init__(self) -> None:
+        model = (self.model or "").strip()
+        if not model:
+            raise ValueError("ProviderRequest.model must be a non-empty string")
+        self.model = model
+
         self.prompt = (self.prompt or "").strip()
 
         normalized_messages: list[Mapping[str, Any]] = []

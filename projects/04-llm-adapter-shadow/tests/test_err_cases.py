@@ -1,13 +1,12 @@
-
 import json
 from pathlib import Path
 from typing import Any
-import pytest
 
+import pytest
 from src.llm_adapter.errors import TimeoutError
+from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
-from src.llm_adapter.provider_spi import ProviderRequest
 
 
 def _providers_for(marker: str):
@@ -24,7 +23,7 @@ def test_timeout_fallback():
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[TIMEOUT] hello"))
+    response = runner.run(ProviderRequest(prompt="[TIMEOUT] hello", model="test-model"))
     assert response.text.startswith("echo(p2):")
 
 
@@ -32,7 +31,7 @@ def test_ratelimit_retry_fallback():
     p1, p2 = _providers_for("[RATELIMIT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[RATELIMIT] test"))
+    response = runner.run(ProviderRequest(prompt="[RATELIMIT] test", model="test-model"))
     assert response.text.startswith("echo(p2):")
 
 
@@ -40,7 +39,7 @@ def test_invalid_json_fallback():
     p1, p2 = _providers_for("[INVALID_JSON]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test"))
+    response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test", model="test-model"))
     assert response.text.startswith("echo(p2):")
 
 
@@ -50,7 +49,8 @@ def test_timeout_fallback_records_metrics(tmp_path):
 
     metrics_path = tmp_path / "fallback.jsonl"
     response = runner.run(
-        ProviderRequest(prompt="[TIMEOUT] metrics"),
+        ProviderRequest(prompt="[TIMEOUT] metrics", model="test-model"),
+        
         shadow=None,
         shadow_metrics_path=metrics_path,
     )
@@ -87,7 +87,7 @@ def test_runner_emits_chain_failed_metric(tmp_path):
 
     with pytest.raises(TimeoutError):
         runner.run(
-            ProviderRequest(prompt="[TIMEOUT] hard"),
+            ProviderRequest(prompt="[TIMEOUT] hard", model="test-model"),
             shadow=None,
             shadow_metrics_path=metrics_path,
         )
