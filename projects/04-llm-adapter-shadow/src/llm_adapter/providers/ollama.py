@@ -8,12 +8,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..errors import ConfigError, RetriableError
-from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from ._requests_compat import (
     SessionProtocol,
     create_session,
     requests_exceptions,
 )
+from .base import BaseProvider
 from .ollama_client import OllamaClient
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
@@ -26,7 +27,7 @@ def _token_usage_from_payload(payload: Mapping[str, Any]) -> TokenUsage:
     return TokenUsage(prompt=prompt_tokens, completion=completion_tokens)
 
 
-class OllamaProvider(ProviderSPI):
+class OllamaProvider(BaseProvider):
     """Provider backed by the local Ollama HTTP API."""
 
     def __init__(
@@ -41,9 +42,8 @@ class OllamaProvider(ProviderSPI):
         pull_timeout: float = 300.0,
         auto_pull: bool = True,
     ) -> None:
-        # Factory/CLI で ``ProviderRequest.model`` に設定される推奨デフォルトを保持。
-        self._model = model
-        self._name = name or f"ollama:{model}"
+        provider_name = name or f"ollama:{model}"
+        super().__init__(name=provider_name, model=model)
         env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
         self._timeout = timeout
@@ -60,12 +60,6 @@ class OllamaProvider(ProviderSPI):
                 pull_timeout=self._pull_timeout,
             )
         self._client = client
-
-    def name(self) -> str:
-        return self._name
-
-    def capabilities(self) -> set[str]:
-        return {"chat"}
 
     def _ensure_model(self, model_name: str) -> None:
         if model_name in self._ready_models:

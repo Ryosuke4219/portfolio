@@ -13,6 +13,8 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
     runner = Runner([primary])
 
+    assert primary.model is None
+
     metrics_path = tmp_path / "metrics.jsonl"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
 
