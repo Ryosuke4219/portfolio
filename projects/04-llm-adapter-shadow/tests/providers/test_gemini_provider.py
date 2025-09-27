@@ -8,7 +8,7 @@ import pytest
 
 from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.gemini import GeminiProvider
+from src.llm_adapter.providers.gemini.provider import GeminiProvider
 
 from tests.helpers.fakes import RecordGeminiClient
 
