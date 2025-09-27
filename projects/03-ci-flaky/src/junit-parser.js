@@ -2,21 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { classifyFailureByMessage, createFailureSignature, applyTimeoutClassification } from './classification.js';
-
-const ATTRIBUTE_REGEX = /([:\w.-]+)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s'"=<>`]+)))?/g;
-
-function parseAttributes(raw) {
-  const attrs = {};
-  let match;
-  while ((match = ATTRIBUTE_REGEX.exec(raw)) !== null) {
-    const [, key, , dbl, sgl, bare] = match;
-    if (dbl !== undefined) attrs[key] = dbl;
-    else if (sgl !== undefined) attrs[key] = sgl;
-    else if (bare !== undefined) attrs[key] = bare;
-    else attrs[key] = '';
-  }
-  return attrs;
-}
+import { JUnitStreamParser } from './junit/stream-parser.js';
 
 function buildSuiteName(stack) {
   const names = stack.map((entry) => entry.fullName).filter(Boolean);
@@ -165,26 +151,11 @@ export async function parseJUnitStream(readable, options = {}) {
     if (typeof onTestcase === 'function') onTestcase(attempt);
   };
 
-  const processClosingTag = (name) => {
-    const node = nodeStack.pop();
-    if (!node || node.name !== name) {
-      throw new Error(`Unexpected closing tag </${name}> while parsing ${filename}`);
-    }
-    if (node.type === 'testsuite') {
-      popSuite();
-    } else if (node.type === 'testcase') {
-      finaliseTestcase(node);
-    } else {
-      attachChildNode(node);
-    }
-  };
-
-  const processOpeningTag = (name, attrs, selfClosing) => {
+  const handleOpenTag = (name, attrs) => {
     if (name === 'testsuite') {
       pushSuite(attrs);
       const node = { type: 'testsuite', name, attrs, text: '' };
       nodeStack.push(node);
-      if (selfClosing) processClosingTag(name);
       return;
     }
     if (name === 'testcase') {
@@ -200,7 +171,6 @@ export async function parseJUnitStream(readable, options = {}) {
         systemErr: [],
       };
       nodeStack.push(node);
-      if (selfClosing) processClosingTag(name);
       return;
     }
 
@@ -214,79 +184,40 @@ export async function parseJUnitStream(readable, options = {}) {
     const mapped = typeMap[name] || 'generic';
     const node = { type: mapped, name, attrs, text: '' };
     nodeStack.push(node);
-    if (selfClosing) processClosingTag(name);
   };
 
-  let buffer = '';
-  for await (const chunk of readable) {
-    buffer += chunk;
-    let index = 0;
-    while (index < buffer.length) {
-      const next = buffer.indexOf('<', index);
-      if (next === -1) {
-        buffer = buffer.slice(index);
-        break;
-      }
-      if (next > index) {
-        const text = buffer.slice(index, next);
-        if (text.trim()) {
-          const current = nodeStack[nodeStack.length - 1];
-          if (current && typeof current.text === 'string') {
-            current.text += text;
-          }
-        }
-      }
-      if (buffer.startsWith('<!--', next)) {
-        const end = buffer.indexOf('-->', next + 4);
-        if (end === -1) {
-          buffer = buffer.slice(next);
-          break;
-        }
-        index = end + 3;
-        continue;
-      }
-      if (buffer.startsWith('<![CDATA[', next)) {
-        const end = buffer.indexOf(']]>', next + 9);
-        if (end === -1) {
-          buffer = buffer.slice(next);
-          break;
-        }
-        const content = buffer.slice(next + 9, end);
-        const current = nodeStack[nodeStack.length - 1];
-        if (current && typeof current.text === 'string') {
-          current.text += content;
-        }
-        index = end + 3;
-        continue;
-      }
-      const tagEnd = buffer.indexOf('>', next + 1);
-      if (tagEnd === -1) {
-        buffer = buffer.slice(next);
-        break;
-      }
-      const rawTag = buffer.slice(next + 1, tagEnd).trim();
-      index = tagEnd + 1;
-      if (!rawTag) continue;
-      if (rawTag.startsWith('?') || rawTag.startsWith('!')) continue;
-      if (rawTag.startsWith('/')) {
-        const name = rawTag.slice(1).trim();
-        processClosingTag(name);
-        continue;
-      }
-      const selfClosing = rawTag.endsWith('/');
-      const body = selfClosing ? rawTag.slice(0, -1).trim() : rawTag;
-      const spaceIndex = body.search(/\s/);
-      const name = spaceIndex === -1 ? body : body.slice(0, spaceIndex);
-      const attrString = spaceIndex === -1 ? '' : body.slice(spaceIndex + 1);
-      const attrs = parseAttributes(attrString);
-      processOpeningTag(name, attrs, selfClosing);
+  const handleCloseTag = (name) => {
+    const node = nodeStack.pop();
+    if (!node || node.name !== name) {
+      throw new Error(`Unexpected closing tag </${name}> while parsing ${filename}`);
     }
-  }
+    if (node.type === 'testsuite') {
+      popSuite();
+    } else if (node.type === 'testcase') {
+      finaliseTestcase(node);
+    } else {
+      attachChildNode(node);
+    }
+  };
 
-  if (nodeStack.length) {
-    const last = nodeStack[nodeStack.length - 1];
-    throw new Error(`Unclosed tag <${last.name}> detected while parsing ${filename}`);
-  }
+  const handleText = (text, info) => {
+    const current = nodeStack[nodeStack.length - 1];
+    if (!current || typeof current.text !== 'string') return;
+    if (info?.isCData) {
+      current.text += text;
+    } else {
+      current.text += text;
+    }
+  };
+
+  const parser = new JUnitStreamParser({
+    filename,
+    onOpenTag: (name, attrs) => handleOpenTag(name, attrs),
+    onCloseTag: (name) => handleCloseTag(name),
+    onText: (text, info) => handleText(text, info),
+  });
+
+  await parser.parse(readable);
 
   applyTimeoutClassification(attempts, suiteDurations, options.timeoutFactor ?? 3.0);
 
