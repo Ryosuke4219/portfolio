@@ -7,7 +7,8 @@ import time
 from collections.abc import Iterable, Mapping, Sequence
 
 from ..errors import AdapterError, RateLimitError, RetriableError, TimeoutError
-from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from .base import BaseProvider
 
 ErrorSpec = tuple[type[AdapterError], str]
 _ERROR_BY_MARKER: dict[str, ErrorSpec] = {
@@ -17,7 +18,7 @@ _ERROR_BY_MARKER: dict[str, ErrorSpec] = {
 }
 
 
-class MockProvider(ProviderSPI):
+class MockProvider(BaseProvider):
     """Very small provider implementation for exercising the adapter."""
 
     def __init__(
@@ -26,7 +27,7 @@ class MockProvider(ProviderSPI):
         base_latency_ms: int = 50,
         error_markers: Iterable[str] | None = None,
     ) -> None:
-        self._name = name
+        super().__init__(name=name)
         self.base_latency_ms = base_latency_ms
         if error_markers is None:
             self._error_markers: set[str] = set(_ERROR_BY_MARKER)
@@ -34,12 +35,6 @@ class MockProvider(ProviderSPI):
             self._error_markers = {
                 marker for marker in error_markers if marker in _ERROR_BY_MARKER
             }
-
-    def name(self) -> str:
-        return self._name
-
-    def capabilities(self) -> set[str]:
-        return {"chat"}
 
     def _maybe_raise_error(self, text: str) -> None:
         for marker in self._error_markers:
@@ -71,15 +66,17 @@ class MockProvider(ProviderSPI):
         prompt_tokens = max(1, len(text) // 4)
         completion_tokens = 16
 
+        provider_name = self.name()
+
         return ProviderResponse(
-            text=f"echo({self._name}): {text}",
+            text=f"echo({provider_name}): {text}",
             latency_ms=latency,
             token_usage=TokenUsage(prompt=prompt_tokens, completion=completion_tokens),
             model=request.model,
             finish_reason="stop",
             raw={
                 "echo": text,
-                "provider": self._name,
+                "provider": provider_name,
             },
         )
 

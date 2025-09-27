@@ -59,13 +59,6 @@ class Runner:
                 error_message=str(err),
             )
 
-        def _provider_model(provider: ProviderSPI) -> str | None:
-            for attr in ("model", "_model"):
-                value = getattr(provider, attr, None)
-                if isinstance(value, str) and value:
-                    return value
-            return None
-
         def _elapsed_ms(start_ts: float) -> int:
             return max(0, int((time.time() - start_ts) * 1000))
 
@@ -85,6 +78,10 @@ class Runner:
             error_type = type(error).__name__ if error is not None else None
             error_message = str(error) if error is not None else None
 
+            provider_model = getattr(provider, "model", None)
+            if not isinstance(provider_model, str) or not provider_model:
+                provider_model = None
+
             log_event(
                 "provider_call",
                 metrics_path_str,
@@ -96,7 +93,7 @@ class Runner:
                     request.max_tokens,
                 ),
                 provider=provider.name(),
-                model=_provider_model(provider),
+                model=provider_model,
                 attempt=attempt,
                 total_providers=len(self.providers),
                 status=status,

@@ -17,7 +17,8 @@ from ..errors import (
     RetriableError,
     TimeoutError,
 )
-from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from ..provider_spi import ProviderRequest, ProviderResponse
+from .base import BaseProvider
 from .gemini_client import GeminiClientProtocol, genai, invoke_gemini, select_safety_settings
 from .gemini_helpers import (
     coerce_finish_reason,
@@ -30,7 +31,7 @@ from .gemini_helpers import (
 __all__ = ["GeminiProvider", "parse_gemini_messages"]
 
 
-class GeminiProvider(ProviderSPI):
+class GeminiProvider(BaseProvider):
     """Provider implementation backed by the Gemini SDK (models API)."""
 
     def __init__(
@@ -42,10 +43,8 @@ class GeminiProvider(ProviderSPI):
         generation_config: Mapping[str, Any] | None = None,
         safety_settings: Sequence[Mapping[str, Any]] | None = None,
     ) -> None:
-        # ``model`` は CLI/Factory で ``ProviderRequest`` に設定される想定だが、
-        # 推奨デフォルトをメトリクスなどで参照できるよう記録しておく。
-        self._model = model
-        self._name = name or f"gemini:{model}"
+        provider_name = name or f"gemini:{model}"
+        super().__init__(name=provider_name, model=model)
         self._client: GeminiClientProtocol | None = None
         self._client_module: Any | None = None
         if client is None:
@@ -58,12 +57,6 @@ class GeminiProvider(ProviderSPI):
             self._client = client
         self._generation_config = dict(generation_config or {})
         self._safety_settings = list(safety_settings or [])
-
-    def name(self) -> str:
-        return self._name
-
-    def capabilities(self) -> set[str]:
-        return {"chat"}
 
     def _translate_error(self, exc: Exception) -> Exception:
         if isinstance(exc, ConfigError):
