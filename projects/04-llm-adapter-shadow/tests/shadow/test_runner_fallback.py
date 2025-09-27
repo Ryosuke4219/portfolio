@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import sys
+from pathlib import Path
+
 import pytest
 from src.llm_adapter.errors import AuthError, RateLimitError, RetriableError, TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderSPI
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import AsyncRunner
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
 
-from ._runner_test_helpers import (
+_HELPER_DIR = Path(__file__).resolve().parent
+if str(_HELPER_DIR) not in sys.path:
+    sys.path.insert(0, str(_HELPER_DIR))
+
+from _runner_test_helpers import (
     FakeLogger,
     _ErrorProvider,
     _SuccessProvider,
@@ -117,7 +125,7 @@ def test_rate_limit_triggers_backoff_and_logs(
     def _fake_sleep(duration: float) -> None:
         sleep_calls.append(duration)
 
-    monkeypatch.setattr("src.llm_adapter.runner.time.sleep", _fake_sleep)
+    monkeypatch.setattr("src.llm_adapter.runner_sync.time.sleep", _fake_sleep)
 
     _, logger = _run_and_collect(
         [rate_limited, succeeding],
@@ -200,8 +208,7 @@ def test_provider_chain_failed_records_last_error_family() -> None:
     assert run_event["error_family"] == "retryable"
 
 
-@pytest.mark.asyncio
-async def test_async_rate_limit_triggers_backoff_and_logs(
+def test_async_rate_limit_triggers_backoff_and_logs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rate_limited = _ErrorProvider("rate-limit", RateLimitError("slow down"))
@@ -212,7 +219,7 @@ async def test_async_rate_limit_triggers_backoff_and_logs(
     async def _fake_sleep(duration: float) -> None:
         sleep_calls.append(duration)
 
-    monkeypatch.setattr("src.llm_adapter.runner.asyncio.sleep", _fake_sleep)
+    monkeypatch.setattr("src.llm_adapter.runner_async.asyncio.sleep", _fake_sleep)
 
     logger = FakeLogger()
     runner = AsyncRunner(
@@ -222,7 +229,13 @@ async def test_async_rate_limit_triggers_backoff_and_logs(
     )
     request = ProviderRequest(prompt="hello", model="demo-model")
 
-    response = await runner.run_async(request, shadow_metrics_path=None)
+    async def _exercise() -> ProviderResponse:
+        response = await runner.run_async(
+            request, shadow_metrics_path="unused-metrics.jsonl"
+        )
+        return response
+
+    response = asyncio.run(_exercise())
 
     assert response.text == "success:ok"
     assert sleep_calls == [0.321]
@@ -236,14 +249,16 @@ async def test_async_rate_limit_triggers_backoff_and_logs(
     assert first_call["error_family"] == "rate_limit"
 
 
-@pytest.mark.asyncio
-async def test_async_retryable_error_logs_family() -> None:
+def test_async_retryable_error_logs_family() -> None:
     logger = FakeLogger()
     runner = AsyncRunner([_ErrorProvider("oops", RetriableError("nope"))], logger=logger)
     request = ProviderRequest(prompt="hello", model="demo-model")
 
+    async def _exercise() -> None:
+        await runner.run_async(request, shadow_metrics_path="unused-metrics.jsonl")
+
     with pytest.raises(RetriableError):
-        await runner.run_async(request, shadow_metrics_path=None)
+        asyncio.run(_exercise())
 
     provider_event = logger.of_type("provider_call")[0]
     assert provider_event["error_family"] == "retryable"
