@@ -34,7 +34,7 @@
 * 代表フロー：
 
   1. `run_compare.py` で 2プロバイダ×2プロンプト×N回 実行
-  2. `runs-metrics.jsonl` を `metrics_to_html.py` で **`/reports/index.html`** に可視化（生成物は Git 管理外）
+  2. `runs-metrics.jsonl` を `metrics/cli.py` で **`/reports/index.html`** に可視化（生成物は Git 管理外）
   3. `just golden` で **baseline vs 最新** の回帰比較を HTML に差し込む
 
 ---
@@ -53,7 +53,11 @@
        ├─ tasks.jsonl                   # 10〜20件の小データ
        └─ baseline/                     # 期待 or 参照出力（任意）
 /tools/report/
-  └─ metrics_to_html.py                 # JSONL→HTML
+  └─ metrics/
+       ├─ __init__.py                  # モジュールエクスポート
+       ├─ data.py                      # JSONL ロードと統計処理
+       ├─ render.py                    # HTML/Markdown 生成
+       └─ cli.py                       # CLI エントリーポイント
 /reports/
   └─ index.html                         # 集計レポ（Actionsで更新）
 /data/
@@ -199,7 +203,7 @@ overrides:
 
 ## 7. レポート生成（B1）
 
-### 7.1 ツール（`/tools/report/metrics_to_html.py`）
+### 7.1 ツール（`/tools/report/metrics/cli.py`）
 
 * 入力：`/data/runs-metrics.jsonl`、（任意）`/datasets/golden/baseline/*`
 * 出力：`/reports/index.html`（単一ファイル、必要なときに再生成）
@@ -215,7 +219,7 @@ overrides:
 
 ### 7.2 GitHub Actions（nightly）
 
-* ステップ：チェックアウト → Python セットアップ → 依存導入（pandas+任意の可視化） → `metrics_to_html.py` 実行 → **Artifact / Pages 公開**
+* ステップ：チェックアウト → Python セットアップ → 依存導入（pandas+任意の可視化） → `metrics/cli.py` 実行 → **Artifact / Pages 公開**
 * 受け入れ：**2プロバイダ×2プロンプト**以上で表・グラフが表示されること
 
 ---
@@ -234,7 +238,7 @@ overrides:
 ```
 just golden
 # 内部で: run_compare.py --repeat 1 --providers <set> --prompts golden
-#        → metrics_to_html.py が baseline vs 最新 の結果をレポへ差し込み
+#        → metrics/cli.py が baseline vs 最新 の結果をレポへ差し込み
 ```
 
 ### 8.3 受け入れ
@@ -304,7 +308,7 @@ python adapter/run_compare.py \
   --prompts datasets/golden/tasks.jsonl \
   --repeat 3 --mode parallel
 
-python tools/report/metrics_to_html.py \
+python tools/report/metrics/cli.py \
   --metrics data/runs-metrics.jsonl \
   --golden datasets/golden \
   --out reports/index.html

@@ -1,0 +1,34 @@
+"""Utilities for generating LLM Adapter metric reports."""
+
+from .data import (
+    build_comparison_table,
+    build_determinism_alerts,
+    build_failure_summary,
+    build_latency_histogram_data,
+    build_scatter_data,
+    compute_overview,
+    load_baseline_expectations,
+    load_metrics,
+)
+from .render import (
+    build_regression_summary,
+    render_html,
+    update_weekly_summary,
+)
+from .cli import generate_report, main
+
+__all__ = [
+    "build_comparison_table",
+    "build_determinism_alerts",
+    "build_failure_summary",
+    "build_latency_histogram_data",
+    "build_scatter_data",
+    "build_regression_summary",
+    "compute_overview",
+    "generate_report",
+    "load_baseline_expectations",
+    "load_metrics",
+    "main",
+    "render_html",
+    "update_weekly_summary",
+]
