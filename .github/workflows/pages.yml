@@ -2,7 +2,7 @@ name: Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -18,25 +18,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
+          destination: ./_site
       - name: Copy bundled CI reports
         run: |
           for dir in coverage flaky junit; do
             if [ -d "docs/reports/${dir}" ]; then
               mkdir -p "_site/reports/${dir}"
-              rsync -av --delete --omit-dir-times --no-perms --no-owner --no-group --exclude='.gitkeep' "docs/reports/${dir}/" "_site/reports/${dir}/"
-
+              rsync -av --delete --omit-dir-times --no-perms --no-owner --no-group --exclude='.gitkeep' \
+                "docs/reports/${dir}/" "_site/reports/${dir}/"
             fi
           done
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: _site
+          path: ./_site
 
   deploy:
     needs: build
