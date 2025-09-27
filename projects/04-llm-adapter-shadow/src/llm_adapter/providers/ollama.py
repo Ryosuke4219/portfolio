@@ -4,108 +4,21 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import (
-    Iterable,
-    Mapping,
-    Sequence,
-)
-from types import TracebackType
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Protocol,
-    cast,
-)
+from collections.abc import Mapping, Sequence
+from typing import Any
 
-from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
+from ..errors import ConfigError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
+from .ollama_http import (
+    OllamaHTTPClient,
+    SessionProtocol as _SessionProtocol,
+    requests_exceptions as _requests_exceptions,
+)
 
-
-class _ResponseProtocol(Protocol):
-    status_code: int
-
-    def close(self) -> None: ...
-    def __enter__(self) -> _ResponseProtocol: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> bool | None: ...
-    def json(self) -> Any: ...
-    def raise_for_status(self) -> None: ...
-    def iter_lines(self) -> Iterable[bytes]: ...
-
-
-class _SessionProtocol(Protocol):
-    def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol: ...
-
-
-if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
-    requests: Any
-    Response = _ResponseProtocol
-    requests_exceptions: Any
-else:  # pragma: no cover - allow running without the optional dependency
-    import importlib
-
-    try:
-        _requests_module = importlib.import_module("requests")
-    except ModuleNotFoundError:
-        requests = None
-
-        class _FallbackRequestsExceptions:  # pragma: no cover - trivial container
-            class RequestException(Exception): ...
-            class Timeout(RequestException): ...
-            class HTTPError(RequestException):
-                def __init__(self, message: str | None = None, response: Any | None = None):
-                    super().__init__(message or "HTTP error")
-                    self.response = response
-
-        requests_exceptions = _FallbackRequestsExceptions()
-
-        class Response:
-            """Very small stub mimicking the subset of Response we rely on."""
-            status_code: int
-
-            def __init__(self, status_code: int = 200) -> None:
-                self.status_code = status_code
-
-            def close(self) -> None:  # pragma: no cover - trivial stub
-                return None
-
-            def __enter__(self) -> Response:  # pragma: no cover - stub
-                return self
-
-            def __exit__(
-                self,
-                exc_type: type[BaseException] | None,
-                exc: BaseException | None,
-                tb: TracebackType | None,
-            ) -> bool | None:  # pragma: no cover - stub
-                return None
-
-            def json(self) -> Any:  # pragma: no cover - tests supply payloads
-                return {}
-
-            def raise_for_status(self) -> None:  # pragma: no cover - stub
-                if self.status_code >= 400:
-                    raise requests_exceptions.HTTPError(response=self)
-
-            def iter_lines(self) -> Iterable[bytes]:  # pragma: no cover - stub
-                return []
-    else:
-        requests = cast(Any, _requests_module)
-        Response = cast(type[_ResponseProtocol], _requests_module.Response)
-        requests_exceptions = cast(Any, _requests_module.exceptions)
+requests_exceptions = _requests_exceptions
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 __all__ = ["OllamaProvider", "DEFAULT_HOST"]
-
-
-def _combine_host(base: str, path: str) -> str:
-    if base.endswith("/"):
-        base = base[:-1]
-    return f"{base}{path}"
 
 
 def _token_usage_from_payload(payload: Mapping[str, Any]) -> TokenUsage:
@@ -133,93 +46,23 @@ class OllamaProvider(ProviderSPI):
         self._name = name or f"ollama:{model}"
         env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
-        if session is None:
-            if requests is None:  # pragma: no cover - defensive branch
-                raise ImportError("requests is required unless a session is provided")
-            session = requests.Session()
-        self._session = session
+        self._http = OllamaHTTPClient(
+            host=self._host,
+            session=session,
+            timeout=timeout,
+            pull_timeout=pull_timeout,
+            auto_pull=auto_pull,
+        )
+        self._session = self._http.session
         self._timeout = timeout
-        self._pull_timeout = pull_timeout
         self._auto_pull = auto_pull
-        self._ready_models: set[str] = set()
+        self._ready_models = self._http.ready_models
 
     def name(self) -> str:
         return self._name
 
     def capabilities(self) -> set[str]:
         return {"chat"}
-
-    # ------------------------------------------------------------------
-    # HTTP helpers
-    # ------------------------------------------------------------------
-    def _request(
-        self,
-        path: str,
-        payload: Mapping[str, Any],
-        *,
-        stream: bool = False,
-        timeout: float | None = None,
-    ) -> _ResponseProtocol:
-        url = _combine_host(self._host, path)
-        try:
-            response = self._session.post(
-                url,
-                json=payload,
-                stream=stream,
-                timeout=timeout or self._timeout,
-            )
-        except requests_exceptions.Timeout as exc:  # pragma: no cover - error handling
-            raise TimeoutError(f"Ollama request timed out: {url}") from exc
-        except requests_exceptions.RequestException as exc:  # pragma: no cover
-            raise RetriableError(f"Ollama request failed: {url}") from exc
-        return response
-
-    def _ensure_model(self, model_name: str) -> None:
-        if model_name in self._ready_models:
-            return
-
-        show_response = self._request("/api/show", {"model": model_name})
-        if show_response.status_code == 200:
-            self._ready_models.add(model_name)
-            show_response.close()
-            return
-        show_response.close()
-
-        if not self._auto_pull:
-            raise RetriableError(f"ollama model not available: {model_name}")
-
-        with self._request(
-            "/api/pull",
-            {"model": model_name},
-            stream=True,
-            timeout=self._pull_timeout,
-        ) as pull_response:
-            try:
-                pull_response.raise_for_status()
-            except requests_exceptions.HTTPError as exc:
-                status = pull_response.status_code
-                if status in {401, 403}:
-                    raise AuthError(str(exc)) from exc
-                if status == 429:
-                    raise RateLimitError(str(exc)) from exc
-                if status in {408, 504}:
-                    raise TimeoutError(str(exc)) from exc
-                raise RetriableError(str(exc)) from exc
-            # Drain the streaming response to complete the pull.
-            for _ in pull_response.iter_lines():  # pragma: no cover - network interaction
-                pass
-
-        # Verify again with a short retry window.
-        for _ in range(10):
-            show_after = self._request("/api/show", {"model": model_name})
-            if show_after.status_code == 200:
-                self._ready_models.add(model_name)
-                show_after.close()
-                return
-            show_after.close()
-            time.sleep(1)
-
-        raise RetriableError(f"failed to pull ollama model: {model_name}")
 
     # ------------------------------------------------------------------
     # ProviderSPI implementation
@@ -231,7 +74,7 @@ class OllamaProvider(ProviderSPI):
         model_name = model_name.strip()
         if not model_name:
             raise ConfigError("OllamaProvider requires request.model to be set")
-        self._ensure_model(model_name)
+        self._http.ensure_model(model_name)
 
         def _coerce_content(entry: Mapping[str, Any]) -> str:
             content = entry.get("content")
@@ -313,28 +156,7 @@ class OllamaProvider(ProviderSPI):
             payload["options"] = {**options_payload, **payload.get("options", {})}
 
         ts0 = time.time()
-        response = self._request("/api/chat", payload, timeout=timeout_override)
-
-        try:
-            try:
-                response.raise_for_status()
-            except requests_exceptions.HTTPError as exc:
-                status = response.status_code
-                if status in {401, 403}:
-                    raise AuthError(str(exc)) from exc
-                if status == 429:
-                    raise RateLimitError(str(exc)) from exc
-                if status in {408, 504}:
-                    raise TimeoutError(str(exc)) from exc
-                if status >= 500:
-                    raise RetriableError(str(exc)) from exc
-                raise RetriableError(str(exc)) from exc
-
-            payload_json = response.json()
-        except ValueError as exc:
-            raise RetriableError("invalid JSON from Ollama") from exc
-        finally:
-            response.close()
+        payload_json = self._http.chat(payload, timeout=timeout_override)
 
         message = payload_json.get("message")
         text = ""

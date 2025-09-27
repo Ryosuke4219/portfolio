@@ -70,6 +70,8 @@ def test_ollama_provider_auto_pull_and_chat():
     session = Session()
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
+    assert provider._http.session is session
+
     response = provider.invoke(ProviderRequest(prompt="hello", model="gemma3n:e2b"))
 
     assert response.text == "hello"
