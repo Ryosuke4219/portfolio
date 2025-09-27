@@ -9,11 +9,9 @@ from typing import Any
 
 from ..errors import ConfigError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
-from .ollama_http import (
-    OllamaHTTPClient,
-    SessionProtocol as _SessionProtocol,
-    requests_exceptions as _requests_exceptions,
-)
+from .ollama_http import OllamaHTTPClient
+from .ollama_http import SessionProtocol as _SessionProtocol
+from .ollama_http import requests_exceptions as _requests_exceptions
 
 requests_exceptions = _requests_exceptions
 
@@ -81,7 +79,7 @@ class OllamaProvider(ProviderSPI):
             if isinstance(content, str):
                 return content
             if isinstance(content, Sequence) and not isinstance(
-                content, (bytes, bytearray)
+                content, bytes | bytearray
             ):
                 parts = [part for part in content if isinstance(part, str)]
                 return "\n".join(parts)
