@@ -39,12 +39,46 @@ def test_ratelimit_retry_fallback():
     assert response.text.startswith("echo(p2):")
 
 
+def test_ratelimit_backoff_sleep(monkeypatch: pytest.MonkeyPatch):
+    sleep_calls: list[float] = []
+
+    def fake_runner_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr("time.sleep", fake_runner_sleep)
+
+    p1, p2 = _providers_for("[RATELIMIT]")
+    runner = Runner([p1, p2])
+
+    response = runner.run(ProviderRequest(prompt="[RATELIMIT] backoff", model="fallback-model"))
+
+    assert response.text.startswith("echo(p2):")
+    assert sleep_calls.count(0.05) == 1
+
+
 def test_invalid_json_fallback():
     p1, p2 = _providers_for("[INVALID_JSON]")
     runner = Runner([p1, p2])
 
     response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test", model="fallback-model"))
     assert response.text.startswith("echo(p2):")
+
+
+def test_timeout_no_backoff(monkeypatch: pytest.MonkeyPatch):
+    sleep_calls: list[float] = []
+
+    def fake_runner_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr("time.sleep", fake_runner_sleep)
+
+    p1, p2 = _providers_for("[TIMEOUT]")
+    runner = Runner([p1, p2])
+
+    response = runner.run(ProviderRequest(prompt="[TIMEOUT] no-wait", model="fallback-model"))
+
+    assert response.text.startswith("echo(p2):")
+    assert all(abs(delay - 0.05) > 1e-9 for delay in sleep_calls)
 
 
 def test_timeout_fallback_records_metrics(tmp_path: Path):
