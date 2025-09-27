@@ -8,7 +8,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from typing import Any
+from typing import Any, NoReturn
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
@@ -116,14 +116,7 @@ class OllamaProvider(ProviderSPI):
             try:
                 pull_response.raise_for_status()
             except requests_exceptions.HTTPError as exc:
-                status = pull_response.status_code
-                if status in {401, 403}:
-                    raise AuthError(str(exc)) from exc
-                if status == 429:
-                    raise RateLimitError(str(exc)) from exc
-                if status in {408, 504}:
-                    raise TimeoutError(str(exc)) from exc
-                raise RetriableError(str(exc)) from exc
+                self._handle_http_error(pull_response, exc)
             # Drain the streaming response to complete the pull.
             for _ in pull_response.iter_lines():  # pragma: no cover - network interaction
                 pass
@@ -236,16 +229,7 @@ class OllamaProvider(ProviderSPI):
             try:
                 response.raise_for_status()
             except requests_exceptions.HTTPError as exc:
-                status = response.status_code
-                if status in {401, 403}:
-                    raise AuthError(str(exc)) from exc
-                if status == 429:
-                    raise RateLimitError(str(exc)) from exc
-                if status in {408, 504}:
-                    raise TimeoutError(str(exc)) from exc
-                if status >= 500:
-                    raise RetriableError(str(exc)) from exc
-                raise RetriableError(str(exc)) from exc
+                self._handle_http_error(response, exc)
 
             payload_json = response.json()
         except ValueError as exc:
@@ -273,3 +257,19 @@ class OllamaProvider(ProviderSPI):
             finish_reason=payload_json.get("done_reason"),
             raw=payload_json,
         )
+
+    def _handle_http_error(
+        self,
+        response: ResponseProtocol,
+        exc: Exception,
+    ) -> NoReturn:
+        status = response.status_code
+        message = str(exc)
+        if status in {401, 403}:
+            raise AuthError(message) from exc
+        if status == 429:
+            raise RateLimitError(message) from exc
+        if status in {408, 504}:
+            raise TimeoutError(message) from exc
+        raise RetriableError(message) from exc
+
