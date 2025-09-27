@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
@@ -22,13 +23,30 @@ from .utils import content_hash
 MetricsPath = str | Path | None
 
 
+@dataclass(slots=True)
+class BackoffPolicy:
+    rate_limit_sleep_s: float = 0.05
+    max_attempts: int | None = None
+
+
+@dataclass(slots=True)
+class RunnerConfig:
+    backoff: BackoffPolicy = field(default_factory=BackoffPolicy)
+
+
 class Runner:
     """Attempt providers sequentially until one succeeds."""
 
-    def __init__(self, providers: Sequence[ProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI],
+        *,
+        config: RunnerConfig | None = None,
+    ) -> None:
         if not providers:
             raise ValueError("Runner requires at least one provider")
         self.providers: list[ProviderSPI] = list(providers)
+        self.config: RunnerConfig = config or RunnerConfig()
 
     def run(
         self,
@@ -102,7 +120,7 @@ class Runner:
                 provider=provider.name(),
                 model=provider_model,
                 attempt=attempt,
-                total_providers=len(self.providers),
+                total_providers=allowed_attempts,
                 status=status,
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
@@ -170,7 +188,19 @@ class Runner:
                 project_id=metadata.get("project_id"),
             )
 
-        for attempt_index, provider in enumerate(self.providers, start=1):
+        backoff_config = self.config.backoff
+        max_attempts = backoff_config.max_attempts
+        if isinstance(max_attempts, int):
+            allowed_attempts = min(len(self.providers), max(max_attempts, 0))
+        else:
+            allowed_attempts = len(self.providers)
+        providers_to_try = (
+            self.providers[:allowed_attempts]
+            if allowed_attempts < len(self.providers)
+            else self.providers
+        )
+
+        for attempt_index, provider in enumerate(providers_to_try, start=1):
             attempt_started = time.time()
             try:
                 response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
@@ -198,7 +228,7 @@ class Runner:
                     tokens_out=None,
                     error=err,
                 )
-                time.sleep(0.05)
+                time.sleep(backoff_config.rate_limit_sleep_s)
             except (TimeoutError, RetriableError) as err:
                 last_err = err
                 _log_provider_call(
@@ -241,15 +271,15 @@ class Runner:
                 "provider_chain_failed",
                 metrics_path_str,
                 request_fingerprint=request_fingerprint,
-                provider_attempts=len(self.providers),
-                providers=[provider.name() for provider in self.providers],
+                provider_attempts=allowed_attempts,
+                providers=[provider.name() for provider in providers_to_try],
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
             )
         _log_run_metric(
             status="error",
             provider=None,
-            attempts=len(self.providers),
+            attempts=allowed_attempts,
             latency_ms=_elapsed_ms(run_started),
             tokens_in=None,
             tokens_out=None,
@@ -262,12 +292,18 @@ class Runner:
 class AsyncRunner:
     """Async counterpart of :class:`Runner` providing ``asyncio`` bridges."""
 
-    def __init__(self, providers: Sequence[ProviderSPI | AsyncProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI | AsyncProviderSPI],
+        *,
+        config: RunnerConfig | None = None,
+    ) -> None:
         if not providers:
             raise ValueError("AsyncRunner requires at least one provider")
         self.providers: list[tuple[ProviderSPI | AsyncProviderSPI, AsyncProviderSPI]] = [
             (provider, ensure_async_provider(provider)) for provider in providers
         ]
+        self.config: RunnerConfig = config or RunnerConfig()
 
     async def run_async(
         self,
@@ -346,7 +382,7 @@ class AsyncRunner:
                 provider=provider.name(),
                 model=_provider_model(provider),
                 attempt=attempt,
-                total_providers=len(self.providers),
+                total_providers=allowed_attempts,
                 status=status,
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
@@ -416,7 +452,19 @@ class AsyncRunner:
                 project_id=metadata.get("project_id"),
             )
 
-        for attempt_index, (provider, async_provider) in enumerate(self.providers, start=1):
+        backoff_config = self.config.backoff
+        max_attempts = backoff_config.max_attempts
+        if isinstance(max_attempts, int):
+            allowed_attempts = min(len(self.providers), max(max_attempts, 0))
+        else:
+            allowed_attempts = len(self.providers)
+        providers_to_try = (
+            self.providers[:allowed_attempts]
+            if allowed_attempts < len(self.providers)
+            else self.providers
+        )
+
+        for attempt_index, (provider, async_provider) in enumerate(providers_to_try, start=1):
             attempt_started = time.time()
             try:
                 response = await run_with_shadow_async(
@@ -449,7 +497,7 @@ class AsyncRunner:
                     tokens_out=None,
                     error=err,
                 )
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(backoff_config.rate_limit_sleep_s)
             except (TimeoutError, RetriableError) as err:
                 last_err = err
                 _log_provider_call(
@@ -492,15 +540,15 @@ class AsyncRunner:
                 "provider_chain_failed",
                 metrics_path_str,
                 request_fingerprint=request_fingerprint,
-                provider_attempts=len(self.providers),
-                providers=[provider.name() for provider, _ in self.providers],
+                provider_attempts=allowed_attempts,
+                providers=[provider.name() for provider, _ in providers_to_try],
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
             )
         _log_run_metric(
             status="error",
             provider=None,
-            attempts=len(self.providers),
+            attempts=allowed_attempts,
             latency_ms=_elapsed_ms(run_started),
             tokens_in=None,
             tokens_out=None,
@@ -510,4 +558,9 @@ class AsyncRunner:
         raise last_err if last_err is not None else RuntimeError("No providers succeeded")
 
 
-__all__ = ["Runner", "AsyncRunner"]
+__all__ = [
+    "BackoffPolicy",
+    "RunnerConfig",
+    "Runner",
+    "AsyncRunner",
+]
