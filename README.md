@@ -48,6 +48,16 @@ Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuous
 - `just report` — Generate pytest coverage reports for the Python adapter.
 - GitHub Pages: <https://ryosuke4219.github.io/portfolio/>
 
+### GitHub Pages 公開 / 復旧手順
+
+- 公開 URL: <https://ryosuke4219.github.io/portfolio/>
+- 復旧手順:
+  1. GitHub Actions → Pages ワークフローを `Run workflow` で再実行し、`Build with Jekyll` が `Completed` になることをログで確認。
+  2. ビルド失敗時はローカルで `bundle exec jekyll build --source docs --destination _site` を実行しエラー箇所を修正。
+  3. 修正を `main` ブランチへプッシュすると自動でデプロイが再開されます。
+
+---
+
 > [!TIP] Quick Start
 > `just setup` — Node.js / Python 依存と Playwright スタブを初期化します。
 > `just test` — Node＋Python の回帰テストを一括で実行します。
@@ -180,6 +190,20 @@ pip install -r requirements.txt
 # デモ：影実行と差分メトリクスを記録
 python demo_shadow.py
 # => artifacts/runs-metrics.jsonl に1行/リクエストで追記
+```
+
+```bash
+# LLM Adapter 本体の最短バッチ実行
+cat <<'JSONL' > sample.jsonl
+{"prompt": "日本語で1行、自己紹介して"}
+JSONL
+
+llm-adapter --provider projects/04-llm-adapter/adapter/config/providers/openai.yaml \
+  --prompts sample.jsonl --out out.jsonl --format jsonl
+```
+
+```jsonl
+{"prompt_sha256": "d4b8…", "status": "ok", "latency_ms": 480, "model": "gpt-4o-mini", "output_tokens": 34}
 ```
 
 **異常系テストとCI**
