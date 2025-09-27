@@ -33,6 +33,8 @@ class Runner:
 
         last_err: Exception | None = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
+        metadata = request.metadata or {}
+        run_started = time.time()
         request_fingerprint = content_hash(
             "runner", request.prompt_text, request.options, request.max_tokens
         )
@@ -80,7 +82,6 @@ class Runner:
             if not metrics_path_str:
                 return
 
-            metadata = request.metadata or {}
             error_type = type(error).__name__ if error is not None else None
             error_message = str(error) if error is not None else None
 
@@ -102,6 +103,62 @@ class Runner:
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
+                error_type=error_type,
+                error_message=error_message,
+                shadow_used=shadow is not None,
+                trace_id=metadata.get("trace_id"),
+                project_id=metadata.get("project_id"),
+            )
+
+        def _estimate_cost(provider: ProviderSPI, tokens_in: int, tokens_out: int) -> float:
+            estimator = getattr(provider, "estimate_cost", None)
+            if callable(estimator):
+                try:
+                    return float(estimator(tokens_in, tokens_out))
+                except Exception:  # pragma: no cover - defensive guard
+                    return 0.0
+            return 0.0
+
+        def _log_run_metric(
+            *,
+            status: str,
+            provider: ProviderSPI | None,
+            attempts: int,
+            latency_ms: int,
+            tokens_in: int | None,
+            tokens_out: int | None,
+            cost_usd: float,
+            error: Exception | None,
+        ) -> None:
+            if not metrics_path_str:
+                return
+
+            error_type = type(error).__name__ if error else None
+            error_message = str(error) if error else None
+            provider_name = provider.name() if provider is not None else None
+            request_hash = (
+                content_hash(
+                    provider_name,
+                    request.prompt_text,
+                    request.options,
+                    request.max_tokens,
+                )
+                if provider_name
+                else None
+            )
+
+            log_event(
+                "run_metric",
+                metrics_path_str,
+                request_fingerprint=request_fingerprint,
+                request_hash=request_hash,
+                provider=provider_name,
+                status=status,
+                attempts=attempts,
+                latency_ms=latency_ms,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                cost_usd=float(cost_usd),
                 error_type=error_type,
                 error_message=error_message,
                 shadow_used=shadow is not None,
@@ -160,6 +217,19 @@ class Runner:
                     tokens_out=response.output_tokens,
                     error=None,
                 )
+                tokens_in = response.input_tokens
+                tokens_out = response.output_tokens
+                cost_usd = _estimate_cost(provider, tokens_in, tokens_out)
+                _log_run_metric(
+                    status="ok",
+                    provider=provider,
+                    attempts=attempt_index,
+                    latency_ms=_elapsed_ms(run_started),
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    cost_usd=cost_usd,
+                    error=None,
+                )
                 return response
 
         if metrics_path_str:
@@ -172,6 +242,16 @@ class Runner:
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
             )
+        _log_run_metric(
+            status="error",
+            provider=None,
+            attempts=len(self.providers),
+            latency_ms=_elapsed_ms(run_started),
+            tokens_in=None,
+            tokens_out=None,
+            cost_usd=0.0,
+            error=last_err,
+        )
         raise last_err if last_err is not None else RuntimeError("No providers succeeded")
 
 
