@@ -346,6 +346,8 @@ class GeminiProvider(ProviderSPI):
         generation_config: Mapping[str, Any] | None = None,
         safety_settings: Sequence[Mapping[str, Any]] | None = None,
     ) -> None:
+        # ``model`` は CLI/Factory で ``ProviderRequest`` に設定される想定だが、
+        # 推奨デフォルトをメトリクスなどで参照できるよう記録しておく。
         self._model = model
         self._name = name or f"gemini:{model}"
         self._client: _GeminiClient | None = None
@@ -479,7 +481,12 @@ class GeminiProvider(ProviderSPI):
         ts0 = time.time()
         try:
             client = self._resolve_client()
-            model_name = request.model or self._model
+            model_name = request.model
+            if not isinstance(model_name, str):
+                raise ConfigError("GeminiProvider requires request.model to be set")
+            model_name = model_name.strip()
+            if not model_name:
+                raise ConfigError("GeminiProvider requires request.model to be set")
             response = _invoke_gemini(client, model_name, messages, config, safety_settings)
         except ProviderSkip:
             raise
@@ -496,7 +503,7 @@ class GeminiProvider(ProviderSPI):
             text=text,
             token_usage=usage,
             latency_ms=latency_ms,
-            model=(request.model or self._model),
+            model=model_name,
             finish_reason=finish_reason,
             raw=response,
         )

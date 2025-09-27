@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from src.llm_adapter.errors import TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
@@ -23,15 +24,18 @@ def test_timeout_fallback():
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[TIMEOUT] hello", model="test-model"))
+    request = ProviderRequest(prompt="[TIMEOUT] hello", model="fallback-model")
+    response = runner.run(request)
+
     assert response.text.startswith("echo(p2):")
+    assert response.model == "fallback-model"
 
 
 def test_ratelimit_retry_fallback():
     p1, p2 = _providers_for("[RATELIMIT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[RATELIMIT] test", model="test-model"))
+    response = runner.run(ProviderRequest(prompt="[RATELIMIT] test", model="fallback-model"))
     assert response.text.startswith("echo(p2):")
 
 
@@ -39,18 +43,17 @@ def test_invalid_json_fallback():
     p1, p2 = _providers_for("[INVALID_JSON]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test", model="test-model"))
+    response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test", model="fallback-model"))
     assert response.text.startswith("echo(p2):")
 
 
-def test_timeout_fallback_records_metrics(tmp_path):
+def test_timeout_fallback_records_metrics(tmp_path: Path):
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
     metrics_path = tmp_path / "fallback.jsonl"
     response = runner.run(
-        ProviderRequest(prompt="[TIMEOUT] metrics", model="test-model"),
-        
+        ProviderRequest(prompt="[TIMEOUT] metrics", model="fallback-model"),
         shadow=None,
         shadow_metrics_path=metrics_path,
     )
@@ -78,7 +81,7 @@ def test_timeout_fallback_records_metrics(tmp_path):
     assert success_event["tokens_out"] == response.token_usage.completion
 
 
-def test_runner_emits_chain_failed_metric(tmp_path):
+def test_runner_emits_chain_failed_metric(tmp_path: Path):
     failing1 = MockProvider("p1", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     failing2 = MockProvider("p2", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     runner = Runner([failing1, failing2])
@@ -87,7 +90,7 @@ def test_runner_emits_chain_failed_metric(tmp_path):
 
     with pytest.raises(TimeoutError):
         runner.run(
-            ProviderRequest(prompt="[TIMEOUT] hard", model="test-model"),
+            ProviderRequest(prompt="[TIMEOUT] hard", model="fallback-model"),
             shadow=None,
             shadow_metrics_path=metrics_path,
         )

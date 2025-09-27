@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -13,13 +15,17 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
 
     metrics_path = tmp_path / "metrics.jsonl"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
+
+    # モデル名は明示指定（フォールバック禁止の設計に合わせる）
+    request = ProviderRequest(prompt="hello", metadata=metadata, model="primary-model")
     response = runner.run(
-        ProviderRequest(prompt="hello", metadata=metadata, model="mock-model"),
+        request,
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
 
     assert response.text.startswith("echo(primary):")
+    assert response.model == "primary-model"
     assert metrics_path.exists()
 
     payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
@@ -45,6 +51,7 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
     assert call_event["tokens_out"] == token_usage.completion
     assert call_event["trace_id"] == metadata["trace_id"]
     assert call_event["project_id"] == metadata["project_id"]
+    # メトリクスに model は記録しない設計（プライバシー配慮）
     assert call_event.get("model") is None
 
     expected_tokens = max(1, len("hello") // 4) + 16
@@ -59,7 +66,7 @@ def test_shadow_error_records_metrics(tmp_path: Path) -> None:
 
     metrics_path = tmp_path / "metrics.jsonl"
     runner.run(
-        ProviderRequest(prompt="[TIMEOUT] hello", model="mock-model"),
+        ProviderRequest(prompt="[TIMEOUT] hello", model="primary-model"),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
@@ -80,11 +87,11 @@ def test_request_hash_includes_max_tokens(tmp_path: Path) -> None:
     metrics_path = tmp_path / "metrics.jsonl"
 
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=32, model="mock-model"),
+        ProviderRequest(prompt="hello", max_tokens=32, model="primary-model"),
         shadow_metrics_path=metrics_path,
     )
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=64, model="mock-model"),
+        ProviderRequest(prompt="hello", max_tokens=64, model="primary-model"),
         shadow_metrics_path=metrics_path,
     )
 

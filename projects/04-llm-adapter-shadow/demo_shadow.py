@@ -7,10 +7,33 @@ from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.factory import provider_from_environment
 from src.llm_adapter.runner import Runner
 
+
+def _resolve_model_name(provider) -> str:
+    # Provider 実装が保持しているモデル名を優先して取得
+    for attr in ("model", "_model"):
+        val = getattr(provider, attr, None)
+        if isinstance(val, str) and val.strip():
+            return val
+
+    # name() が "prefix:model" 形式ならモデル部を抽出（念のため）
+    try:
+        name = provider.name()
+        if isinstance(name, str) and ":" in name:
+            _, model_part = name.split(":", 1)
+            if model_part.strip():
+                return model_part
+    except Exception:
+        pass
+
+    # 最後の保険（ここに来ることは基本想定しない）
+    return "primary-model"
+
+
 if __name__ == "__main__":
     try:
         primary = provider_from_environment(
-            "PRIMARY_PROVIDER", default="gemini:gemini-2.5-flash"
+            "PRIMARY_PROVIDER",
+            default="gemini:gemini-2.5-flash",
         )
         shadow = provider_from_environment(
             "SHADOW_PROVIDER",
@@ -22,12 +45,12 @@ if __name__ == "__main__":
         raise SystemExit(1) from exc
 
     runner = Runner([primary])
-    model_name = getattr(primary, "model", None)
-    if not isinstance(model_name, str) or not model_name.strip():
-        model_name = getattr(primary, "_model", None)
-    if not isinstance(model_name, str) or not model_name.strip():
-        model_name = "primary-model"
-    request = ProviderRequest(prompt="こんにちは、世界", model=model_name)
+
+    # ProviderRequest.model は必須。CLI/Factory 層で必ず決める。
+    request = ProviderRequest(
+        prompt="こんにちは、世界",
+        model=_resolve_model_name(primary),
+    )
 
     try:
         response = runner.run(request, shadow=shadow)
