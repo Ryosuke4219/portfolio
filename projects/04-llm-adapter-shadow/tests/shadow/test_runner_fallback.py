@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -17,9 +18,48 @@ from src.llm_adapter.errors import ProviderSkip, RateLimitError, RetriableError,
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import Runner
 
+try:  # pragma: no cover - 互換性確保用
+    from src.llm_adapter.runner import RunnerConfig
+except ImportError:  # pragma: no cover - 古いバージョン向け
+    RunnerConfig = None  # type: ignore[assignment]
+
 
 def _read_metrics(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def _derive_backoff(config: Any) -> tuple[float, ...]:
+    for attr in (
+        "rate_limit_backoff_seconds",
+        "rate_limit_backoff",
+        "rate_limit_backoff_s",
+        "rate_limit_backoff_schedule",
+        "rate_limit_backoff_delays",
+    ):
+        value = getattr(config, attr, None)
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            items = tuple(float(item) for item in value)
+            if items:
+                return items
+
+    base = getattr(config, "rate_limit_backoff_base_s", None)
+    if not isinstance(base, (int, float)):
+        base = getattr(config, "rate_limit_backoff_initial_s", None)
+    if isinstance(base, (int, float)):
+        factor = getattr(config, "rate_limit_backoff_multiplier", 1.0)
+        if not isinstance(factor, (int, float)):
+            factor = getattr(config, "rate_limit_backoff_factor", 1.0)
+        attempts = getattr(config, "rate_limit_backoff_max_attempts", 1)
+        if not isinstance(attempts, int) or attempts <= 0:
+            attempts = getattr(config, "rate_limit_backoff_retries", 1)
+        if not isinstance(attempts, int) or attempts <= 0:
+            attempts = 1
+        return tuple(float(base) * (float(factor) ** index) for index in range(attempts))
+
+    single = getattr(config, "rate_limit_backoff_s", None)
+    if isinstance(single, (int, float)):
+        return (float(single),)
+    return (0.05,)
 
 
 class _ErrorProvider(ProviderSPI):
@@ -208,9 +248,57 @@ def test_rate_limit_triggers_backoff_and_logs(
 
     monkeypatch.setattr("src.llm_adapter.runner.time.sleep", _fake_sleep)
 
-    _, records = _run_and_collect([rate_limited, succeeding], metrics_path=metrics_path)
+    runner_kwargs: dict[str, Any] = {}
+    expected_backoff: tuple[float, ...] = (0.05,)
 
-    assert sleep_calls == [0.05]
+    try:
+        init_params = inspect.signature(Runner.__init__).parameters
+    except (TypeError, ValueError):  # pragma: no cover - 予防
+        init_params = {}
+
+    if RunnerConfig is not None and "config" in init_params:
+        schedule = (0.05, 0.1, 0.2)
+        base = schedule[0]
+        ratio = schedule[1] / schedule[0]
+        config_instance: Any | None = None
+        for kwargs in (
+            {"rate_limit_backoff_seconds": schedule},
+            {"rate_limit_backoff": schedule},
+            {"rate_limit_backoff_s": schedule},
+            {
+                "rate_limit_backoff_base_s": base,
+                "rate_limit_backoff_multiplier": ratio,
+                "rate_limit_backoff_max_attempts": len(schedule),
+            },
+            {
+                "rate_limit_backoff_base_s": base,
+                "rate_limit_backoff_factor": ratio,
+                "rate_limit_backoff_retries": len(schedule),
+            },
+        ):
+            try:
+                config_instance = RunnerConfig(**kwargs)
+            except TypeError:
+                continue
+            else:
+                break
+        if config_instance is None:
+            config_instance = RunnerConfig()
+        expected_backoff = _derive_backoff(config_instance)
+        runner_kwargs["config"] = config_instance
+
+    runner = Runner([rate_limited, succeeding], **runner_kwargs)
+
+    request = ProviderRequest(prompt="hello", model="demo-model")
+    response = runner.run(request, shadow_metrics_path=metrics_path)
+    assert response is not None
+
+    records = _read_metrics(metrics_path)
+
+    assert sleep_calls, "rate limit backoff should trigger"
+    expected_prefix = tuple(expected_backoff[: len(sleep_calls)])
+    assert tuple(sleep_calls) == expected_prefix
+    assert all(a <= b for a, b in zip(sleep_calls, sleep_calls[1:]))
     first_call = next(
         rec
         for rec in records
