@@ -4,24 +4,29 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from types import ModuleType
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from ..errors import ConfigError
 from ..provider_spi import ProviderRequest
+
+LegacyConfigPayload = Mapping[str, Any] | Sequence[Mapping[str, Any]]
+
+genai: ModuleType | None
+gt: Any | None
 
 try:  # pragma: no cover - import guard for offline environments
     from google import genai as _genai_module
     from google.genai import types as _genai_types
 except ModuleNotFoundError:  # pragma: no cover - SDK optional at runtime
-    genai: ModuleType | None = None
-    gt: Any | None = None
+    genai = None
+    gt = None
 else:
-    genai = cast(ModuleType, _genai_module)
-    gt = cast(Any, _genai_types)
+    genai = _genai_module
+    gt = _genai_types
 
 if gt is None:  # pragma: no cover - stub for unit tests without the SDK
 
-    class _GenerateContentConfig(dict):
+    class _GenerateContentConfig(dict[str, Any]):
         def __init__(self, **kwargs: Any) -> None:
             super().__init__(**kwargs)
 
@@ -31,7 +36,7 @@ if gt is None:  # pragma: no cover - stub for unit tests without the SDK
     class _TypesModule:
         GenerateContentConfig = _GenerateContentConfig
 
-    gt = cast(Any, _TypesModule())
+    gt = _TypesModule()
 
 __all__ = [
     "GeminiModelsAPI",
@@ -49,7 +54,7 @@ class GeminiModelsAPI(Protocol):
         *,
         model: str,
         contents: Sequence[Mapping[str, Any]] | None,
-        config: Mapping[str, Any] | None = None,
+        config: Any | None = None,
     ) -> Any:
         ...
 
@@ -60,7 +65,7 @@ class GeminiResponsesAPI(Protocol):  # pragma: no cover - legacy fallback
         *,
         model: str,
         input: Sequence[Mapping[str, Any]] | None,
-        config: Mapping[str, Any] | None = None,
+        config: LegacyConfigPayload | None = None,
     ) -> Any:
         ...
 
@@ -73,7 +78,7 @@ class GeminiClientProtocol(Protocol):
 def _prepare_generation_config(
     base_config: Mapping[str, Any] | None,
     safety_settings: Sequence[Mapping[str, Any]] | None,
-) -> tuple[Any | None, Mapping[str, Any] | None]:
+) -> tuple[Any | None, LegacyConfigPayload | None]:
     merged: dict[str, Any] = {}
     if base_config:
         merged.update(base_config)
@@ -86,7 +91,7 @@ def _prepare_generation_config(
     elif merged:
         config_obj = merged
 
-    config_payload: Mapping[str, Any] | None = None
+    config_payload: LegacyConfigPayload | None = None
     if config_obj is not None:
         to_dict = getattr(config_obj, "to_dict", None)
         if callable(to_dict):

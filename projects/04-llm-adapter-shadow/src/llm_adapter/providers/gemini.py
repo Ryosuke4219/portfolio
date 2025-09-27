@@ -55,7 +55,7 @@ class GeminiProvider(ProviderSPI):
                 )
             self._client_module = cast(Any, genai)
         else:
-            self._client = cast(GeminiClientProtocol, client)
+            self._client = client
         self._generation_config = dict(generation_config or {})
         self._safety_settings = list(safety_settings or [])
 
