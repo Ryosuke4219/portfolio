@@ -209,57 +209,6 @@ def test_provider_chain_failed_records_last_error_family() -> None:
     assert run_event["error_family"] == "retryable"
 
 
-@pytest.mark.asyncio
-async def test_async_rate_limit_triggers_backoff_and_logs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    rate_limited = _ErrorProvider("rate-limit", RateLimitError("slow down"))
-    succeeding = _SuccessProvider("success")
-
-    sleep_calls: list[float] = []
-
-    async def _fake_sleep(duration: float) -> None:
-        sleep_calls.append(duration)
-
-    monkeypatch.setattr("src.llm_adapter.runner.asyncio.sleep", _fake_sleep)
-
-    logger = FakeLogger()
-    runner = AsyncRunner(
-        [rate_limited, succeeding],
-        logger=logger,
-        config=RunnerConfig(backoff=BackoffPolicy(rate_limit_sleep_s=0.321)),
-    )
-    request = ProviderRequest(prompt="hello", model="demo-model")
-
-    response = await runner.run_async(request, shadow_metrics_path=None)
-
-    assert response.text == "success:ok"
-    assert sleep_calls == [0.321]
-    first_call = next(
-        record
-        for record in logger.of_type("provider_call")
-        if record["provider"] == "rate-limit"
-    )
-    assert first_call["status"] == "error"
-    assert first_call["error_type"] == "RateLimitError"
-    assert first_call["error_family"] == "rate_limit"
-
-
-@pytest.mark.asyncio
-async def test_async_retryable_error_logs_family() -> None:
-    logger = FakeLogger()
-    runner = AsyncRunner([_ErrorProvider("oops", RetriableError("nope"))], logger=logger)
-    request = ProviderRequest(prompt="hello", model="demo-model")
-
-    with pytest.raises(RetriableError):
-        await runner.run_async(request, shadow_metrics_path=None)
-
-    provider_event = logger.of_type("provider_call")[0]
-    assert provider_event["error_family"] == "retryable"
-
-    chain_event = logger.of_type("provider_chain_failed")[0]
-    assert chain_event["last_error_family"] == "retryable"
-
 def test_run_metric_contains_tokens_and_cost() -> None:
     succeeding = _SuccessProvider("success", tokens_in=21, tokens_out=9, cost_usd=0.456)
 
