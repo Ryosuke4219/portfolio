@@ -12,13 +12,15 @@ def test_shadow_exec_records_metrics(tmp_path):
 
     metrics_path = tmp_path / "metrics.jsonl"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
+    request = ProviderRequest(prompt="hello", metadata=metadata, model="primary-model")
     response = runner.run(
-        ProviderRequest(prompt="hello", metadata=metadata),
+        request,
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
 
     assert response.text.startswith("echo(primary):")
+    assert response.model == "primary-model"
     assert metrics_path.exists()
 
     payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
@@ -55,7 +57,7 @@ def test_shadow_error_records_metrics(tmp_path):
 
     metrics_path = tmp_path / "metrics.jsonl"
     runner.run(
-        ProviderRequest(prompt="[TIMEOUT] hello"),
+        ProviderRequest(prompt="[TIMEOUT] hello", model="primary-model"),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
@@ -76,11 +78,11 @@ def test_request_hash_includes_max_tokens(tmp_path):
     metrics_path = tmp_path / "metrics.jsonl"
 
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=32),
+        ProviderRequest(prompt="hello", max_tokens=32, model="primary-model"),
         shadow_metrics_path=metrics_path,
     )
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=64),
+        ProviderRequest(prompt="hello", max_tokens=64, model="primary-model"),
         shadow_metrics_path=metrics_path,
     )
 

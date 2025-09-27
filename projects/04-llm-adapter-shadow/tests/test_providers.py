@@ -222,6 +222,7 @@ def test_gemini_provider_invokes_client_with_config():
         temperature=0.4,
         top_p=0.85,
         stop=["END"],
+        model="gemini-2.5-flash",
     )
     response = provider.invoke(request)
 
@@ -318,7 +319,7 @@ def test_gemini_provider_skips_without_api_key(monkeypatch):
     provider = GeminiProvider("gemini-2.5-flash")
 
     with pytest.raises(ProviderSkip) as excinfo:
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
     assert excinfo.value.reason == "missing_gemini_api_key"
 
@@ -337,7 +338,7 @@ def test_gemini_provider_translates_rate_limit():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(RateLimitError):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
 
 def test_gemini_provider_translates_rate_limit_status_object():
@@ -361,7 +362,7 @@ def test_gemini_provider_translates_rate_limit_status_object():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(RateLimitError):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
 
 def test_gemini_provider_preserves_rate_limit_error_instances():
@@ -378,7 +379,7 @@ def test_gemini_provider_preserves_rate_limit_error_instances():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(RateLimitError) as excinfo:
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
     assert excinfo.value is raised_error
 
@@ -404,7 +405,7 @@ def test_gemini_provider_translates_timeout_status_object():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(TimeoutError):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
 
 def test_gemini_provider_preserves_timeout_error_instances():
@@ -421,7 +422,7 @@ def test_gemini_provider_preserves_timeout_error_instances():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(TimeoutError) as excinfo:
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
     assert excinfo.value is raised_error
 
@@ -468,7 +469,7 @@ def test_gemini_provider_translates_callable_code_status(
     )
 
     with pytest.raises(expected):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
 
 def test_gemini_provider_translates_named_timeout_exception():
@@ -486,7 +487,7 @@ def test_gemini_provider_translates_named_timeout_exception():
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(TimeoutError):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
 
 @pytest.mark.parametrize(
@@ -516,7 +517,7 @@ def test_gemini_provider_translates_http_errors(status_code: int, expected: type
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
 
     with pytest.raises(expected):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemini-2.5-flash"))
 
 
 def test_ollama_provider_auto_pull_and_chat():
@@ -555,7 +556,7 @@ def test_ollama_provider_auto_pull_and_chat():
     session = Session()
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
-    response = provider.invoke(ProviderRequest(prompt="hello"))
+    response = provider.invoke(ProviderRequest(prompt="hello", model="gemma3n:e2b"))
 
     assert response.text == "hello"
     assert response.token_usage.prompt == 3
@@ -609,6 +610,7 @@ def test_ollama_provider_merges_request_options():
         stop=["END"],
         timeout_s=5.0,
         options={"options": {"stop": ["ALT"], "seed": 99}, "stream": True},
+        model="gemma3",
     )
     provider.invoke(request)
 
@@ -657,7 +659,7 @@ def test_ollama_provider_auto_pull_error_mapping(status_code: int, expected: typ
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
     with pytest.raises(expected):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemma3n:e2b"))
 
     assert session.pull_response is not None
     assert session.pull_response.closed
@@ -690,6 +692,7 @@ def test_ollama_provider_request_timeout_override():
             prompt="hello",
             timeout_s=None,
             options={"REQUEST_TIMEOUT_S": "2.5", "extra": True},
+            model="gemma3n:e2b",
         )
     )
 
@@ -727,7 +730,7 @@ def test_ollama_provider_maps_auth_error(status_code: int, expected: type[Except
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")
 
     with pytest.raises(expected):
-        provider.invoke(ProviderRequest(prompt="hello"))
+        provider.invoke(ProviderRequest(prompt="hello", model="gemma3n:e2b"))
 
     assert session.last_chat_response is not None
     assert session.last_chat_response.closed
