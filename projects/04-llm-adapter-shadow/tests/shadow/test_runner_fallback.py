@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -12,7 +10,6 @@ from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 
-from src.llm_adapter import metrics as metrics_module
 from src.llm_adapter import provider_spi as provider_spi_module
 from src.llm_adapter.errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
@@ -102,24 +99,17 @@ def _run_and_collect(
     prompt: str = "hello",
     expect_exception: type[Exception] | None = None,
 ) -> tuple[ProviderResponse | None, FakeLogger]:
-    runner = Runner(list(providers))
+    logger = FakeLogger()
+    runner = Runner(list(providers), logger=logger)
     request = ProviderRequest(prompt=prompt, model="demo-model")
 
-    logger = FakeLogger()
-    metrics_path = Path(f"/in-memory/{uuid.uuid4().hex}.jsonl")
-    with metrics_module._JSONL_LOGGERS_LOCK:
-        metrics_module._JSONL_LOGGERS[metrics_path] = logger
-    try:
-        if expect_exception is None:
-            response = runner.run(request, shadow_metrics_path=metrics_path)
-            return response, logger
+    if expect_exception is None:
+        response = runner.run(request, shadow_metrics_path=None)
+        return response, logger
 
-        with pytest.raises(expect_exception):
-            runner.run(request, shadow_metrics_path=metrics_path)
-        return None, logger
-    finally:
-        with metrics_module._JSONL_LOGGERS_LOCK:
-            metrics_module._JSONL_LOGGERS.pop(metrics_path, None)
+    with pytest.raises(expect_exception):
+        runner.run(request, shadow_metrics_path=None)
+    return None, logger
 
 
 @pytest.mark.parametrize(

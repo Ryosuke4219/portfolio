@@ -2,11 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, Runner
+
+
+class _CapturingLogger:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
+        self.events.append((event_type, dict(record)))
+
+    def of_type(self, event_type: str) -> list[dict[str, Any]]:
+        return [payload for kind, payload in self.events if kind == event_type]
 
 
 def test_async_runner_matches_sync(tmp_path: Path) -> None:
@@ -28,6 +41,52 @@ def test_async_runner_matches_sync(tmp_path: Path) -> None:
     assert async_response.text == sync_response.text
     assert async_response.model == sync_response.model
     assert async_metrics.exists()
+
+
+def test_async_shadow_exec_uses_injected_logger(tmp_path: Path) -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = _CapturingLogger()
+    runner = AsyncRunner([primary], logger=logger)
+
+    request = ProviderRequest(prompt="hello", model="primary-model")
+    metrics_path = tmp_path / "async-unused.jsonl"
+
+    response = asyncio.run(
+        runner.run_async(
+            request,
+            shadow=shadow,
+            shadow_metrics_path=metrics_path,
+        )
+    )
+
+    diff_events = logger.of_type("shadow_diff")
+    assert len(diff_events) == 1
+    diff_event = diff_events[0]
+    assert diff_event["primary_provider"] == "primary"
+    assert diff_event["shadow_provider"] == "shadow"
+    assert diff_event["shadow_ok"] is True
+    assert diff_event["primary_text_len"] == len(response.text)
+    assert not metrics_path.exists()
+
+
+def test_async_shadow_exec_without_metrics_path_skips_logging() -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = _CapturingLogger()
+    runner = AsyncRunner([primary], logger=logger)
+
+    request = ProviderRequest(prompt="hello", model="primary-model")
+
+    asyncio.run(
+        runner.run_async(
+            request,
+            shadow=shadow,
+            shadow_metrics_path=None,
+        )
+    )
+
+    assert logger.of_type("shadow_diff") == []
 
 
 def test_async_shadow_exec_records_metrics(tmp_path: Path) -> None:
