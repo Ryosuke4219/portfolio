@@ -131,7 +131,7 @@ def test_rate_limit_triggers_backoff_and_logs(
     def _fake_sleep(duration: float) -> None:
         sleep_calls.append(duration)
 
-    monkeypatch.setattr("src.llm_adapter.runner.time.sleep", _fake_sleep)
+    monkeypatch.setattr("src.llm_adapter.runner_sync.time.sleep", _fake_sleep)
 
     _, logger = _run_and_collect(
         [rate_limited, succeeding],
