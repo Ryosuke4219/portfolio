@@ -1,6 +1,7 @@
-"""Utility helpers for hashing request payloads."""
+"""Utility helpers for hashing request payloads and timing."""
 
 import hashlib
+import time
 from typing import Any
 
 
@@ -17,3 +18,10 @@ def content_hash(
     if options:
         h.update(repr(sorted(options.items())).encode())
     return h.hexdigest()[:16]
+
+
+def elapsed_ms(start_ts: float, *, end_ts: float | None = None) -> int:
+    """Return elapsed milliseconds between ``start_ts`` and now (clamped to >= 0)."""
+
+    end = end_ts if end_ts is not None else time.time()
+    return max(0, int((end - start_ts) * 1000))
