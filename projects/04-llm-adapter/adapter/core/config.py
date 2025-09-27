@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Tuple, Union
 
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
 try:  # pragma: no cover - 依存がある場合はこちらを利用
     import yaml  # type: ignore
 except Exception:  # pragma: no cover - フォールバックで処理
@@ -51,6 +53,7 @@ class ProviderConfig:
     """プロバイダ設定。"""
 
     path: Path
+    schema_version: Optional[int]
     provider: str
     endpoint: Optional[str]
     model: str
@@ -83,6 +86,83 @@ class BudgetBook:
 
     default: BudgetRule
     overrides: Mapping[str, BudgetRule]
+
+
+class ConfigError(ValueError):
+    """設定ファイルの検証エラー。"""
+
+
+class RetryConfigModel(BaseModel):
+    """API 呼び出し再試行設定のスキーマ。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max: int = 0
+    backoff_s: float = 0.0
+
+
+class PricingConfigModel(BaseModel):
+    """料金設定のスキーマ。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    prompt_usd: float = 0.0
+    completion_usd: float = 0.0
+    input_per_million: float = 0.0
+    output_per_million: float = 0.0
+
+
+class RateLimitConfigModel(BaseModel):
+    """レートリミット設定のスキーマ。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rpm: int = 0
+    tpm: int = 0
+
+
+class QualityGatesConfigModel(BaseModel):
+    """決定性ゲート設定のスキーマ。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    determinism_diff_rate_max: float = 0.0
+    determinism_len_stdev_max: float = 0.0
+
+
+class ProviderConfigModel(BaseModel):
+    """プロバイダ設定全体のスキーマ。"""
+
+    model_config = ConfigDict(extra="allow")
+
+    schema_version: Optional[int] = None
+    provider: str
+    endpoint: Optional[str] = None
+    model: str
+    auth_env: Optional[str] = None
+    seed: int = 0
+    temperature: float = 0.0
+    top_p: float = 1.0
+    max_tokens: int = 0
+    timeout_s: int = 0
+    retries: RetryConfigModel = Field(default_factory=RetryConfigModel)
+    persist_output: bool = False
+    pricing: PricingConfigModel = Field(default_factory=PricingConfigModel)
+    rate_limit: RateLimitConfigModel = Field(default_factory=RateLimitConfigModel)
+    quality_gates: QualityGatesConfigModel = Field(default_factory=QualityGatesConfigModel)
+
+
+def _format_validation_error(path: Path, exc: ValidationError) -> str:
+    details = []
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error.get("loc", ()) if part is not None)
+        message = error.get("msg", "未知のエラー")
+        if location:
+            details.append(f"{location}: {message}")
+        else:
+            details.append(message)
+    summary = "; ".join(details)
+    return f"設定ファイルの検証に失敗しました ({path}): {summary}"
 
 
 def _load_yaml(path: Union[str, Path]) -> MutableMapping[str, Any]:
@@ -150,45 +230,43 @@ def load_provider_config(path: Union[str, Path]) -> ProviderConfig:
 
     path = Path(path)
     data = _load_yaml(path)
-    retries = data.get("retries", {})
-    pricing = data.get("pricing", {})
-    rate_limit = data.get("rate_limit", {})
-    quality = data.get("quality_gates", {})
+    try:
+        model = ProviderConfigModel.model_validate(data)
+    except ValidationError as exc:
+        raise ConfigError(_format_validation_error(path, exc)) from None
+    retries = model.retries
+    pricing = model.pricing
+    rate_limit = model.rate_limit
+    quality = model.quality_gates
+    raw_dump = model.model_dump(mode="python")
+    if model.model_extra:
+        raw_dump.update(model.model_extra)
     return ProviderConfig(
         path=path,
-        provider=str(data.get("provider")),
-        endpoint=data.get("endpoint"),
-        model=str(data.get("model")),
-        auth_env=data.get("auth_env"),
-        seed=int(data.get("seed", 0)),
-        temperature=float(data.get("temperature", 0.0)),
-        top_p=float(data.get("top_p", 1.0)),
-        max_tokens=int(data.get("max_tokens", 0)),
-        timeout_s=int(data.get("timeout_s", 0)),
-        retries=RetryConfig(
-            max=int(retries.get("max", 0)),
-            backoff_s=float(retries.get("backoff_s", 0.0)),
-        ),
-        persist_output=bool(data.get("persist_output", False)),
+        schema_version=model.schema_version,
+        provider=model.provider,
+        endpoint=model.endpoint,
+        model=model.model,
+        auth_env=model.auth_env,
+        seed=model.seed,
+        temperature=model.temperature,
+        top_p=model.top_p,
+        max_tokens=model.max_tokens,
+        timeout_s=model.timeout_s,
+        retries=RetryConfig(max=retries.max, backoff_s=retries.backoff_s),
+        persist_output=model.persist_output,
         pricing=PricingConfig(
-            prompt_usd=float(pricing.get("prompt_usd", 0.0)),
-            completion_usd=float(pricing.get("completion_usd", 0.0)),
-            input_per_million=float(pricing.get("input_per_million", 0.0)),
-            output_per_million=float(pricing.get("output_per_million", 0.0)),
+            prompt_usd=pricing.prompt_usd,
+            completion_usd=pricing.completion_usd,
+            input_per_million=pricing.input_per_million,
+            output_per_million=pricing.output_per_million,
         ),
-        rate_limit=RateLimitConfig(
-            rpm=int(rate_limit.get("rpm", 0)),
-            tpm=int(rate_limit.get("tpm", 0)),
-        ),
+        rate_limit=RateLimitConfig(rpm=rate_limit.rpm, tpm=rate_limit.tpm),
         quality_gates=QualityGatesConfig(
-            determinism_diff_rate_max=float(
-                quality.get("determinism_diff_rate_max", 0.0)
-            ),
-            determinism_len_stdev_max=float(
-                quality.get("determinism_len_stdev_max", 0.0)
-            ),
+            determinism_diff_rate_max=quality.determinism_diff_rate_max,
+            determinism_len_stdev_max=quality.determinism_len_stdev_max,
         ),
-        raw=data,
+        raw=raw_dump,
     )
 
 
