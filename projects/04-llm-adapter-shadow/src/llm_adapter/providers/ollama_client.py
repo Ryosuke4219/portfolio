@@ -6,7 +6,6 @@ from typing import Any
 from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from ._requests_compat import ResponseProtocol, SessionProtocol, requests_exceptions
 
-
 _streaming_error_candidates: list[type[BaseException]] = []
 for _attr in ("ChunkedEncodingError", "ProtocolError"):
     _candidate = getattr(requests_exceptions, _attr, None)
