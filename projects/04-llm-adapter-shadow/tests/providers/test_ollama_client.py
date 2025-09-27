@@ -95,3 +95,36 @@ def test_ollama_client_closes_responses_on_http_error(
 
     assert session.last_response is not None
     assert session.last_response.closed is True
+
+
+def test_ollama_client_closes_responses_on_stream_error():
+    stream_error_cls = getattr(
+        requests_exceptions,
+        "ChunkedEncodingError",
+        getattr(requests_exceptions, "ProtocolError", requests_exceptions.RequestException),
+    )
+
+    class Session(FakeSession):
+        def __init__(self) -> None:
+            super().__init__()
+            self.last_response: FakeResponse | None = None
+
+        def post(self, url, json=None, stream=False, timeout=None):
+            response = FakeResponse(
+                status_code=200,
+                payload={},
+                iter_lines_exception=stream_error_cls("boom"),
+            )
+            self.last_response = response
+            return response
+
+    session = Session()
+    client = OllamaClient(host="http://h", session=session, timeout=10.0, pull_timeout=5.0)
+
+    with pytest.raises(RetriableError):
+        with client.pull({"model": "m"}) as response:
+            for _ in response.iter_lines():
+                pass
+
+    assert session.last_response is not None
+    assert session.last_response.closed is True

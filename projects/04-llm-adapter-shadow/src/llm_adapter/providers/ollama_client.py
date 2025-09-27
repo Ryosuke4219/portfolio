@@ -1,9 +1,66 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from ._requests_compat import ResponseProtocol, SessionProtocol, requests_exceptions
+
+
+_streaming_error_candidates: list[type[BaseException]] = []
+for _attr in ("ChunkedEncodingError", "ProtocolError"):
+    _candidate = getattr(requests_exceptions, _attr, None)
+    if isinstance(_candidate, type) and issubclass(_candidate, BaseException):
+        _streaming_error_candidates.append(_candidate)
+
+if _streaming_error_candidates:
+    _STREAMING_ERRORS: tuple[type[BaseException], ...] = tuple(_streaming_error_candidates)
+else:
+    _STREAMING_ERRORS = (requests_exceptions.RequestException,)
+
+
+class _StreamingResponseWrapper:
+    __slots__ = ("_response", "_path")
+
+    def __init__(self, response: ResponseProtocol, path: str) -> None:
+        self._response = response
+        self._path = path
+
+    def close(self) -> None:
+        self._response.close()
+
+    @property
+    def status_code(self) -> int:
+        return self._response.status_code
+
+    @property
+    def closed(self) -> bool:
+        return bool(getattr(self._response, "closed", False))
+
+    def json(self):
+        return self._response.json()
+
+    def raise_for_status(self) -> None:
+        self._response.raise_for_status()
+
+    def iter_lines(self):
+        try:
+            yield from self._response.iter_lines()
+        except _STREAMING_ERRORS as exc:
+            self.close()
+            raise RetriableError(
+                f"Ollama streaming failed: {self._path}"
+            ) from exc
+
+    def __enter__(self):
+        self._response.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return self._response.__exit__(exc_type, exc, tb)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._response, name)
 
 
 def _combine_host(base: str, path: str) -> str:
@@ -30,10 +87,11 @@ class OllamaClient:
         return self._post("/api/show", payload)
 
     def pull(self, payload: Mapping[str, object]) -> ResponseProtocol:
-        return self._ensure_success(
+        response = self._ensure_success(
             "/api/pull",
             self._post("/api/pull", payload, stream=True, timeout=self._pull_timeout),
         )
+        return _StreamingResponseWrapper(response, "/api/pull")
 
     def chat(
         self,

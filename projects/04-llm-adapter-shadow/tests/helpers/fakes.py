@@ -13,10 +13,12 @@ class FakeResponse:
         status_code: int,
         payload: dict | None = None,
         lines: list[bytes] | None = None,
+        iter_lines_exception: Exception | None = None,
     ) -> None:
         self.status_code = status_code
         self._payload = payload or {}
         self._lines = lines or [b"{}"]
+        self._iter_lines_exception = iter_lines_exception
         self.closed = False
 
     def raise_for_status(self) -> None:
@@ -27,6 +29,8 @@ class FakeResponse:
         return self._payload
 
     def iter_lines(self):
+        if self._iter_lines_exception is not None:
+            raise self._iter_lines_exception
         yield from self._lines
 
     def close(self) -> None:
