@@ -26,7 +26,10 @@ class AuthError(AdapterError):
 
 
 class RetriableError(AdapterError):
-    """Raised for transient issues where retrying with another provider may help (instant fallback)."""
+    """Raised for transient issues where retrying with another provider may help.
+
+    Runner instantly falls back to the next provider when this error is encountered.
+    """
 
 
 class FatalError(AdapterError):
