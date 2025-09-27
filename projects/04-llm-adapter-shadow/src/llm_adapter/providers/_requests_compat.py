@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import importlib
+import typing
 from collections.abc import Iterable
 from types import TracebackType
-
-# ruff: isort: off
-from typing import Any, Protocol, TYPE_CHECKING, cast
-# ruff: isort: on
+from typing import Any, Protocol, cast
 
 
 class ResponseProtocol(Protocol):
@@ -49,7 +47,7 @@ Response: type[ResponseProtocol]
 requests_exceptions: RequestsExceptionsProtocol
 
 
-if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
+if typing.TYPE_CHECKING:  # pragma: no cover - typing time placeholders
     import requests as _requests_mod  # type: ignore[import-untyped]  # noqa: F401
     from requests import Response as _RequestsResponse  # noqa: F401
     from requests import exceptions as _RequestsExceptions  # noqa: F401
