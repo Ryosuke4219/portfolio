@@ -6,16 +6,45 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import importlib
 import json
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Iterable, List, Optional
+from types import ModuleType
+from typing import Iterable, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from tools.weekly_summary.__main__ import main as _cli_main
+    from tools.weekly_summary.__main__ import parse_args as _cli_parse_args
+
+__all__ = ["parse_args", "main"]
+
+_CLI_MODULE_NAME = "tools.weekly_summary.__main__"
+_CLI_MODULE: ModuleType | None = None
+_CLI_MODULE_MISSING = False
+
+
+def _load_cli_module() -> ModuleType | None:
+    """Return the CLI implementation module if available."""
+
+    global _CLI_MODULE, _CLI_MODULE_MISSING
+
+    if _CLI_MODULE is not None:
+        return _CLI_MODULE
+    if _CLI_MODULE_MISSING:
+        return None
+    try:
+        _CLI_MODULE = importlib.import_module(_CLI_MODULE_NAME)
+    except ModuleNotFoundError:
+        _CLI_MODULE_MISSING = True
+        return None
+    return _CLI_MODULE
 
 ISO_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})")
 
 
-def parse_args() -> argparse.Namespace:
+def _parse_args_impl(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate weekly QA summary")
     parser.add_argument("--runs", type=Path, required=True, help="Path to runs.jsonl")
     parser.add_argument("--flaky", type=Path, required=True, help="Path to flaky_rank.csv")
@@ -27,7 +56,8 @@ def parse_args() -> argparse.Namespace:
         default=Path("docs/defect-report-sample.md"),
         help="Path to defect reports used for counting new defects",
     )
-    return parser.parse_args()
+    args = None if argv is None else list(argv)
+    return parser.parse_args(args)
 
 
 def parse_iso8601(value: Optional[str]) -> Optional[dt.datetime]:
@@ -259,8 +289,8 @@ def fallback_write(out_path: Path, today: dt.date, days: int) -> None:
     out_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
 
 
-def main() -> None:
-    args = parse_args()
+def _main_impl() -> None:
+    args = _parse_args_impl()
     out_path: Path = args.out
     today = dt.datetime.now(dt.timezone.utc).date()
 
@@ -368,6 +398,27 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     content = build_front_matter(today, args.days) + markdown_lines
     out_path.write_text("\n".join(content) + "\n", encoding="utf-8")
+
+
+def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
+    module = _load_cli_module()
+    if module is not None:
+        parse = getattr(module, "parse_args", None)
+        if callable(parse):
+            if argv is None:
+                return parse()
+            return parse(argv)
+    return _parse_args_impl(argv)
+
+
+def main() -> None:
+    module = _load_cli_module()
+    if module is not None:
+        entry = getattr(module, "main", None)
+        if callable(entry):
+            entry()
+            return
+    _main_impl()
 
 
 if __name__ == "__main__":  # pragma: no cover
