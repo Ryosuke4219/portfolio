@@ -1,0 +1,277 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
+from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError, TimeoutError
+from src.llm_adapter.provider_spi import ProviderRequest
+from src.llm_adapter.providers.gemini import GeminiProvider
+
+from tests.helpers.fakes import RecordGeminiClient
+
+
+def _maybe_attr(obj: Any, name: str) -> Any:
+    return getattr(obj, name) if hasattr(obj, name) else None
+
+
+def test_gemini_provider_invokes_client_with_config():
+    client = RecordGeminiClient()
+    provider = GeminiProvider(
+        "gemini-2.5-flash",
+        client=client,  # type: ignore[arg-type]
+        generation_config={"temperature": 0.2},
+    )
+
+    request = ProviderRequest(
+        prompt="テスト",
+        max_tokens=128,
+        metadata={"system": "you are helpful"},
+        temperature=0.4,
+        top_p=0.85,
+        stop=["END"],
+        model="gemini-2.5-flash",
+    )
+    response = provider.invoke(request)
+
+    assert response.text == "こんにちは"
+    assert response.token_usage.prompt == 12
+    assert response.token_usage.completion == 7
+    assert response.latency_ms >= 0
+    assert response.model == "gemini-2.5-flash"
+    assert response.tokens_in == 12
+    assert response.tokens_out == 7
+    assert response.finish_reason is None
+    assert response.raw is not None
+
+    recorded = client.calls.pop()
+    assert recorded["model"] == "gemini-2.5-flash"
+    assert recorded["contents"][0]["role"] == "system"
+    assert recorded["contents"][0]["parts"][0]["text"] == "you are helpful"
+    assert recorded["contents"][1]["role"] == "user"
+    recorded_config = recorded["config"]
+    config_view: dict[str, Any] = {}
+    config_dict = recorded.get("_config_dict")
+    if isinstance(config_dict, Mapping):
+        config_view.update(config_dict)
+    to_dict = getattr(recorded_config, "to_dict", None)
+    if callable(to_dict):
+        maybe = to_dict()
+        if isinstance(maybe, Mapping):
+            config_view.update(maybe)
+    if isinstance(recorded_config, Mapping):
+        config_view.update(recorded_config)
+
+    temperature = config_view.get("temperature")
+    if temperature is None:
+        maybe_temp = _maybe_attr(recorded_config, "temperature")
+        if maybe_temp is not None:
+            temperature = maybe_temp
+    max_tokens = config_view.get("max_output_tokens")
+    if max_tokens is None:
+        maybe_max = _maybe_attr(recorded_config, "max_output_tokens")
+        if maybe_max is not None:
+            max_tokens = maybe_max
+
+    stop_sequences = config_view.get("stop_sequences")
+    top_p = config_view.get("top_p")
+    if top_p is None:
+        maybe_top_p = _maybe_attr(recorded_config, "top_p")
+        if maybe_top_p is not None:
+            top_p = maybe_top_p
+    if stop_sequences is None:
+        maybe_stop = _maybe_attr(recorded_config, "stop_sequences")
+        if maybe_stop is not None:
+            stop_sequences = maybe_stop
+
+    assert temperature == 0.2
+    assert top_p == pytest.approx(0.85)
+    assert stop_sequences == ["END"]
+    assert max_tokens == 128
+    assert isinstance(recorded["contents"], list)
+
+
+def test_gemini_provider_uses_request_model_override_and_finish_reason():
+    class _Client:
+        def __init__(self):
+            self.calls = []
+
+            class _Models:
+                def __init__(self, outer):
+                    self._outer = outer
+
+                def generate_content(self, **kwargs):
+                    self._outer.calls.append(kwargs)
+                    return SimpleNamespace(
+                        text="ok",
+                        usage_metadata=SimpleNamespace(input_tokens=2, output_tokens=3),
+                        candidates=[SimpleNamespace(finish_reason="STOP")],
+                    )
+
+            self.models = _Models(self)
+
+    client = _Client()
+    provider = GeminiProvider("gemini-1.5-pro", client=client)  # type: ignore[arg-type]
+
+    request = ProviderRequest(prompt="hello", model="gemini-1.5-pro-exp")
+    response = provider.invoke(request)
+
+    recorded = client.calls.pop()
+    assert recorded["model"] == "gemini-1.5-pro-exp"
+    assert response.model == "gemini-1.5-pro-exp"
+    assert response.finish_reason == "STOP"
+    assert response.tokens_in == 2
+    assert response.tokens_out == 3
+
+
+def test_gemini_provider_skips_without_api_key(monkeypatch, provider_request_model):
+    from src.llm_adapter.providers import gemini as gemini_module
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    stub_module = SimpleNamespace(Client=lambda **_: SimpleNamespace(models=None, responses=None))
+    monkeypatch.setattr(gemini_module, "genai", stub_module, raising=False)
+
+    provider = GeminiProvider("gemini-2.5-flash")
+
+    with pytest.raises(ProviderSkip) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
+
+    assert excinfo.value.reason == "missing_gemini_api_key"
+
+
+def test_gemini_provider_translates_rate_limit(provider_request_model):
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            err = Exception("rate limited")
+            err.status = "RESOURCE_EXHAUSTED"
+            raise err
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(RateLimitError):
+        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
+
+
+def test_gemini_provider_translates_rate_limit_status_object(provider_request_model):
+    class _StatusCode:
+        def __init__(self, name: str):
+            self.name = name
+
+        def __str__(self) -> str:  # pragma: no cover - defensive normalization
+            return f"StatusCode.{self.name}"
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            err = Exception("rate limited")
+            err.status = _StatusCode("RESOURCE_EXHAUSTED")
+            raise err
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(RateLimitError):
+        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
+
+
+def test_gemini_provider_preserves_rate_limit_error_instances(provider_request_model):
+    raised_error = RateLimitError("rate limited")
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise raised_error
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(RateLimitError) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
+
+    assert excinfo.value is raised_error
+
+
+def test_gemini_provider_translates_timeout_status_object(provider_request_model):
+    class _StatusCode:
+        def __init__(self, name: str):
+            self.name = name
+
+        def __str__(self) -> str:  # pragma: no cover - defensive normalization
+            return f"StatusCode.{self.name}"
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            err = Exception("timeout")
+            err.code = _StatusCode("DEADLINE_EXCEEDED")
+            raise err
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(TimeoutError):
+        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
+
+
+def test_gemini_provider_preserves_timeout_error_instances(provider_request_model):
+    raised_error = TimeoutError("took too long")
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise raised_error
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(TimeoutError) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
+
+    assert excinfo.value is raised_error
+
+
+@pytest.mark.parametrize(
+    "status_code, expected",
+    [
+        (429, RateLimitError),
+        (401, AuthError),
+        (403, AuthError),
+        (408, TimeoutError),
+        (504, TimeoutError),
+    ],
+)
+def test_gemini_provider_translates_http_errors(
+    status_code: int, expected: type[Exception], provider_request_model
+):
+    class _HttpError(Exception):
+        def __init__(self, code: int):
+            super().__init__(f"http {code}")
+            self.response = SimpleNamespace(status_code=code)
+
+    class _FailingModels:
+        def generate_content(self, **kwargs):
+            raise _HttpError(status_code)
+
+    class _Client:
+        def __init__(self):
+            self.models = _FailingModels()
+
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+
+    with pytest.raises(expected):
+        provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
