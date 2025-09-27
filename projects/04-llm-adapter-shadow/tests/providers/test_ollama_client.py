@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+import pytest
+from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
+from src.llm_adapter.providers._requests_compat import requests_exceptions
+from src.llm_adapter.providers.ollama_client import OllamaClient
+
+from tests.helpers.fakes import FakeResponse, FakeSession
+
+
+def test_ollama_client_success_paths():
+    class Session(FakeSession):
+        def __init__(self) -> None:
+            super().__init__()
+            self.timeouts: list[float | None] = []
+
+        def post(self, url, json=None, stream=False, timeout=None):
+            self.calls.append((url, json, stream))
+            self.timeouts.append(timeout)
+            if url.endswith("/api/show"):
+                return FakeResponse(status_code=200, payload={"result": "ok"})
+            if url.endswith("/api/pull"):
+                return FakeResponse(status_code=200, payload={"done": True})
+            if url.endswith("/api/chat"):
+                return FakeResponse(status_code=200, payload={"message": {"content": "hi"}})
+            raise AssertionError(url)
+
+    session = Session()
+    client = OllamaClient(
+        host="http://localhost/",
+        session=session,
+        timeout=12.5,
+        pull_timeout=45.0,
+    )
+
+    assert client.show({"model": "m"}).json()["result"] == "ok"
+    assert client.pull({"model": "m"}).json()["done"] is True
+    assert (
+        client.chat({"messages": []}, timeout=2.5).json()["message"]["content"] == "hi"
+    )
+
+    assert [url for url, *_ in session.calls] == [
+        "http://localhost/api/show",
+        "http://localhost/api/pull",
+        "http://localhost/api/chat",
+    ]
+    assert session.timeouts == [12.5, 45.0, 2.5]
+
+
+@pytest.mark.parametrize(
+    ("factory", "expected"),
+    [
+        (requests_exceptions.ConnectionError, RetriableError),
+        (requests_exceptions.Timeout, TimeoutError),
+    ],
+)
+def test_ollama_client_normalizes_session_errors(factory, expected):
+    class Session(FakeSession):
+        def post(self, url, json=None, stream=False, timeout=None):
+            raise factory()
+
+    client = OllamaClient(host="http://h", session=Session(), timeout=10.0, pull_timeout=10.0)
+
+    with pytest.raises(expected):
+        client.chat({"messages": []})
+
+
+@pytest.mark.parametrize(
+    ("method_name", "path", "status", "payload", "kwargs", "expected"),
+    [
+        ("chat", "/api/chat", 429, {"messages": []}, {}, RateLimitError),
+        ("pull", "/api/pull", 500, {"model": "m"}, {}, RetriableError),
+    ],
+)
+def test_ollama_client_closes_responses_on_http_error(
+    method_name, path, status, payload, kwargs, expected
+):
+    class Session(FakeSession):
+        def __init__(self) -> None:
+            super().__init__()
+            self.last_response: FakeResponse | None = None
+
+        def post(self, url, json=None, stream=False, timeout=None):
+            if url.endswith(path):
+                response = FakeResponse(status_code=status, payload={})
+                self.last_response = response
+                return response
+            return FakeResponse(status_code=200, payload={})
+
+    session = Session()
+    client = OllamaClient(host="http://h", session=session, timeout=10.0, pull_timeout=5.0)
+
+    with pytest.raises(expected):
+        getattr(client, method_name)(payload, **kwargs)
+
+    assert session.last_response is not None
+    assert session.last_response.closed is True
