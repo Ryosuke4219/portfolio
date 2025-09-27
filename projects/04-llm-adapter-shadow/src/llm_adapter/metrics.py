@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Union
+from pathlib import Path
+from typing import Any
 
 from .observability import DEFAULT_LOGGER, EventLogger
 
-PathLike = Union[str, "Path"]
+PathLike = str | Path
 
 _DEFAULT_LOGGER: EventLogger = DEFAULT_LOGGER
 

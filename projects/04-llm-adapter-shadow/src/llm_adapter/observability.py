@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import sys
 import time
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from threading import Lock
-from typing import Any, Iterable, Protocol, Sequence, TextIO
+from typing import Any, Protocol, TextIO
 
 PathLike = str | Path
 
@@ -50,7 +51,7 @@ class StdLogger:
     def __init__(self, stream: TextIO | None = None) -> None:
         self._stream: TextIO = stream if stream is not None else sys.stdout
 
-    def emit(self, event_type: str, path: PathLike, **fields: Any) -> None:  # pragma: no cover - passthrough
+    def emit(self, event_type: str, path: PathLike, **fields: Any) -> None:  # pragma: no cover
         record = dict(fields)
         record.setdefault("ts", int(time.time() * 1000))
         record["event"] = event_type
