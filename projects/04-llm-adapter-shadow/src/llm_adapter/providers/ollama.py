@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import time
 from collections.abc import (
@@ -10,7 +11,7 @@ from collections.abc import (
     Sequence,
 )
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
@@ -49,21 +50,25 @@ class _RequestsModuleProtocol(Protocol):
     Response: type[_ResponseProtocol]
 
 
+requests: _RequestsModuleProtocol | None = None
+Response: type[_ResponseProtocol]
+requests_exceptions: _RequestsExceptionsProtocol
+
+
 if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
-    RequestsModule: TypeAlias = _RequestsModuleProtocol | None
-    ResponseType: TypeAlias = type[_ResponseProtocol]
-    RequestsExceptions: TypeAlias = _RequestsExceptionsProtocol
+    import requests as _requests_mod  # type: ignore[import-untyped]  # noqa: F401
+    from requests import Response as _RequestsResponse  # noqa: F401
+    from requests import exceptions as _RequestsExceptions  # noqa: F401
 
-    requests: RequestsModule
-    Response: ResponseType
-    requests_exceptions: RequestsExceptions
-else:  # pragma: no cover - allow running without the optional dependency
-    import importlib
 
+def _initialize_requests() -> tuple[
+    _RequestsModuleProtocol | None,
+    type[_ResponseProtocol],
+    _RequestsExceptionsProtocol,
+]:
     try:
         _requests_module = importlib.import_module("requests")
     except ModuleNotFoundError:
-        requests = None
 
         class _FallbackRequestsExceptions:  # pragma: no cover - trivial container
             class RequestException(Exception): ...
@@ -73,12 +78,13 @@ else:  # pragma: no cover - allow running without the optional dependency
                     super().__init__(message or "HTTP error")
                     self.response = response
 
-        requests_exceptions = cast(
+        fallback_exceptions = cast(
             _RequestsExceptionsProtocol, _FallbackRequestsExceptions()
         )
 
-        class Response:
+        class _FallbackResponse:
             """Very small stub mimicking the subset of Response we rely on."""
+
             status_code: int
 
             def __init__(self, status_code: int = 200) -> None:
@@ -87,7 +93,7 @@ else:  # pragma: no cover - allow running without the optional dependency
             def close(self) -> None:  # pragma: no cover - trivial stub
                 return None
 
-            def __enter__(self) -> Response:  # pragma: no cover - stub
+            def __enter__(self) -> _FallbackResponse:  # pragma: no cover - stub
                 return self
 
             def __exit__(
@@ -103,14 +109,24 @@ else:  # pragma: no cover - allow running without the optional dependency
 
             def raise_for_status(self) -> None:  # pragma: no cover - stub
                 if self.status_code >= 400:
-                    raise requests_exceptions.HTTPError(response=self)
+                    raise cast(Any, fallback_exceptions.HTTPError)(response=self)
 
             def iter_lines(self) -> Iterable[bytes]:  # pragma: no cover - stub
                 return []
-    else:
-        requests = cast(_RequestsModuleProtocol, _requests_module)
-        Response = cast(type[_ResponseProtocol], _requests_module.Response)
-        requests_exceptions = cast(_RequestsExceptionsProtocol, _requests_module.exceptions)
+
+        return (
+            None,
+            cast(type[_ResponseProtocol], _FallbackResponse),
+            fallback_exceptions,
+        )
+
+    _typed_requests = cast(_RequestsModuleProtocol, _requests_module)
+    response_type = cast(type[_ResponseProtocol], _requests_module.Response)
+    exceptions = cast(_RequestsExceptionsProtocol, _requests_module.exceptions)
+    return _typed_requests, response_type, exceptions
+
+
+requests, Response, requests_exceptions = _initialize_requests()
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 __all__ = ["OllamaProvider", "DEFAULT_HOST"]
@@ -251,9 +267,7 @@ class OllamaProvider(ProviderSPI):
             content = entry.get("content")
             if isinstance(content, str):
                 return content
-            if isinstance(content, Sequence) and not isinstance(
-                content, (bytes, bytearray)
-            ):
+            if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
                 parts = [part for part in content if isinstance(part, str)]
                 return "\n".join(parts)
             if content is None:
