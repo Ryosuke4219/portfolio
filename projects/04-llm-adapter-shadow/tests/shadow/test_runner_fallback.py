@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -12,14 +12,22 @@ from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 
+from src.llm_adapter import metrics as metrics_module
 from src.llm_adapter import provider_spi as provider_spi_module
 from src.llm_adapter.errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import Runner
 
 
-def _read_metrics(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+class FakeLogger:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
+        self.events.append((event_type, dict(record)))
+
+    def of_type(self, event_type: str) -> list[dict[str, Any]]:
+        return [record for logged_event, record in self.events if logged_event == event_type]
 
 
 class _ErrorProvider(ProviderSPI):
@@ -91,19 +99,27 @@ class _SkipProvider(ProviderSPI):
 def _run_and_collect(
     providers: Iterable[ProviderSPI],
     *,
-    metrics_path: Path,
     prompt: str = "hello",
     expect_exception: type[Exception] | None = None,
-) -> tuple[ProviderResponse | None, list[dict[str, Any]]]:
+) -> tuple[ProviderResponse | None, FakeLogger]:
     runner = Runner(list(providers))
     request = ProviderRequest(prompt=prompt, model="demo-model")
-    if expect_exception is None:
-        response = runner.run(request, shadow_metrics_path=metrics_path)
-        return response, _read_metrics(metrics_path)
 
-    with pytest.raises(expect_exception):
-        runner.run(request, shadow_metrics_path=metrics_path)
-    return None, _read_metrics(metrics_path)
+    logger = FakeLogger()
+    metrics_path = Path(f"/in-memory/{uuid.uuid4().hex}.jsonl")
+    with metrics_module._JSONL_LOGGERS_LOCK:
+        metrics_module._JSONL_LOGGERS[metrics_path] = logger
+    try:
+        if expect_exception is None:
+            response = runner.run(request, shadow_metrics_path=metrics_path)
+            return response, logger
+
+        with pytest.raises(expect_exception):
+            runner.run(request, shadow_metrics_path=metrics_path)
+        return None, logger
+    finally:
+        with metrics_module._JSONL_LOGGERS_LOCK:
+            metrics_module._JSONL_LOGGERS.pop(metrics_path, None)
 
 
 @pytest.mark.parametrize(
@@ -160,7 +176,6 @@ def _run_and_collect(
     ],
 )
 def test_runner_fallback_paths(
-    tmp_path: Path,
     providers: list[ProviderSPI],
     expected_statuses: list[str],
     expected_run_status: str,
@@ -169,23 +184,21 @@ def test_runner_fallback_paths(
     expected_skip_events: int,
     expect_exception: type[Exception] | None,
 ) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
-    response, records = _run_and_collect(
+    response, logger = _run_and_collect(
         providers,
-        metrics_path=metrics_path,
         expect_exception=expect_exception,
     )
 
-    provider_events = [rec for rec in records if rec["event"] == "provider_call"]
+    provider_events = logger.of_type("provider_call")
     assert len(provider_events) == len(expected_statuses)
     assert [event["status"] for event in provider_events] == expected_statuses
 
-    run_event = next(rec for rec in records if rec["event"] == "run_metric")
+    run_event = logger.of_type("run_metric")[0]
     assert run_event["status"] == expected_run_status
     assert run_event.get("provider") == expected_provider
     assert run_event["attempts"] == expected_attempts
 
-    skip_events = [rec for rec in records if rec["event"] == "provider_skipped"]
+    skip_events = logger.of_type("provider_skipped")
     assert len(skip_events) == expected_skip_events
 
     if expected_run_status == "ok":
@@ -195,9 +208,8 @@ def test_runner_fallback_paths(
 
 
 def test_rate_limit_triggers_backoff_and_logs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
     rate_limited = _ErrorProvider("rate-limit", RateLimitError("slow down"))
     succeeding = _SuccessProvider("success")
 
@@ -208,48 +220,46 @@ def test_rate_limit_triggers_backoff_and_logs(
 
     monkeypatch.setattr("src.llm_adapter.runner.time.sleep", _fake_sleep)
 
-    _, records = _run_and_collect([rate_limited, succeeding], metrics_path=metrics_path)
+    _, logger = _run_and_collect([rate_limited, succeeding])
 
     assert sleep_calls == [0.05]
     first_call = next(
-        rec
-        for rec in records
-        if rec["event"] == "provider_call" and rec["provider"] == "rate-limit"
+        record
+        for record in logger.of_type("provider_call")
+        if record["provider"] == "rate-limit"
     )
     assert first_call["status"] == "error"
     assert first_call["error_type"] == "RateLimitError"
 
 
-def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
+def test_timeout_switches_to_next_provider() -> None:
     timeouting = _ErrorProvider("slow", TimeoutError("too slow"))
     succeeding = _SuccessProvider("success")
 
-    _, records = _run_and_collect([timeouting, succeeding], metrics_path=metrics_path)
+    _, logger = _run_and_collect([timeouting, succeeding])
 
     timeout_event = next(
-        rec
-        for rec in records
-        if rec["event"] == "provider_call" and rec["provider"] == "slow"
+        record
+        for record in logger.of_type("provider_call")
+        if record["provider"] == "slow"
     )
     assert timeout_event["status"] == "error"
     assert timeout_event["error_type"] == "TimeoutError"
 
     success_event = next(
-        rec
-        for rec in records
-        if rec["event"] == "provider_call" and rec["provider"] == "success"
+        record
+        for record in logger.of_type("provider_call")
+        if record["provider"] == "success"
     )
     assert success_event["status"] == "ok"
 
 
-def test_run_metric_contains_tokens_and_cost(tmp_path: Path) -> None:
-    metrics_path = tmp_path / "metrics.jsonl"
+def test_run_metric_contains_tokens_and_cost() -> None:
     succeeding = _SuccessProvider("success", tokens_in=21, tokens_out=9, cost_usd=0.456)
 
-    _, records = _run_and_collect([succeeding], metrics_path=metrics_path)
+    _, logger = _run_and_collect([succeeding])
 
-    run_event = next(rec for rec in records if rec["event"] == "run_metric")
+    run_event = logger.of_type("run_metric")[0]
     assert run_event["tokens_in"] == 21
     assert run_event["tokens_out"] == 9
     assert run_event["cost_usd"] == pytest.approx(0.456)
