@@ -11,7 +11,8 @@ from collections.abc import (
     Sequence,
 )
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Protocol, cast
+
+from typing import Any, Protocol, TYPE_CHECKING, cast  # isort: skip
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
