@@ -2,12 +2,18 @@
 import json
 from pathlib import Path
 from typing import Any
+
 import pytest
 
 from src.llm_adapter.errors import TimeoutError
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
 from src.llm_adapter.provider_spi import ProviderRequest
+
+
+@pytest.fixture(scope="module")
+def provider_request_model() -> str:
+    return "gemini:test-model"
 
 
 def _providers_for(marker: str):
@@ -20,37 +26,43 @@ def _read_metrics(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def test_timeout_fallback():
+def test_timeout_fallback(provider_request_model):
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[TIMEOUT] hello"))
+    response = runner.run(
+        ProviderRequest(prompt="[TIMEOUT] hello", model=provider_request_model)
+    )
     assert response.text.startswith("echo(p2):")
 
 
-def test_ratelimit_retry_fallback():
+def test_ratelimit_retry_fallback(provider_request_model):
     p1, p2 = _providers_for("[RATELIMIT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[RATELIMIT] test"))
+    response = runner.run(
+        ProviderRequest(prompt="[RATELIMIT] test", model=provider_request_model)
+    )
     assert response.text.startswith("echo(p2):")
 
 
-def test_invalid_json_fallback():
+def test_invalid_json_fallback(provider_request_model):
     p1, p2 = _providers_for("[INVALID_JSON]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test"))
+    response = runner.run(
+        ProviderRequest(prompt="[INVALID_JSON] test", model=provider_request_model)
+    )
     assert response.text.startswith("echo(p2):")
 
 
-def test_timeout_fallback_records_metrics(tmp_path):
+def test_timeout_fallback_records_metrics(tmp_path, provider_request_model):
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
     metrics_path = tmp_path / "fallback.jsonl"
     response = runner.run(
-        ProviderRequest(prompt="[TIMEOUT] metrics"),
+        ProviderRequest(prompt="[TIMEOUT] metrics", model=provider_request_model),
         shadow=None,
         shadow_metrics_path=metrics_path,
     )
@@ -78,7 +90,7 @@ def test_timeout_fallback_records_metrics(tmp_path):
     assert success_event["tokens_out"] == response.token_usage.completion
 
 
-def test_runner_emits_chain_failed_metric(tmp_path):
+def test_runner_emits_chain_failed_metric(tmp_path, provider_request_model):
     failing1 = MockProvider("p1", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     failing2 = MockProvider("p2", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     runner = Runner([failing1, failing2])
@@ -87,7 +99,7 @@ def test_runner_emits_chain_failed_metric(tmp_path):
 
     with pytest.raises(TimeoutError):
         runner.run(
-            ProviderRequest(prompt="[TIMEOUT] hard"),
+            ProviderRequest(prompt="[TIMEOUT] hard", model=provider_request_model),
             shadow=None,
             shadow_metrics_path=metrics_path,
         )

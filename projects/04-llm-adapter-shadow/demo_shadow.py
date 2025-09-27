@@ -22,7 +22,7 @@ if __name__ == "__main__":
         raise SystemExit(1) from exc
 
     runner = Runner([primary])
-    request = ProviderRequest(prompt="こんにちは、世界")
+    request = ProviderRequest(prompt="こんにちは、世界", model="gemini-2.5-flash")
 
     try:
         response = runner.run(request, shadow=shadow)
