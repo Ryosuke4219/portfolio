@@ -52,10 +52,10 @@ def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
     return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProviderRequest:
+    model: str
     prompt: str = ""
-    model: str | None = None
     messages: Sequence[Mapping[str, Any]] | None = None
     max_tokens: int | None = 256
     temperature: float | None = None
@@ -95,6 +95,23 @@ class ProviderRequest:
     @property
     def prompt_text(self) -> str:
         return self.prompt
+
+    @property
+    def timeout(self) -> float:
+        """互換用のタイムアウト秒数アクセス。未指定時は 30 秒を返す。"""
+
+        return 30.0 if self.timeout_s is None else float(self.timeout_s)
+
+    @timeout.setter
+    def timeout(self, value: float | int | None) -> None:
+        if value is None:
+            self.timeout_s = None
+            return
+
+        try:
+            self.timeout_s = float(value)
+        except (TypeError, ValueError) as exc:  # pragma: no cover - defensive branch
+            raise ValueError("timeout must be a number or None") from exc
 
 
 @dataclass

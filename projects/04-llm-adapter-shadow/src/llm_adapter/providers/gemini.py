@@ -479,7 +479,7 @@ class GeminiProvider(ProviderSPI):
         ts0 = time.time()
         try:
             client = self._resolve_client()
-            model_name = request.model or self._model
+            model_name = request.model
             response = _invoke_gemini(client, model_name, messages, config, safety_settings)
         except ProviderSkip:
             raise
@@ -496,7 +496,7 @@ class GeminiProvider(ProviderSPI):
             text=text,
             token_usage=usage,
             latency_ms=latency_ms,
-            model=(request.model or self._model),
+            model=request.model,
             finish_reason=finish_reason,
             raw=response,
         )
