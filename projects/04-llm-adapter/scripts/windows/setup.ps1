@@ -18,7 +18,7 @@ Write-Host "OpenAI/Gemini の API キーを .env に記入してください" -F
 if (-not (Test-Path .env)) {
     @(
         "OPENAI_API_KEY=",
-        "GOOGLE_API_KEY="
+        "GEMINI_API_KEY="
     ) | Set-Content -Encoding UTF8 .env
 }
 

@@ -109,10 +109,10 @@ Windows で環境変数を毎回設定する手間を省くため、`--env .env`
 
 ### Google Gemini を利用する
 
-実プロバイダとして Google Gemini を呼び出す場合は、API キーを `GOOGLE_API_KEY` に設定し、Gemini 用の設定ファイルを指定します。
+実プロバイダとして Google Gemini を呼び出す場合は、API キーを `GEMINI_API_KEY` に設定し、Gemini 用の設定ファイルを指定します。
 
 ```bash
-export GOOGLE_API_KEY="<取得したAPIキー>"
+export GEMINI_API_KEY="<取得したAPIキー>"
 python adapter/run_compare.py \
   --providers adapter/config/providers/gemini.yaml \
   --prompts datasets/golden/tasks.jsonl
