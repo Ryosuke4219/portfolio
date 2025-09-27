@@ -5,12 +5,12 @@ from typing import Any
 import pytest
 
 from src.llm_adapter.errors import TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
 
 
-def _providers_for(marker: str):
+def _providers_for(marker: str) -> tuple[MockProvider, MockProvider]:
     failing = MockProvider("p1", base_latency_ms=5, error_markers={marker})
     fallback = MockProvider("p2", base_latency_ms=5, error_markers=set())
     return failing, fallback
@@ -20,18 +20,24 @@ def _read_metrics(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def test_timeout_fallback():
+def _require_token_usage(response: ProviderResponse) -> TokenUsage:
+    assert response.token_usage is not None
+    return response.token_usage
+
+
+def test_timeout_fallback() -> None:
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
     request = ProviderRequest(prompt="[TIMEOUT] hello", model="fallback-model")
     response = runner.run(request)
 
+    _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
     assert response.model == "fallback-model"
 
 
-def test_ratelimit_retry_fallback():
+def test_ratelimit_retry_fallback() -> None:
     p1, p2 = _providers_for("[RATELIMIT]")
     runner = Runner([p1, p2])
 
@@ -39,7 +45,7 @@ def test_ratelimit_retry_fallback():
     assert response.text.startswith("echo(p2):")
 
 
-def test_ratelimit_backoff_sleep(monkeypatch: pytest.MonkeyPatch):
+def test_ratelimit_backoff_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     sleep_calls: list[float] = []
 
     def fake_runner_sleep(delay: float) -> None:
@@ -52,11 +58,12 @@ def test_ratelimit_backoff_sleep(monkeypatch: pytest.MonkeyPatch):
 
     response = runner.run(ProviderRequest(prompt="[RATELIMIT] backoff", model="fallback-model"))
 
+    _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
     assert sleep_calls.count(0.05) == 1
 
 
-def test_invalid_json_fallback():
+def test_invalid_json_fallback() -> None:
     p1, p2 = _providers_for("[INVALID_JSON]")
     runner = Runner([p1, p2])
 
@@ -64,7 +71,7 @@ def test_invalid_json_fallback():
     assert response.text.startswith("echo(p2):")
 
 
-def test_timeout_no_backoff(monkeypatch: pytest.MonkeyPatch):
+def test_timeout_no_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
     sleep_calls: list[float] = []
 
     def fake_runner_sleep(delay: float) -> None:
@@ -77,11 +84,12 @@ def test_timeout_no_backoff(monkeypatch: pytest.MonkeyPatch):
 
     response = runner.run(ProviderRequest(prompt="[TIMEOUT] no-wait", model="fallback-model"))
 
+    _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
     assert all(abs(delay - 0.05) > 1e-9 for delay in sleep_calls)
 
 
-def test_timeout_fallback_records_metrics(tmp_path: Path):
+def test_timeout_fallback_records_metrics(tmp_path: Path) -> None:
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
@@ -92,6 +100,7 @@ def test_timeout_fallback_records_metrics(tmp_path: Path):
         shadow_metrics_path=metrics_path,
     )
 
+    token_usage = _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
 
     payloads = _read_metrics(metrics_path)
@@ -112,10 +121,10 @@ def test_timeout_fallback_records_metrics(tmp_path: Path):
     assert success_event["provider"] == "p2"
     assert success_event["attempt"] == 2
     assert success_event["shadow_used"] is False
-    assert success_event["tokens_out"] == response.token_usage.completion
+    assert success_event["tokens_out"] == token_usage.completion
 
 
-def test_runner_emits_chain_failed_metric(tmp_path: Path):
+def test_runner_emits_chain_failed_metric(tmp_path: Path) -> None:
     failing1 = MockProvider("p1", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     failing2 = MockProvider("p2", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     runner = Runner([failing1, failing2])
