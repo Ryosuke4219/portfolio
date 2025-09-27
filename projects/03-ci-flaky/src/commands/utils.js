@@ -54,8 +54,8 @@ export function openInBrowser(filePath) {
     command = 'open';
     commandArgs = [resolved];
   } else if (process.platform === 'win32') {
-    command = 'cmd';
-    commandArgs = ['/c', 'start', '""', resolved];
+    command = 'explorer.exe';
+    commandArgs = [resolved];
   } else {
     command = 'xdg-open';
     commandArgs = [resolved];
