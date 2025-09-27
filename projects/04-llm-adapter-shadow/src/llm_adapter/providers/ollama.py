@@ -6,7 +6,12 @@ import os
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Protocol,
+    cast,
+)
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
