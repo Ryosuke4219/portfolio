@@ -10,7 +10,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.report.metrics import data as data_mod
-from tools.report.metrics import render as render_mod
+from tools.report.metrics import regression_summary as regression_mod
+from tools.report.metrics import weekly_summary as weekly_mod
 
 
 def test_load_metrics_handles_missing_file(tmp_path: Path) -> None:
@@ -113,11 +114,13 @@ def test_build_regression_summary_and_weekly_summary(tmp_path: Path) -> None:
             "ts": "2024-01-01T00:00:00Z",
         }
     ]
-    regression_html = render_mod.build_regression_summary(metrics, golden_dir)
+    regression_html = regression_mod.build_regression_summary(metrics, golden_dir)
     assert "PASS" in regression_html
 
     weekly_path = tmp_path / "summary.md"
-    render_mod.update_weekly_summary(weekly_path, 1, [{"failure_kind": "timeout", "count": 1}])
+    weekly_mod.update_weekly_summary(
+        weekly_path, 1, [{"failure_kind": "timeout", "count": 1}]
+    )
     content = weekly_path.read_text(encoding="utf-8")
     assert "週次サマリ" in content
     # Ensure the Markdown table header is present when failures exist.
@@ -135,5 +138,5 @@ def test_build_regression_summary_handles_missing_baseline(
     tmp_path: Path, golden_dir: Path | None, expected: str
 ) -> None:
     metrics: list[dict[str, object]] = []
-    actual = render_mod.build_regression_summary(metrics, golden_dir)
+    actual = regression_mod.build_regression_summary(metrics, golden_dir)
     assert expected in actual
