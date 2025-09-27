@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from types import ModuleType
@@ -410,7 +411,7 @@ class GeminiProvider(ProviderSPI):
             token = text.split()[0]
             if "." in token:
                 token = token.split(".")[-1]
-            token = token.strip(" <>:,'\"")
+            token = re.sub(r"^[ <>:,\'\"]+|[ <>:,\'\"]+$", "", token)
             return token.upper()
 
         status_value: Any = None
