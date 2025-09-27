@@ -168,7 +168,7 @@ python adapter/run_compare.py \
 | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `python adapter/run_compare.py --providers adapter/config/providers/simulated.yaml --prompts datasets/golden/tasks.jsonl` | 指定プロバイダ構成とゴールデンタスクを比較実行し、`data/runs-metrics.jsonl` に追記します。 |
 | `python adapter/run_compare.py --providers <a,b> --mode parallel --repeat 3 --metrics tmp/metrics.jsonl`                  | 複数プロバイダを並列実行し、出力先をカスタマイズします。                               |
-| `python tools/report/metrics_to_html.py --metrics data/runs-metrics.jsonl --out reports/index.html`                       | JSONL メトリクスを HTML ダッシュボードに変換します。                           |
+| `python tools/report/metrics/cli.py --metrics data/runs-metrics.jsonl --out reports/index.html`                       | JSONL メトリクスを HTML ダッシュボードに変換します。                           |
 
 > `--budgets` で `adapter/config/budgets.yaml` を差し替えると、実行ごとのコスト上限や停止条件を変更できます。
 
@@ -184,7 +184,7 @@ python adapter/run_compare.py \
 # => data/runs-metrics.jsonl に追記（プロジェクト直下に data/ が自動生成されます）
 
 # 2. 収集したメトリクスを HTML に変換
-python tools/report/metrics_to_html.py \
+python tools/report/metrics/cli.py \
   --metrics data/runs-metrics.jsonl \
   --golden datasets/golden/baseline \
   --out reports/index.html
@@ -204,7 +204,7 @@ python tools/report/metrics_to_html.py \
 
 * **Shadow 実行統合**：`projects/04-llm-adapter-shadow` の仕組みを取り込み、プライマリ応答と比較実行を同一 JSONL で記録。
 * **評価モジュール追加**：`adapter/core/metrics.py` を拡張し、BLEU/ROUGE や構造比較など用途別メトリクスを追加。
-* **外部連携**：`tools/report/metrics_to_html.py` を CI から呼び出し、GitHub Pages や Dashboards SaaS へ自動配信。
+* **外部連携**：`tools/report/metrics/cli.py` を CI から呼び出し、GitHub Pages や Dashboards SaaS へ自動配信。
 * **予算ポリシー強化**：`adapter/core/budgets.py` に日次/週次の複合制限や優先度キューを実装し、コスト最適化を自動化。
 
 ```
