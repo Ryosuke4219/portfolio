@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
-from .metrics import log_event
+from .observability import EventLogger, JsonlLogger
 from .provider_spi import (
     AsyncProviderSPI,
     ProviderRequest,
@@ -25,10 +25,15 @@ MetricsPath = str | Path | None
 class Runner:
     """Attempt providers sequentially until one succeeds."""
 
-    def __init__(self, providers: Sequence[ProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI],
+        logger: EventLogger | None = None,
+    ) -> None:
         if not providers:
             raise ValueError("Runner requires at least one provider")
         self.providers: list[ProviderSPI] = list(providers)
+        self._logger = logger
 
     def run(
         self,
@@ -40,6 +45,12 @@ class Runner:
 
         last_err: Exception | None = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
+        if metrics_path_str is None:
+            event_logger: EventLogger | None = None
+        elif self._logger is not None:
+            event_logger = self._logger
+        else:
+            event_logger = JsonlLogger(metrics_path_str)
         metadata = request.metadata or {}
         run_started = time.time()
         request_fingerprint = content_hash(
@@ -47,23 +58,24 @@ class Runner:
         )
 
         def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
-            if not metrics_path_str:
+            if event_logger is None:
                 return
-            log_event(
+            event_logger.emit(
                 "provider_skipped",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                request_hash=content_hash(
-                    provider.name(),
-                    request.prompt_text,
-                    request.options,
-                    request.max_tokens,
-                ),
-                provider=provider.name(),
-                attempt=attempt,
-                total_providers=len(self.providers),
-                reason=err.reason if hasattr(err, "reason") else None,
-                error_message=str(err),
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "request_hash": content_hash(
+                        provider.name(),
+                        request.prompt_text,
+                        request.options,
+                        request.max_tokens,
+                    ),
+                    "provider": provider.name(),
+                    "attempt": attempt,
+                    "total_providers": len(self.providers),
+                    "reason": err.reason if hasattr(err, "reason") else None,
+                    "error_message": str(err),
+                },
             )
 
         def _log_provider_call(
@@ -76,7 +88,7 @@ class Runner:
             tokens_out: int | None,
             error: Exception | None = None,
         ) -> None:
-            if not metrics_path_str:
+            if event_logger is None:
                 return
 
             error_type = type(error).__name__ if error is not None else None
@@ -86,29 +98,30 @@ class Runner:
             if not isinstance(provider_model, str) or not provider_model:
                 provider_model = None
 
-            log_event(
+            event_logger.emit(
                 "provider_call",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                request_hash=content_hash(
-                    provider.name(),
-                    request.prompt_text,
-                    request.options,
-                    request.max_tokens,
-                ),
-                provider=provider.name(),
-                model=provider_model,
-                attempt=attempt,
-                total_providers=len(self.providers),
-                status=status,
-                latency_ms=latency_ms,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-                error_type=error_type,
-                error_message=error_message,
-                shadow_used=shadow is not None,
-                trace_id=metadata.get("trace_id"),
-                project_id=metadata.get("project_id"),
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "request_hash": content_hash(
+                        provider.name(),
+                        request.prompt_text,
+                        request.options,
+                        request.max_tokens,
+                    ),
+                    "provider": provider.name(),
+                    "model": provider_model,
+                    "attempt": attempt,
+                    "total_providers": len(self.providers),
+                    "status": status,
+                    "latency_ms": latency_ms,
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
+                    "error_type": error_type,
+                    "error_message": error_message,
+                    "shadow_used": shadow is not None,
+                    "trace_id": metadata.get("trace_id"),
+                    "project_id": metadata.get("project_id"),
+                },
             )
 
         def _estimate_cost(provider: ProviderSPI, tokens_in: int, tokens_out: int) -> float:
@@ -131,7 +144,7 @@ class Runner:
             cost_usd: float,
             error: Exception | None,
         ) -> None:
-            if not metrics_path_str:
+            if event_logger is None:
                 return
 
             error_type = type(error).__name__ if error else None
@@ -148,23 +161,24 @@ class Runner:
                 else None
             )
 
-            log_event(
+            event_logger.emit(
                 "run_metric",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                request_hash=request_hash,
-                provider=provider_name,
-                status=status,
-                attempts=attempts,
-                latency_ms=latency_ms,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-                cost_usd=float(cost_usd),
-                error_type=error_type,
-                error_message=error_message,
-                shadow_used=shadow is not None,
-                trace_id=metadata.get("trace_id"),
-                project_id=metadata.get("project_id"),
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "request_hash": request_hash,
+                    "provider": provider_name,
+                    "status": status,
+                    "attempts": attempts,
+                    "latency_ms": latency_ms,
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
+                    "cost_usd": float(cost_usd),
+                    "error_type": error_type,
+                    "error_message": error_message,
+                    "shadow_used": shadow is not None,
+                    "trace_id": metadata.get("trace_id"),
+                    "project_id": metadata.get("project_id"),
+                },
             )
 
         for attempt_index, provider in enumerate(self.providers, start=1):
@@ -233,15 +247,16 @@ class Runner:
                 )
                 return response
 
-        if metrics_path_str:
-            log_event(
+        if event_logger is not None:
+            event_logger.emit(
                 "provider_chain_failed",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                provider_attempts=len(self.providers),
-                providers=[provider.name() for provider in self.providers],
-                last_error_type=type(last_err).__name__ if last_err else None,
-                last_error_message=str(last_err) if last_err else None,
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "provider_attempts": len(self.providers),
+                    "providers": [provider.name() for provider in self.providers],
+                    "last_error_type": type(last_err).__name__ if last_err else None,
+                    "last_error_message": str(last_err) if last_err else None,
+                },
             )
         _log_run_metric(
             status="error",
@@ -259,12 +274,17 @@ class Runner:
 class AsyncRunner:
     """Async counterpart of :class:`Runner` providing ``asyncio`` bridges."""
 
-    def __init__(self, providers: Sequence[ProviderSPI | AsyncProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI | AsyncProviderSPI],
+        logger: EventLogger | None = None,
+    ) -> None:
         if not providers:
             raise ValueError("AsyncRunner requires at least one provider")
         self.providers: list[tuple[ProviderSPI | AsyncProviderSPI, AsyncProviderSPI]] = [
             (provider, ensure_async_provider(provider)) for provider in providers
         ]
+        self._logger = logger
 
     async def run_async(
         self,
@@ -274,6 +294,12 @@ class AsyncRunner:
     ) -> ProviderResponse:
         last_err: Exception | None = None
         metrics_path_str = None if shadow_metrics_path is None else str(Path(shadow_metrics_path))
+        if metrics_path_str is None:
+            event_logger: EventLogger | None = None
+        elif self._logger is not None:
+            event_logger = self._logger
+        else:
+            event_logger = JsonlLogger(metrics_path_str)
         metadata = request.metadata or {}
         run_started = time.time()
         request_fingerprint = content_hash(
@@ -285,23 +311,24 @@ class AsyncRunner:
         def _record_skip(
             err: ProviderSkip, attempt: int, provider: ProviderSPI | AsyncProviderSPI
         ) -> None:
-            if not metrics_path_str:
+            if event_logger is None:
                 return
-            log_event(
+            event_logger.emit(
                 "provider_skipped",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                request_hash=content_hash(
-                    provider.name(),
-                    request.prompt_text,
-                    request.options,
-                    request.max_tokens,
-                ),
-                provider=provider.name(),
-                attempt=attempt,
-                total_providers=len(self.providers),
-                reason=err.reason if hasattr(err, "reason") else None,
-                error_message=str(err),
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "request_hash": content_hash(
+                        provider.name(),
+                        request.prompt_text,
+                        request.options,
+                        request.max_tokens,
+                    ),
+                    "provider": provider.name(),
+                    "attempt": attempt,
+                    "total_providers": len(self.providers),
+                    "reason": err.reason if hasattr(err, "reason") else None,
+                    "error_message": str(err),
+                },
             )
 
         def _provider_model(provider: ProviderSPI | AsyncProviderSPI) -> str | None:
@@ -321,35 +348,36 @@ class AsyncRunner:
             tokens_out: int | None,
             error: Exception | None = None,
         ) -> None:
-            if not metrics_path_str:
+            if event_logger is None:
                 return
 
             error_type = type(error).__name__ if error is not None else None
             error_message = str(error) if error is not None else None
 
-            log_event(
+            event_logger.emit(
                 "provider_call",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                request_hash=content_hash(
-                    provider.name(),
-                    request.prompt_text,
-                    request.options,
-                    request.max_tokens,
-                ),
-                provider=provider.name(),
-                model=_provider_model(provider),
-                attempt=attempt,
-                total_providers=len(self.providers),
-                status=status,
-                latency_ms=latency_ms,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-                error_type=error_type,
-                error_message=error_message,
-                shadow_used=shadow is not None,
-                trace_id=metadata.get("trace_id"),
-                project_id=metadata.get("project_id"),
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "request_hash": content_hash(
+                        provider.name(),
+                        request.prompt_text,
+                        request.options,
+                        request.max_tokens,
+                    ),
+                    "provider": provider.name(),
+                    "model": _provider_model(provider),
+                    "attempt": attempt,
+                    "total_providers": len(self.providers),
+                    "status": status,
+                    "latency_ms": latency_ms,
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
+                    "error_type": error_type,
+                    "error_message": error_message,
+                    "shadow_used": shadow is not None,
+                    "trace_id": metadata.get("trace_id"),
+                    "project_id": metadata.get("project_id"),
+                },
             )
 
         def _estimate_cost(
@@ -374,7 +402,7 @@ class AsyncRunner:
             cost_usd: float,
             error: Exception | None,
         ) -> None:
-            if not metrics_path_str:
+            if event_logger is None:
                 return
 
             error_type = type(error).__name__ if error else None
@@ -391,23 +419,24 @@ class AsyncRunner:
                 else None
             )
 
-            log_event(
+            event_logger.emit(
                 "run_metric",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                request_hash=request_hash,
-                provider=provider_name,
-                status=status,
-                attempts=attempts,
-                latency_ms=latency_ms,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-                cost_usd=float(cost_usd),
-                error_type=error_type,
-                error_message=error_message,
-                shadow_used=shadow is not None,
-                trace_id=metadata.get("trace_id"),
-                project_id=metadata.get("project_id"),
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "request_hash": request_hash,
+                    "provider": provider_name,
+                    "status": status,
+                    "attempts": attempts,
+                    "latency_ms": latency_ms,
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
+                    "cost_usd": float(cost_usd),
+                    "error_type": error_type,
+                    "error_message": error_message,
+                    "shadow_used": shadow is not None,
+                    "trace_id": metadata.get("trace_id"),
+                    "project_id": metadata.get("project_id"),
+                },
             )
 
         for attempt_index, (provider, async_provider) in enumerate(self.providers, start=1):
@@ -481,15 +510,16 @@ class AsyncRunner:
                 )
                 return response
 
-        if metrics_path_str:
-            log_event(
+        if event_logger is not None:
+            event_logger.emit(
                 "provider_chain_failed",
-                metrics_path_str,
-                request_fingerprint=request_fingerprint,
-                provider_attempts=len(self.providers),
-                providers=[provider.name() for provider, _ in self.providers],
-                last_error_type=type(last_err).__name__ if last_err else None,
-                last_error_message=str(last_err) if last_err else None,
+                {
+                    "request_fingerprint": request_fingerprint,
+                    "provider_attempts": len(self.providers),
+                    "providers": [provider.name() for provider, _ in self.providers],
+                    "last_error_type": type(last_err).__name__ if last_err else None,
+                    "last_error_message": str(last_err) if last_err else None,
+                },
             )
         _log_run_metric(
             status="error",
