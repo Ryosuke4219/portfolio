@@ -184,7 +184,13 @@ class Runner:
         for attempt_index, provider in enumerate(self.providers, start=1):
             attempt_started = time.time()
             try:
-                response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
+                response = run_with_shadow(
+                    provider,
+                    shadow,
+                    request,
+                    metrics_path=metrics_path_str,
+                    logger=event_logger,
+                )
             except ProviderSkip as err:
                 last_err = err
                 _record_skip(err, attempt_index, provider)
@@ -447,6 +453,7 @@ class AsyncRunner:
                     shadow_async,
                     request,
                     metrics_path=metrics_path_str,
+                    logger=event_logger,
                 )
             except ProviderSkip as err:
                 last_err = err

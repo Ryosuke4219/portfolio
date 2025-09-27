@@ -1,11 +1,24 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
+
+
+class _CapturingLogger:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
+        self.events.append((event_type, dict(record)))
+
+    def of_type(self, event_type: str) -> list[dict[str, Any]]:
+        return [payload for kind, payload in self.events if kind == event_type]
 
 
 def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
@@ -59,6 +72,46 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
     expected_tokens = max(1, len("hello") // 4) + 16
     assert diff_event["shadow_token_usage_total"] == expected_tokens
     assert diff_event["shadow_text_len"] == len("echo(shadow): hello")
+
+
+def test_shadow_exec_uses_injected_logger(tmp_path: Path) -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = _CapturingLogger()
+    runner = Runner([primary], logger=logger)
+
+    request = ProviderRequest(prompt="hello", model="primary-model")
+    metrics_path = tmp_path / "unused.jsonl"
+    response = runner.run(
+        request,
+        shadow=shadow,
+        shadow_metrics_path=metrics_path,
+    )
+
+    diff_events = logger.of_type("shadow_diff")
+    assert len(diff_events) == 1
+    diff_event = diff_events[0]
+    assert diff_event["primary_provider"] == "primary"
+    assert diff_event["shadow_provider"] == "shadow"
+    assert diff_event["shadow_ok"] is True
+    assert diff_event["primary_text_len"] == len(response.text)
+    assert not metrics_path.exists()
+
+
+def test_shadow_exec_without_metrics_path_skips_logging() -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    logger = _CapturingLogger()
+    runner = Runner([primary], logger=logger)
+
+    request = ProviderRequest(prompt="hello", model="primary-model")
+    runner.run(
+        request,
+        shadow=shadow,
+        shadow_metrics_path=None,
+    )
+
+    assert logger.of_type("shadow_diff") == []
 
 
 def test_shadow_error_records_metrics(tmp_path: Path) -> None:
