@@ -59,13 +59,15 @@ class ProviderSkip(SkipError):
         reason: ProviderSkipReason | str | None = None,
     ) -> None:
         super().__init__(message)
+        normalized_reason: ProviderSkipReason | str | None
         if isinstance(reason, str):
             try:
-                self.reason = ProviderSkipReason(reason)
+                normalized_reason = ProviderSkipReason(reason)
             except ValueError:
-                self.reason = reason
+                normalized_reason = reason
         else:
-            self.reason = reason
+            normalized_reason = reason
+        self.reason = normalized_reason
 
 
 class ConfigError(AdapterError):
