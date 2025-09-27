@@ -5,8 +5,8 @@ import { parseArgs } from '../src/cli-args.js';
 import { runAnalyze } from '../src/commands/analyze.js';
 import { runIssue } from '../src/commands/issue.js';
 import { runParse } from '../src/commands/parse.js';
-import { runWeekly } from '../src/commands/weekly.js';
 import { openInBrowser, parseBoolean } from '../src/commands/utils.js';
+import { runWeekly } from '../src/commands/weekly.js';
 
 async function main() {
   const [, , command, ...rest] = process.argv;
