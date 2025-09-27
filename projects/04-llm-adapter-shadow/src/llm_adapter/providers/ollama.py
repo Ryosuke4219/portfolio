@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import (
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
