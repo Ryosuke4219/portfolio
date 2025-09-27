@@ -215,7 +215,7 @@ class OllamaProvider(ProviderSPI):
     # ProviderSPI implementation
     # ------------------------------------------------------------------
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        model_name = request.model or self._model
+        model_name = request.model
         self._ensure_model(model_name)
 
         def _coerce_content(entry: Mapping[str, Any]) -> str:
