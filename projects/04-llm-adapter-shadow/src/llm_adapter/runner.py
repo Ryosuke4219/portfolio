@@ -7,6 +7,8 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
+from enum import Enum
+
 from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from .metrics import log_event
 from .provider_spi import (
@@ -46,6 +48,12 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
+        def _skip_reason(err: ProviderSkip) -> str | None:
+            reason = getattr(err, "reason", None)
+            if isinstance(reason, Enum):
+                return str(reason.value)
+            return reason
+
         def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
             if not metrics_path_str:
                 return
@@ -62,7 +70,7 @@ class Runner:
                 provider=provider.name(),
                 attempt=attempt,
                 total_providers=len(self.providers),
-                reason=err.reason if hasattr(err, "reason") else None,
+                reason=_skip_reason(err),
                 error_message=str(err),
             )
 
@@ -285,6 +293,14 @@ class AsyncRunner:
 
         shadow_async = ensure_async_provider(shadow) if shadow is not None else None
 
+        def _skip_reason(
+            err: ProviderSkip,
+        ) -> str | None:
+            reason = getattr(err, "reason", None)
+            if isinstance(reason, Enum):
+                return str(reason.value)
+            return reason
+
         def _record_skip(
             err: ProviderSkip, attempt: int, provider: ProviderSPI | AsyncProviderSPI
         ) -> None:
@@ -303,7 +319,7 @@ class AsyncRunner:
                 provider=provider.name(),
                 attempt=attempt,
                 total_providers=len(self.providers),
-                reason=err.reason if hasattr(err, "reason") else None,
+                reason=_skip_reason(err),
                 error_message=str(err),
             )
 

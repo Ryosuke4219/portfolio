@@ -13,7 +13,13 @@ from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 
 from src.llm_adapter import provider_spi as provider_spi_module
-from src.llm_adapter.errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
+from src.llm_adapter.errors import (
+    ProviderSkip,
+    RateLimitError,
+    RetriableError,
+    SkipReason,
+    TimeoutError,
+)
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import Runner
 
@@ -85,7 +91,9 @@ class _SkipProvider(ProviderSPI):
         return {"chat"}
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        raise ProviderSkip(f"{self._name} unavailable")
+        raise ProviderSkip(
+            f"{self._name} unavailable", reason=SkipReason.PROVIDER_UNAVAILABLE
+        )
 
 
 def _run_and_collect(
@@ -187,6 +195,10 @@ def test_runner_fallback_paths(
 
     skip_events = [rec for rec in records if rec["event"] == "provider_skipped"]
     assert len(skip_events) == expected_skip_events
+    if skip_events:
+        assert [event["reason"] for event in skip_events] == [
+            SkipReason.PROVIDER_UNAVAILABLE.value
+        ]
 
     if expected_run_status == "ok":
         assert response is not None
