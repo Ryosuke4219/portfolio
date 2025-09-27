@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 """Ollama provider with automatic model management."""
 
 from __future__ import annotations
@@ -11,8 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from types import TracebackType
-
-from typing import Any, Protocol, TYPE_CHECKING, cast  # isort: skip
+from typing import Any, Protocol, TYPE_CHECKING, cast
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
