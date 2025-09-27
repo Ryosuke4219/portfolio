@@ -1,11 +1,18 @@
 import json
 
+import pytest
+
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
 from src.llm_adapter.provider_spi import ProviderRequest
 
 
-def test_shadow_exec_records_metrics(tmp_path):
+@pytest.fixture(scope="module")
+def provider_request_model() -> str:
+    return "gemini:test-model"
+
+
+def test_shadow_exec_records_metrics(tmp_path, provider_request_model):
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
     runner = Runner([primary])
@@ -13,7 +20,7 @@ def test_shadow_exec_records_metrics(tmp_path):
     metrics_path = tmp_path / "metrics.jsonl"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
     response = runner.run(
-        ProviderRequest(prompt="hello", metadata=metadata),
+        ProviderRequest(prompt="hello", metadata=metadata, model=provider_request_model),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
@@ -48,14 +55,14 @@ def test_shadow_exec_records_metrics(tmp_path):
     assert diff_event["shadow_text_len"] == len("echo(shadow): hello")
 
 
-def test_shadow_error_records_metrics(tmp_path):
+def test_shadow_error_records_metrics(tmp_path, provider_request_model):
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     runner = Runner([primary])
 
     metrics_path = tmp_path / "metrics.jsonl"
     runner.run(
-        ProviderRequest(prompt="[TIMEOUT] hello"),
+        ProviderRequest(prompt="[TIMEOUT] hello", model=provider_request_model),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
@@ -69,18 +76,18 @@ def test_shadow_error_records_metrics(tmp_path):
     assert diff_event["shadow_duration_ms"] >= 0
 
 
-def test_request_hash_includes_max_tokens(tmp_path):
+def test_request_hash_includes_max_tokens(tmp_path, provider_request_model):
     provider = MockProvider("primary", base_latency_ms=1, error_markers=set())
     runner = Runner([provider])
 
     metrics_path = tmp_path / "metrics.jsonl"
 
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=32),
+        ProviderRequest(prompt="hello", max_tokens=32, model=provider_request_model),
         shadow_metrics_path=metrics_path,
     )
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=64),
+        ProviderRequest(prompt="hello", max_tokens=64, model=provider_request_model),
         shadow_metrics_path=metrics_path,
     )
 
