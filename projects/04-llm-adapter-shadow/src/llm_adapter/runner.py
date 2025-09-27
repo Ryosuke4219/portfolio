@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -163,7 +163,9 @@ class EventLogger:
             project_id=self._metadata.get("project_id"),
         )
 
-    def log_chain_failure(self, providers: Sequence[ProviderSPI], last_error: Exception | None) -> None:
+    def log_chain_failure(
+        self, providers: Sequence[ProviderSPI], last_error: Exception | None
+    ) -> None:
         if not self.enabled():
             return
         log_event(
@@ -203,7 +205,6 @@ class Runner:
         """Execute ``request`` with fallback semantics."""
 
         last_err: Exception | None = None
-        metadata = request.metadata or {}
         run_started = time.time()
         resolved_config = config or self._config
         attempts_budget = resolved_config.attempts_budget(len(self.providers))
