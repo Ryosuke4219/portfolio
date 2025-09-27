@@ -199,7 +199,7 @@ def ensure_async_provider(provider: ProviderSPI | AsyncProviderSPI) -> AsyncProv
         async def _invoke(request: ProviderRequest) -> ProviderResponse:
             result = invoke_async(request)
             if inspect.isawaitable(result):
-                return cast(ProviderResponse, await cast(Awaitable[ProviderResponse], result))
+                return await cast(Awaitable[ProviderResponse], result)
             return cast(ProviderResponse, result)
 
         return _AsyncProviderAdapter(provider, async_invoke=_invoke)

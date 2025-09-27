@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import threading
 import time
 from pathlib import Path
 from typing import Any
-
-import asyncio
-import contextlib
 
 from .metrics import log_event
 from .provider_spi import (
