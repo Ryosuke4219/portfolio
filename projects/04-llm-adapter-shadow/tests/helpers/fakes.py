@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from src.llm_adapter.providers import ollama as ollama_module
+from src.llm_adapter.providers.ollama.http import requests_exceptions
 
 
 class FakeResponse:
@@ -21,7 +21,7 @@ class FakeResponse:
 
     def raise_for_status(self) -> None:
         if not (200 <= self.status_code < 300):
-            raise ollama_module.requests_exceptions.HTTPError(response=self)
+            raise requests_exceptions.HTTPError(response=self)
 
     def json(self) -> dict:
         return self._payload
