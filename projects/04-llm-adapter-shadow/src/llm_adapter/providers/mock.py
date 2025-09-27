@@ -75,7 +75,7 @@ class MockProvider(ProviderSPI):
             text=f"echo({self._name}): {text}",
             latency_ms=latency,
             token_usage=TokenUsage(prompt=prompt_tokens, completion=completion_tokens),
-            model=request.model or self._name,
+            model=request.model,
             finish_reason="stop",
             raw={
                 "echo": text,

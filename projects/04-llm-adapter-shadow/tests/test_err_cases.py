@@ -24,7 +24,7 @@ def test_timeout_fallback():
     p1, p2 = _providers_for("[TIMEOUT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[TIMEOUT] hello"))
+    response = runner.run(ProviderRequest(model="mock-model", prompt="[TIMEOUT] hello"))
     assert response.text.startswith("echo(p2):")
 
 
@@ -32,7 +32,7 @@ def test_ratelimit_retry_fallback():
     p1, p2 = _providers_for("[RATELIMIT]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[RATELIMIT] test"))
+    response = runner.run(ProviderRequest(model="mock-model", prompt="[RATELIMIT] test"))
     assert response.text.startswith("echo(p2):")
 
 
@@ -40,7 +40,7 @@ def test_invalid_json_fallback():
     p1, p2 = _providers_for("[INVALID_JSON]")
     runner = Runner([p1, p2])
 
-    response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test"))
+    response = runner.run(ProviderRequest(model="mock-model", prompt="[INVALID_JSON] test"))
     assert response.text.startswith("echo(p2):")
 
 
@@ -50,7 +50,7 @@ def test_timeout_fallback_records_metrics(tmp_path):
 
     metrics_path = tmp_path / "fallback.jsonl"
     response = runner.run(
-        ProviderRequest(prompt="[TIMEOUT] metrics"),
+        ProviderRequest(model="mock-model", prompt="[TIMEOUT] metrics"),
         shadow=None,
         shadow_metrics_path=metrics_path,
     )
@@ -87,7 +87,7 @@ def test_runner_emits_chain_failed_metric(tmp_path):
 
     with pytest.raises(TimeoutError):
         runner.run(
-            ProviderRequest(prompt="[TIMEOUT] hard"),
+            ProviderRequest(model="mock-model", prompt="[TIMEOUT] hard"),
             shadow=None,
             shadow_metrics_path=metrics_path,
         )

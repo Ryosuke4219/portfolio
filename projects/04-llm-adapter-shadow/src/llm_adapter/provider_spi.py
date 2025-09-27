@@ -52,10 +52,10 @@ def _extract_prompt_from_messages(messages: Sequence[Mapping[str, Any]]) -> str:
     return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProviderRequest:
+    model: str
     prompt: str = ""
-    model: str | None = None
     messages: Sequence[Mapping[str, Any]] | None = None
     max_tokens: int | None = 256
     temperature: float | None = None

@@ -22,7 +22,10 @@ if __name__ == "__main__":
         raise SystemExit(1) from exc
 
     runner = Runner([primary])
-    request = ProviderRequest(prompt="こんにちは、世界")
+    model_name = getattr(primary, "model", None) or getattr(primary, "_model", None)
+    if not isinstance(model_name, str) or not model_name:
+        model_name = primary.name()
+    request = ProviderRequest(model=model_name, prompt="こんにちは、世界")
 
     try:
         response = runner.run(request, shadow=shadow)

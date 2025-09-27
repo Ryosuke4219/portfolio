@@ -13,7 +13,7 @@ def test_shadow_exec_records_metrics(tmp_path):
     metrics_path = tmp_path / "metrics.jsonl"
     metadata = {"trace_id": "trace-123", "project_id": "proj-789"}
     response = runner.run(
-        ProviderRequest(prompt="hello", metadata=metadata),
+        ProviderRequest(model="mock-model", prompt="hello", metadata=metadata),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
@@ -55,7 +55,7 @@ def test_shadow_error_records_metrics(tmp_path):
 
     metrics_path = tmp_path / "metrics.jsonl"
     runner.run(
-        ProviderRequest(prompt="[TIMEOUT] hello"),
+        ProviderRequest(model="mock-model", prompt="[TIMEOUT] hello"),
         shadow=shadow,
         shadow_metrics_path=metrics_path,
     )
@@ -76,11 +76,11 @@ def test_request_hash_includes_max_tokens(tmp_path):
     metrics_path = tmp_path / "metrics.jsonl"
 
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=32),
+        ProviderRequest(model="mock-model", prompt="hello", max_tokens=32),
         shadow_metrics_path=metrics_path,
     )
     runner.run(
-        ProviderRequest(prompt="hello", max_tokens=64),
+        ProviderRequest(model="mock-model", prompt="hello", max_tokens=64),
         shadow_metrics_path=metrics_path,
     )
 
