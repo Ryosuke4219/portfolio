@@ -1,0 +1,19 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.6
+    hooks:
+      - id: ruff
+        name: ruff import order
+        args: ["--select", "I", "--fix"]
+        files: ^projects/04-llm-adapter-shadow/src/.*\\.py$
+      - id: ruff-format
+        files: ^projects/04-llm-adapter-shadow/src/.*\\.py$
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        name: mypy strict shadow adapter
+        args:
+          ["--strict", "projects/04-llm-adapter-shadow/src", "--pretty"]
+        pass_filenames: false
+        files: ^projects/04-llm-adapter-shadow/src/.*\\.py$
