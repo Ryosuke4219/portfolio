@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
-from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
+from .errors import FatalError, RateLimitError, RetryableError, SkipError
 from .metrics import log_event
 from .provider_spi import (
     AsyncProviderSPI,
@@ -22,13 +23,21 @@ from .utils import content_hash
 MetricsPath = str | Path | None
 
 
+@dataclass(frozen=True)
+class RunnerConfig:
+    """Runtime configuration knobs for :class:`Runner` and :class:`AsyncRunner`."""
+
+    rate_limit_backoff_s: float = 0.05
+
+
 class Runner:
     """Attempt providers sequentially until one succeeds."""
 
-    def __init__(self, providers: Sequence[ProviderSPI]):
+    def __init__(self, providers: Sequence[ProviderSPI], *, config: RunnerConfig | None = None):
         if not providers:
             raise ValueError("Runner requires at least one provider")
         self.providers: list[ProviderSPI] = list(providers)
+        self.config = config or RunnerConfig()
 
     def run(
         self,
@@ -46,7 +55,7 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
-        def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
+        def _record_skip(err: SkipError, attempt: int, provider: ProviderSPI) -> None:
             if not metrics_path_str:
                 return
             log_event(
@@ -64,6 +73,7 @@ class Runner:
                 total_providers=len(self.providers),
                 reason=err.reason if hasattr(err, "reason") else None,
                 error_message=str(err),
+                error_family="skip",
             )
 
         def _elapsed_ms(start_ts: float) -> int:
@@ -78,6 +88,7 @@ class Runner:
             tokens_in: int | None,
             tokens_out: int | None,
             error: Exception | None = None,
+            error_family: str | None = None,
         ) -> None:
             if not metrics_path_str:
                 return
@@ -109,6 +120,7 @@ class Runner:
                 tokens_out=tokens_out,
                 error_type=error_type,
                 error_message=error_message,
+                error_family=error_family,
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -133,6 +145,7 @@ class Runner:
             tokens_out: int | None,
             cost_usd: float,
             error: Exception | None,
+            error_family: str | None,
         ) -> None:
             if not metrics_path_str:
                 return
@@ -165,16 +178,28 @@ class Runner:
                 cost_usd=float(cost_usd),
                 error_type=error_type,
                 error_message=error_message,
+                error_family=error_family,
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
             )
 
+        def _error_family(error: Exception | None) -> str | None:
+            if error is None:
+                return None
+            if isinstance(error, SkipError):
+                return "skip"
+            if isinstance(error, FatalError):
+                return "fatal"
+            if isinstance(error, RetryableError):
+                return "retryable"
+            return None
+
         for attempt_index, provider in enumerate(self.providers, start=1):
             attempt_started = time.time()
             try:
                 response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
-            except ProviderSkip as err:
+            except SkipError as err:
                 last_err = err
                 _record_skip(err, attempt_index, provider)
                 _log_provider_call(
@@ -185,9 +210,10 @@ class Runner:
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
+                    error_family="skip",
                 )
                 continue
-            except RateLimitError as err:
+            except FatalError as err:
                 last_err = err
                 _log_provider_call(
                     provider,
@@ -197,9 +223,21 @@ class Runner:
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
+                    error_family="fatal",
                 )
-                time.sleep(0.05)
-            except (TimeoutError, RetriableError) as err:
+                _log_run_metric(
+                    status="error",
+                    provider=provider,
+                    attempts=attempt_index,
+                    latency_ms=_elapsed_ms(run_started),
+                    tokens_in=None,
+                    tokens_out=None,
+                    cost_usd=0.0,
+                    error=err,
+                    error_family="fatal",
+                )
+                raise
+            except RetryableError as err:
                 last_err = err
                 _log_provider_call(
                     provider,
@@ -209,7 +247,12 @@ class Runner:
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
+                    error_family="retryable",
                 )
+                if isinstance(err, RateLimitError):
+                    backoff = max(0.0, self.config.rate_limit_backoff_s)
+                    if backoff > 0:
+                        time.sleep(backoff)
                 continue
             else:
                 _log_provider_call(
@@ -220,6 +263,7 @@ class Runner:
                     tokens_in=response.input_tokens,
                     tokens_out=response.output_tokens,
                     error=None,
+                    error_family=None,
                 )
                 tokens_in = response.input_tokens
                 tokens_out = response.output_tokens
@@ -233,6 +277,7 @@ class Runner:
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
                     error=None,
+                    error_family=None,
                 )
                 return response
 
@@ -245,6 +290,7 @@ class Runner:
                 providers=[provider.name() for provider in self.providers],
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
+                error_family=_error_family(last_err),
             )
         _log_run_metric(
             status="error",
@@ -255,6 +301,7 @@ class Runner:
             tokens_out=None,
             cost_usd=0.0,
             error=last_err,
+            error_family=_error_family(last_err),
         )
         raise last_err if last_err is not None else RuntimeError("No providers succeeded")
 
@@ -262,12 +309,18 @@ class Runner:
 class AsyncRunner:
     """Async counterpart of :class:`Runner` providing ``asyncio`` bridges."""
 
-    def __init__(self, providers: Sequence[ProviderSPI | AsyncProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI | AsyncProviderSPI],
+        *,
+        config: RunnerConfig | None = None,
+    ):
         if not providers:
             raise ValueError("AsyncRunner requires at least one provider")
         self.providers: list[tuple[ProviderSPI | AsyncProviderSPI, AsyncProviderSPI]] = [
             (provider, ensure_async_provider(provider)) for provider in providers
         ]
+        self.config = config or RunnerConfig()
 
     async def run_async(
         self,
@@ -286,7 +339,7 @@ class AsyncRunner:
         shadow_async = ensure_async_provider(shadow) if shadow is not None else None
 
         def _record_skip(
-            err: ProviderSkip, attempt: int, provider: ProviderSPI | AsyncProviderSPI
+            err: SkipError, attempt: int, provider: ProviderSPI | AsyncProviderSPI
         ) -> None:
             if not metrics_path_str:
                 return
@@ -305,6 +358,7 @@ class AsyncRunner:
                 total_providers=len(self.providers),
                 reason=err.reason if hasattr(err, "reason") else None,
                 error_message=str(err),
+                error_family="skip",
             )
 
         def _provider_model(provider: ProviderSPI | AsyncProviderSPI) -> str | None:
@@ -326,6 +380,7 @@ class AsyncRunner:
             tokens_in: int | None,
             tokens_out: int | None,
             error: Exception | None = None,
+            error_family: str | None = None,
         ) -> None:
             if not metrics_path_str:
                 return
@@ -353,6 +408,7 @@ class AsyncRunner:
                 tokens_out=tokens_out,
                 error_type=error_type,
                 error_message=error_message,
+                error_family=error_family,
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -379,6 +435,7 @@ class AsyncRunner:
             tokens_out: int | None,
             cost_usd: float,
             error: Exception | None,
+            error_family: str | None,
         ) -> None:
             if not metrics_path_str:
                 return
@@ -411,10 +468,22 @@ class AsyncRunner:
                 cost_usd=float(cost_usd),
                 error_type=error_type,
                 error_message=error_message,
+                error_family=error_family,
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
             )
+
+        def _error_family(error: Exception | None) -> str | None:
+            if error is None:
+                return None
+            if isinstance(error, SkipError):
+                return "skip"
+            if isinstance(error, FatalError):
+                return "fatal"
+            if isinstance(error, RetryableError):
+                return "retryable"
+            return None
 
         for attempt_index, (provider, async_provider) in enumerate(self.providers, start=1):
             attempt_started = time.time()
@@ -425,7 +494,7 @@ class AsyncRunner:
                     request,
                     metrics_path=metrics_path_str,
                 )
-            except ProviderSkip as err:
+            except SkipError as err:
                 last_err = err
                 _record_skip(err, attempt_index, provider)
                 _log_provider_call(
@@ -436,9 +505,10 @@ class AsyncRunner:
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
+                    error_family="skip",
                 )
                 continue
-            except RateLimitError as err:
+            except FatalError as err:
                 last_err = err
                 _log_provider_call(
                     provider,
@@ -448,9 +518,21 @@ class AsyncRunner:
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
+                    error_family="fatal",
                 )
-                await asyncio.sleep(0.05)
-            except (TimeoutError, RetriableError) as err:
+                _log_run_metric(
+                    status="error",
+                    provider=provider,
+                    attempts=attempt_index,
+                    latency_ms=_elapsed_ms(run_started),
+                    tokens_in=None,
+                    tokens_out=None,
+                    cost_usd=0.0,
+                    error=err,
+                    error_family="fatal",
+                )
+                raise
+            except RetryableError as err:
                 last_err = err
                 _log_provider_call(
                     provider,
@@ -460,7 +542,12 @@ class AsyncRunner:
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
+                    error_family="retryable",
                 )
+                if isinstance(err, RateLimitError):
+                    backoff = max(0.0, self.config.rate_limit_backoff_s)
+                    if backoff > 0:
+                        await asyncio.sleep(backoff)
                 continue
             else:
                 _log_provider_call(
@@ -471,6 +558,7 @@ class AsyncRunner:
                     tokens_in=response.input_tokens,
                     tokens_out=response.output_tokens,
                     error=None,
+                    error_family=None,
                 )
                 tokens_in = response.input_tokens
                 tokens_out = response.output_tokens
@@ -484,6 +572,7 @@ class AsyncRunner:
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
                     error=None,
+                    error_family=None,
                 )
                 return response
 
@@ -496,6 +585,7 @@ class AsyncRunner:
                 providers=[provider.name() for provider, _ in self.providers],
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
+                error_family=_error_family(last_err),
             )
         _log_run_metric(
             status="error",
@@ -506,8 +596,9 @@ class AsyncRunner:
             tokens_out=None,
             cost_usd=0.0,
             error=last_err,
+            error_family=_error_family(last_err),
         )
         raise last_err if last_err is not None else RuntimeError("No providers succeeded")
 
 
-__all__ = ["Runner", "AsyncRunner"]
+__all__ = ["Runner", "AsyncRunner", "RunnerConfig"]
