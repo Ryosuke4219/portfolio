@@ -223,6 +223,7 @@ def test_provider_chain_failed_records_last_error_family() -> None:
     assert run_event["error_family"] == "retryable"
 
 
+# ===== 非同期ランナーの振る舞いテスト（統合維持） =====
 def test_async_rate_limit_triggers_backoff_and_logs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -307,7 +308,7 @@ if _HAS_HYPOTHESIS:
             sequence_strategy,
             st.integers(),
         )
-        role_strategy = st.one_of(st.none(), text_strategy)
+        role_strategy = st.one_of(st.none(), st.text())
         extra_strategy = st.dictionaries(
             st.text(min_size=1),
             st.one_of(text_strategy, st.integers()),
