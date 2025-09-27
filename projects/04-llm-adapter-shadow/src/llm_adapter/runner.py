@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
+from enum import Enum
 from pathlib import Path
 
-from .errors import ProviderSkip, RateLimitError, RetriableError, TimeoutError
+from .errors import (
+    ProviderSkip,
+    RateLimitError,
+    RetryableError,
+    SkipError,
+)
 from .metrics import log_event
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow
@@ -39,6 +45,25 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
+        def _error_family(err: Exception | None) -> str | None:
+            if err is None:
+                return None
+            if isinstance(err, SkipError):
+                return "skip"
+            if isinstance(err, RateLimitError):
+                return "retryable"
+            if isinstance(err, RetryableError):
+                return "retryable"
+            return "fatal"
+
+        def _skip_reason(err: ProviderSkip) -> str | None:
+            reason = getattr(err, "reason", None)
+            if isinstance(reason, Enum):
+                return str(reason.value)
+            if reason is None:
+                return None
+            return str(reason)
+
         def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
             if not metrics_path_str:
                 return
@@ -55,7 +80,7 @@ class Runner:
                 provider=provider.name(),
                 attempt=attempt,
                 total_providers=len(self.providers),
-                reason=err.reason if hasattr(err, "reason") else None,
+                reason=_skip_reason(err),
                 error_message=str(err),
             )
 
@@ -84,6 +109,7 @@ class Runner:
 
             error_type = type(error).__name__ if error is not None else None
             error_message = str(error) if error is not None else None
+            error_family = _error_family(error)
 
             log_event(
                 "provider_call",
@@ -105,6 +131,7 @@ class Runner:
                 tokens_out=tokens_out,
                 error_type=error_type,
                 error_message=error_message,
+                error_family=error_family,
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -135,6 +162,7 @@ class Runner:
 
             error_type = type(error).__name__ if error else None
             error_message = str(error) if error else None
+            error_family = _error_family(error)
             provider_name = provider.name() if provider is not None else None
             request_hash = (
                 content_hash(
@@ -161,6 +189,7 @@ class Runner:
                 cost_usd=float(cost_usd),
                 error_type=error_type,
                 error_message=error_message,
+                error_family=error_family,
                 shadow_used=shadow is not None,
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
@@ -170,9 +199,10 @@ class Runner:
             attempt_started = time.time()
             try:
                 response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
-            except ProviderSkip as err:
+            except SkipError as err:
                 last_err = err
-                _record_skip(err, attempt_index, provider)
+                if isinstance(err, ProviderSkip):
+                    _record_skip(err, attempt_index, provider)
                 _log_provider_call(
                     provider,
                     attempt_index,
@@ -183,7 +213,7 @@ class Runner:
                     error=err,
                 )
                 continue
-            except RateLimitError as err:
+            except RetryableError as err:
                 last_err = err
                 _log_provider_call(
                     provider,
@@ -194,18 +224,8 @@ class Runner:
                     tokens_out=None,
                     error=err,
                 )
-                time.sleep(0.05)
-            except (TimeoutError, RetriableError) as err:
-                last_err = err
-                _log_provider_call(
-                    provider,
-                    attempt_index,
-                    status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
-                    tokens_in=None,
-                    tokens_out=None,
-                    error=err,
-                )
+                if isinstance(err, RateLimitError):
+                    time.sleep(0.05)
                 continue
             else:
                 _log_provider_call(
@@ -241,6 +261,7 @@ class Runner:
                 providers=[provider.name() for provider in self.providers],
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
+                last_error_family=_error_family(last_err),
             )
         _log_run_metric(
             status="error",

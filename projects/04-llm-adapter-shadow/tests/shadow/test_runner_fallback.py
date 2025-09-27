@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
+from src.llm_adapter.errors import (
+    ProviderSkip,
+    ProviderSkipReason,
+    RateLimitError,
+    RetriableError,
+    TimeoutError,
+)
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import Runner
 
@@ -89,7 +95,9 @@ def test_first_failure_then_success_records_chain(tmp_path: Path) -> None:
     provider_events = [rec for rec in records if rec["event"] == "provider_call"]
     assert [event["provider"] for event in provider_events] == ["fail-first", "success"]
     assert provider_events[0]["status"] == "error"
+    assert provider_events[0]["error_family"] == "retryable"
     assert provider_events[1]["status"] == "ok"
+    assert provider_events[1]["error_family"] is None
 
     run_event = next(rec for rec in records if rec["event"] == "run_metric")
     assert run_event["status"] == "ok"
@@ -121,6 +129,7 @@ def test_rate_limit_triggers_backoff_and_logs(
     )
     assert first_call["status"] == "error"
     assert first_call["error_type"] == "RateLimitError"
+    assert first_call["error_family"] == "retryable"
 
 
 def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
@@ -137,6 +146,7 @@ def test_timeout_switches_to_next_provider(tmp_path: Path) -> None:
     )
     assert timeout_event["status"] == "error"
     assert timeout_event["error_type"] == "TimeoutError"
+    assert timeout_event["error_family"] == "retryable"
 
     success_event = next(
         rec
@@ -157,3 +167,32 @@ def test_run_metric_contains_tokens_and_cost(tmp_path: Path) -> None:
     assert run_event["tokens_out"] == 9
     assert run_event["cost_usd"] == pytest.approx(0.456)
     assert succeeding.cost_calls == [(21, 9)]
+
+
+def test_provider_skip_logs_reason_and_family(tmp_path: Path) -> None:
+    metrics_path = tmp_path / "metrics.jsonl"
+    skipping = _ErrorProvider(
+        "skipper",
+        ProviderSkip("skip me", reason=ProviderSkipReason.MISSING_GEMINI_API_KEY),
+    )
+    succeeding = _SuccessProvider("success")
+
+    _, records = _run_and_collect([skipping, succeeding], metrics_path=metrics_path)
+
+    skip_call = next(
+        rec
+        for rec in records
+        if rec["event"] == "provider_call" and rec["provider"] == "skipper"
+    )
+    assert skip_call["status"] == "error"
+    assert skip_call["error_family"] == "skip"
+
+    skip_metric = next(rec for rec in records if rec["event"] == "provider_skipped")
+    assert skip_metric["reason"] == "missing_gemini_api_key"
+
+    success_event = next(
+        rec
+        for rec in records
+        if rec["event"] == "provider_call" and rec["provider"] == "success"
+    )
+    assert success_event["status"] == "ok"

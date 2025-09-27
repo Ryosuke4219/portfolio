@@ -13,6 +13,7 @@ from ..errors import (
     AuthError,
     ConfigError,
     ProviderSkip,
+    ProviderSkipReason,
     RateLimitError,
     RetriableError,
     TimeoutError,
@@ -212,11 +213,17 @@ class GeminiProvider(ProviderSPI):
 
         api_key = os.getenv("GEMINI_API_KEY")
         if api_key is None:
-            raise ProviderSkip("gemini: GEMINI_API_KEY not set", reason="missing_gemini_api_key")
+            raise ProviderSkip(
+                "gemini: GEMINI_API_KEY not set",
+                reason=ProviderSkipReason.MISSING_GEMINI_API_KEY,
+            )
 
         api_key_value = api_key.strip()
         if not api_key_value:
-            raise ProviderSkip("gemini: GEMINI_API_KEY not set", reason="missing_gemini_api_key")
+            raise ProviderSkip(
+                "gemini: GEMINI_API_KEY not set",
+                reason=ProviderSkipReason.MISSING_GEMINI_API_KEY,
+            )
 
         module = cast(Any, self._client_module)
         client = cast(GeminiClientProtocol, module.Client(api_key=api_key_value))
