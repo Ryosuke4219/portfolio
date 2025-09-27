@@ -1,8 +1,15 @@
 """Utility helpers for hashing request payloads and message normalization."""
 
 import hashlib
+import time
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+
+def elapsed_ms(start_ts: float) -> int:
+    """Return elapsed milliseconds since ``start_ts`` in seconds."""
+
+    return max(0, int((time.time() - start_ts) * 1000))
 
 
 def ensure_str_list(value: Any) -> list[str]:
@@ -78,6 +85,7 @@ def content_hash(
 
 
 __all__ = [
+    "elapsed_ms",
     "content_hash",
     "ensure_str_list",
     "normalize_message",

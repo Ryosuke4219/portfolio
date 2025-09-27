@@ -17,7 +17,7 @@ from .provider_spi import (
     ensure_async_provider,
 )
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow, run_with_shadow_async
-from .utils import content_hash
+from .utils import content_hash, elapsed_ms
 
 MetricsPath = str | Path | None
 
@@ -65,9 +65,6 @@ class Runner:
                 reason=err.reason if hasattr(err, "reason") else None,
                 error_message=str(err),
             )
-
-        def _elapsed_ms(start_ts: float) -> int:
-            return max(0, int((time.time() - start_ts) * 1000))
 
         def _log_provider_call(
             provider: ProviderSPI,
@@ -181,7 +178,7 @@ class Runner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -193,7 +190,7 @@ class Runner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -205,7 +202,7 @@ class Runner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -228,7 +225,7 @@ class Runner:
                     status="ok",
                     provider=provider,
                     attempts=attempt_index,
-                    latency_ms=_elapsed_ms(run_started),
+                    latency_ms=elapsed_ms(run_started),
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
@@ -250,7 +247,7 @@ class Runner:
             status="error",
             provider=None,
             attempts=len(self.providers),
-            latency_ms=_elapsed_ms(run_started),
+            latency_ms=elapsed_ms(run_started),
             tokens_in=None,
             tokens_out=None,
             cost_usd=0.0,
@@ -313,9 +310,6 @@ class AsyncRunner:
                 if isinstance(value, str) and value:
                     return value
             return None
-
-        def _elapsed_ms(start_ts: float) -> int:
-            return max(0, int((time.time() - start_ts) * 1000))
 
         def _log_provider_call(
             provider: ProviderSPI | AsyncProviderSPI,
@@ -432,7 +426,7 @@ class AsyncRunner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -444,7 +438,7 @@ class AsyncRunner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -456,7 +450,7 @@ class AsyncRunner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -479,7 +473,7 @@ class AsyncRunner:
                     status="ok",
                     provider=provider,
                     attempts=attempt_index,
-                    latency_ms=_elapsed_ms(run_started),
+                    latency_ms=elapsed_ms(run_started),
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
@@ -501,7 +495,7 @@ class AsyncRunner:
             status="error",
             provider=None,
             attempts=len(self.providers),
-            latency_ms=_elapsed_ms(run_started),
+            latency_ms=elapsed_ms(run_started),
             tokens_in=None,
             tokens_out=None,
             cost_usd=0.0,
