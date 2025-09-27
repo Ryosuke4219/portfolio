@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
+from dataclasses import dataclass, field
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -17,18 +19,51 @@ from .provider_spi import (
     ensure_async_provider,
 )
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow, run_with_shadow_async
-from .utils import content_hash
+from .utils import content_hash, elapsed_ms, provider_model_name, safe_estimate_cost
 
 MetricsPath = str | Path | None
+
+
+@dataclass(frozen=True)
+class BackoffPolicy:
+    rate_limit_seconds: float = 0.05
+
+
+@dataclass(frozen=True)
+class RunnerConfig:
+    max_attempts: int | None = None
+    backoff: BackoffPolicy = field(default_factory=BackoffPolicy)
 
 
 class Runner:
     """Attempt providers sequentially until one succeeds."""
 
-    def __init__(self, providers: Sequence[ProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI],
+        *,
+        config: RunnerConfig | None = None,
+        logger: logging.Logger | None = None,
+    ):
         if not providers:
             raise ValueError("Runner requires at least one provider")
         self.providers: list[ProviderSPI] = list(providers)
+        self.config = config or RunnerConfig()
+        self.logger = logger or logging.getLogger(__name__)
+
+    def _resolved_providers(self) -> list[ProviderSPI]:
+        max_attempts = self.config.max_attempts
+        if max_attempts is None or max_attempts >= len(self.providers):
+            selected = list(self.providers)
+        else:
+            selected = list(self.providers[: max_attempts])
+        self.logger.debug(
+            "Runner plan: providers=%s max_attempts=%s rate_limit_backoff=%.3fs",
+            [provider.name() for provider in selected],
+            self.config.max_attempts,
+            self.config.backoff.rate_limit_seconds,
+        )
+        return selected
 
     def run(
         self,
@@ -46,6 +81,9 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
+        providers = self._resolved_providers()
+        total_providers = len(providers)
+
         def _record_skip(err: ProviderSkip, attempt: int, provider: ProviderSPI) -> None:
             if not metrics_path_str:
                 return
@@ -61,13 +99,10 @@ class Runner:
                 ),
                 provider=provider.name(),
                 attempt=attempt,
-                total_providers=len(self.providers),
+                total_providers=total_providers,
                 reason=err.reason if hasattr(err, "reason") else None,
                 error_message=str(err),
             )
-
-        def _elapsed_ms(start_ts: float) -> int:
-            return max(0, int((time.time() - start_ts) * 1000))
 
         def _log_provider_call(
             provider: ProviderSPI,
@@ -85,10 +120,6 @@ class Runner:
             error_type = type(error).__name__ if error is not None else None
             error_message = str(error) if error is not None else None
 
-            provider_model = getattr(provider, "model", None)
-            if not isinstance(provider_model, str) or not provider_model:
-                provider_model = None
-
             log_event(
                 "provider_call",
                 metrics_path_str,
@@ -100,9 +131,9 @@ class Runner:
                     request.max_tokens,
                 ),
                 provider=provider.name(),
-                model=provider_model,
+                model=provider_model_name(provider),
                 attempt=attempt,
-                total_providers=len(self.providers),
+                total_providers=total_providers,
                 status=status,
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
@@ -113,15 +144,6 @@ class Runner:
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
             )
-
-        def _estimate_cost(provider: ProviderSPI, tokens_in: int, tokens_out: int) -> float:
-            estimator = getattr(provider, "estimate_cost", None)
-            if callable(estimator):
-                try:
-                    return float(estimator(tokens_in, tokens_out))
-                except Exception:  # pragma: no cover - defensive guard
-                    return 0.0
-            return 0.0
 
         def _log_run_metric(
             *,
@@ -170,7 +192,7 @@ class Runner:
                 project_id=metadata.get("project_id"),
             )
 
-        for attempt_index, provider in enumerate(self.providers, start=1):
+        for attempt_index, provider in enumerate(providers, start=1):
             attempt_started = time.time()
             try:
                 response = run_with_shadow(provider, shadow, request, metrics_path=metrics_path_str)
@@ -181,7 +203,7 @@ class Runner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -193,19 +215,25 @@ class Runner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
                 )
-                time.sleep(0.05)
+                self.logger.debug(
+                    "Rate limited by %s; sleeping %.3fs (max_attempts=%s)",
+                    provider.name(),
+                    self.config.backoff.rate_limit_seconds,
+                    self.config.max_attempts,
+                )
+                time.sleep(self.config.backoff.rate_limit_seconds)
             except (TimeoutError, RetriableError) as err:
                 last_err = err
                 _log_provider_call(
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -223,12 +251,12 @@ class Runner:
                 )
                 tokens_in = response.input_tokens
                 tokens_out = response.output_tokens
-                cost_usd = _estimate_cost(provider, tokens_in, tokens_out)
+                cost_usd = safe_estimate_cost(provider, tokens_in, tokens_out)
                 _log_run_metric(
                     status="ok",
                     provider=provider,
                     attempts=attempt_index,
-                    latency_ms=_elapsed_ms(run_started),
+                    latency_ms=elapsed_ms(run_started),
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
@@ -241,16 +269,16 @@ class Runner:
                 "provider_chain_failed",
                 metrics_path_str,
                 request_fingerprint=request_fingerprint,
-                provider_attempts=len(self.providers),
-                providers=[provider.name() for provider in self.providers],
+                provider_attempts=total_providers,
+                providers=[provider.name() for provider in providers],
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
             )
         _log_run_metric(
             status="error",
             provider=None,
-            attempts=len(self.providers),
-            latency_ms=_elapsed_ms(run_started),
+            attempts=total_providers,
+            latency_ms=elapsed_ms(run_started),
             tokens_in=None,
             tokens_out=None,
             cost_usd=0.0,
@@ -262,12 +290,34 @@ class Runner:
 class AsyncRunner:
     """Async counterpart of :class:`Runner` providing ``asyncio`` bridges."""
 
-    def __init__(self, providers: Sequence[ProviderSPI | AsyncProviderSPI]):
+    def __init__(
+        self,
+        providers: Sequence[ProviderSPI | AsyncProviderSPI],
+        *,
+        config: RunnerConfig | None = None,
+        logger: logging.Logger | None = None,
+    ):
         if not providers:
             raise ValueError("AsyncRunner requires at least one provider")
         self.providers: list[tuple[ProviderSPI | AsyncProviderSPI, AsyncProviderSPI]] = [
             (provider, ensure_async_provider(provider)) for provider in providers
         ]
+        self.config = config or RunnerConfig()
+        self.logger = logger or logging.getLogger(__name__)
+
+    def _resolved_providers(self) -> list[tuple[ProviderSPI | AsyncProviderSPI, AsyncProviderSPI]]:
+        max_attempts = self.config.max_attempts
+        if max_attempts is None or max_attempts >= len(self.providers):
+            selected = list(self.providers)
+        else:
+            selected = list(self.providers[: max_attempts])
+        self.logger.debug(
+            "AsyncRunner plan: providers=%s max_attempts=%s rate_limit_backoff=%.3fs",
+            [provider.name() for provider, _ in selected],
+            self.config.max_attempts,
+            self.config.backoff.rate_limit_seconds,
+        )
+        return selected
 
     async def run_async(
         self,
@@ -284,6 +334,9 @@ class AsyncRunner:
         )
 
         shadow_async = ensure_async_provider(shadow) if shadow is not None else None
+
+        providers = self._resolved_providers()
+        total_providers = len(providers)
 
         def _record_skip(
             err: ProviderSkip, attempt: int, provider: ProviderSPI | AsyncProviderSPI
@@ -302,20 +355,10 @@ class AsyncRunner:
                 ),
                 provider=provider.name(),
                 attempt=attempt,
-                total_providers=len(self.providers),
+                total_providers=total_providers,
                 reason=err.reason if hasattr(err, "reason") else None,
                 error_message=str(err),
             )
-
-        def _provider_model(provider: ProviderSPI | AsyncProviderSPI) -> str | None:
-            for attr in ("model", "_model"):
-                value = getattr(provider, attr, None)
-                if isinstance(value, str) and value:
-                    return value
-            return None
-
-        def _elapsed_ms(start_ts: float) -> int:
-            return max(0, int((time.time() - start_ts) * 1000))
 
         def _log_provider_call(
             provider: ProviderSPI | AsyncProviderSPI,
@@ -344,9 +387,9 @@ class AsyncRunner:
                     request.max_tokens,
                 ),
                 provider=provider.name(),
-                model=_provider_model(provider),
+                model=provider_model_name(provider),
                 attempt=attempt,
-                total_providers=len(self.providers),
+                total_providers=total_providers,
                 status=status,
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
@@ -357,17 +400,6 @@ class AsyncRunner:
                 trace_id=metadata.get("trace_id"),
                 project_id=metadata.get("project_id"),
             )
-
-        def _estimate_cost(
-            provider: ProviderSPI | AsyncProviderSPI, tokens_in: int, tokens_out: int
-        ) -> float:
-            estimator = getattr(provider, "estimate_cost", None)
-            if callable(estimator):
-                try:
-                    return float(estimator(tokens_in, tokens_out))
-                except Exception:  # pragma: no cover - defensive guard
-                    return 0.0
-            return 0.0
 
         def _log_run_metric(
             *,
@@ -416,7 +448,10 @@ class AsyncRunner:
                 project_id=metadata.get("project_id"),
             )
 
-        for attempt_index, (provider, async_provider) in enumerate(self.providers, start=1):
+        providers = self._resolved_providers()
+        total_providers = len(providers)
+
+        for attempt_index, (provider, async_provider) in enumerate(providers, start=1):
             attempt_started = time.time()
             try:
                 response = await run_with_shadow_async(
@@ -432,7 +467,7 @@ class AsyncRunner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -444,19 +479,25 @@ class AsyncRunner:
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
                 )
-                await asyncio.sleep(0.05)
+                self.logger.debug(
+                    "Async rate limit hit by %s; sleeping %.3fs (max_attempts=%s)",
+                    provider.name(),
+                    self.config.backoff.rate_limit_seconds,
+                    self.config.max_attempts,
+                )
+                await asyncio.sleep(self.config.backoff.rate_limit_seconds)
             except (TimeoutError, RetriableError) as err:
                 last_err = err
                 _log_provider_call(
                     provider,
                     attempt_index,
                     status="error",
-                    latency_ms=_elapsed_ms(attempt_started),
+                    latency_ms=elapsed_ms(attempt_started),
                     tokens_in=None,
                     tokens_out=None,
                     error=err,
@@ -474,12 +515,12 @@ class AsyncRunner:
                 )
                 tokens_in = response.input_tokens
                 tokens_out = response.output_tokens
-                cost_usd = _estimate_cost(provider, tokens_in, tokens_out)
+                cost_usd = safe_estimate_cost(provider, tokens_in, tokens_out)
                 _log_run_metric(
                     status="ok",
                     provider=provider,
                     attempts=attempt_index,
-                    latency_ms=_elapsed_ms(run_started),
+                    latency_ms=elapsed_ms(run_started),
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
@@ -492,16 +533,16 @@ class AsyncRunner:
                 "provider_chain_failed",
                 metrics_path_str,
                 request_fingerprint=request_fingerprint,
-                provider_attempts=len(self.providers),
-                providers=[provider.name() for provider, _ in self.providers],
+                provider_attempts=total_providers,
+                providers=[provider.name() for provider, _ in providers],
                 last_error_type=type(last_err).__name__ if last_err else None,
                 last_error_message=str(last_err) if last_err else None,
             )
         _log_run_metric(
             status="error",
             provider=None,
-            attempts=len(self.providers),
-            latency_ms=_elapsed_ms(run_started),
+            attempts=total_providers,
+            latency_ms=elapsed_ms(run_started),
             tokens_in=None,
             tokens_out=None,
             cost_usd=0.0,
@@ -510,4 +551,9 @@ class AsyncRunner:
         raise last_err if last_err is not None else RuntimeError("No providers succeeded")
 
 
-__all__ = ["Runner", "AsyncRunner"]
+__all__ = [
+    "AsyncRunner",
+    "BackoffPolicy",
+    "Runner",
+    "RunnerConfig",
+]

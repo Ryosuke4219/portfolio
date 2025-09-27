@@ -1,6 +1,7 @@
-"""Utility helpers for hashing request payloads and message normalization."""
+"""Utility helpers shared across the adapter."""
 
 import hashlib
+import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -77,9 +78,41 @@ def content_hash(
     return h.hexdigest()[:16]
 
 
+def elapsed_ms(start_ts: float, *, now: float | None = None) -> int:
+    """Return elapsed time in milliseconds since ``start_ts``."""
+
+    current = time.time() if now is None else now
+    return max(0, int((current - start_ts) * 1000))
+
+
+def provider_model_name(provider: Any) -> str | None:
+    """Extract a provider's configured model name when available."""
+
+    for attr in ("model", "_model"):
+        value = getattr(provider, attr, None)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def safe_estimate_cost(provider: Any, tokens_in: int, tokens_out: int) -> float:
+    """Safely execute ``provider.estimate_cost`` if it exists."""
+
+    estimator = getattr(provider, "estimate_cost", None)
+    if callable(estimator):
+        try:
+            return float(estimator(tokens_in, tokens_out))
+        except Exception:  # pragma: no cover - defensive guard
+            return 0.0
+    return 0.0
+
+
 __all__ = [
     "content_hash",
+    "elapsed_ms",
     "ensure_str_list",
+    "provider_model_name",
+    "safe_estimate_cost",
     "normalize_message",
     "extract_prompt_from_messages",
 ]

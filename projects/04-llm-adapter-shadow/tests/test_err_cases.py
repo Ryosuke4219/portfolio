@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,7 @@ import pytest
 from src.llm_adapter.errors import TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import Runner
+from src.llm_adapter.runner import BackoffPolicy, Runner, RunnerConfig
 
 
 def _providers_for(marker: str):
@@ -48,12 +49,15 @@ def test_ratelimit_backoff_sleep(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("time.sleep", fake_runner_sleep)
 
     p1, p2 = _providers_for("[RATELIMIT]")
-    runner = Runner([p1, p2])
+    runner = Runner(
+        [p1, p2],
+        config=RunnerConfig(backoff=BackoffPolicy(rate_limit_seconds=0.01)),
+    )
 
     response = runner.run(ProviderRequest(prompt="[RATELIMIT] backoff", model="fallback-model"))
 
     assert response.text.startswith("echo(p2):")
-    assert sleep_calls.count(0.05) == 1
+    assert any(pytest.approx(0.01) == delay for delay in sleep_calls)
 
 
 def test_invalid_json_fallback():
@@ -79,6 +83,17 @@ def test_timeout_no_backoff(monkeypatch: pytest.MonkeyPatch):
 
     assert response.text.startswith("echo(p2):")
     assert all(abs(delay - 0.05) > 1e-9 for delay in sleep_calls)
+
+
+def test_runner_respects_max_attempts(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG)
+    p1, p2 = _providers_for("[TIMEOUT]")
+    runner = Runner([p1, p2], config=RunnerConfig(max_attempts=1))
+
+    with pytest.raises(TimeoutError):
+        runner.run(ProviderRequest(prompt="[TIMEOUT] halt", model="fallback-model"))
+
+    assert "max_attempts=1" in caplog.text
 
 
 def test_timeout_fallback_records_metrics(tmp_path: Path):

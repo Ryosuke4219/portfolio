@@ -4,9 +4,11 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import AsyncRunner, Runner
+from src.llm_adapter.runner import AsyncRunner, BackoffPolicy, Runner, RunnerConfig
 
 
 def test_async_runner_matches_sync(tmp_path: Path) -> None:
@@ -96,3 +98,26 @@ def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_error"] == "TimeoutError"
     assert diff_event["shadow_error_message"] == "simulated timeout"
     assert diff_event["shadow_duration_ms"] >= 0
+
+
+def test_async_runner_custom_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr("asyncio.sleep", fake_sleep)
+
+    ratelimited = MockProvider("p1", base_latency_ms=5, error_markers={"[RATELIMIT]"})
+    fallback = MockProvider("p2", base_latency_ms=5, error_markers=set())
+    runner = AsyncRunner(
+        [ratelimited, fallback],
+        config=RunnerConfig(backoff=BackoffPolicy(rate_limit_seconds=0.02)),
+    )
+
+    response = asyncio.run(
+        runner.run_async(ProviderRequest(prompt="[RATELIMIT] async", model="fallback-model"))
+    )
+
+    assert response.text.startswith("echo(p2):")
+    assert sleep_calls == [pytest.approx(0.02)]
