@@ -10,12 +10,7 @@ from collections.abc import (
     Sequence,
 )
 from types import TracebackType
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Protocol,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
@@ -55,9 +50,13 @@ class _RequestsModuleProtocol(Protocol):
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
-    requests: _RequestsModuleProtocol | None
-    Response: type[_ResponseProtocol]
-    requests_exceptions: _RequestsExceptionsProtocol
+    RequestsModule: TypeAlias = _RequestsModuleProtocol | None
+    ResponseType: TypeAlias = type[_ResponseProtocol]
+    RequestsExceptions: TypeAlias = _RequestsExceptionsProtocol
+
+    requests: RequestsModule
+    Response: ResponseType
+    requests_exceptions: RequestsExceptions
 else:  # pragma: no cover - allow running without the optional dependency
     import importlib
 
