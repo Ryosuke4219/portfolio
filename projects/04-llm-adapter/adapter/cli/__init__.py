@@ -3,10 +3,10 @@ from __future__ import annotations
 import http as _http
 import socket as _socket
 import sys
-from typing import List, Optional
 
 from adapter.core import providers as provider_module
 
+from .app import app, main
 from .doctor import run_doctor
 from .prompt_runner import PromptResult as _PromptResult, RateLimiter as _RateLimiter
 from .prompts import ProviderFactory as _ProviderFactory, run_prompts
@@ -33,23 +33,16 @@ __all__ = [
     "EXIT_OK",
     "EXIT_PROVIDER_ERROR",
     "EXIT_RATE_LIMIT",
+    "app",
     "ProviderFactory",
     "ProviderResponse",
     "PromptResult",
     "RateLimiter",
-    "main",
     "run_doctor",
     "run_prompts",
     "http",
     "socket",
 ]
-
-
-def main(argv: Optional[List[str]] = None) -> int:
-    args = list(argv or sys.argv[1:])
-    if args and args[0] == "doctor":
-        return run_doctor(args[1:], socket_module=socket)
-    return run_prompts(args, provider_factory=ProviderFactory)
 
 
 if __name__ == "__main__":  # pragma: no cover
