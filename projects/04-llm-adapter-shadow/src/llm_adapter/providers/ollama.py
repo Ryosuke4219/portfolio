@@ -247,11 +247,11 @@ class OllamaProvider(ProviderSPI):
             return str(content)
 
         messages_payload: list[dict[str, str]] = []
-        for message in request.chat_messages:
-            if not isinstance(message, Mapping):
+        for chat_message in request.chat_messages:
+            if not isinstance(chat_message, Mapping):
                 continue
-            role = str(message.get("role", "user")) or "user"
-            text = _coerce_content(message).strip()
+            role = str(chat_message.get("role", "user")) or "user"
+            text = _coerce_content(chat_message).strip()
             if text:
                 messages_payload.append({"role": role, "content": text})
 
