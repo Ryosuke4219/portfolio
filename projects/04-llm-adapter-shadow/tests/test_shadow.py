@@ -1,13 +1,14 @@
+from __future__ import annotations
+
 import json
+from pathlib import Path
 
-import pytest
-
+from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
-from src.llm_adapter.provider_spi import ProviderRequest
 
 
-def test_shadow_exec_records_metrics(tmp_path):
+def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
     runner = Runner([primary])
@@ -35,7 +36,10 @@ def test_shadow_exec_records_metrics(tmp_path):
     assert diff_event["shadow_provider"] == "shadow"
     assert diff_event["shadow_ok"] is True
     assert diff_event["primary_text_len"] == len(response.text)
-    assert diff_event["primary_token_usage_total"] == response.token_usage.total
+    token_usage = response.token_usage
+    assert token_usage is not None
+
+    assert diff_event["primary_token_usage_total"] == token_usage.total
     assert diff_event["request_fingerprint"]
 
     assert call_event["provider"] == "primary"
@@ -43,8 +47,8 @@ def test_shadow_exec_records_metrics(tmp_path):
     assert call_event["shadow_used"] is True
     assert call_event["status"] == "ok"
     assert call_event["latency_ms"] == response.latency_ms
-    assert call_event["tokens_in"] == response.token_usage.prompt
-    assert call_event["tokens_out"] == response.token_usage.completion
+    assert call_event["tokens_in"] == token_usage.prompt
+    assert call_event["tokens_out"] == token_usage.completion
     assert call_event["trace_id"] == metadata["trace_id"]
     assert call_event["project_id"] == metadata["project_id"]
     # メトリクスに model は記録しない設計（プライバシー配慮）
@@ -55,7 +59,7 @@ def test_shadow_exec_records_metrics(tmp_path):
     assert diff_event["shadow_text_len"] == len("echo(shadow): hello")
 
 
-def test_shadow_error_records_metrics(tmp_path):
+def test_shadow_error_records_metrics(tmp_path: Path) -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers={"[TIMEOUT]"})
     runner = Runner([primary])
@@ -76,7 +80,7 @@ def test_shadow_error_records_metrics(tmp_path):
     assert diff_event["shadow_duration_ms"] >= 0
 
 
-def test_request_hash_includes_max_tokens(tmp_path):
+def test_request_hash_includes_max_tokens(tmp_path: Path) -> None:
     provider = MockProvider("primary", base_latency_ms=1, error_markers=set())
     runner = Runner([provider])
 

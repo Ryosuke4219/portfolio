@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
 from src.llm_adapter.errors import AuthError, ProviderSkip, RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
@@ -13,6 +12,7 @@ from src.llm_adapter.provider_spi import (
     ProviderSPI,
     TokenUsage,
 )
+from src.llm_adapter.providers import ollama as ollama_module
 from src.llm_adapter.providers.factory import (
     create_provider_from_spec,
     parse_provider_spec,
@@ -20,7 +20,10 @@ from src.llm_adapter.providers.factory import (
 )
 from src.llm_adapter.providers.gemini import GeminiProvider
 from src.llm_adapter.providers.ollama import OllamaProvider
-from src.llm_adapter.providers import ollama as ollama_module
+
+
+def _maybe_attr(obj: Any, name: str) -> Any:
+    return getattr(obj, name) if hasattr(obj, name) else None
 
 
 @pytest.fixture(scope="module")
@@ -41,7 +44,6 @@ def test_parse_provider_spec_requires_separator():
 
 def test_provider_request_builds_messages_from_prompt(provider_request_model):
     request = ProviderRequest(prompt="  hello ", model=provider_request_model)
-
     assert request.prompt_text == "hello"
     assert request.chat_messages == [{"role": "user", "content": "hello"}]
     assert request.stop is None
@@ -54,7 +56,6 @@ def test_provider_request_normalizes_messages_and_stop(provider_request_model):
         stop=[" END ", ""],
         model=provider_request_model,
     )
-
     assert request.prompt_text == "hi"
     assert request.chat_messages == [{"role": "User", "content": ["hi", "there"]}]
     assert request.stop == ("END",)
@@ -65,9 +66,15 @@ def test_provider_request_timeout_defaults_to_30_seconds(provider_request_model)
     assert request.timeout_s == pytest.approx(30.0)
 
 
+def test_provider_request_rejects_empty_model():
+    with pytest.raises(ValueError):
+        ProviderRequest(model="", prompt="hello")
+    with pytest.raises(ValueError):
+        ProviderRequest(model="   ", prompt="hello")
+
+
 def test_provider_response_populates_token_usage_from_inputs():
     response = ProviderResponse(text="ok", latency_ms=10, tokens_in=3, tokens_out=4)
-
     assert response.token_usage.prompt == 3
     assert response.token_usage.completion == 4
     assert response.input_tokens == 3
@@ -77,7 +84,6 @@ def test_provider_response_populates_token_usage_from_inputs():
 def test_provider_response_uses_token_usage_if_provided():
     usage = TokenUsage(prompt=5, completion=7)
     response = ProviderResponse(text="ok", latency_ms=10, token_usage=usage)
-
     assert response.tokens_in == 5
     assert response.tokens_out == 7
     assert response.token_usage is usage
@@ -127,7 +133,13 @@ def test_provider_from_environment_disabled_requires_optional(monkeypatch):
 
 
 class _FakeResponse:
-    def __init__(self, *, status_code: int, payload: dict | None = None, lines: list[bytes] | None = None):
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        payload: dict | None = None,
+        lines: list[bytes] | None = None,
+    ):
         self.status_code = status_code
         self._payload = payload or {}
         self._lines = lines or [b"{}"]
@@ -159,7 +171,8 @@ class _FakeSession:
         self.calls: list[tuple[str, dict | None, bool]] = []
         self._show_calls = 0
 
-    def post(self, url, json=None, stream=False, timeout=None):  # pragma: no cover - patched in tests
+    def post(self, url, json=None, stream=False, timeout=None):
+        """Override in subclasses."""  # pragma: no cover - patched in tests
         raise NotImplementedError
 
 
@@ -260,18 +273,26 @@ def test_gemini_provider_invokes_client_with_config():
         config_view.update(recorded_config)
 
     temperature = config_view.get("temperature")
-    if temperature is None and hasattr(recorded_config, "temperature"):
-        temperature = getattr(recorded_config, "temperature")
+    if temperature is None:
+        maybe_temp = _maybe_attr(recorded_config, "temperature")
+        if maybe_temp is not None:
+            temperature = maybe_temp
     max_tokens = config_view.get("max_output_tokens")
-    if max_tokens is None and hasattr(recorded_config, "max_output_tokens"):
-        max_tokens = getattr(recorded_config, "max_output_tokens")
+    if max_tokens is None:
+        maybe_max = _maybe_attr(recorded_config, "max_output_tokens")
+        if maybe_max is not None:
+            max_tokens = maybe_max
 
     stop_sequences = config_view.get("stop_sequences")
     top_p = config_view.get("top_p")
-    if top_p is None and hasattr(recorded_config, "top_p"):
-        top_p = getattr(recorded_config, "top_p")
-    if stop_sequences is None and hasattr(recorded_config, "stop_sequences"):
-        stop_sequences = getattr(recorded_config, "stop_sequences")
+    if top_p is None:
+        maybe_top_p = _maybe_attr(recorded_config, "top_p")
+        if maybe_top_p is not None:
+            top_p = maybe_top_p
+    if stop_sequences is None:
+        maybe_stop = _maybe_attr(recorded_config, "stop_sequences")
+        if maybe_stop is not None:
+            stop_sequences = maybe_stop
 
     assert temperature == 0.2
     assert top_p == pytest.approx(0.85)
@@ -333,7 +354,7 @@ def test_gemini_provider_translates_rate_limit(provider_request_model):
     class _FailingModels:
         def generate_content(self, **kwargs):
             err = Exception("rate limited")
-            setattr(err, "status", "RESOURCE_EXHAUSTED")
+            err.status = "RESOURCE_EXHAUSTED"
             raise err
 
     class _Client:
@@ -357,7 +378,7 @@ def test_gemini_provider_translates_rate_limit_status_object(provider_request_mo
     class _FailingModels:
         def generate_content(self, **kwargs):
             err = Exception("rate limited")
-            setattr(err, "status", _StatusCode("RESOURCE_EXHAUSTED"))
+            err.status = _StatusCode("RESOURCE_EXHAUSTED")
             raise err
 
     class _Client:
@@ -400,7 +421,7 @@ def test_gemini_provider_translates_timeout_status_object(provider_request_model
     class _FailingModels:
         def generate_content(self, **kwargs):
             err = Exception("timeout")
-            setattr(err, "code", _StatusCode("DEADLINE_EXCEEDED"))
+            err.code = _StatusCode("DEADLINE_EXCEEDED")
             raise err
 
     class _Client:

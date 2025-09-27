@@ -5,9 +5,9 @@ from typing import Any
 import pytest
 
 from src.llm_adapter.errors import TimeoutError
+from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
-from src.llm_adapter.provider_spi import ProviderRequest
 
 
 def _providers_for(marker: str):
