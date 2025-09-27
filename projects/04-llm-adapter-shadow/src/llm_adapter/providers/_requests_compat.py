@@ -5,7 +5,10 @@ from __future__ import annotations
 import importlib
 from collections.abc import Iterable
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Protocol, cast
+
+# ruff: isort: off
+from typing import Any, Protocol, TYPE_CHECKING, cast
+# ruff: isort: on
 
 
 class ResponseProtocol(Protocol):
