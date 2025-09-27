@@ -1,133 +1,23 @@
-# ruff: noqa: I001
 """Ollama provider with automatic model management."""
 
 from __future__ import annotations
 
-import importlib
 import os
 import time
 from collections.abc import (
-    Iterable,
     Mapping,
     Sequence,
 )
-from types import TracebackType
-from typing import Any, Protocol, TYPE_CHECKING, cast
+from typing import Any
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
-
-
-class _ResponseProtocol(Protocol):
-    status_code: int
-
-    def close(self) -> None: ...
-    def __enter__(self) -> _ResponseProtocol: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> bool | None: ...
-    def json(self) -> Any: ...
-    def raise_for_status(self) -> None: ...
-    def iter_lines(self) -> Iterable[bytes]: ...
-
-
-class _SessionProtocol(Protocol):
-    def post(self, url: str, *args: Any, **kwargs: Any) -> _ResponseProtocol: ...
-
-
-class _RequestsExceptionsProtocol(Protocol):
-    Timeout: type[Exception]
-    RequestException: type[Exception]
-    HTTPError: type[Exception]
-
-
-class _RequestsModuleProtocol(Protocol):
-    def Session(self) -> _SessionProtocol: ...
-
-    exceptions: _RequestsExceptionsProtocol
-    Response: type[_ResponseProtocol]
-
-
-requests: _RequestsModuleProtocol | None = None
-Response: type[_ResponseProtocol]
-requests_exceptions: _RequestsExceptionsProtocol
-
-
-if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
-    import requests as _requests_mod  # type: ignore[import-untyped]  # noqa: F401
-    from requests import Response as _RequestsResponse  # noqa: F401
-    from requests import exceptions as _RequestsExceptions  # noqa: F401
-
-
-def _initialize_requests() -> tuple[
-    _RequestsModuleProtocol | None,
-    type[_ResponseProtocol],
-    _RequestsExceptionsProtocol,
-]:
-    try:
-        _requests_module = importlib.import_module("requests")
-    except ModuleNotFoundError:
-
-        class _FallbackRequestsExceptions:  # pragma: no cover - trivial container
-            class RequestException(Exception): ...
-            class Timeout(RequestException): ...
-            class HTTPError(RequestException):
-                def __init__(self, message: str | None = None, response: Any | None = None):
-                    super().__init__(message or "HTTP error")
-                    self.response = response
-
-        fallback_exceptions = cast(
-            _RequestsExceptionsProtocol, _FallbackRequestsExceptions()
-        )
-
-        class _FallbackResponse:
-            """Very small stub mimicking the subset of Response we rely on."""
-
-            status_code: int
-
-            def __init__(self, status_code: int = 200) -> None:
-                self.status_code = status_code
-
-            def close(self) -> None:  # pragma: no cover - trivial stub
-                return None
-
-            def __enter__(self) -> _FallbackResponse:  # pragma: no cover - stub
-                return self
-
-            def __exit__(
-                self,
-                exc_type: type[BaseException] | None,
-                exc: BaseException | None,
-                tb: TracebackType | None,
-            ) -> bool | None:  # pragma: no cover - stub
-                return None
-
-            def json(self) -> Any:  # pragma: no cover - tests supply payloads
-                return {}
-
-            def raise_for_status(self) -> None:  # pragma: no cover - stub
-                if self.status_code >= 400:
-                    raise cast(Any, fallback_exceptions.HTTPError)(response=self)
-
-            def iter_lines(self) -> Iterable[bytes]:  # pragma: no cover - stub
-                return []
-
-        return (
-            None,
-            cast(type[_ResponseProtocol], _FallbackResponse),
-            fallback_exceptions,
-        )
-
-    _typed_requests = cast(_RequestsModuleProtocol, _requests_module)
-    response_type = cast(type[_ResponseProtocol], _requests_module.Response)
-    exceptions = cast(_RequestsExceptionsProtocol, _requests_module.exceptions)
-    return _typed_requests, response_type, exceptions
-
-
-requests, Response, requests_exceptions = _initialize_requests()
+from ._requests_compat import (
+    ResponseProtocol,
+    SessionProtocol,
+    create_session,
+    requests_exceptions,
+)
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 __all__ = ["OllamaProvider", "DEFAULT_HOST"]
@@ -154,7 +44,7 @@ class OllamaProvider(ProviderSPI):
         *,
         name: str | None = None,
         host: str | None = None,
-        session: _SessionProtocol | None = None,
+        session: SessionProtocol | None = None,
         timeout: float = 60.0,
         pull_timeout: float = 300.0,
         auto_pull: bool = True,
@@ -165,9 +55,7 @@ class OllamaProvider(ProviderSPI):
         env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
         if session is None:
-            if requests is None:  # pragma: no cover - defensive branch
-                raise ImportError("requests is required unless a session is provided")
-            session = requests.Session()
+            session = create_session()
         self._session = session
         self._timeout = timeout
         self._pull_timeout = pull_timeout
@@ -190,7 +78,7 @@ class OllamaProvider(ProviderSPI):
         *,
         stream: bool = False,
         timeout: float | None = None,
-    ) -> _ResponseProtocol:
+    ) -> ResponseProtocol:
         url = _combine_host(self._host, path)
         try:
             response = self._session.post(
