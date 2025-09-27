@@ -4,18 +4,9 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import (
-    Iterable,
-    Mapping,
-    Sequence,
-)
+from collections.abc import Iterable, Mapping, Sequence
 from types import TracebackType
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Protocol,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
 
 from ..errors import AuthError, ConfigError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI, TokenUsage
@@ -61,10 +52,18 @@ if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
         requests_exceptions as _requests_exceptions,
         SessionProtocol as _SessionProtocol,
     )
+    # 型参照専用 import の未使用警告を抑止（mypy/ruff 対策）
     _unused_imports = (OllamaHTTPClient, _requests_exceptions, _SessionProtocol)
-    requests: _RequestsModuleProtocol | None
-    Response: type[_ResponseProtocol]
-    requests_exceptions: _RequestsExceptionsProtocol
+
+    # requests 周辺の型エイリアス
+    RequestsModule: TypeAlias = _RequestsModuleProtocol | None
+    ResponseType: TypeAlias = type[_ResponseProtocol]
+    RequestsExceptions: TypeAlias = _RequestsExceptionsProtocol
+
+    # 実体は実行時ブロックで代入。ここでは型のみ宣言。
+    requests: RequestsModule
+    Response: ResponseType
+    requests_exceptions: RequestsExceptions
 else:  # pragma: no cover - allow running without the optional dependency
     import importlib
 
@@ -259,9 +258,7 @@ class OllamaProvider(ProviderSPI):
             content = entry.get("content")
             if isinstance(content, str):
                 return content
-            if isinstance(content, Sequence) and not isinstance(
-                content, bytes | bytearray
-            ):
+            if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
                 parts = [part for part in content if isinstance(part, str)]
                 return "\n".join(parts)
             if content is None:
@@ -313,9 +310,7 @@ class OllamaProvider(ProviderSPI):
                         try:
                             timeout_override = float(raw_timeout)
                         except (TypeError, ValueError) as exc:
-                            raise ConfigError(
-                                "request_timeout_s must be a number"
-                            ) from exc
+                            raise ConfigError("request_timeout_s must be a number") from exc
                     break
 
             # 衝突しうるトップレベルは除去
