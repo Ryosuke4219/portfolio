@@ -55,6 +55,13 @@ class _RequestsModuleProtocol(Protocol):
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing time placeholders
+    # ruff: noqa: I001
+    from .ollama_http import (
+        OllamaHTTPClient,
+        requests_exceptions as _requests_exceptions,
+        SessionProtocol as _SessionProtocol,
+    )
+    _unused_imports = (OllamaHTTPClient, _requests_exceptions, _SessionProtocol)
     requests: _RequestsModuleProtocol | None
     Response: type[_ResponseProtocol]
     requests_exceptions: _RequestsExceptionsProtocol
@@ -253,7 +260,7 @@ class OllamaProvider(ProviderSPI):
             if isinstance(content, str):
                 return content
             if isinstance(content, Sequence) and not isinstance(
-                content, (bytes, bytearray)
+                content, bytes | bytearray
             ):
                 parts = [part for part in content if isinstance(part, str)]
                 return "\n".join(parts)
