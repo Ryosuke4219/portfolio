@@ -1,7 +1,7 @@
 # サンプル: Google Gemini API 用プロバイダ設定
 provider: gemini
 model: gemini-1.5-flash
-auth_env: GOOGLE_API_KEY
+auth_env: GEMINI_API_KEY
 seed: 0
 temperature: 0.2
 top_p: 1.0
