@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
+import asyncio
 from typing import Any, Mapping, Sequence
 
 import pytest
@@ -390,6 +390,38 @@ def test_runner_parallel_all_exhausts_timeout_retries(
     assert all(event["error_type"] == "TimeoutError" for event in provider_calls)
     run_metrics = [event for event in events if event["event"] == "run_metric"]
     assert [event["attempts"] for event in run_metrics] == [1, 2]
+
+
+def test_async_runner_parallel_all_rate_limit_does_not_retry_by_default() -> None:
+    provider = _RetryProbeProvider("retry-all-default", [RateLimitError("rate-limit")])
+    runner = AsyncRunner(
+        [provider],
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL),
+    )
+    request = ProviderRequest(prompt="rl", model="parallel-all-default")
+
+    async def _run() -> None:
+        with pytest.raises(RateLimitError):
+            await asyncio.wait_for(runner.run_async(request), timeout=0.2)
+
+    asyncio.run(_run())
+    assert provider.call_count == 1
+
+
+def test_async_runner_consensus_rate_limit_does_not_retry_by_default() -> None:
+    provider = _RetryProbeProvider("retry-consensus-default", [RateLimitError("rate-limit")])
+    runner = AsyncRunner(
+        [provider],
+        config=RunnerConfig(mode=RunnerMode.CONSENSUS, consensus=ConsensusConfig()),
+    )
+    request = ProviderRequest(prompt="rl", model="consensus-default")
+
+    async def _run() -> None:
+        with pytest.raises(ParallelExecutionError):
+            await asyncio.wait_for(runner.run_async(request), timeout=0.2)
+
+    asyncio.run(_run())
+    assert provider.call_count == 1
 
 
 def test_run_parallel_all_async_on_retry_future() -> None:

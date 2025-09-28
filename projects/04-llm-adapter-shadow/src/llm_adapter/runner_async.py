@@ -342,6 +342,9 @@ class AsyncRunner:
                 nonlocal retry_attempts, attempt_count
                 provider, _ = providers[worker_index]
                 next_attempt_total = total_providers + retry_attempts + 1
+                limit = self._config.max_attempts
+                if limit is None:
+                    return None
                 delay: float | None = None
                 if isinstance(error, RateLimitError):
                     delay = max(self._config.backoff.rate_limit_sleep_s, 0.0)
@@ -351,10 +354,7 @@ class AsyncRunner:
                 elif isinstance(error, RetryableError):
                     if not self._config.backoff.retryable_next_provider:
                         delay = 0.0
-                if delay is None or (
-                    (limit := self._config.max_attempts) is not None
-                    and next_attempt_total > limit
-                ):
+                if delay is None or next_attempt_total > limit:
                     return None
                 retry_attempt = retry_attempts + 1
                 retry_attempts, attempt_count = retry_attempt, next_attempt_total
