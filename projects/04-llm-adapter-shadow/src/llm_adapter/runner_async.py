@@ -247,7 +247,7 @@ class AsyncRunner:
 
         mode = self._config.mode
         attempt_count = 0
-        results: list[WorkerResult] = []
+        results: list[WorkerResult] | None = None
 
         if mode is RunnerMode.SEQUENTIAL:
             for attempt_index, (provider, async_provider) in enumerate(providers, start=1):
@@ -425,10 +425,10 @@ class AsyncRunner:
             except Exception as err:  # noqa: BLE001
                 last_err = err
             else:
-                if not results:
+                if results is None or not results:
                     last_err = RuntimeError("No providers succeeded")
                 else:
-                    if mode is RunnerMode.CONSENSUS:
+                    if mode is RunnerMode.CONSENSUS and results is not None:
                         try:
                             consensus = compute_consensus(
                                 [response for _, _, response, _ in results],
@@ -570,7 +570,7 @@ class AsyncRunner:
                             lambda entry: entry[2],
                         )
 
-        if mode is RunnerMode.CONSENSUS:
+        if mode is RunnerMode.CONSENSUS and results is not None:
             for _, _, _, metrics in results:
                 if metrics is not None:
                     metrics.emit()
