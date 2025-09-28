@@ -148,6 +148,7 @@ class ConsensusResult:
     reason: str
 
 
+
 def _extract_weight(response: ProviderResponse) -> float:
     raw = response.raw
     if isinstance(raw, Mapping):
@@ -259,6 +260,7 @@ def resolve_consensus(
     if last_error is not None:
         raise last_error
     raise ParallelExecutionError("consensus resolution failed")
+
 
 
 __all__ = [

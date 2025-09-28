@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from .errors import (
     FatalError,
@@ -39,10 +39,15 @@ from .runner_shared import (
     log_run_metric,
     resolve_event_logger,
 )
-from .shadow import DEFAULT_METRICS_PATH, run_with_shadow_async
+from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow_async
 from .utils import content_hash, elapsed_ms
 
-WorkerResult = tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]
+WorkerResult = tuple[
+    int,
+    ProviderSPI | AsyncProviderSPI,
+    ProviderResponse,
+    ShadowMetrics | None,
+]
 WorkerFactory = Callable[[], Awaitable[WorkerResult]]
 
 
@@ -78,16 +83,35 @@ class AsyncRunner:
         shadow: ProviderSPI | AsyncProviderSPI | None,
         shadow_async: AsyncProviderSPI | None,
         metrics_path: str | None,
-    ) -> ProviderResponse:
+        capture_shadow_metrics: bool,
+    ) -> tuple[ProviderResponse, ShadowMetrics | None]:
         attempt_started = time.time()
+        shadow_metrics: ShadowMetrics | None = None
+        response: ProviderResponse
         try:
-            response = await run_with_shadow_async(
-                async_provider,
-                shadow_async,
-                request,
-                metrics_path=metrics_path,
-                logger=event_logger,
-            )
+            if capture_shadow_metrics:
+                response_with_metrics = await run_with_shadow_async(
+                    async_provider,
+                    shadow_async,
+                    request,
+                    metrics_path=metrics_path,
+                    logger=event_logger,
+                    capture_metrics=True,
+                )
+                response, shadow_metrics = cast(
+                    tuple[ProviderResponse, ShadowMetrics | None],
+                    response_with_metrics,
+                )
+            else:
+                response_only = await run_with_shadow_async(
+                    async_provider,
+                    shadow_async,
+                    request,
+                    metrics_path=metrics_path,
+                    logger=event_logger,
+                    capture_metrics=False,
+                )
+                response = cast(ProviderResponse, response_only)
         except RateLimitError as err:
             log_provider_call(
                 event_logger,
@@ -186,7 +210,7 @@ class AsyncRunner:
             shadow_used=shadow is not None,
             allow_private_model=True,
         )
-        return response
+        return response, shadow_metrics
 
     async def run_async(
         self,
@@ -216,12 +240,13 @@ class AsyncRunner:
 
         mode = self._config.mode
         attempt_count = 0
+        results: list[WorkerResult] = []
 
         if mode is RunnerMode.SEQUENTIAL:
             for attempt_index, (provider, async_provider) in enumerate(providers, start=1):
                 attempt_count = attempt_index
                 try:
-                    response = await self._invoke_provider_async(
+                    response, _ = await self._invoke_provider_async(
                         provider,
                         async_provider,
                         request,
@@ -233,6 +258,7 @@ class AsyncRunner:
                         shadow=shadow,
                         shadow_async=shadow_async,
                         metrics_path=metrics_path_str,
+                        capture_shadow_metrics=False,
                     )
                 except RateLimitError as err:
                     last_err = err
@@ -278,13 +304,15 @@ class AsyncRunner:
         else:
             attempt_count = total_providers
 
+            capture_shadow = mode is RunnerMode.CONSENSUS
+
             def _build_worker(
                 provider: ProviderSPI | AsyncProviderSPI,
                 async_provider: AsyncProviderSPI,
                 attempt_index: int,
             ) -> WorkerFactory:
                 async def _worker() -> WorkerResult:
-                    response = await self._invoke_provider_async(
+                    response, shadow_metrics = await self._invoke_provider_async(
                         provider,
                         async_provider,
                         request,
@@ -296,8 +324,9 @@ class AsyncRunner:
                         shadow=shadow,
                         shadow_async=shadow_async,
                         metrics_path=metrics_path_str,
+                        capture_shadow_metrics=capture_shadow,
                     )
-                    return attempt_index, provider, response
+                    return attempt_index, provider, response, shadow_metrics
 
                 return _worker
 
@@ -308,7 +337,12 @@ class AsyncRunner:
 
             try:
                 if mode is RunnerMode.PARALLEL_ANY:
-                    attempt_index, provider, response = await run_parallel_any_async(
+                    (
+                        attempt_index,
+                        provider,
+                        response,
+                        shadow_metrics,
+                    ) = await run_parallel_any_async(
                         workers,
                         max_concurrency=self._config.max_concurrency,
                     )
@@ -330,6 +364,8 @@ class AsyncRunner:
                         metadata=metadata,
                         shadow_used=shadow is not None,
                     )
+                    if shadow_metrics is not None:
+                        shadow_metrics.emit()
                     return response
                 results = await run_parallel_all_async(
                     workers,
@@ -350,30 +386,101 @@ class AsyncRunner:
                         except ParallelExecutionError as err:
                             last_err = err
                         else:
-                            for _attempt_index, provider, response in results:
-                                if response is consensus.response:
-                                    tokens_in = response.input_tokens
-                                    tokens_out = response.output_tokens
-                                    cost_usd = estimate_cost(provider, tokens_in, tokens_out)
-                                    log_run_metric(
-                                        event_logger,
-                                        request_fingerprint=request_fingerprint,
-                                        request=request,
-                                        provider=provider,
-                                        status="ok",
-                                        attempts=attempt_count,
-                                        latency_ms=elapsed_ms(run_started),
-                                        tokens_in=tokens_in,
-                                        tokens_out=tokens_out,
-                                        cost_usd=cost_usd,
-                                        error=None,
-                                        metadata=metadata,
-                                        shadow_used=shadow is not None,
-                                    )
-                                    return response
+                            winner_entry = next(
+                                (
+                                    attempt,
+                                    provider,
+                                    response,
+                                    metrics,
+                                )
+                                for attempt, provider, response, metrics in results
+                                if response is consensus.response
+                            )
+                            votes_against = (
+                                consensus.total_voters
+                                - consensus.votes
+                                - consensus.abstained
+                            )
+                            if event_logger is not None:
+                                candidate_summaries = [
+                                    {
+                                        "provider": provider.name(),
+                                        "latency_ms": response.latency_ms,
+                                        "votes": consensus.tally.get(
+                                            response.text.strip(), 0
+                                        ),
+                                        "text_hash": content_hash(
+                                            "consensus", response.text
+                                        ),
+                                    }
+                                    for _, provider, response, _ in results
+                                ]
+                                event_logger.emit(
+                                    "consensus_vote",
+                                    {
+                                        "request_fingerprint": request_fingerprint,
+                                        "strategy": consensus.strategy,
+                                        "tie_breaker": consensus.tie_breaker,
+                                        "min_votes": consensus.min_votes,
+                                        "score_threshold": consensus.score_threshold,
+                                        "voters_total": consensus.total_voters,
+                                        "votes_for": consensus.votes,
+                                        "votes_against": votes_against,
+                                        "abstained": consensus.abstained,
+                                        "winner_provider": winner_entry[1].name(),
+                                        "winner_score": consensus.winner_score,
+                                        "winner_latency_ms": consensus.response.latency_ms,
+                                        "tie_break_applied": consensus.tie_break_applied,
+                                        "tie_break_reason": consensus.tie_break_reason,
+                                        "votes": dict(consensus.tally),
+                                        "candidate_summaries": candidate_summaries,
+                                    },
+                                )
+                            (
+                                attempt_index,
+                                provider,
+                                response,
+                                shadow_metrics,
+                            ) = winner_entry
+                            tokens_in = response.input_tokens
+                            tokens_out = response.output_tokens
+                            cost_usd = estimate_cost(provider, tokens_in, tokens_out)
+                            log_run_metric(
+                                event_logger,
+                                request_fingerprint=request_fingerprint,
+                                request=request,
+                                provider=provider,
+                                status="ok",
+                                attempts=attempt_count,
+                                latency_ms=elapsed_ms(run_started),
+                                tokens_in=tokens_in,
+                                tokens_out=tokens_out,
+                                cost_usd=cost_usd,
+                                error=None,
+                                metadata=metadata,
+                                shadow_used=shadow is not None,
+                            )
+                            if shadow_metrics is not None:
+                                shadow_payload = shadow_metrics.payload
+                                extra: dict[str, object] = {
+                                    "shadow_consensus_delta": {
+                                        "votes_for": consensus.votes,
+                                        "votes_total": consensus.total_voters,
+                                        "tie_break_applied": consensus.tie_break_applied,
+                                    }
+                                }
+                                if not shadow_payload.get("shadow_ok", True):
+                                    error = shadow_payload.get("shadow_error")
+                                    if error is not None:
+                                        extra["shadow_consensus_error"] = error
+                                shadow_metrics.emit(extra)
+                            for _, _, _, metrics in results:
+                                if metrics is not None and metrics is not shadow_metrics:
+                                    metrics.emit()
+                            return response
                             last_err = ParallelExecutionError("consensus resolution failed")
                     else:
-                        _attempt_index, provider, response = results[0]
+                        _attempt_index, provider, response, _metrics = results[0]
                         tokens_in = response.input_tokens
                         tokens_out = response.output_tokens
                         cost_usd = estimate_cost(provider, tokens_in, tokens_out)
@@ -393,6 +500,11 @@ class AsyncRunner:
                             shadow_used=shadow is not None,
                         )
                         return response
+
+        if mode is RunnerMode.CONSENSUS:
+            for _, _, _, metrics in results:
+                if metrics is not None:
+                    metrics.emit()
 
         if event_logger is not None:
             event_logger.emit(

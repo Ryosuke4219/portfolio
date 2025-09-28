@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
-
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
+from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
     ParallelExecutionError,
@@ -14,7 +14,30 @@ from src.llm_adapter.runner_parallel import (
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
+from src.llm_adapter.runner_sync import Runner
 from src.llm_adapter.shadow import run_with_shadow
+
+
+class _StaticProvider:
+    def __init__(self, name: str, text: str, latency_ms: int) -> None:
+        self._name = name
+        self._text = text
+        self._latency_ms = latency_ms
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        return ProviderResponse(
+            text=self._text,
+            latency_ms=self._latency_ms,
+            token_usage=TokenUsage(prompt=1, completion=1),
+            model=request.model,
+            finish_reason="stop",
+        )
 
 
 def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,3 +95,61 @@ def test_parallel_any_with_shadow_logs(tmp_path: Path, monkeypatch: pytest.Monke
     assert shadow_event["shadow_provider"] == "shadow"
     assert shadow_event["shadow_ok"] is False
     assert shadow_event["shadow_error"] == "TimeoutError"
+
+
+def test_consensus_vote_event_and_shadow_delta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+
+    agree_text = "agree: hello"
+    agree_a = _StaticProvider("agree_a", agree_text, latency_ms=5)
+    agree_b = _StaticProvider("agree_b", agree_text, latency_ms=7)
+    disagree = _StaticProvider("disagree", "disagree: hello", latency_ms=9)
+    shadow = MockProvider("shadow", base_latency_ms=1, error_markers=set())
+
+    runner = Runner(
+        [agree_a, agree_b, disagree],
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=3,
+            consensus=ConsensusConfig(quorum=2),
+        ),
+    )
+
+    request = ProviderRequest(prompt="hello", model="m-consensus")
+    metrics_path = tmp_path / "consensus.jsonl"
+
+    response = runner.run(
+        request,
+        shadow=shadow,
+        shadow_metrics_path=metrics_path,
+    )
+
+    assert response.text == agree_text
+    payloads = [
+        json.loads(line)
+        for line in metrics_path.read_text().splitlines()
+        if line.strip()
+    ]
+    consensus_event = next(
+        item for item in payloads if item.get("event") == "consensus_vote"
+    )
+    assert consensus_event["strategy"] == "majority"
+    assert consensus_event["voters_total"] == 3
+    assert consensus_event["votes_for"] == 2
+    assert consensus_event["votes_against"] == 1
+    assert consensus_event["winner_provider"] == "agree_a"
+    assert consensus_event["winner_latency_ms"] == response.latency_ms
+    assert consensus_event["votes"][response.text] == 2
+    summaries = consensus_event["candidate_summaries"]
+    assert {entry["provider"] for entry in summaries} == {"agree_a", "agree_b", "disagree"}
+
+    winner_diff = next(
+        item
+        for item in payloads
+        if item.get("event") == "shadow_diff"
+        and item.get("primary_provider") == "agree_a"
+    )
+    assert winner_diff["shadow_consensus_delta"]["votes_for"] == 2
+    assert winner_diff["shadow_consensus_delta"]["votes_total"] == 3
