@@ -116,6 +116,8 @@ projects/04-llm-adapter-shadow/
 
 プロバイダ文字列は最初のコロンのみを区切り文字として扱うため、`ollama:gemma3n:e2b` のようにモデルIDにコロンを含めても問題ありません。`mock:foo` を指定するとモックプロバイダで簡易動作確認が可能です。
 
+> ⚠️ `ProviderResponse.token_usage` が正式名称です。旧 `response.input_tokens` / `response.output_tokens` は互換プロパティとして残っていますが将来削除予定で、`DeprecationWarning` が出た場合は `response.token_usage.prompt` / `response.token_usage.completion`（合計値は `response.token_usage.total`）へ読み替えてください。メトリクスJSONの `*_token_usage_total` もこの値を参照します。
+
 #### よく使う環境変数例
 
 ```bash
