@@ -7,8 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from src.llm_adapter.provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    TokenUsage,
+)
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, Runner
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
@@ -61,8 +64,16 @@ def test_async_runner_matches_sync(tmp_path: Path) -> None:
     sync_runner = Runner([primary])
     async_runner = AsyncRunner([primary])
 
-    sync_request = ProviderRequest(prompt="hello", metadata={"trace_id": "t1"}, model="primary-model")
-    async_request = ProviderRequest(prompt="hello", metadata={"trace_id": "t1"}, model="primary-model")
+    sync_request = ProviderRequest(
+        prompt="hello",
+        metadata={"trace_id": "t1"},
+        model="primary-model",
+    )
+    async_request = ProviderRequest(
+        prompt="hello",
+        metadata={"trace_id": "t1"},
+        model="primary-model",
+    )
 
     sync_metrics = tmp_path / "sync-metrics.jsonl"
     async_metrics = tmp_path / "async-metrics.jsonl"
@@ -191,8 +202,7 @@ def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_duration_ms"] >= 0
 
 
-@pytest.mark.asyncio
-async def test_async_parallel_any_returns_first_completion() -> None:
+def test_async_parallel_any_returns_first_completion() -> None:
     slow = _AsyncProbeProvider("slow", delay=0.1, text="slow")
     fast = _AsyncProbeProvider("fast", delay=0.01, text="fast")
     runner = AsyncRunner(
@@ -201,13 +211,12 @@ async def test_async_parallel_any_returns_first_completion() -> None:
     )
     request = ProviderRequest(prompt="hi", model="model-parallel-any")
 
-    response = await runner.run_async(request)
+    response = asyncio.run(runner.run_async(request))
 
     assert response.text.startswith("fast:")
 
 
-@pytest.mark.asyncio
-async def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
+def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
     slow = _AsyncProbeProvider("slow", delay=0.2, text="slow")
     fast = _AsyncProbeProvider("fast", delay=0.01, text="fast")
     runner = AsyncRunner(
@@ -216,15 +225,14 @@ async def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
     )
     request = ProviderRequest(prompt="hi", model="model-parallel-cancel")
 
-    response = await runner.run_async(request)
+    response = asyncio.run(runner.run_async(request))
 
     assert response.text.startswith("fast:")
     assert slow.cancelled is True
     assert slow.finished is True
 
 
-@pytest.mark.asyncio
-async def test_async_consensus_quorum_failure() -> None:
+def test_async_consensus_quorum_failure() -> None:
     provider_a = _AsyncProbeProvider("pa", delay=0.01, text="A")
     provider_b = _AsyncProbeProvider("pb", delay=0.01, text="B")
     runner = AsyncRunner(
@@ -237,4 +245,4 @@ async def test_async_consensus_quorum_failure() -> None:
     request = ProviderRequest(prompt="topic", model="model-consensus")
 
     with pytest.raises(ParallelExecutionError):
-        await runner.run_async(request)
+        asyncio.run(runner.run_async(request))
