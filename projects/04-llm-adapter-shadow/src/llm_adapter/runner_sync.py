@@ -351,7 +351,6 @@ class Runner:
         max_attempts = self._config.max_attempts
         attempt_lock = threading.Lock()
         attempts_used = 0
-        retry_events = 0
 
         def reserve_attempt() -> int | None:
             nonlocal attempts_used
@@ -361,24 +360,22 @@ class Runner:
                 attempts_used += 1
                 return attempts_used
 
-        def record_retry_event() -> int:
-            nonlocal retry_events
-            with attempt_lock:
-                retry_events += 1
-                return retry_events
-
         def snapshot_attempts() -> int:
             with attempt_lock:
                 return attempts_used
 
-        def compute_retry_delay(error: BaseException) -> float | None:
+        def classify_retry(error: BaseException) -> tuple[bool, float | None]:
             if isinstance(error, RateLimitError):
-                return max(self._config.backoff.rate_limit_sleep_s, 0.0)
+                return True, max(self._config.backoff.rate_limit_sleep_s, 0.0)
             if isinstance(error, TimeoutError):
-                return 0.0 if self._config.backoff.timeout_next_provider else None
+                if self._config.backoff.timeout_next_provider:
+                    return False, None
+                return True, 0.0
             if isinstance(error, RetryableError):
-                return 0.0 if self._config.backoff.retryable_next_provider else None
-            return None
+                if self._config.backoff.retryable_next_provider:
+                    return False, None
+                return True, 0.0
+            return False, None
 
         def handle_parallel_retry(
             _worker_index: int, _attempt_index: int, _error: BaseException
@@ -430,13 +427,15 @@ class Runner:
                     if err is None:
                         err = ParallelExecutionError("provider returned no response")
                         result.error = err
-                    delay = compute_retry_delay(err) if allow_retry else None
-                    if delay is None:
+                    should_retry = False
+                    delay: float | None = None
+                    if allow_retry:
+                        should_retry, delay = classify_retry(err)
+                    if not should_retry:
                         raise err
                     next_attempt = reserve_attempt()
                     if next_attempt is None:
                         raise err
-                    retry_attempt = record_retry_event()
                     if event_logger is not None:
                         event_logger.emit(
                             "retry",
@@ -444,11 +443,10 @@ class Runner:
                                 "request_fingerprint": request_fingerprint,
                                 "provider": provider.name(),
                                 "attempt": attempt_index,
-                                "retry_attempt": retry_attempt,
                                 "error_type": type(err).__name__,
                             },
                         )
-                    if delay > 0:
+                    if delay is not None and delay > 0:
                         time.sleep(delay)
                     attempt_index = next_attempt
 
