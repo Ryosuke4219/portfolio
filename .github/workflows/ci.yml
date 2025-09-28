@@ -135,17 +135,19 @@ jobs:
           node-version: '24'
 
       - name: Download node test artifacts
-        if: ${{ needs['node-tests'].result == 'success' }}
+        if: ${{ always() }}
         uses: actions/download-artifact@v4
         with:
           name: node-test-artifacts
+          if-no-files-found: warn
           path: .
 
       - name: Download Python coverage artifacts
-        if: ${{ needs['python-tests'].result == 'success' }}
+        if: ${{ always() }}
         uses: actions/download-artifact@v4
         with:
           name: python-coverage-artifacts
+          if-no-files-found: warn
           path: .
 
       - name: Build CI reports bundle
