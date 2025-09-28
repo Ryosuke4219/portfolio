@@ -49,6 +49,7 @@ def test_majority_with_latency_tie_breaker() -> None:
     assert result.votes == 2
     assert result.tie_break_applied is True
     assert result.tie_break_reason.startswith("latency")
+    assert result.tie_breaker_selected == "latency"
     assert result.rounds == 2
 
 
@@ -69,6 +70,28 @@ def test_weighted_strategy_records_scores() -> None:
     assert result.scores["B"] == pytest.approx(0.6)
     assert result.winner_score == pytest.approx(0.6)
     assert result.tie_break_reason == "cost(min)"
+    assert result.tie_breaker_selected == "cost"
+
+
+def test_max_score_strategy_prefers_best_latency() -> None:
+    responses = [
+        _response("A", 18, score=0.6),
+        _response("B", 9, score=0.5),
+        _response("A", 22, score=0.4),
+        _response("B", 7, score=0.6),
+    ]
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(strategy="max_score", tie_breaker="latency", quorum=2),
+    )
+    assert result.response.text == "B"
+    assert result.tie_break_applied is True
+    assert result.tie_breaker_selected == "latency"
+    assert result.tie_break_reason.startswith("latency")
+    assert result.scores is not None
+    assert result.scores["A"] == pytest.approx(0.6)
+    assert result.scores["B"] == pytest.approx(0.6)
+    assert result.winner_score == pytest.approx(0.6)
 
 
 def test_schema_validation_marks_abstentions() -> None:
