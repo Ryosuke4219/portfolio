@@ -19,6 +19,20 @@ from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerM
 from src.llm_adapter.runner_parallel import ParallelExecutionError
 
 
+class _FakeClock:
+    def __init__(self) -> None:
+        self.current = 0.0
+
+    def monotonic(self) -> float:
+        return self.current
+
+    def sleep(self, duration: float) -> None:
+        self.current += duration
+
+    async def async_sleep(self, duration: float) -> None:
+        self.current += duration
+
+
 class _CapturingLogger:
     def __init__(self) -> None:
         self.events: list[tuple[str, dict[str, Any]]] = []
@@ -94,6 +108,42 @@ def _run_without_warnings(action: Callable[[], T]) -> T:
         result = action()
     assert len(warnings_record) == 0
     return result
+
+
+def test_async_runner_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+    clock = _FakeClock()
+    monkeypatch.setattr("src.llm_adapter.runner_shared.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("src.llm_adapter.runner_shared.time.sleep", clock.sleep)
+    monkeypatch.setattr("src.llm_adapter.runner_shared.asyncio.sleep", clock.async_sleep)
+
+    call_times: list[float] = []
+
+    class _RecordingAsyncProvider:
+        def name(self) -> str:
+            return "timed"
+
+        def capabilities(self) -> set[str]:
+            return set()
+
+        async def invoke_async(self, _: ProviderRequest) -> ProviderResponse:
+            call_times.append(clock.monotonic())
+            return ProviderResponse(
+                text="ok",
+                latency_ms=10,
+                token_usage=TokenUsage(prompt=1, completion=1),
+                model="timed-model",
+            )
+
+    runner = AsyncRunner([_RecordingAsyncProvider()], config=RunnerConfig(rpm=30))
+
+    async def _execute() -> None:
+        await runner.run_async(request)
+        await runner.run_async(request)
+
+    asyncio.run(_execute())
+
+    assert call_times[1] - call_times[0] >= 2.0
 
 
 def test_async_runner_matches_sync(tmp_path: Path) -> None:

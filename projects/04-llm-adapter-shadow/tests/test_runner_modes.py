@@ -10,6 +10,17 @@ from src.llm_adapter.runner_parallel import ParallelExecutionError
 from src.llm_adapter.runner_sync import Runner
 
 
+class _FakeClock:
+    def __init__(self) -> None:
+        self.current = 0.0
+
+    def monotonic(self) -> float:
+        return self.current
+
+    def sleep(self, duration: float) -> None:
+        self.current += duration
+
+
 class _MockProvider:
     def __init__(self, name: str, behavior: Callable[[ProviderRequest], ProviderResponse]):
         self._name = name
@@ -120,3 +131,24 @@ def test_runner_consensus_quorum_failure() -> None:
 
     with pytest.raises(ParallelExecutionError):
         runner.run(request)
+
+
+def test_runner_sequential_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+    clock = _FakeClock()
+    monkeypatch.setattr("src.llm_adapter.runner_shared.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("src.llm_adapter.runner_shared.time.sleep", clock.sleep)
+
+    call_times: list[float] = []
+
+    def _record(_: ProviderRequest) -> ProviderResponse:
+        call_times.append(clock.monotonic())
+        return _response("ok")
+
+    provider = _MockProvider("timed", _record)
+    runner = Runner([provider], config=RunnerConfig(rpm=30))
+
+    runner.run(request)
+    runner.run(request)
+
+    assert call_times[1] - call_times[0] >= 2.0
