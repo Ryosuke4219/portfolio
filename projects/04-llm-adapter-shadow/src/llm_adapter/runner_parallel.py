@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections import Counter
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+import json
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import (
     FIRST_COMPLETED,
     ThreadPoolExecutor,
@@ -140,38 +140,132 @@ async def run_parallel_all_async(
         raise
     return responses
 
-
 @dataclass(slots=True)
 class ConsensusResult:
     response: ProviderResponse
     votes: int
+    score: float
+    reason: str
 
+
+def _extract_weight(response: ProviderResponse) -> float:
+    raw = response.raw
+    if isinstance(raw, Mapping):
+        weight = raw.get("weight")
+        if isinstance(weight, int | float):
+            return float(weight)
+    return 1.0
 
 def compute_consensus(
     responses: Iterable[ProviderResponse], *, config: ConsensusConfig | None = None
 ) -> ConsensusResult:
-    """Return the majority response according to ``config``."""
-
     collected = list(responses)
     if not collected:
         raise ValueError("responses must not be empty")
-    if config is None:
-        config = ConsensusConfig()
-    quorum = config.quorum or len(collected)
-    counter = Counter(response.text.strip() for response in collected)
-    top_text, votes = counter.most_common(1)[0]
-    if votes < quorum:
-        raise ParallelExecutionError("consensus quorum not reached")
+    cfg = config or ConsensusConfig()
+    groups: dict[str, list[ProviderResponse]] = {}
     for response in collected:
-        if response.text.strip() == top_text:
-            return ConsensusResult(response=response, votes=votes)
-    raise RuntimeError("consensus resolution failed")
+        groups.setdefault(response.text.strip(), []).append(response)
+    if cfg.strategy == "majority":
+
+        def score_fn(group: Sequence[ProviderResponse]) -> float:
+            return float(len(group))
+
+    elif cfg.strategy == "weighted":
+
+        def score_fn(group: Sequence[ProviderResponse]) -> float:
+            return float(sum(_extract_weight(resp) for resp in group))
+
+    else:
+        raise ValueError(f"unsupported consensus strategy: {cfg.strategy}")
+    scores = {text: score_fn(group) for text, group in groups.items()}
+    top_score = max(scores.values())
+    tied_texts = [text for text, score in scores.items() if score == top_score]
+    quorum = cfg.quorum or len(collected)
+    if max(len(groups[text]) for text in tied_texts) < quorum:
+        raise ParallelExecutionError("consensus quorum not reached")
+    if len(tied_texts) == 1:
+        text = tied_texts[0]
+        reason = f"strategy={cfg.strategy}"
+        return ConsensusResult(groups[text][0], len(groups[text]), top_score, reason)
+    if cfg.tie_breaker == "latency":
+
+        def metric(resp: ProviderResponse) -> float:
+            return resp.latency_ms
+
+    elif cfg.tie_breaker == "cost":
+
+        def metric(resp: ProviderResponse) -> float:
+            return resp.token_usage.total
+
+    elif cfg.tie_breaker is None:
+        raise ParallelExecutionError("consensus tie unresolved")
+    else:
+        raise ValueError(f"unsupported tie breaker: {cfg.tie_breaker}")
+    text = min(tied_texts, key=lambda t: min(metric(resp) for resp in groups[t]))
+    winner = min(groups[text], key=metric)
+    reason = f"strategy={cfg.strategy},tie_breaker={cfg.tie_breaker}"
+    return ConsensusResult(winner, len(groups[text]), top_score, reason)
+
+def _build_schema_validator(schema: str) -> Callable[[ProviderResponse], bool]:
+    data = json.loads(schema)
+    required = data.get("required", []) if isinstance(data, dict) else []
+    expect_object = isinstance(data, dict) and data.get("type") == "object"
+
+    def _validate(response: ProviderResponse) -> bool:
+        try:
+            payload = json.loads(response.text)
+        except json.JSONDecodeError:
+            return False
+        if expect_object and not isinstance(payload, dict):
+            return False
+        return all(field in payload for field in required)
+
+    return _validate
+
+def resolve_consensus(
+    responses: Sequence[ProviderResponse],
+    *,
+    config: ConsensusConfig | None = None,
+    judge: Callable[[Sequence[ProviderResponse]], ProviderResponse | None] | None = None,
+) -> ConsensusResult:
+    cfg = config or ConsensusConfig()
+    remaining = list(responses)
+    validator = _build_schema_validator(cfg.schema) if cfg.schema else None
+    rounds = cfg.max_rounds or 1
+    last_error: ParallelExecutionError | None = None
+    for _ in range(rounds):
+        if validator is not None:
+            remaining = [response for response in remaining if validator(response)]
+        if not remaining:
+            raise ParallelExecutionError("no responses after validation")
+        try:
+            return compute_consensus(remaining, config=cfg)
+        except ParallelExecutionError as exc:
+            last_error = exc
+            if cfg.judge is None:
+                continue
+            if judge is None:
+                raise ValueError("judge callable required when judge is configured") from exc
+            judged = judge(remaining)
+            if judged is None:
+                continue
+            return ConsensusResult(
+                response=judged,
+                votes=0,
+                score=0.0,
+                reason=f"judge={cfg.judge}",
+            )
+    if last_error is not None:
+        raise last_error
+    raise ParallelExecutionError("consensus resolution failed")
 
 
 __all__ = [
     "ParallelExecutionError",
     "ConsensusResult",
     "compute_consensus",
+    "resolve_consensus",
     "run_parallel_all_async",
     "run_parallel_all_sync",
     "run_parallel_any_async",

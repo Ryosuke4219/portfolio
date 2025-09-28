@@ -19,7 +19,7 @@ from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
     ParallelExecutionError,
-    compute_consensus,
+    resolve_consensus,
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
@@ -375,7 +375,7 @@ class Runner:
                 ]
                 if len(provider_responses) != len(responses):
                     raise ParallelExecutionError("all workers failed")
-                consensus = compute_consensus(
+                consensus = resolve_consensus(
                     provider_responses, config=self._config.consensus
                 )
                 return consensus.response
