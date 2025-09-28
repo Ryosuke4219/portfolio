@@ -226,8 +226,6 @@ def run_parallel_all_sync(
             for future in as_completed(future_map):
                 responses[future_map[future]] = future.result()
         except BaseException:
-            for pending in future_map:
-                pending.cancel()
             raise
     return responses
 
