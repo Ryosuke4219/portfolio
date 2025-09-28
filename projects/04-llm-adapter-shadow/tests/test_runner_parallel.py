@@ -5,7 +5,7 @@ import json
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 import pytest
 from src.llm_adapter.errors import RateLimitError, TimeoutError
@@ -23,6 +23,17 @@ from src.llm_adapter.runner_parallel import (
 )
 from src.llm_adapter.runner_sync import Runner
 from src.llm_adapter.shadow import run_with_shadow
+
+
+class RecordingLogger:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
+        self.events.append((event_type, dict(record)))
+
+    def of_type(self, event_type: str) -> list[dict[str, Any]]:
+        return [payload for kind, payload in self.events if kind == event_type]
 
 
 class _StaticProvider:
@@ -268,18 +279,10 @@ def test_runner_parallel_any_returns_success_after_fast_failure(
     monkeypatch.setattr(
         "src.llm_adapter.runner_sync.estimate_cost", _record_cost, raising=False
     )
-    run_metric_calls: list[dict[str, Any]] = []
-
-    def _record_run_metric(
-        event_logger: object, *, status: str, **kwargs: Any
-    ) -> None:
-        run_metric_calls.append({"status": status, **kwargs})
-
-    monkeypatch.setattr(
-        "src.llm_adapter.runner_sync.log_run_metric", _record_run_metric, raising=False
-    )
+    logger = RecordingLogger()
     runner = Runner(
         providers,
+        logger=logger,
         config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=1),
     )
     request = ProviderRequest(prompt="hello", model="m-parallel-any")
@@ -287,9 +290,11 @@ def test_runner_parallel_any_returns_success_after_fast_failure(
     response = runner.run(request)
 
     assert response.text == "slow-ok"
-    success_metrics = [call for call in run_metric_calls if call["status"] == "ok"]
-    assert len(success_metrics) == 1
-    assert success_metrics[0]["attempts"] == 2
+    run_metric_events = [
+        event for event in logger.of_type("run_metric") if event["status"] == "ok"
+    ]
+    assert len(run_metric_events) == 1
+    assert run_metric_events[0]["attempts"] == 2
     assert len(cost_calls) == 1
     cost_provider, cost_tokens_in, cost_tokens_out = cost_calls[0]
     assert cost_provider is providers[1]

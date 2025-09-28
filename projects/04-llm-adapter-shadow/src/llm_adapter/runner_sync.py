@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import cast
 
@@ -178,8 +178,10 @@ class Runner:
         run_started: float,
         shadow_used: bool,
         skip: tuple[ProviderInvocationResult, ...] | None = None,
+        attempts_override: Mapping[int, int] | None = None,
     ) -> None:
         skipped = skip or ()
+        attempts_map = dict(attempts_override or {})
         for result in results:
             if result is None:
                 continue
@@ -199,13 +201,14 @@ class Runner:
             latency_ms = result.latency_ms
             if latency_ms is None:
                 latency_ms = elapsed_ms(run_started)
+            attempts_value = attempts_map.get(result.attempt, result.attempt)
             log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,
                 request=request,
                 provider=result.provider,
                 status=status,
-                attempts=result.attempt,
+                attempts=attempts_value,
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
@@ -449,6 +452,7 @@ class Runner:
             return None
 
         skip_run_metric: tuple[ProviderInvocationResult, ...] | None = None
+
         try:
             if mode is RunnerMode.PARALLEL_ANY:
                 winner = run_parallel_any_sync(
@@ -463,6 +467,7 @@ class Runner:
                 response = winner.response
                 if response is None:
                     raise ParallelExecutionError("all workers failed")
+
                 attempts_final = attempts_used if attempts_used > 0 else winner.attempt
                 tokens_in = winner.tokens_in if winner.tokens_in is not None else 0
                 tokens_out = winner.tokens_out if winner.tokens_out is not None else 0
@@ -527,6 +532,7 @@ class Runner:
                     failure_details: list[dict[str, str]] = []
                     for invocation in invocations:
                         provider_name = invocation.provider.name()
+                        attempt_label = str(invocation.attempt)
                         error = invocation.error
                         summary = (
                             f"{type(error).__name__}: {error}"
@@ -534,10 +540,14 @@ class Runner:
                             else "unknown error"
                         )
                         failure_details.append(
-                            {"provider": provider_name, "summary": summary}
+                            {
+                                "provider": provider_name,
+                                "attempt": attempt_label,
+                                "summary": summary,
+                            }
                         )
                     detail_text = "; ".join(
-                        f"{item['provider']}: {item['summary']}"
+                        f"{item['provider']} (attempt {item['attempt']}): {item['summary']}"
                         for item in failure_details
                     )
                     message = "all workers failed"
@@ -637,7 +647,7 @@ class Runner:
                 metadata=metadata,
                 run_started=run_started,
                 shadow_used=shadow_used,
-                skip=skip_run_metric,
+                attempts_override=attempts_override,
             )
 
         raise RuntimeError(f"Unsupported runner mode: {mode}")
