@@ -218,7 +218,7 @@ async def run_with_shadow_async(
     if shadow_task is not None:
         try:
             shadow_payload = await asyncio.wait_for(shadow_task, timeout=10)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             shadow_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await shadow_task
