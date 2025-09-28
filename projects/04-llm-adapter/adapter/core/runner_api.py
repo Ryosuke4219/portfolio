@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, List, Literal, Sequence, cast
+from pathlib import Path
+from typing import Literal, cast
 
 from .budgets import BudgetManager
 from .config import load_budget_book, load_provider_configs
 from .datasets import load_golden_tasks
-from .runners import CompareRunner
 
 Mode = Literal["sequential", "parallel-any", "parallel-all", "consensus"]
 
@@ -116,12 +116,15 @@ def run_compare(
     budget_book = load_budget_book(budgets_path)
     budget_manager = BudgetManager(budget_book)
 
+    from .runners import CompareRunner
+
     runner = CompareRunner(
         provider_configs,
         tasks,
         budget_manager,
         metrics_path,
         allow_overrun=allow_overrun,
+        runner_config=config,
     )
     results = runner.run(repeat=max(repeat, 1), mode=config.mode)
     logging.getLogger(__name__).info("%d 件の試行を記録しました", len(results))
@@ -129,7 +132,7 @@ def run_compare(
 
 
 def run_batch(provider_specs: Iterable[str], prompts_path: str) -> int:
-    provider_paths: List[Path] = [
+    provider_paths: list[Path] = [
         Path(spec).expanduser().resolve() for spec in provider_specs if spec
     ]
     if not provider_paths:

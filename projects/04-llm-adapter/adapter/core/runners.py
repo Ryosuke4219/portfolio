@@ -7,10 +7,14 @@ import logging
 import os
 import re
 import uuid
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from time import perf_counter
 from statistics import median, pstdev
-from typing import List, Mapping, Optional, Sequence, Tuple
+from time import perf_counter
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .runner_api import RunnerConfig
 
 from .budgets import BudgetManager
 from .config import ProviderConfig
@@ -39,6 +43,8 @@ class CompareRunner:
         budget_manager: BudgetManager,
         metrics_path: Path,
         allow_overrun: bool = False,
+        runner_config: RunnerConfig | None = None,
+        resolver: Callable[..., object] | None = None,
     ) -> None:
         self.provider_configs = list(provider_configs)
         self.tasks = list(tasks)
@@ -46,16 +52,22 @@ class CompareRunner:
         self.metrics_path = metrics_path
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.allow_overrun = allow_overrun
+        self.runner_config = runner_config
+        self.resolver = resolver
 
-    def run(self, repeat: int, mode: str) -> List[RunMetrics]:
-        results: List[RunMetrics] = []
+    def run(self, repeat: int, mode: str) -> list[RunMetrics]:
+        results: list[RunMetrics] = []
         for provider_config in self.provider_configs:
             provider = ProviderFactory.create(provider_config)
-            LOGGER.info("provider=%s model=%s を実行", provider_config.provider, provider_config.model)
+            LOGGER.info(
+                "provider=%s model=%s を実行",
+                provider_config.provider,
+                provider_config.model,
+            )
             for task in self.tasks:
-                attempt_metrics: List[RunMetrics] = []
-                attempt_outputs: List[str] = []
-                stop_reason: Optional[str] = None
+                attempt_metrics: list[RunMetrics] = []
+                attempt_outputs: list[str] = []
+                stop_reason: str | None = None
                 for attempt in range(repeat):
                     metrics, raw_output, budget_reason = self._run_single(
                         provider_config, provider, task, attempt, mode
@@ -83,7 +95,7 @@ class CompareRunner:
         task: GoldenTask,
         attempt_index: int,
         mode: str,
-    ) -> Tuple[RunMetrics, str, Optional[str]]:
+    ) -> tuple[RunMetrics, str, str | None]:
         prompt = task.render_prompt()
         response, status, failure_kind, error_message, latency_ms = self._run_provider_call(
             provider_config,
@@ -122,7 +134,7 @@ class CompareRunner:
         provider_config: ProviderConfig,
         provider: BaseProvider,
         prompt: str,
-    ) -> Tuple[ProviderResponse, str, Optional[str], Optional[str], int]:
+    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
         response, status, failure_kind, error_message, latency_ms = self._invoke_provider(
             provider, prompt
         )
@@ -139,8 +151,8 @@ class CompareRunner:
         provider_config: ProviderConfig,
         latency_ms: int,
         status: str,
-        failure_kind: Optional[str],
-    ) -> Tuple[str, Optional[str]]:
+        failure_kind: str | None,
+    ) -> tuple[str, str | None]:
         if (
             provider_config.timeout_s > 0
             and latency_ms > provider_config.timeout_s * 1000
@@ -150,19 +162,19 @@ class CompareRunner:
         return status, failure_kind
 
     def _enforce_output_guard(
-        self, output_text: Optional[str], status: str, failure_kind: Optional[str]
-    ) -> Tuple[str, Optional[str]]:
+        self, output_text: str | None, status: str, failure_kind: str | None
+    ) -> tuple[str, str | None]:
         if (output_text is None or not output_text.strip()) and status == "ok":
             return "error", failure_kind or "guard_violation"
         return status, failure_kind
 
     def _invoke_provider(
         self, provider: BaseProvider, prompt: str
-    ) -> Tuple[ProviderResponse, str, Optional[str], Optional[str], int]:
+    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
         start = perf_counter()
         status = "ok"
-        failure_kind: Optional[str] = None
-        error_message: Optional[str] = None
+        failure_kind: str | None = None
+        error_message: str | None = None
         try:
             response = provider.generate(prompt)
         except Exception as exc:  # pragma: no cover - 実プロバイダ利用時の防御
@@ -187,12 +199,12 @@ class CompareRunner:
         mode: str,
         response: ProviderResponse,
         status: str,
-        failure_kind: Optional[str],
-        error_message: Optional[str],
+        failure_kind: str | None,
+        error_message: str | None,
         latency_ms: int,
         budget_snapshot: BudgetSnapshot,
         cost_usd: float,
-    ) -> Tuple[RunMetrics, str]:
+    ) -> tuple[RunMetrics, str]:
         output_text = response.output_text
         eval_metrics, eval_failure_kind = self._evaluate(task, output_text)
         eval_metrics.len_tokens = response.output_tokens
@@ -231,9 +243,9 @@ class CompareRunner:
     def _merge_eval_failure(
         self,
         status: str,
-        failure_kind: Optional[str],
-        eval_failure_kind: Optional[str],
-    ) -> Tuple[str, Optional[str]]:
+        failure_kind: str | None,
+        eval_failure_kind: str | None,
+    ) -> tuple[str, str | None]:
         if not eval_failure_kind:
             return status, failure_kind
         failure_kind = failure_kind or eval_failure_kind
@@ -241,7 +253,7 @@ class CompareRunner:
             status = "error"
         return status, failure_kind
 
-    def _compute_output_hash(self, output_text: Optional[str]) -> Optional[str]:
+    def _compute_output_hash(self, output_text: str | None) -> str | None:
         return hash_text(output_text) if output_text else None
 
     def _evaluate_budget(
@@ -249,9 +261,9 @@ class CompareRunner:
         provider_config: ProviderConfig,
         cost_usd: float,
         status: str,
-        failure_kind: Optional[str],
-        error_message: Optional[str],
-    ) -> Tuple[BudgetSnapshot, Optional[str], str, Optional[str], Optional[str]]:
+        failure_kind: str | None,
+        error_message: str | None,
+    ) -> tuple[BudgetSnapshot, str | None, str, str | None, str | None]:
         run_budget_limit = self.budget_manager.run_budget(provider_config.provider)
         run_budget_hit = run_budget_limit > 0 and cost_usd > run_budget_limit
         daily_stop_required = not self.budget_manager.notify_cost(
@@ -261,21 +273,23 @@ class CompareRunner:
             run_budget_usd=run_budget_limit,
             hit_stop=run_budget_hit or daily_stop_required,
         )
-        run_reason: Optional[str] = None
+        run_reason: str | None = None
         if run_budget_hit:
             run_reason = (
-                f"provider={provider_config.provider} run budget {run_budget_limit:.4f} USD exceeded "
+                f"provider={provider_config.provider} run budget "
+                f"{run_budget_limit:.4f} USD exceeded "
                 f"(cost={cost_usd:.4f} USD)"
             )
-        daily_reason: Optional[str] = None
+        daily_reason: str | None = None
         if daily_stop_required:
             spent = self.budget_manager.spent_today(provider_config.provider)
             daily_limit = self.budget_manager.daily_budget(provider_config.provider)
             daily_reason = (
-                f"provider={provider_config.provider} daily budget {daily_limit:.4f} USD exceeded "
+                f"provider={provider_config.provider} daily budget "
+                f"{daily_limit:.4f} USD exceeded "
                 f"(spent={spent:.4f} USD)"
             )
-        stop_reason: Optional[str] = None
+        stop_reason: str | None = None
         if not self.allow_overrun:
             if daily_reason:
                 stop_reason = daily_reason
@@ -301,11 +315,13 @@ class CompareRunner:
             json.dump(metrics.to_json_dict(), fp, ensure_ascii=False)
             fp.write("\n")
 
-    def _evaluate(self, task: GoldenTask, output_text: str) -> Tuple[EvalMetrics, Optional[str]]:
+    def _evaluate(
+        self, task: GoldenTask, output_text: str | None
+    ) -> tuple[EvalMetrics, str | None]:
         expected_type = str(task.expected.get("type", "regex"))
         expected_value = task.expected.get("value")
         eval_metrics = EvalMetrics()
-        failure_kind: Optional[str] = None
+        failure_kind: str | None = None
         if output_text is None:
             return eval_metrics, failure_kind
         if expected_type == "regex" and isinstance(expected_value, str):
@@ -352,19 +368,19 @@ class CompareRunner:
         gates = provider_config.quality_gates
         if gates.determinism_diff_rate_max <= 0 and gates.determinism_len_stdev_max <= 0:
             return
-        comparable: List[Tuple[RunMetrics, str]] = [
+        comparable: list[tuple[RunMetrics, str]] = [
             (metrics, output)
-            for metrics, output in zip(metrics_list, outputs)
+            for metrics, output in zip(metrics_list, outputs, strict=False)
             if metrics.status == "ok" and output
         ]
         if len(comparable) < 2:
             return
-        diff_rates: List[float] = []
+        diff_rates: list[float] = []
         for idx, (_, output_a) in enumerate(comparable):
             for _, output_b in comparable[idx + 1 :]:
                 diff_rates.append(compute_diff_rate(output_a, output_b))
         median_diff = median(diff_rates) if diff_rates else 0.0
-        lengths: List[int] = [
+        lengths: list[int] = [
             metrics.eval.len_tokens
             if metrics.eval.len_tokens is not None
             else metrics.output_tokens
