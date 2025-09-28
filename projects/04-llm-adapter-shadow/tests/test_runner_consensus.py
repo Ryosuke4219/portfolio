@@ -1,12 +1,19 @@
 import pytest
 
-from src.llm_adapter.provider_spi import ProviderResponse, TokenUsage
-from src.llm_adapter.runner_config import ConsensusConfig
+from src.llm_adapter.errors import RetriableError, TimeoutError
+from src.llm_adapter.provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    TokenUsage,
+)
+from src.llm_adapter.providers.mock import MockProvider
+from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
     ConsensusResult,
     ParallelExecutionError,
     compute_consensus,
 )
+from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 
 
 def _response(
@@ -154,3 +161,64 @@ def test_max_rounds_exhausted_before_judge_round() -> None:
                 max_rounds=2,
             ),
         )
+
+
+def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> None:
+    providers = [
+        MockProvider("timeout", base_latency_ms=1, error_markers=set()),
+        MockProvider("invalid", base_latency_ms=1, error_markers=set()),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=2,
+        ),
+    )
+    request = ProviderRequest(
+        prompt="consensus failure",
+        model="consensus-failure",
+    )
+
+    errors = [TimeoutError("simulated timeout"), RetriableError("simulated invalid JSON")]
+    invocations = [
+        ProviderInvocationResult(
+            provider=provider,
+            attempt=index,
+            total_providers=len(providers),
+            response=None,
+            error=error,
+            latency_ms=25,
+            tokens_in=None,
+            tokens_out=None,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+        )
+        for index, (provider, error) in enumerate(zip(providers, errors), start=1)
+    ]
+
+    def _fake_run_parallel_all_sync(workers, *, max_concurrency=None):
+        return invocations
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        _fake_run_parallel_all_sync,
+    )
+
+    with pytest.raises(ParallelExecutionError) as exc_info:
+        runner.run(request)
+
+    error = exc_info.value
+    failures = getattr(error, "failures", None)
+    expected = [
+        {
+            "provider": invocation.provider.name(),
+            "summary": f"{type(invocation.error).__name__}: {invocation.error}",
+        }
+        for invocation in invocations
+    ]
+    assert failures == expected
+    message = str(error)
+    for detail in expected:
+        assert detail["provider"] in message
+        assert detail["summary"] in message

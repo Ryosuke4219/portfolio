@@ -78,12 +78,14 @@ class _AsyncProbeProvider:
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
         self.invocations += 1
         try:
+
             if self._failures:
                 raise self._failures.pop(0)
             if self._block:
                 await asyncio.Event().wait()
                 latency_ms = 0
             elif self._delay <= 0:
+
                 latency_ms = 0
             else:
                 await asyncio.sleep(self._delay)
