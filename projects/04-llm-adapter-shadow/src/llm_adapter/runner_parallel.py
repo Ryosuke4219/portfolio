@@ -33,6 +33,10 @@ RetryDirective = float | tuple[int, float] | None
 class ParallelExecutionError(RuntimeError):
     """Raised when all parallel workers fail to produce a response."""
 
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+        self.failures: list[dict[str, object]] | None = None
+
 
 S = TypeVar("S")
 

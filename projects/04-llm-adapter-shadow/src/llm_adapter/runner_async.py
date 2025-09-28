@@ -446,7 +446,7 @@ class AsyncRunner:
                             )
                         )
                         if not successful_entries:
-                            consensus_results = [
+                            consensus_results: list[dict[str, object]] = [
                                 {
                                     "index": index,
                                     "attempt": attempt,
@@ -466,9 +466,9 @@ class AsyncRunner:
                             message = "all responses failed schema validation"
                             if summary:
                                 message = f"{message} ({summary})"
-                            error = ParallelExecutionError(message)
-                            error.failures = consensus_results
-                            last_err = error
+                            error_with_failures = ParallelExecutionError(message)
+                            error_with_failures.failures = consensus_results
+                            last_err = error_with_failures
                         else:
                             try:
                                 consensus = compute_consensus(
@@ -576,9 +576,9 @@ class AsyncRunner:
                                         }
                                     }
                                     if not shadow_payload.get("shadow_ok", True):
-                                        error = shadow_payload.get("shadow_error")
-                                        if error is not None:
-                                            extra["shadow_consensus_error"] = error
+                                        shadow_error = shadow_payload.get("shadow_error")
+                                        if shadow_error is not None:
+                                            extra["shadow_consensus_error"] = shadow_error
                                     shadow_metrics.emit(extra)
                                 for _, _, _, metrics in results:
                                     if metrics is not None and metrics is not shadow_metrics:
