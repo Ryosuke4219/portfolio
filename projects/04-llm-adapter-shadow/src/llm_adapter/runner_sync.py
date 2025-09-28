@@ -32,6 +32,7 @@ from .runner_shared import (
     log_provider_skipped,
     log_run_metric,
     resolve_event_logger,
+    token_bucket_from_config,
 )
 from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow
 from .utils import content_hash, elapsed_ms
@@ -66,6 +67,7 @@ class Runner:
         self.providers: list[ProviderSPI] = list(providers)
         self._logger = logger
         self._config = config or RunnerConfig()
+        self._token_bucket = token_bucket_from_config(self._config)
 
     def _invoke_provider_sync(
         self,
@@ -88,6 +90,7 @@ class Runner:
         tokens_in: int | None = None
         tokens_out: int | None = None
         shadow_metrics: ShadowMetrics | None = None
+        permit = self._token_bucket.acquire() if self._token_bucket else None
         try:
             if capture_shadow_metrics:
                 response_with_metrics = run_with_shadow(
@@ -130,6 +133,9 @@ class Runner:
             usage = response.token_usage
             tokens_in = usage.prompt
             tokens_out = usage.completion
+        finally:
+            if permit is not None:
+                permit.commit()
         status = "ok" if error is None else "error"
         log_provider_call(
             event_logger,

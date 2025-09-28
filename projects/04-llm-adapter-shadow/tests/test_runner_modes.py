@@ -31,6 +31,31 @@ def _response(text: str) -> ProviderResponse:
     return ProviderResponse(text=text, latency_ms=10, tokens_in=5, tokens_out=3)
 
 
+def test_runner_respects_rpm_spacing() -> None:
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+    call_times: list[float] = []
+
+    def _record(_: ProviderRequest) -> ProviderResponse:
+        call_times.append(time.monotonic())
+        return _response("ok")
+
+    provider = _MockProvider("rate-limited", _record)
+    rpm = 120
+    runner = Runner([provider], config=RunnerConfig(rpm=rpm))
+
+    for _ in range(3):
+        runner.run(request)
+
+    assert provider.calls == 3
+    assert len(call_times) == 3
+    first_interval = call_times[1] - call_times[0]
+    second_interval = call_times[2] - call_times[1]
+    expected_interval = 60.0 / rpm
+
+    assert first_interval < expected_interval / 2
+    assert abs(second_interval - expected_interval) <= 0.15
+
+
 def test_runner_parallel_any_cancels_pending_workers() -> None:
     request = ProviderRequest(model="gpt-test", prompt="hi")
 

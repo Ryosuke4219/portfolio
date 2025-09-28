@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,45 @@ class _StaticProvider:
             model=request.model,
             finish_reason="stop",
         )
+
+
+def test_async_runner_respects_rpm_spacing() -> None:
+    call_times: list[float] = []
+
+    class _RecordingProvider:
+        def name(self) -> str:
+            return "async-rate"
+
+        def capabilities(self) -> set[str]:
+            return set()
+
+        async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
+            call_times.append(time.monotonic())
+            await asyncio.sleep(0)
+            return ProviderResponse(
+                text="ok",
+                latency_ms=1,
+                token_usage=TokenUsage(prompt=1, completion=1),
+                model=request.model,
+            )
+
+    provider = _RecordingProvider()
+    runner = AsyncRunner([provider], config=RunnerConfig(rpm=120))
+    request = ProviderRequest(prompt="hello", model="primary-model")
+
+    async def _run_calls() -> None:
+        for _ in range(3):
+            await runner.run_async(request)
+
+    asyncio.run(_run_calls())
+
+    assert len(call_times) == 3
+    first_interval = call_times[1] - call_times[0]
+    second_interval = call_times[2] - call_times[1]
+    expected_interval = 60.0 / 120
+
+    assert first_interval < expected_interval / 2
+    assert abs(second_interval - expected_interval) <= 0.15
 
 
 def test_async_runner_matches_sync(tmp_path: Path) -> None:

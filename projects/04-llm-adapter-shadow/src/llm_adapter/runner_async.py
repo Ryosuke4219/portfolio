@@ -38,6 +38,7 @@ from .runner_shared import (
     log_provider_skipped,
     log_run_metric,
     resolve_event_logger,
+    token_bucket_from_config,
 )
 from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow_async
 from .utils import content_hash, elapsed_ms
@@ -68,6 +69,7 @@ class AsyncRunner:
         ]
         self._logger = logger
         self._config = config or RunnerConfig()
+        self._token_bucket = token_bucket_from_config(self._config)
 
     async def _invoke_provider_async(
         self,
@@ -88,6 +90,11 @@ class AsyncRunner:
         attempt_started = time.time()
         shadow_metrics: ShadowMetrics | None = None
         response: ProviderResponse
+        permit = (
+            await self._token_bucket.acquire_async()
+            if self._token_bucket
+            else None
+        )
         try:
             if capture_shadow_metrics:
                 response_with_metrics = await run_with_shadow_async(
@@ -194,6 +201,9 @@ class AsyncRunner:
                 allow_private_model=True,
             )
             raise
+        finally:
+            if permit is not None:
+                permit.commit()
         log_provider_call(
             event_logger,
             request_fingerprint=request_fingerprint,
