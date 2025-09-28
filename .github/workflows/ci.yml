@@ -12,6 +12,8 @@ jobs:
   node-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
     steps:
       - name: Checkout
@@ -23,10 +25,20 @@ jobs:
           node-version: '24'
           cache: 'npm'   # ← npm依存キャッシュを有効化
 
-      - name: Install deps & Playwright browsers
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm i; fi
-          npx playwright install --with-deps
+
+      - name: Install Playwright browsers
+        uses: microsoft/playwright-github-action@v1
+        with:
+          playwright-version: 1.45.0
 
       - name: Validate cases JSON
         run: npm run spec:validate
