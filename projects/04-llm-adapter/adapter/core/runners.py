@@ -85,19 +85,14 @@ class CompareRunner:
         mode: str,
     ) -> Tuple[RunMetrics, str, Optional[str]]:
         prompt = task.render_prompt()
-        response, status, failure_kind, error_message, latency_ms = self._invoke_provider(
-            provider, prompt
+        response, status, failure_kind, error_message, latency_ms = self._run_provider_call(
+            provider_config,
+            provider,
+            prompt,
         )
-        input_tokens = response.input_tokens
-        output_tokens = response.output_tokens
-        if (
-            provider_config.timeout_s > 0
-            and latency_ms > provider_config.timeout_s * 1000
-            and status == "ok"
-        ):
-            status = "error"
-            failure_kind = "timeout"
-        cost_usd = estimate_cost(provider_config, input_tokens, output_tokens)
+        cost_usd = estimate_cost(
+            provider_config, response.input_tokens, response.output_tokens
+        )
         budget_snapshot, stop_reason, status, failure_kind, error_message = (
             self._evaluate_budget(
                 provider_config,
@@ -107,48 +102,59 @@ class CompareRunner:
                 error_message,
             )
         )
-        output_text = response.output_text
-        if (output_text is None or not output_text.strip()) and status == "ok":
-            status = "error"
-            failure_kind = "guard_violation"
-        if not provider_config.persist_output:
-            output_text_record: Optional[str] = None
-        else:
-            output_text_record = output_text
-        output_hash = hash_text(output_text) if output_text else None
-        eval_metrics, eval_failure_kind = self._evaluate(task, output_text)
-        eval_metrics.len_tokens = output_tokens
-        if eval_failure_kind and failure_kind is None:
-            failure_kind = eval_failure_kind
-        if eval_failure_kind and status == "ok":
-            status = "error"
-        ci_meta = self._ci_metadata()
-        run_metrics = RunMetrics(
-            ts=now_ts(),
-            run_id=f"run_{task.task_id}_{attempt_index}_{uuid.uuid4().hex}",
-            provider=provider_config.provider,
-            model=provider_config.model,
-            mode=mode,
-            prompt_id=task.task_id,
-            prompt_name=task.name,
-            seed=provider_config.seed,
-            temperature=provider_config.temperature,
-            top_p=provider_config.top_p,
-            max_tokens=provider_config.max_tokens,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            latency_ms=latency_ms,
-            cost_usd=cost_usd,
-            status=status,
-            failure_kind=failure_kind,
-            error_message=error_message,
-            output_text=output_text_record,
-            output_hash=output_hash,
-            eval=eval_metrics,
-            budget=budget_snapshot,
-            ci_meta=ci_meta,
+        run_metrics, raw_output = self._build_metrics(
+            provider_config,
+            task,
+            attempt_index,
+            mode,
+            response,
+            status,
+            failure_kind,
+            error_message,
+            latency_ms,
+            budget_snapshot,
+            cost_usd,
         )
-        return run_metrics, output_text or "", stop_reason
+        return run_metrics, raw_output, stop_reason
+
+    def _run_provider_call(
+        self,
+        provider_config: ProviderConfig,
+        provider: BaseProvider,
+        prompt: str,
+    ) -> Tuple[ProviderResponse, str, Optional[str], Optional[str], int]:
+        response, status, failure_kind, error_message, latency_ms = self._invoke_provider(
+            provider, prompt
+        )
+        status, failure_kind = self._check_timeout(
+            provider_config, latency_ms, status, failure_kind
+        )
+        status, failure_kind = self._enforce_output_guard(
+            response.output_text, status, failure_kind
+        )
+        return response, status, failure_kind, error_message, latency_ms
+
+    def _check_timeout(
+        self,
+        provider_config: ProviderConfig,
+        latency_ms: int,
+        status: str,
+        failure_kind: Optional[str],
+    ) -> Tuple[str, Optional[str]]:
+        if (
+            provider_config.timeout_s > 0
+            and latency_ms > provider_config.timeout_s * 1000
+            and status == "ok"
+        ):
+            return "error", "timeout"
+        return status, failure_kind
+
+    def _enforce_output_guard(
+        self, output_text: Optional[str], status: str, failure_kind: Optional[str]
+    ) -> Tuple[str, Optional[str]]:
+        if (output_text is None or not output_text.strip()) and status == "ok":
+            return "error", failure_kind or "guard_violation"
+        return status, failure_kind
 
     def _invoke_provider(
         self, provider: BaseProvider, prompt: str
@@ -172,6 +178,71 @@ class CompareRunner:
             )
             return response, status, failure_kind, error_message, latency_ms
         return response, status, failure_kind, error_message, response.latency_ms
+
+    def _build_metrics(
+        self,
+        provider_config: ProviderConfig,
+        task: GoldenTask,
+        attempt_index: int,
+        mode: str,
+        response: ProviderResponse,
+        status: str,
+        failure_kind: Optional[str],
+        error_message: Optional[str],
+        latency_ms: int,
+        budget_snapshot: BudgetSnapshot,
+        cost_usd: float,
+    ) -> Tuple[RunMetrics, str]:
+        output_text = response.output_text
+        eval_metrics, eval_failure_kind = self._evaluate(task, output_text)
+        eval_metrics.len_tokens = response.output_tokens
+        status, failure_kind = self._merge_eval_failure(
+            status, failure_kind, eval_failure_kind
+        )
+        output_text_record = output_text if provider_config.persist_output else None
+        output_hash = self._compute_output_hash(output_text)
+        run_metrics = RunMetrics(
+            ts=now_ts(),
+            run_id=f"run_{task.task_id}_{attempt_index}_{uuid.uuid4().hex}",
+            provider=provider_config.provider,
+            model=provider_config.model,
+            mode=mode,
+            prompt_id=task.task_id,
+            prompt_name=task.name,
+            seed=provider_config.seed,
+            temperature=provider_config.temperature,
+            top_p=provider_config.top_p,
+            max_tokens=provider_config.max_tokens,
+            input_tokens=response.input_tokens,
+            output_tokens=response.output_tokens,
+            latency_ms=latency_ms,
+            cost_usd=cost_usd,
+            status=status,
+            failure_kind=failure_kind,
+            error_message=error_message,
+            output_text=output_text_record,
+            output_hash=output_hash,
+            eval=eval_metrics,
+            budget=budget_snapshot,
+            ci_meta=self._ci_metadata(),
+        )
+        return run_metrics, output_text or ""
+
+    def _merge_eval_failure(
+        self,
+        status: str,
+        failure_kind: Optional[str],
+        eval_failure_kind: Optional[str],
+    ) -> Tuple[str, Optional[str]]:
+        if not eval_failure_kind:
+            return status, failure_kind
+        failure_kind = failure_kind or eval_failure_kind
+        if status == "ok":
+            status = "error"
+        return status, failure_kind
+
+    def _compute_output_hash(self, output_text: Optional[str]) -> Optional[str]:
+        return hash_text(output_text) if output_text else None
 
     def _evaluate_budget(
         self,
