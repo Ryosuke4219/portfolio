@@ -11,28 +11,6 @@ on:
       - '.github/workflows/adapter-tests.yml'
 
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: projects/04-llm-adapter-shadow/requirements.txt
-
-      - name: Install dependencies
-        working-directory: projects/04-llm-adapter-shadow
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run pytest
-        working-directory: projects/04-llm-adapter-shadow
-        env:
-          PYTHONPATH: src
-        run: pytest -q
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
