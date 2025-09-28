@@ -60,10 +60,14 @@ class _AsyncProbeProvider:
 
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
         try:
-            await asyncio.sleep(self._delay)
+            if self._delay <= 0:
+                latency_ms = 0
+            else:
+                await asyncio.sleep(self._delay)
+                latency_ms = int(self._delay * 1000)
             return ProviderResponse(
                 text=f"{self._text}:{request.prompt}",
-                latency_ms=int(self._delay * 1000),
+                latency_ms=latency_ms,
                 token_usage=TokenUsage(prompt=1, completion=1),
                 model=request.model,
             )
