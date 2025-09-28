@@ -34,7 +34,9 @@ def _normalize_concurrency(total: int, limit: int | None) -> int:
     return max(min(limit, total), 1)
 
 
-def run_parallel_any_sync(workers: Sequence[SyncWorker[T]], *, max_concurrency: int | None = None) -> T:
+def run_parallel_any_sync(
+    workers: Sequence[SyncWorker[T]], *, max_concurrency: int | None = None
+) -> T:
     """Execute workers concurrently until the first success."""
 
     if not workers:
