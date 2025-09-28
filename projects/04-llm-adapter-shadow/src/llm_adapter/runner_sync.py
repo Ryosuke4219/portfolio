@@ -354,18 +354,50 @@ class Runner:
             index: int, provider: ProviderSPI
         ) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
-                result = self._invoke_provider_sync(
-                    provider,
-                    request,
-                    attempt=index,
-                    total_providers=total_providers,
-                    event_logger=event_logger,
-                    request_fingerprint=request_fingerprint,
-                    metadata=metadata,
-                    shadow=shadow,
-                    metrics_path=metrics_path_str,
-                    capture_shadow_metrics=capture_shadow,
-                )
+                attempt_started = time.time()
+                try:
+                    result = self._invoke_provider_sync(
+                        provider,
+                        request,
+                        attempt=index,
+                        total_providers=total_providers,
+                        event_logger=event_logger,
+                        request_fingerprint=request_fingerprint,
+                        metadata=metadata,
+                        shadow=shadow,
+                        metrics_path=metrics_path_str,
+                        capture_shadow_metrics=capture_shadow,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    latency_ms = elapsed_ms(attempt_started)
+                    log_provider_call(
+                        event_logger,
+                        request_fingerprint=request_fingerprint,
+                        provider=provider,
+                        request=request,
+                        attempt=index,
+                        total_providers=total_providers,
+                        status="error",
+                        latency_ms=latency_ms,
+                        tokens_in=None,
+                        tokens_out=None,
+                        error=exc,
+                        metadata=metadata,
+                        shadow_used=shadow is not None,
+                    )
+                    result = ProviderInvocationResult(
+                        provider=provider,
+                        attempt=index,
+                        total_providers=total_providers,
+                        response=None,
+                        error=exc,
+                        latency_ms=latency_ms,
+                        tokens_in=None,
+                        tokens_out=None,
+                        shadow_metrics=None,
+                        shadow_metrics_extra=None,
+                        succeeded=False,
+                    )
                 results[index - 1] = result
                 return result
 
