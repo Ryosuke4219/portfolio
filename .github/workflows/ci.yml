@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
-  test:
+  node-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -54,14 +54,37 @@ jobs:
         if: always()
         run: npm run ci:analyze
 
+      - name: Run shadow pipeline integration test
+        if: always()
+        run: node --test tests/e2e-shadow.test.mjs
+
       - name: Create issue (stub)
         if: always()
         run: npm run ci:issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Python
+      - name: Upload node test artifacts
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-test-artifacts
+          if-no-files-found: warn
+          path: |
+            junit-results.xml
+            database.json
+            projects/03-ci-flaky/out/**
+            test-results/**
+
+  python-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -69,7 +92,6 @@ jobs:
           cache-dependency-path: projects/04-llm-adapter-shadow/requirements.txt
 
       - name: Install Python dependencies
-        if: always()
         run: |
           python -m pip install --upgrade pip
           pip install -r projects/04-llm-adapter-shadow/requirements.txt
@@ -87,10 +109,6 @@ jobs:
         if: always()
         run: mypy projects/04-llm-adapter-shadow/src --pretty --strict
 
-      - name: Run shadow pipeline integration test
-        if: always()
-        run: node --test tests/e2e-shadow.test.mjs
-
       - name: Run pytest with coverage HTML
         if: always()
         run: |
@@ -101,22 +119,50 @@ jobs:
             --cov-report=term-missing \
             projects/04-llm-adapter-shadow/tests
 
-      - name: Upload artifacts (JUnit, DB, raw results)
+      - name: Upload Python coverage artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts
+          name: python-coverage-artifacts
+          if-no-files-found: warn
           path: |
-            junit-results.xml
-            database.json
-            test-results/**
+            projects/04-llm-adapter-shadow/htmlcov/**
+            projects/04-llm-adapter-shadow/coverage.xml
+
+  reports:
+    needs:
+      - node-tests
+      - python-tests
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Download node test artifacts
+        if: ${{ needs['node-tests'].result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: node-test-artifacts
+          path: .
+
+      - name: Download Python coverage artifacts
+        if: ${{ needs['python-tests'].result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: python-coverage-artifacts
+          path: .
 
       - name: Build CI reports bundle
-        if: always()
         run: node scripts/build-ci-reports.mjs
 
       - name: Upload CI reports for Pages
-        if: always()
         uses: actions/upload-pages-artifact@v4
         with:
           name: ci-reports
