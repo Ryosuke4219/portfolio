@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from dataclasses import dataclass
-from typing import Literal, cast
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal, cast
 
 from .budgets import BudgetManager
 from .config import load_budget_book, load_provider_configs
 from .datasets import load_golden_tasks
-from .runners import CompareRunner
 
 Mode = Literal["sequential", "parallel-any", "parallel-all", "consensus"]
 
@@ -31,7 +30,6 @@ _MODE_ALIASES: dict[str, Mode] = {
 @dataclass(frozen=True)
 class RunnerConfig:
     """ランナーの制御パラメータ."""
-
     mode: Mode
     aggregate: str | None = None
     quorum: int | None = None
@@ -117,12 +115,15 @@ def run_compare(
     budget_book = load_budget_book(budgets_path)
     budget_manager = BudgetManager(budget_book)
 
+    from .runners import CompareRunner
+
     runner = CompareRunner(
         provider_configs,
         tasks,
         budget_manager,
         metrics_path,
         allow_overrun=allow_overrun,
+        runner_config=config,
     )
     results = runner.run(repeat=max(repeat, 1), config=config)
     logging.getLogger(__name__).info("%d 件の試行を記録しました", len(results))

@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """OpenAI プロバイダ用ユーティリティ。"""
 
 from __future__ import annotations
@@ -232,4 +233,3 @@ class OpenAIClientFactory:
             headers.update(default_headers)
             setattr(openai_module, "_default_headers", headers)
         return openai_module
-

@@ -15,7 +15,7 @@ from statistics import median, pstdev
 from threading import Lock
 from time import perf_counter, sleep
 from typing import TYPE_CHECKING
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from .budgets import BudgetManager
 from .config import ProviderConfig
@@ -109,6 +109,8 @@ class CompareRunner:
         budget_manager: BudgetManager,
         metrics_path: Path,
         allow_overrun: bool = False,
+        runner_config: RunnerConfig | None = None,
+        resolver: Callable[..., object] | None = None,
     ) -> None:
         self.provider_configs = list(provider_configs)
         self.tasks = list(tasks)
@@ -116,6 +118,9 @@ class CompareRunner:
         self.metrics_path = metrics_path
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.allow_overrun = allow_overrun
+        self.runner_config = runner_config
+        self.resolver = resolver  # 予約（現状未使用）
+
         self._schema_validator: _SchemaValidator | None = None
         self._token_bucket: _TokenBucket | None = None
 
@@ -433,6 +438,7 @@ class CompareRunner:
             failure_kind = "provider_error"
             error_message = str(exc)
             latency_ms = int((perf_counter() - start) * 1000)
+            # フォールバックのダミー応答
             response = ProviderResponse(
                 output_text="",
                 input_tokens=len(prompt.split()),
@@ -527,7 +533,8 @@ class CompareRunner:
         run_reason: str | None = None
         if run_budget_hit:
             run_reason = (
-                f"provider={provider_config.provider} run budget {run_budget_limit:.4f} USD exceeded "
+                f"provider={provider_config.provider} run budget "
+                f"{run_budget_limit:.4f} USD exceeded "
                 f"(cost={cost_usd:.4f} USD)"
             )
         daily_reason: str | None = None
@@ -535,7 +542,8 @@ class CompareRunner:
             spent = self.budget_manager.spent_today(provider_config.provider)
             daily_limit = self.budget_manager.daily_budget(provider_config.provider)
             daily_reason = (
-                f"provider={provider_config.provider} daily budget {daily_limit:.4f} USD exceeded "
+                f"provider={provider_config.provider} daily budget "
+                f"{daily_limit:.4f} USD exceeded "
                 f"(spent={spent:.4f} USD)"
             )
         stop_reason: str | None = None
@@ -564,7 +572,9 @@ class CompareRunner:
             json.dump(metrics.to_json_dict(), fp, ensure_ascii=False)
             fp.write("\n")
 
-    def _evaluate(self, task: GoldenTask, output_text: str) -> tuple[EvalMetrics, str | None]:
+    def _evaluate(
+        self, task: GoldenTask, output_text: str | None
+    ) -> tuple[EvalMetrics, str | None]:
         expected_type = str(task.expected.get("type", "regex"))
         expected_value = task.expected.get("value")
         eval_metrics = EvalMetrics()
@@ -596,7 +606,7 @@ class CompareRunner:
         return eval_metrics, failure_kind
 
     def _ci_metadata(self) -> Mapping[str, str]:
-        meta = {}
+        meta: dict[str, str] = {}
         branch = os.getenv("GITHUB_REF_NAME") or os.getenv("GITHUB_HEAD_REF")
         commit = os.getenv("GITHUB_SHA")
         if branch:
@@ -617,7 +627,7 @@ class CompareRunner:
             return
         comparable: list[tuple[RunMetrics, str]] = [
             (metrics, output)
-            for metrics, output in zip(metrics_list, outputs)
+            for metrics, output in zip(metrics_list, outputs, strict=False)
             if metrics.status == "ok" and output
         ]
         if len(comparable) < 2:
