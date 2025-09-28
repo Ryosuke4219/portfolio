@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import inspect
 import json
 import math
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
@@ -145,8 +146,21 @@ def _normalize_retry_directive(
     if directive is None:
         return None, None
     if isinstance(directive, tuple):
-        return directive[0], directive[1]
-    return None, directive
+        next_attempt, delay_value = directive
+    else:
+        next_attempt, delay_value = None, directive
+    delay_normalized = None if delay_value is None else float(delay_value)
+    return next_attempt, delay_normalized
+
+
+async def _resolve_retry_directive(
+    directive: Awaitable[RetryDirective] | RetryDirective,
+) -> RetryDirective:
+    if inspect.isawaitable(directive):
+        awaited_directive = await cast(Awaitable[Any], directive)
+    else:
+        awaited_directive = directive
+    return cast(RetryDirective, awaited_directive)
 
 
 async def run_parallel_any_async(
@@ -197,11 +211,8 @@ async def run_parallel_any_async(
                 next_attempt: int | None = None
                 if on_retry is not None:
                     directive = on_retry(index, attempt, exc)
-                    if asyncio.iscoroutine(directive):
-                        directive = await cast(Awaitable[RetryDirective], directive)
-                    next_attempt, delay = _normalize_retry_directive(
-                        cast(RetryDirective, directive)
-                    )
+                    awaited = await _resolve_retry_directive(directive)
+                    next_attempt, delay = _normalize_retry_directive(awaited)
                 if delay is not None and delay >= 0:
                     if next_attempt is not None:
                         attempt = max(next_attempt - 1, attempt)
@@ -285,11 +296,8 @@ async def run_parallel_all_async(
                 next_attempt: int | None = None
                 if on_retry is not None:
                     directive = on_retry(index, attempt, exc)
-                    if asyncio.iscoroutine(directive):
-                        directive = await cast(Awaitable[RetryDirective], directive)
-                    next_attempt, delay = _normalize_retry_directive(
-                        cast(RetryDirective, directive)
-                    )
+                    awaited = await _resolve_retry_directive(directive)
+                    next_attempt, delay = _normalize_retry_directive(awaited)
                 if delay is not None and delay >= 0:
                     if next_attempt is not None:
                         attempt = max(next_attempt - 1, attempt)

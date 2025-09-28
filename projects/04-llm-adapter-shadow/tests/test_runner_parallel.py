@@ -17,6 +17,7 @@ from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
     ParallelExecutionError,
     compute_consensus,
+    run_parallel_all_async,
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
@@ -356,6 +357,41 @@ def test_runner_parallel_all_exhausts_timeout_retries(
     assert all(event["error_type"] == "TimeoutError" for event in provider_calls)
     run_metrics = [event for event in events if event["event"] == "run_metric"]
     assert [event["attempts"] for event in run_metrics] == [1, 2]
+
+
+def test_run_parallel_all_async_on_retry_future() -> None:
+    async def _run() -> None:
+        attempts = 0
+
+        async def worker() -> str:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise TimeoutError("first failure")
+            return "ok"
+
+        retry_log: list[tuple[int, int, str]] = []
+        loop = asyncio.get_running_loop()
+
+        def on_retry(
+            index: int, attempt: int, exc: BaseException
+        ) -> asyncio.Future[float | None]:
+            retry_log.append((index, attempt, type(exc).__name__))
+            future: asyncio.Future[float | None] = loop.create_future()
+            loop.call_soon(future.set_result(0.0))
+            return future
+
+        result = await run_parallel_all_async(
+            [worker],
+            max_attempts=2,
+            on_retry=on_retry,
+        )
+
+        assert result == ["ok"]
+        assert retry_log == [(0, 1, "TimeoutError")]
+        assert attempts == 2
+
+    asyncio.run(_run())
 
 
 def test_consensus_vote_event_and_shadow_delta(
