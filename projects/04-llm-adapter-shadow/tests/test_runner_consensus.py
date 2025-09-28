@@ -213,6 +213,7 @@ def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> No
     expected = [
         {
             "provider": invocation.provider.name(),
+            "attempt": str(invocation.attempt),
             "summary": f"{type(invocation.error).__name__}: {invocation.error}",
         }
         for invocation in invocations
@@ -221,4 +222,5 @@ def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> No
     message = str(error)
     for detail in expected:
         assert detail["provider"] in message
+        assert detail["attempt"] in message
         assert detail["summary"] in message
