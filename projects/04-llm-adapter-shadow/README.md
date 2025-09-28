@@ -99,7 +99,9 @@ projects/04-llm-adapter-shadow/
 
    - `GEMINI_API_KEY` が未設定／空文字なら Gemini は `ProviderSkip` として自動スキップし、`provider_skipped` イベントを記録します。他プロバイダが成功すればチェーン全体は継続します。
    - PowerShell では bash 由来の構文（ヒアドキュメントなど）が動かないため、`python -c "..."` などで置き換えてください。
-   - `runs-metrics.jsonl` にイベントが追加されない場合は書き込み権限と直前の `provider_chain_failed` ログを確認してください。
+- `runs-metrics.jsonl` にイベントが追加されない場合は書き込み権限と直前の `provider_chain_failed` ログを確認してください。
+
+> ℹ️ `ProviderResponse.token_usage`（`prompt` / `completion` / `total`）を正式APIとし、旧来の `input_tokens` / `output_tokens` は段階的に非推奨化しています。既存呼び出しは動作を維持しますが、必要に応じて `llm_adapter.provider_spi.SUPPRESS_TOKEN_USAGE_DEPRECATION = True` で警告を抑止できます。
 
 ### Provider configuration
 

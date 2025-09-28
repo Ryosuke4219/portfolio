@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import warnings
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from typing import Any, Protocol, cast
 
 from .utils import ensure_str_list
@@ -81,21 +82,23 @@ class TokenUsage:
 class ProviderResponse:
     text: str
     latency_ms: int
-    token_usage: TokenUsage | None = None
+    token_usage: InitVar[TokenUsage | None] = None
     model: str | None = None
     finish_reason: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
     raw: Any | None = None
+    _token_usage: TokenUsage = field(init=False, repr=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, token_usage: TokenUsage | None) -> None:
         prompt_tokens = int(self.tokens_in or 0)
         completion_tokens = int(self.tokens_out or 0)
-        if self.token_usage is not None:
-            prompt_tokens = self.token_usage.prompt
-            completion_tokens = self.token_usage.completion
+        if token_usage is not None:
+            prompt_tokens = token_usage.prompt
+            completion_tokens = token_usage.completion
+            self._token_usage = token_usage
         else:
-            self.token_usage = TokenUsage(
+            self._token_usage = TokenUsage(
                 prompt=prompt_tokens,
                 completion=completion_tokens,
             )
@@ -109,11 +112,43 @@ class ProviderResponse:
 
     @property
     def input_tokens(self) -> int:
+        if not SUPPRESS_TOKEN_USAGE_DEPRECATION:
+            warnings.warn(
+                "ProviderResponse.input_tokens は非推奨です。"
+                " ProviderResponse.token_usage.prompt を利用してください。",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         return self.tokens_in or 0
 
     @property
     def output_tokens(self) -> int:
+        if not SUPPRESS_TOKEN_USAGE_DEPRECATION:
+            warnings.warn(
+                "ProviderResponse.output_tokens は非推奨です。"
+                " ProviderResponse.token_usage.completion を利用してください。",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         return self.tokens_out or 0
+
+    @property
+    def token_usage(self) -> TokenUsage:
+        return self._token_usage
+
+    @token_usage.setter
+    def token_usage(self, value: TokenUsage | None) -> None:
+        if value is None:
+            value = TokenUsage(
+                prompt=int(self.tokens_in or 0),
+                completion=int(self.tokens_out or 0),
+            )
+        self._token_usage = value
+        self.tokens_in = value.prompt
+        self.tokens_out = value.completion
+
+
+SUPPRESS_TOKEN_USAGE_DEPRECATION = False
 
 
 class ProviderSPI(Protocol):
