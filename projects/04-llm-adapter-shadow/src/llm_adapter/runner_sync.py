@@ -267,6 +267,7 @@ class Runner:
         request_fingerprint: str,
     ) -> ProviderResponse:
         providers = self._selected_providers()
+        shadow_used = shadow is not None
         if not providers:
             log_provider_chain_failed(
                 event_logger,
@@ -291,8 +292,6 @@ class Runner:
                 shadow_used=shadow_used,
             )
             raise RuntimeError("No providers succeeded")
-
-        shadow_used = shadow is not None
         max_concurrency = self._config.max_concurrency
         attempts = len(providers)
         record_lock = Lock()
