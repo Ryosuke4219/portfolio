@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import cast
 
@@ -176,8 +176,10 @@ class Runner:
         run_started: float,
         shadow_used: bool,
         skip: tuple[ProviderInvocationResult, ...] | None = None,
+        attempts_override: Mapping[int, int] | None = None,
     ) -> None:
         skipped = skip or ()
+        attempts_map = dict(attempts_override or {})
         for result in results:
             if result is None:
                 continue
@@ -197,13 +199,14 @@ class Runner:
             latency_ms = result.latency_ms
             if latency_ms is None:
                 latency_ms = elapsed_ms(run_started)
+            attempts_value = attempts_map.get(result.attempt, result.attempt)
             log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,
                 request=request,
                 provider=result.provider,
                 status=status,
-                attempts=result.attempt,
+                attempts=attempts_value,
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
@@ -384,7 +387,7 @@ class Runner:
             for index, provider in enumerate(self.providers, start=1)
         ]
 
-        skip_run_metric: tuple[ProviderInvocationResult, ...] | None = None
+        attempts_override: dict[int, int] | None = None
         try:
             if mode is RunnerMode.PARALLEL_ANY:
                 winner = run_parallel_any_sync(
@@ -399,30 +402,7 @@ class Runner:
                 attempts_final = sum(1 for item in results if item is not None)
                 if attempts_final == 0:
                     attempts_final = winner.attempt
-                tokens_in = winner.tokens_in if winner.tokens_in is not None else 0
-                tokens_out = winner.tokens_out if winner.tokens_out is not None else 0
-                cost_usd = estimate_cost(winner.provider, tokens_in, tokens_out)
-                latency_ms = (
-                    winner.latency_ms
-                    if winner.latency_ms is not None
-                    else elapsed_ms(run_started)
-                )
-                log_run_metric(
-                    event_logger,
-                    request_fingerprint=request_fingerprint,
-                    request=request,
-                    provider=winner.provider,
-                    status="ok",
-                    attempts=attempts_final,
-                    latency_ms=latency_ms,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    cost_usd=cost_usd,
-                    error=None,
-                    metadata=metadata,
-                    shadow_used=shadow_used,
-                )
-                skip_run_metric = (winner,)
+                attempts_override = {winner.attempt: attempts_final}
                 return response
 
             if mode is RunnerMode.PARALLEL_ALL:
@@ -568,7 +548,7 @@ class Runner:
                 metadata=metadata,
                 run_started=run_started,
                 shadow_used=shadow_used,
-                skip=skip_run_metric,
+                attempts_override=attempts_override,
             )
 
         raise RuntimeError(f"Unsupported runner mode: {mode}")
