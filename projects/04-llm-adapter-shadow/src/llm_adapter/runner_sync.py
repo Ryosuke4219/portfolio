@@ -46,7 +46,7 @@ class ProviderInvocationResult:
     total_providers: int
     response: ProviderResponse | None
     error: Exception | None
-    latency_ms: float
+    latency_ms: int | None
     tokens_in: int | None
     tokens_out: int | None
     shadow_metrics: ShadowMetrics | None
@@ -89,7 +89,7 @@ class Runner:
         attempt_started = time.time()
         response: ProviderResponse | None = None
         error: Exception | None = None
-        latency_ms: float
+        latency_ms: int
         tokens_in: int | None = None
         tokens_out: int | None = None
         shadow_metrics: ShadowMetrics | None = None
@@ -189,6 +189,9 @@ class Runner:
                 tokens_in = None
                 tokens_out = None
                 cost_usd = 0.0
+            latency_ms = result.latency_ms
+            if latency_ms is None:
+                latency_ms = elapsed_ms(run_started)
             log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -196,7 +199,7 @@ class Runner:
                 provider=result.provider,
                 status=status,
                 attempts=result.attempt,
-                latency_ms=elapsed_ms(run_started),
+                latency_ms=latency_ms,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
                 cost_usd=cost_usd,
