@@ -26,12 +26,14 @@ from .runner_parallel import (
 )
 from .runner_shared import (
     MetricsPath,
+    RateLimiter,
     error_family,
     estimate_cost,
     log_provider_call,
     log_provider_skipped,
     log_run_metric,
     resolve_event_logger,
+    resolve_rate_limiter,
 )
 from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow
 from .utils import content_hash, elapsed_ms
@@ -66,6 +68,7 @@ class Runner:
         self.providers: list[ProviderSPI] = list(providers)
         self._logger = logger
         self._config = config or RunnerConfig()
+        self._rate_limiter: RateLimiter | None = resolve_rate_limiter(self._config.rpm)
 
     def _invoke_provider_sync(
         self,
@@ -81,6 +84,8 @@ class Runner:
         metrics_path: MetricsPath,
         capture_shadow_metrics: bool,
     ) -> ProviderInvocationResult:
+        if self._rate_limiter is not None:
+            self._rate_limiter.acquire()
         attempt_started = time.time()
         response: ProviderResponse | None = None
         error: Exception | None = None
