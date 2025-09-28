@@ -23,6 +23,12 @@ from .provider_spi import (
     ensure_async_provider,
 )
 from .runner_config import RunnerConfig, RunnerMode
+from .runner_parallel import (
+    ParallelExecutionError,
+    compute_consensus,
+    run_parallel_all_async,
+    run_parallel_any_async,
+)
 from .runner_shared import (
     MetricsPath,
     error_family,
@@ -30,16 +36,10 @@ from .runner_shared import (
     log_consensus_result,
     log_parallel_group_result,
     log_provider_call,
-    log_provider_skipped,
     log_provider_chain_failed,
+    log_provider_skipped,
     log_run_metric,
     resolve_event_logger,
-)
-from .runner_parallel import (
-    ParallelExecutionError,
-    compute_consensus,
-    run_parallel_all_async,
-    run_parallel_any_async,
 )
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow_async
 from .utils import content_hash, elapsed_ms
@@ -562,7 +562,9 @@ class AsyncRunner:
                     metadata=metadata,
                     shadow_used=shadow_used,
                 )
-                raise last_error
+                if last_error is err:
+                    raise
+                raise last_error from err
             else:
                 if winner_provider is None:
                     winner_provider = provider_objects[0]
@@ -696,11 +698,13 @@ class AsyncRunner:
                     metadata=metadata,
                     shadow_used=shadow_used,
                 )
-                raise last_error
+                if last_error is err:
+                    raise
+                raise last_error from err
             winner_provider = next(
                 (
                     provider
-                    for provider, response in zip(provider_objects, responses)
+                    for provider, response in zip(provider_objects, responses, strict=False)
                     if response is consensus.response
                 ),
                 None,
@@ -760,7 +764,7 @@ class AsyncRunner:
                 response.input_tokens or 0,
                 response.output_tokens or 0,
             )
-            for provider, response in zip(provider_objects, responses)
+            for provider, response in zip(provider_objects, responses, strict=False)
         )
         log_parallel_group_result(
             event_logger,

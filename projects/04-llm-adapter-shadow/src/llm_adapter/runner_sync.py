@@ -6,14 +6,6 @@ import time
 from collections.abc import Mapping, Sequence
 from threading import Lock
 
-from .runner_config import RunnerMode
-from .runner_parallel import (
-    ParallelExecutionError,
-    compute_consensus,
-    run_parallel_all_sync,
-    run_parallel_any_sync,
-)
-
 from .errors import (
     FatalError,
     ProviderSkip,
@@ -24,7 +16,13 @@ from .errors import (
 )
 from .observability import EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from .runner_config import RunnerConfig
+from .runner_config import RunnerConfig, RunnerMode
+from .runner_parallel import (
+    ParallelExecutionError,
+    compute_consensus,
+    run_parallel_all_sync,
+    run_parallel_any_sync,
+)
 from .runner_shared import (
     MetricsPath,
     error_family,
@@ -32,8 +30,8 @@ from .runner_shared import (
     log_consensus_result,
     log_parallel_group_result,
     log_provider_call,
-    log_provider_skipped,
     log_provider_chain_failed,
+    log_provider_skipped,
     log_run_metric,
     resolve_event_logger,
 )
@@ -534,7 +532,9 @@ class Runner:
                     metadata=metadata,
                     shadow_used=shadow_used,
                 )
-                raise last_error
+                if last_error is err:
+                    raise
+                raise last_error from err
             else:
                 if winner_provider is None:
                     winner_provider = providers[0]
@@ -667,11 +667,13 @@ class Runner:
                     metadata=metadata,
                     shadow_used=shadow_used,
                 )
-                raise last_error
+                if last_error is err:
+                    raise
+                raise last_error from err
             winner_provider = next(
                 (
                     provider
-                    for provider, response in zip(providers, responses)
+                    for provider, response in zip(providers, responses, strict=False)
                     if response is consensus.response
                 ),
                 None,
@@ -731,7 +733,7 @@ class Runner:
                 response.input_tokens or 0,
                 response.output_tokens or 0,
             )
-            for provider, response in zip(providers, responses)
+            for provider, response in zip(providers, responses, strict=False)
         )
         log_parallel_group_result(
             event_logger,
