@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,6 +14,14 @@ if TYPE_CHECKING:
     from .provider_spi import AsyncProviderSPI, ProviderRequest, ProviderSPI
 
 MetricsPath = str | Path | None
+
+
+EVENT_PROVIDER_CALL = "provider_call"
+EVENT_PROVIDER_SKIPPED = "provider_skipped"
+EVENT_PROVIDER_CHAIN_FAILED = "provider_chain_failed"
+EVENT_RUN_METRIC = "run_metric"
+EVENT_PARALLEL_GROUP_RESULT = "parallel_group_result"
+EVENT_CONSENSUS_RESULT = "consensus_result"
 
 
 def resolve_event_logger(
@@ -100,7 +108,7 @@ def log_provider_skipped(
         return
     provider_name = _provider_name(provider)
     event_logger.emit(
-        "provider_skipped",
+        EVENT_PROVIDER_SKIPPED,
         {
             "request_fingerprint": request_fingerprint,
             "request_hash": _request_hash(provider_name, request),
@@ -135,7 +143,7 @@ def log_provider_call(
 
     provider_name = _provider_name(provider)
     event_logger.emit(
-        "provider_call",
+        EVENT_PROVIDER_CALL,
         {
             "request_fingerprint": request_fingerprint,
             "request_hash": _request_hash(provider_name, request),
@@ -178,7 +186,7 @@ def log_run_metric(
 
     provider_name = _provider_name(provider)
     event_logger.emit(
-        "run_metric",
+        EVENT_RUN_METRIC,
         {
             "request_fingerprint": request_fingerprint,
             "request_hash": _request_hash(provider_name, request),
@@ -191,6 +199,105 @@ def log_run_metric(
             "cost_usd": float(cost_usd),
             "error_type": type(error).__name__ if error is not None else None,
             "error_message": str(error) if error is not None else None,
+            "error_family": error_family(error),
+            "shadow_used": shadow_used,
+            "trace_id": metadata.get("trace_id"),
+            "project_id": metadata.get("project_id"),
+        },
+    )
+
+
+def log_provider_chain_failed(
+    event_logger: EventLogger | None,
+    *,
+    request_fingerprint: str,
+    providers: Sequence[ProviderSPI | AsyncProviderSPI],
+    attempt_count: int,
+    last_error: Exception | None,
+) -> None:
+    if event_logger is None:
+        return
+    event_logger.emit(
+        EVENT_PROVIDER_CHAIN_FAILED,
+        {
+            "request_fingerprint": request_fingerprint,
+            "provider_attempts": attempt_count,
+            "providers": [_provider_name(provider) for provider in providers],
+            "last_error_type": type(last_error).__name__ if last_error else None,
+            "last_error_message": str(last_error) if last_error else None,
+            "last_error_family": error_family(last_error),
+        },
+    )
+
+
+def log_parallel_group_result(
+    event_logger: EventLogger | None,
+    *,
+    request_fingerprint: str,
+    request: ProviderRequest,
+    mode: str,
+    status: str,
+    attempts: int,
+    latency_ms: int,
+    records: Sequence[Mapping[str, Any]],
+    winner: ProviderSPI | AsyncProviderSPI | None,
+    error: Exception | None,
+    metadata: Mapping[str, Any],
+    shadow_used: bool,
+) -> None:
+    if event_logger is None:
+        return
+    winner_name = _provider_name(winner)
+    event_logger.emit(
+        EVENT_PARALLEL_GROUP_RESULT,
+        {
+            "request_fingerprint": request_fingerprint,
+            "request_hash": _request_hash(winner_name, request),
+            "mode": mode,
+            "status": status,
+            "attempts": attempts,
+            "latency_ms": latency_ms,
+            "winner": winner_name,
+            "records": list(records),
+            "error_type": type(error).__name__ if error else None,
+            "error_message": str(error) if error else None,
+            "error_family": error_family(error),
+            "shadow_used": shadow_used,
+            "trace_id": metadata.get("trace_id"),
+            "project_id": metadata.get("project_id"),
+        },
+    )
+
+
+def log_consensus_result(
+    event_logger: EventLogger | None,
+    *,
+    request_fingerprint: str,
+    request: ProviderRequest,
+    mode: str,
+    status: str,
+    votes: int | None,
+    total_candidates: int,
+    winner: ProviderSPI | AsyncProviderSPI | None,
+    error: Exception | None,
+    metadata: Mapping[str, Any],
+    shadow_used: bool,
+) -> None:
+    if event_logger is None:
+        return
+    winner_name = _provider_name(winner)
+    event_logger.emit(
+        EVENT_CONSENSUS_RESULT,
+        {
+            "request_fingerprint": request_fingerprint,
+            "request_hash": _request_hash(winner_name, request),
+            "mode": mode,
+            "status": status,
+            "votes": votes,
+            "total_candidates": total_candidates,
+            "winner": winner_name,
+            "error_type": type(error).__name__ if error else None,
+            "error_message": str(error) if error else None,
             "error_family": error_family(error),
             "shadow_used": shadow_used,
             "trace_id": metadata.get("trace_id"),
