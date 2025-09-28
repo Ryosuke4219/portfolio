@@ -30,7 +30,6 @@ _MODE_ALIASES: dict[str, Mode] = {
 @dataclass(frozen=True)
 class RunnerConfig:
     """ランナーの制御パラメータ."""
-
     mode: Mode
     aggregate: str | None = None
     quorum: int | None = None
@@ -126,7 +125,7 @@ def run_compare(
         allow_overrun=allow_overrun,
         runner_config=config,
     )
-    results = runner.run(repeat=max(repeat, 1), mode=config.mode)
+    results = runner.run(repeat=max(repeat, 1), config=config)
     logging.getLogger(__name__).info("%d 件の試行を記録しました", len(results))
     return 0
 
