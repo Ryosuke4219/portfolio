@@ -422,6 +422,29 @@ class Runner:
                     for res in invocations
                     if res.response is not None
                 ]
+                if not successful:
+                    failure_details: list[dict[str, str]] = []
+                    for invocation in invocations:
+                        provider_name = invocation.provider.name()
+                        error = invocation.error
+                        summary = (
+                            f"{type(error).__name__}: {error}"
+                            if error is not None
+                            else "unknown error"
+                        )
+                        failure_details.append(
+                            {"provider": provider_name, "summary": summary}
+                        )
+                    detail_text = "; ".join(
+                        f"{item['provider']}: {item['summary']}"
+                        for item in failure_details
+                    )
+                    message = "all workers failed"
+                    if detail_text:
+                        message = f"{message}: {detail_text}"
+                    error = ParallelExecutionError(message)
+                    setattr(error, "failures", failure_details)
+                    raise error
                 if len(successful) != len(invocations):
                     raise ParallelExecutionError("all workers failed")
                 responses_for_consensus = [response for _, response in successful]
