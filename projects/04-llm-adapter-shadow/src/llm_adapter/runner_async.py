@@ -340,6 +340,8 @@ class AsyncRunner:
                 worker_index: int, attempt_index: int, error: BaseException
             ) -> tuple[int, float] | None:
                 nonlocal retry_attempts, attempt_count
+                if self._config.max_attempts is None:
+                    return None
                 provider, _ = providers[worker_index]
                 next_attempt_total = total_providers + retry_attempts + 1
                 delay: float | None = None
