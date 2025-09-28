@@ -214,7 +214,7 @@ def run_parallel_all_sync(
     if not workers:
         raise ValueError("workers must not be empty")
     max_workers = _normalize_concurrency(len(workers), max_concurrency)
-    responses: list[T] = [None] * len(workers)  # type: ignore[list-item]
+    responses: list[T | None] = [None] * len(workers)
     attempts = [0] * len(workers)
     completed = [False] * len(workers)
     last_error: list[BaseException | None] = [None] * len(workers)
@@ -241,8 +241,8 @@ def run_parallel_all_sync(
             while not all(completed):
                 if not future_map:
                     break
-                done, _ = wait(future_map, return_when=FIRST_COMPLETED)
-                for future in done:
+                completed_futures, _ = wait(future_map, return_when=FIRST_COMPLETED)
+                for future in completed_futures:
                     index = future_map.pop(future)
                     if completed[index]:
                         continue
@@ -275,14 +275,16 @@ def run_parallel_all_sync(
             pending.cancel()
 
     if not all(completed):
-        for index, done in enumerate(completed):
-            if not done:
+        for index, is_done in enumerate(completed):
+            if not is_done:
                 raise ParallelExecutionError("all workers failed") from last_error[index]
-    if any(response is None for response in responses):  # type: ignore[truthy-function]
-        for index, response in enumerate(responses):
-            if response is None:
-                raise ParallelExecutionError("all workers failed") from last_error[index]
-    return responses
+
+    final_responses: list[T] = []
+    for index, response in enumerate(responses):
+        if response is None:
+            raise ParallelExecutionError("all workers failed") from last_error[index]
+        final_responses.append(response)
+    return final_responses
 
 
 async def run_parallel_all_async(
