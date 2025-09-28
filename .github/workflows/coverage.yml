@@ -1,0 +1,98 @@
+name: Coverage
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.6.0
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: python -m pip install -r projects/04-llm-adapter-shadow/requirements.txt
+
+      - name: Validate generated spec JSON
+        run: npm run spec:validate
+
+      - name: Generate Playwright tests
+        run: npm run e2e:gen
+
+      - name: Execute Node test suite
+        run: bash scripts/run-node-suite.sh
+
+      - name: Ingest JUnit results into flaky store
+        run: |
+          node projects/03-ci-flaky/scripts/flaky.mjs parse \
+            --input junit-results.xml \
+            --run-id gh_${{ github.run_id }} \
+            --branch "${{ github.ref_name }}" \
+            --commit "${{ github.sha }}" \
+            --workflow coverage \
+            --actor "${{ github.actor }}"
+
+      - name: Analyze flaky history
+        run: npm run ci:analyze -- --input junit-results.xml --run-id gh_${{ github.run_id }}
+
+      - name: Generate flaky issue drafts
+        run: npm run ci:issue -- --input junit-results.xml --run-id gh_${{ github.run_id }}
+
+      - name: Run pytest with coverage reports
+        run: >-
+          pytest --cov=projects/04-llm-adapter-shadow
+          --cov-report=xml:projects/04-llm-adapter-shadow/coverage.xml
+          --cov-report=html:projects/04-llm-adapter-shadow/htmlcov
+          projects/04-llm-adapter-shadow/tests
+
+      - name: Build aggregated CI reports
+        run: node scripts/build-ci-reports.mjs
+
+      - name: Generate QA reliability snapshot
+        run: >-
+          python tools/generate_ci_report.py
+          --runs projects/03-ci-flaky/data/runs.jsonl
+          --flaky projects/03-ci-flaky/out/flaky_rank.csv
+          --out-markdown docs/reports/latest.md
+          --out-json docs/reports/latest.json
+          --index docs/reports/index.md
+
+      - name: Update README QA metrics
+        run: >-
+          python tools/update_readme_metrics.py
+          --readme README.md
+          --source docs/reports/latest.json
+          --report-url https://ryosuke4219.github.io/portfolio/reports/latest.html
+
+      - name: Upload coverage and report artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-and-reports
+          path: |
+            projects/04-llm-adapter-shadow/coverage.xml
+            projects/04-llm-adapter-shadow/htmlcov
+            reports
+            docs/reports/latest.md
+            docs/reports/latest.json
+          if-no-files-found: warn
