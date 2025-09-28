@@ -65,6 +65,7 @@ class _AsyncProbeProvider:
         self._text = text or name
         self.cancelled = False
         self.finished = False
+        self.invocations = 0
         self._failures = list(failures or [])
         self._block = block
 
@@ -75,6 +76,7 @@ class _AsyncProbeProvider:
         return set()
 
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
+        self.invocations += 1
         try:
             if self._failures:
                 raise self._failures.pop(0)
