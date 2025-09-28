@@ -1,7 +1,10 @@
 # .github/workflows/ci.yml
 name: portfolio-ci
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_call:
 
 # 同じブランチで複数実行されたら古い方をキャンセル
 concurrency:
