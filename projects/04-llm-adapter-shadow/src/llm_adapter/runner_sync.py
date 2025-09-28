@@ -19,6 +19,8 @@ from .observability import EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
+    ConsensusQuorumError,
+    ConsensusVote,
     ParallelExecutionError,
     compute_consensus,
     run_parallel_all_sync,
@@ -405,26 +407,52 @@ class Runner:
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
                     raise fatal from None
+                votes: list[ConsensusVote] = []
                 successful: list[
                     tuple[ProviderInvocationResult, ProviderResponse]
-                ] = [
-                    (res, res.response)
-                    for res in invocations
-                    if res.response is not None
-                ]
-                if len(successful) != len(invocations):
+                ] = []
+                for res in invocations:
+                    provider_name = res.provider.name()
+                    if res.response is not None:
+                        successful.append((res, res.response))
+                        votes.append(
+                            ConsensusVote(
+                                provider=provider_name,
+                                response=res.response,
+                            )
+                        )
+                    else:
+                        votes.append(
+                            ConsensusVote(
+                                provider=provider_name,
+                                error=res.error,
+                            )
+                        )
+                if not successful:
                     raise ParallelExecutionError("all workers failed")
-                responses_for_consensus = [response for _, response in successful]
-                consensus = compute_consensus(
-                    responses_for_consensus,
-                    config=self._config.consensus,
-                )
+                try:
+                    consensus = compute_consensus(
+                        votes,
+                        config=self._config.consensus,
+                    )
+                    quorum_error: ConsensusQuorumError | None = None
+                except ConsensusQuorumError as err:
+                    consensus = err.result
+                    quorum_error = err
                 winner_invocation = next(
                     invocation
                     for invocation, response in successful
                     if response is consensus.response
                 )
                 votes_against = consensus.total_voters - consensus.votes - consensus.abstained
+                failure_summaries = [
+                    {
+                        "provider": failure.provider,
+                        "reason": failure.reason,
+                        "error_type": failure.error_type,
+                    }
+                    for failure in consensus.failures
+                ]
                 if event_logger is not None:
                     candidate_summaries = [
                         {
@@ -465,28 +493,42 @@ class Runner:
                                 "judge_score": consensus.judge_score,
                                 "votes": dict(consensus.tally),
                                 "candidate_summaries": candidate_summaries,
+                                "failures": failure_summaries,
+                                "quorum_met": consensus.quorum_met,
                             },
                         )
+                shadow_delta: dict[str, object] = {
+                    "votes_for": consensus.votes,
+                    "votes_total": consensus.total_voters,
+                    "tie_break_applied": consensus.tie_break_applied,
+                    "winner_score": consensus.winner_score,
+                    "rounds": consensus.rounds,
+                    "tie_break_reason": consensus.tie_break_reason,
+                    "tie_breaker_selected": consensus.tie_breaker_selected,
+                    "judge": consensus.judge_name,
+                    "judge_score": consensus.judge_score,
+                    "failures": failure_summaries,
+                    "quorum_met": consensus.quorum_met,
+                }
                 if winner_invocation.shadow_metrics is not None:
                     shadow_payload = winner_invocation.shadow_metrics.payload
                     extra: dict[str, object] = {
-                        "shadow_consensus_delta": {
-                            "votes_for": consensus.votes,
-                            "votes_total": consensus.total_voters,
-                            "tie_break_applied": consensus.tie_break_applied,
-                            "winner_score": consensus.winner_score,
-                            "rounds": consensus.rounds,
-                            "tie_break_reason": consensus.tie_break_reason,
-                            "tie_breaker_selected": consensus.tie_breaker_selected,
-                            "judge": consensus.judge_name,
-                            "judge_score": consensus.judge_score,
-                        }
+                        "shadow_consensus_delta": shadow_delta,
                     }
                     if not shadow_payload.get("shadow_ok", True):
                         error = shadow_payload.get("shadow_error")
                         if error is not None:
                             extra["shadow_consensus_error"] = error
                     winner_invocation.shadow_metrics_extra = extra
+                if not consensus.quorum_met:
+                    for res in invocations:
+                        metrics = res.shadow_metrics
+                        if metrics is not None:
+                            res.shadow_metrics_extra = {
+                                "shadow_consensus_delta": shadow_delta,
+                            }
+                    if quorum_error is not None:
+                        raise quorum_error
                 return consensus.response
         except ParallelExecutionError as exc:
             fatal = self._extract_fatal_error(results)

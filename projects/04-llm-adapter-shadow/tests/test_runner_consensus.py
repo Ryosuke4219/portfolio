@@ -3,7 +3,9 @@ import pytest
 from src.llm_adapter.provider_spi import ProviderResponse, TokenUsage
 from src.llm_adapter.runner_config import ConsensusConfig
 from src.llm_adapter.runner_parallel import (
+    ConsensusQuorumError,
     ConsensusResult,
+    ConsensusVote,
     ParallelExecutionError,
     compute_consensus,
 )
@@ -154,3 +156,25 @@ def test_max_rounds_exhausted_before_judge_round() -> None:
                 max_rounds=2,
             ),
         )
+
+
+def test_consensus_records_failures_and_quorum_error() -> None:
+    votes = [
+        ConsensusVote(provider="ok", response=_response("A", 11)),
+        ConsensusVote(provider="fail", error=RuntimeError("boom")),
+    ]
+    with pytest.raises(ConsensusQuorumError) as excinfo:
+        compute_consensus(
+            votes,
+            config=ConsensusConfig(strategy="majority", quorum=2),
+        )
+    result = excinfo.value.result
+    assert result.quorum_met is False
+    assert result.total_voters == 2
+    assert result.votes == 1
+    assert result.abstained == 0
+    assert len(result.failures) == 1
+    failure = result.failures[0]
+    assert failure.provider == "fail"
+    assert failure.error_type == "RuntimeError"
+    assert "boom" in failure.reason

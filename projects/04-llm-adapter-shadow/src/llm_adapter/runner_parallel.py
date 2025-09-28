@@ -178,6 +178,31 @@ class ConsensusResult:
     judge_name: str | None
     judge_score: float | None
     scores: dict[str, float] | None
+    failures: list["ConsensusFailure"]
+    quorum_met: bool
+
+
+@dataclass(slots=True)
+class ConsensusFailure:
+    provider: str | None
+    reason: str
+    error_type: str | None = None
+
+
+@dataclass(slots=True)
+class ConsensusVote:
+    provider: str | None
+    response: ProviderResponse | None = None
+    error: Exception | None = None
+    abstain: bool = False
+
+
+class ConsensusQuorumError(ParallelExecutionError):
+    """Raised when consensus cannot reach the configured quorum."""
+
+    def __init__(self, result: ConsensusResult) -> None:
+        super().__init__("consensus quorum not reached")
+        self.result = result
 
 
 @dataclass(slots=True)
@@ -349,12 +374,15 @@ def invoke_consensus_judge(
 
 
 def compute_consensus(
-    responses: Iterable[ProviderResponse], *, config: ConsensusConfig | None = None
+    responses: Iterable[ProviderResponse | ConsensusVote], *, config: ConsensusConfig | None = None
 ) -> ConsensusResult:
     """Return the majority response according to ``config``."""
 
-    collected = list(responses)
-    if not collected:
+    votes = [
+        item if isinstance(item, ConsensusVote) else ConsensusVote(provider=None, response=item)
+        for item in responses
+    ]
+    if not votes:
         raise ValueError("responses must not be empty")
     if config is None:
         config = ConsensusConfig()
@@ -363,15 +391,26 @@ def compute_consensus(
     if tie_breaker is not None and tie_breaker not in {"latency", "cost"}:
         raise ValueError(f"unsupported tie_breaker: {config.tie_breaker!r}")
 
+    success_indices = [
+        (index, vote)
+        for index, vote in enumerate(votes)
+        if vote.response is not None and not vote.abstain
+    ]
+    success_responses = [vote.response for _, vote in success_indices if vote.response is not None]
     valid_entries, schema_failures, schema_checked = validate_consensus_schema(
-        collected, config.schema
+        success_responses, config.schema
     )
 
     if not valid_entries:
         raise ParallelExecutionError("all responses failed schema validation")
 
+    mapped_entries = [
+        (success_indices[index][0], response)
+        for index, response in valid_entries
+    ]
+
     candidates: dict[str, _Candidate] = {}
-    for index, response in valid_entries:
+    for index, response in mapped_entries:
         key = response.text.strip()
         candidate = candidates.get(key)
         if candidate is None:
@@ -421,16 +460,24 @@ def compute_consensus(
         raise ParallelExecutionError("consensus tie could not be resolved")
 
     winner = remaining[0]
-    votes = winner.votes
-    quorum = config.quorum or len(valid_entries)
-    if votes < quorum:
-        raise ParallelExecutionError("consensus quorum not reached")
-
-    return ConsensusResult(
+    votes_for_winner = winner.votes
+    quorum = config.quorum or len(mapped_entries)
+    explicit_abstained = sum(1 for vote in votes if vote.abstain)
+    abstained = explicit_abstained + len(success_responses) - len(valid_entries)
+    failure_details = [
+        ConsensusFailure(
+            provider=vote.provider,
+            reason=str(vote.error) if vote.error is not None else "no response",
+            error_type=type(vote.error).__name__ if vote.error is not None else None,
+        )
+        for vote in votes
+        if vote.response is None and not vote.abstain
+    ]
+    result = ConsensusResult(
         response=winner.primary,
-        votes=votes,
+        votes=votes_for_winner,
         tally=tally,
-        total_voters=len(collected),
+        total_voters=len(votes),
         strategy=config.strategy,
         min_votes=config.quorum,
         score_threshold=None,
@@ -439,19 +486,29 @@ def compute_consensus(
         tie_break_reason=tie_break_reason,
         tie_breaker_selected=tie_breaker_selected,
         winner_score=winner_score,
-        abstained=len(collected) - len(valid_entries),
+        abstained=abstained,
         rounds=rounds,
         schema_checked=schema_checked,
         schema_failures=schema_failures,
         judge_name=judge_name,
         judge_score=judge_score,
         scores=score_map,
+        failures=failure_details,
+        quorum_met=votes_for_winner >= quorum,
     )
+
+    if not result.quorum_met:
+        raise ConsensusQuorumError(result)
+
+    return result
 
 
 __all__ = [
     "ParallelExecutionError",
     "ConsensusResult",
+    "ConsensusFailure",
+    "ConsensusVote",
+    "ConsensusQuorumError",
     "invoke_consensus_judge",
     "validate_consensus_schema",
     "compute_consensus",
