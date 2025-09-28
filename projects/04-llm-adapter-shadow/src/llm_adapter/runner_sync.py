@@ -333,7 +333,7 @@ class Runner:
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
-                    raise fatal
+                    raise fatal from None
                 if winner.response is None:
                     raise ParallelExecutionError("all workers failed")
                 return winner.response
@@ -344,7 +344,7 @@ class Runner:
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
-                    raise fatal
+                    raise fatal from None
                 for response in responses:
                     if response.response is None:
                         raise ParallelExecutionError("all workers failed")
@@ -356,7 +356,7 @@ class Runner:
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
-                    raise fatal
+                    raise fatal from None
                 provider_responses = [
                     res.response
                     for res in responses
@@ -371,7 +371,7 @@ class Runner:
         except ParallelExecutionError as exc:
             fatal = self._extract_fatal_error(results)
             if fatal is not None:
-                raise fatal
+                raise fatal from None
             raise exc
         finally:
             self._log_parallel_results(
