@@ -311,8 +311,41 @@ class AsyncRunner:
         else:
             attempt_count = total_providers
 
-            capture_shadow = mode is RunnerMode.CONSENSUS
+            capture_shadow, retry_attempts = mode is RunnerMode.CONSENSUS, 0
 
+            async def _handle_parallel_retry(
+                worker_index: int, attempt_index: int, error: BaseException
+            ) -> float | None:
+                nonlocal retry_attempts, attempt_count
+                provider, _ = providers[worker_index]
+                next_attempt_total = total_providers + retry_attempts + 1
+                delay: float | None = None
+                if isinstance(error, RateLimitError):
+                    delay = max(self._config.backoff.rate_limit_sleep_s, 0.0)
+                elif isinstance(error, TimeoutError):
+                    if not self._config.backoff.timeout_next_provider:
+                        delay = 0.0
+                elif isinstance(error, RetryableError):
+                    if not self._config.backoff.retryable_next_provider:
+                        delay = 0.0
+                if delay is None or (
+                    (limit := self._config.max_attempts) is not None
+                    and next_attempt_total > limit
+                ):
+                    return None
+                retry_attempts, attempt_count = retry_attempts + 1, next_attempt_total
+                if event_logger is not None:
+                    event_logger.emit(
+                        "retry",
+                        {
+                            "request_fingerprint": request_fingerprint,
+                            "provider": provider.name(),
+                            "attempt": attempt_index,
+                            "retry_attempt": retry_attempts,
+                            "error_type": type(error).__name__,
+                        },
+                    )
+                return delay
             def _build_worker(
                 provider: ProviderSPI | AsyncProviderSPI,
                 async_provider: AsyncProviderSPI,
@@ -352,6 +385,8 @@ class AsyncRunner:
                     ) = await run_parallel_any_async(
                         workers,
                         max_concurrency=self._config.max_concurrency,
+                        max_attempts=self._config.max_attempts,
+                        on_retry=_handle_parallel_retry,
                     )
                     usage = response.token_usage
                     tokens_in = usage.prompt

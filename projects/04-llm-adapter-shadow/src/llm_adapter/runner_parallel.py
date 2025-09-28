@@ -77,31 +77,67 @@ def run_parallel_any_sync(
 
 
 async def run_parallel_any_async(
-    workers: Sequence[AsyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[AsyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    max_attempts: int | None = None,
+    on_retry: Callable[[int, int, BaseException], Awaitable[float | None] | float | None]
+    | None = None,
 ) -> T:
-    """Async variant of :func:`run_parallel_any_sync`."""
+    """Async variant of :func:`run_parallel_any_sync` with retry support."""
 
     if not workers:
         raise ValueError("workers must not be empty")
     limit = _normalize_concurrency(len(workers), max_concurrency)
     semaphore = asyncio.Semaphore(limit)
     winner: asyncio.Future[T] = asyncio.get_running_loop().create_future()
-    errors: list[BaseException] = []
+    attempts_lock = asyncio.Lock()
+    failure_lock = asyncio.Lock()
+    attempts_used = failures = 0
 
-    async def runner(worker: AsyncWorker[T]) -> None:
-        nonlocal errors
-        try:
-            async with semaphore:
-                result = await worker()
-        except BaseException as exc:  # noqa: BLE001
-            errors.append(exc)
-            if len(errors) == len(workers) and not winner.done():
+    async def _reserve_attempt() -> bool:
+        nonlocal attempts_used
+        async with attempts_lock:
+            if max_attempts is not None and attempts_used >= max_attempts:
+                return False
+            attempts_used += 1
+            return True
+
+    async def _record_failure(error: BaseException | None) -> None:
+        nonlocal failures
+        async with failure_lock:
+            failures += 1
+            if failures == len(workers) and not winner.done():
                 winner.set_exception(ParallelExecutionError("all workers failed"))
-            return
-        if not winner.done():
-            winner.set_result(result)
 
-    tasks = [asyncio.create_task(runner(worker)) for worker in workers]
+    async def runner(index: int, worker: AsyncWorker[T]) -> None:
+        attempt = 0
+        while await _reserve_attempt():
+            attempt += 1
+            try:
+                async with semaphore:
+                    result = await worker()
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:  # noqa: BLE001
+                delay: float | None = None
+                if on_retry is not None:
+                    maybe_delay = on_retry(index, attempt, exc)
+                    if asyncio.iscoroutine(maybe_delay):
+                        maybe_delay = await cast(Awaitable[float | None], maybe_delay)
+                    delay = cast(float | None, maybe_delay)
+                if delay is not None and delay >= 0:
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                    continue
+                await _record_failure(exc)
+                return
+            if not winner.done():
+                winner.set_result(result)
+            return
+        await _record_failure(RuntimeError("max attempts exhausted"))
+
+    tasks = [asyncio.create_task(runner(idx, worker)) for idx, worker in enumerate(workers)]
     try:
         return await winner
     finally:
@@ -210,7 +246,7 @@ def _extract_score(response: ProviderResponse) -> float:
     raw = response.raw
     if isinstance(raw, Mapping):
         value = raw.get("score")
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
     return 0.0
 
