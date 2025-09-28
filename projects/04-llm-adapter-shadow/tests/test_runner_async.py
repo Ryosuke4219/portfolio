@@ -83,6 +83,8 @@ class _AsyncProbeProvider:
             if self._block:
                 await asyncio.Event().wait()
                 latency_ms = 0
+            elif self._delay <= 0:
+                latency_ms = 0
             else:
                 await asyncio.sleep(self._delay)
                 latency_ms = int(self._delay * 1000)
