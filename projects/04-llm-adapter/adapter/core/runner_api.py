@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
@@ -16,6 +17,7 @@ from .config import (
     load_provider_configs,
 )
 from .datasets import load_golden_tasks
+from .runners import CompareRunner
 
 Mode = Literal["sequential", "parallel-any", "parallel-all", "consensus"]
 
@@ -130,8 +132,6 @@ def run_compare(
     budget_book = load_budget_book(budgets_path)
     budget_manager = BudgetManager(budget_book)
 
-    from .runners import CompareRunner
-
     runner = CompareRunner(
         provider_configs,
         tasks,
@@ -140,7 +140,13 @@ def run_compare(
         allow_overrun=allow_overrun,
         runner_config=config,
     )
-    results = runner.run(repeat=max(repeat, 1), config=config)
+    run_kwargs: dict[str, object] = {"repeat": max(repeat, 1)}
+    run_signature = inspect.signature(runner.run)
+    if "config" in run_signature.parameters:
+        run_kwargs["config"] = config
+    else:
+        run_kwargs["mode"] = config.mode
+    results = runner.run(**run_kwargs)
     logging.getLogger(__name__).info("%d 件の試行を記録しました", len(results))
     return 0
 
