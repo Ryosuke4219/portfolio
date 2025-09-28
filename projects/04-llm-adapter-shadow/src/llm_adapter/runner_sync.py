@@ -350,15 +350,55 @@ class Runner:
         results: list[ProviderInvocationResult | None] = [None] * total_providers
 
         capture_shadow = mode is RunnerMode.CONSENSUS
+        retry_attempts = 0
+        attempt_labels = [index for index in range(1, total_providers + 1)]
+
+        def handle_parallel_retry(
+            worker_index: int, attempt_index: int, error: BaseException
+        ) -> tuple[int, float] | None:
+            nonlocal retry_attempts
+            provider = self.providers[worker_index]
+            next_attempt_total = total_providers + retry_attempts + 1
+            delay: float | None = None
+            if isinstance(error, RateLimitError):
+                delay = max(self._config.backoff.rate_limit_sleep_s, 0.0)
+            elif isinstance(error, TimeoutError):
+                if not self._config.backoff.timeout_next_provider:
+                    delay = 0.0
+            elif isinstance(error, RetryableError):
+                if not self._config.backoff.retryable_next_provider:
+                    delay = 0.0
+            if delay is None or (
+                (limit := self._config.max_attempts) is not None
+                and next_attempt_total > limit
+            ):
+                return None
+            retry_attempt = retry_attempts + 1
+            retry_attempts = retry_attempt
+            attempt_labels[worker_index] = next_attempt_total
+            if event_logger is not None:
+                event_logger.emit(
+                    "retry",
+                    {
+                        "request_fingerprint": request_fingerprint,
+                        "provider": provider.name(),
+                        "attempt": attempt_index,
+                        "retry_attempt": retry_attempt,
+                        "next_attempt": next_attempt_total,
+                        "error_type": type(error).__name__,
+                    },
+                )
+            return next_attempt_total, delay
 
         def make_worker(
             index: int, provider: ProviderSPI
         ) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
+                attempt_index = attempt_labels[index]
                 result = self._invoke_provider_sync(
                     provider,
                     request,
-                    attempt=index,
+                    attempt=attempt_index,
                     total_providers=total_providers,
                     event_logger=event_logger,
                     request_fingerprint=request_fingerprint,
@@ -367,7 +407,7 @@ class Runner:
                     metrics_path=metrics_path_str,
                     capture_shadow_metrics=capture_shadow,
                 )
-                results[index - 1] = result
+                results[index] = result
                 if result.response is None:
                     error = result.error
                     if error is not None:
@@ -381,7 +421,7 @@ class Runner:
 
         workers = [
             make_worker(index, provider)
-            for index, provider in enumerate(self.providers, start=1)
+            for index, provider in enumerate(self.providers)
         ]
 
         skip_run_metric: tuple[ProviderInvocationResult, ...] | None = None
@@ -427,7 +467,10 @@ class Runner:
 
             if mode is RunnerMode.PARALLEL_ALL:
                 invocations = run_parallel_all_sync(
-                    workers, max_concurrency=self._config.max_concurrency
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                    max_attempts=self._config.max_attempts,
+                    on_retry=handle_parallel_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
@@ -442,7 +485,10 @@ class Runner:
 
             if mode is RunnerMode.CONSENSUS:
                 invocations = run_parallel_all_sync(
-                    workers, max_concurrency=self._config.max_concurrency
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                    max_attempts=self._config.max_attempts,
+                    on_retry=handle_parallel_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
