@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from typing import Any, Protocol, cast
 
 from .utils import ensure_str_list
@@ -81,26 +81,27 @@ class TokenUsage:
 class ProviderResponse:
     text: str
     latency_ms: int
-    token_usage: TokenUsage | None = None
+    token_usage: InitVar[TokenUsage | None] = None
     model: str | None = None
     finish_reason: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
     raw: Any | None = None
+    _token_usage: TokenUsage = field(init=False, repr=False, compare=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, token_usage: TokenUsage | None) -> None:
         prompt_tokens = int(self.tokens_in or 0)
         completion_tokens = int(self.tokens_out or 0)
-        if self.token_usage is not None:
-            prompt_tokens = self.token_usage.prompt
-            completion_tokens = self.token_usage.completion
-        else:
-            self.token_usage = TokenUsage(
-                prompt=prompt_tokens,
-                completion=completion_tokens,
-            )
-        self.tokens_in = prompt_tokens
-        self.tokens_out = completion_tokens
+        usage = token_usage or TokenUsage(
+            prompt=prompt_tokens,
+            completion=completion_tokens,
+        )
+        self._token_usage = usage
+        self.tokens_in = usage.prompt
+        self.tokens_out = usage.completion
+
+    def _get_token_usage(self) -> TokenUsage:
+        return self._token_usage
 
     # 互換エイリアス
     @property
@@ -126,6 +127,9 @@ class AsyncProviderSPI(Protocol):
     def name(self) -> str: ...
     def capabilities(self) -> set[str]: ...
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse: ...
+
+
+cast(Any, ProviderResponse).token_usage = property(ProviderResponse._get_token_usage)
 
 
 class _AsyncProviderAdapter(AsyncProviderSPI):
