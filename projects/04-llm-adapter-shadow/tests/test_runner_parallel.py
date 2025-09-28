@@ -230,7 +230,9 @@ def test_parallel_any_with_shadow_logs(tmp_path: Path, monkeypatch: pytest.Monke
     assert shadow_event["shadow_error"] == "TimeoutError"
 
 
-def test_runner_parallel_any_returns_success_after_fast_failure() -> None:
+def test_runner_parallel_any_returns_success_after_fast_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _FailingProvider:
         def __init__(self, name: str) -> None:
             self._name = name
@@ -257,6 +259,25 @@ def test_runner_parallel_any_returns_success_after_fast_failure() -> None:
         _FailingProvider("fail-fast"),
         _SlowProvider("slow-success", "slow-ok", latency_ms=5, delay=0.05),
     ]
+    cost_calls: list[tuple[object, int, int]] = []
+
+    def _record_cost(provider: object, tokens_in: int, tokens_out: int) -> float:
+        cost_calls.append((provider, tokens_in, tokens_out))
+        return 0.0
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.estimate_cost", _record_cost, raising=False
+    )
+    run_metric_calls: list[dict[str, Any]] = []
+
+    def _record_run_metric(
+        event_logger: object, *, status: str, **kwargs: Any
+    ) -> None:
+        run_metric_calls.append({"status": status, **kwargs})
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.log_run_metric", _record_run_metric, raising=False
+    )
     runner = Runner(
         providers,
         config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=1),
@@ -266,6 +287,13 @@ def test_runner_parallel_any_returns_success_after_fast_failure() -> None:
     response = runner.run(request)
 
     assert response.text == "slow-ok"
+    success_metrics = [call for call in run_metric_calls if call["status"] == "ok"]
+    assert len(success_metrics) == 1
+    assert success_metrics[0]["attempts"] == 2
+    assert len(cost_calls) == 1
+    cost_provider, cost_tokens_in, cost_tokens_out = cost_calls[0]
+    assert cost_provider is providers[1]
+    assert (cost_tokens_in, cost_tokens_out) == (1, 1)
 
 
 def test_runner_parallel_any_retries_until_success(
