@@ -85,20 +85,9 @@ class CompareRunner:
         mode: str,
     ) -> Tuple[RunMetrics, str, Optional[str]]:
         prompt = task.render_prompt()
-        start = perf_counter()
-        status = "ok"
-        failure_kind: Optional[str] = None
-        error_message: Optional[str] = None
-        response: Optional[ProviderResponse] = None
-        try:
-            response = provider.generate(prompt)
-        except Exception as exc:  # pragma: no cover - 実プロバイダ利用時の防御
-            status = "error"
-            failure_kind = "provider_error"
-            error_message = str(exc)
-            latency_ms = int((perf_counter() - start) * 1000)
-            response = ProviderResponse(output_text="", input_tokens=len(prompt.split()), output_tokens=0, latency_ms=latency_ms)
-        latency_ms = response.latency_ms
+        response, status, failure_kind, error_message, latency_ms = self._invoke_provider(
+            provider, prompt
+        )
         input_tokens = response.input_tokens
         output_tokens = response.output_tokens
         if (
@@ -109,48 +98,15 @@ class CompareRunner:
             status = "error"
             failure_kind = "timeout"
         cost_usd = estimate_cost(provider_config, input_tokens, output_tokens)
-        run_budget_limit = self.budget_manager.run_budget(provider_config.provider)
-        run_budget_hit = run_budget_limit > 0 and cost_usd > run_budget_limit
-        daily_stop_required = not self.budget_manager.notify_cost(
-            provider_config.provider, cost_usd
-        )
-        budget_snapshot = BudgetSnapshot(
-            run_budget_usd=run_budget_limit,
-            hit_stop=run_budget_hit or daily_stop_required,
-        )
-        run_reason: Optional[str] = None
-        if run_budget_hit:
-            run_reason = (
-                f"provider={provider_config.provider} run budget {run_budget_limit:.4f} USD exceeded "
-                f"(cost={cost_usd:.4f} USD)"
+        budget_snapshot, stop_reason, status, failure_kind, error_message = (
+            self._evaluate_budget(
+                provider_config,
+                cost_usd,
+                status,
+                failure_kind,
+                error_message,
             )
-        daily_reason: Optional[str] = None
-        if daily_stop_required:
-            spent = self.budget_manager.spent_today(provider_config.provider)
-            daily_limit = self.budget_manager.daily_budget(provider_config.provider)
-            daily_reason = (
-                f"provider={provider_config.provider} daily budget {daily_limit:.4f} USD exceeded "
-                f"(spent={spent:.4f} USD)"
-            )
-        stop_reason: Optional[str] = None
-        if not self.allow_overrun:
-            if daily_reason:
-                stop_reason = daily_reason
-            elif self.budget_manager.should_stop_run(provider_config.provider, cost_usd):
-                stop_reason = run_reason
-        budget_messages = [msg for msg in (run_reason, daily_reason) if msg]
-        if budget_messages:
-            if status == "ok":
-                status = "error"
-            if failure_kind is None:
-                failure_kind = "guard_violation"
-            joined = " | ".join(budget_messages)
-            if error_message:
-                error_message = f"{error_message} | {joined}"
-            else:
-                error_message = joined
-            if self.allow_overrun and stop_reason is None:
-                LOGGER.warning("予算超過を許容 (--allow-overrun): %s", joined)
+        )
         output_text = response.output_text
         if (output_text is None or not output_text.strip()) and status == "ok":
             status = "error"
@@ -193,6 +149,81 @@ class CompareRunner:
             ci_meta=ci_meta,
         )
         return run_metrics, output_text or "", stop_reason
+
+    def _invoke_provider(
+        self, provider: BaseProvider, prompt: str
+    ) -> Tuple[ProviderResponse, str, Optional[str], Optional[str], int]:
+        start = perf_counter()
+        status = "ok"
+        failure_kind: Optional[str] = None
+        error_message: Optional[str] = None
+        try:
+            response = provider.generate(prompt)
+        except Exception as exc:  # pragma: no cover - 実プロバイダ利用時の防御
+            status = "error"
+            failure_kind = "provider_error"
+            error_message = str(exc)
+            latency_ms = int((perf_counter() - start) * 1000)
+            response = ProviderResponse(
+                output_text="",
+                input_tokens=len(prompt.split()),
+                output_tokens=0,
+                latency_ms=latency_ms,
+            )
+            return response, status, failure_kind, error_message, latency_ms
+        return response, status, failure_kind, error_message, response.latency_ms
+
+    def _evaluate_budget(
+        self,
+        provider_config: ProviderConfig,
+        cost_usd: float,
+        status: str,
+        failure_kind: Optional[str],
+        error_message: Optional[str],
+    ) -> Tuple[BudgetSnapshot, Optional[str], str, Optional[str], Optional[str]]:
+        run_budget_limit = self.budget_manager.run_budget(provider_config.provider)
+        run_budget_hit = run_budget_limit > 0 and cost_usd > run_budget_limit
+        daily_stop_required = not self.budget_manager.notify_cost(
+            provider_config.provider, cost_usd
+        )
+        budget_snapshot = BudgetSnapshot(
+            run_budget_usd=run_budget_limit,
+            hit_stop=run_budget_hit or daily_stop_required,
+        )
+        run_reason: Optional[str] = None
+        if run_budget_hit:
+            run_reason = (
+                f"provider={provider_config.provider} run budget {run_budget_limit:.4f} USD exceeded "
+                f"(cost={cost_usd:.4f} USD)"
+            )
+        daily_reason: Optional[str] = None
+        if daily_stop_required:
+            spent = self.budget_manager.spent_today(provider_config.provider)
+            daily_limit = self.budget_manager.daily_budget(provider_config.provider)
+            daily_reason = (
+                f"provider={provider_config.provider} daily budget {daily_limit:.4f} USD exceeded "
+                f"(spent={spent:.4f} USD)"
+            )
+        stop_reason: Optional[str] = None
+        if not self.allow_overrun:
+            if daily_reason:
+                stop_reason = daily_reason
+            elif self.budget_manager.should_stop_run(provider_config.provider, cost_usd):
+                stop_reason = run_reason
+        budget_messages = [msg for msg in (run_reason, daily_reason) if msg]
+        if budget_messages:
+            if status == "ok":
+                status = "error"
+            if failure_kind is None:
+                failure_kind = "guard_violation"
+            joined = " | ".join(budget_messages)
+            if error_message:
+                error_message = f"{error_message} | {joined}"
+            else:
+                error_message = joined
+            if self.allow_overrun and stop_reason is None:
+                LOGGER.warning("予算超過を許容 (--allow-overrun): %s", joined)
+        return budget_snapshot, stop_reason, status, failure_kind, error_message
 
     def _append_metric(self, metrics: RunMetrics) -> None:
         with self.metrics_path.open("a", encoding="utf-8") as fp:
