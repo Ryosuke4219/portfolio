@@ -21,4 +21,4 @@ jobs:
           pip install -r projects/04-llm-adapter-shadow/requirements.txt
       - name: Run tests
         run: |
-          pytest -q projects/04-llm-adapter-shadow/tests
+          pytest -q --asyncio-mode=strict projects/04-llm-adapter-shadow/tests
