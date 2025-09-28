@@ -36,9 +36,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=["parallel", "serial"],
-        default="parallel",
-        help="実行モード",
+        choices=["sequential", "parallel-any", "parallel-all", "consensus"],
+        default="sequential",
+        help="比較実行モード",
     )
     parser.add_argument(
         "--budgets",
@@ -59,6 +59,46 @@ def _parse_args() -> argparse.Namespace:
         "--allow-overrun",
         action="store_true",
         help="予算超過時でも実行を継続する",
+    )
+    parser.add_argument(
+        "--aggregate",
+        default=None,
+        help="複数応答の集約ストラテジ (例: majority, judge)",
+    )
+    parser.add_argument(
+        "--quorum",
+        type=int,
+        default=None,
+        help="合意に必要な最小一致数 (consensus モード向け)",
+    )
+    parser.add_argument(
+        "--tie-breaker",
+        dest="tie_breaker",
+        default=None,
+        help="合意不能時のタイブレーク手法",
+    )
+    parser.add_argument(
+        "--schema",
+        default=None,
+        help="構造化出力バリデーション用スキーマ JSON",
+    )
+    parser.add_argument(
+        "--judge",
+        default=None,
+        help="判定プロバイダ設定ファイル (aggregate=judge など)",
+    )
+    parser.add_argument(
+        "--max-concurrency",
+        dest="max_concurrency",
+        type=int,
+        default=None,
+        help="プロバイダ呼び出しの最大並列数",
+    )
+    parser.add_argument(
+        "--rpm",
+        type=int,
+        default=None,
+        help="1 分あたりの呼び出し上限",
     )
     return parser.parse_args()
 
@@ -83,6 +123,13 @@ def main() -> int:
         else runner_api.default_metrics_path()
     )
 
+    schema_path = Path(args.schema).expanduser().resolve() if args.schema else None
+    max_concurrency = (
+        args.max_concurrency if args.max_concurrency and args.max_concurrency > 0 else None
+    )
+    rpm = args.rpm if args.rpm and args.rpm > 0 else None
+    quorum = args.quorum if args.quorum and args.quorum > 0 else None
+
     return runner_api.run_compare(
         provider_paths,
         prompt_path,
@@ -92,6 +139,13 @@ def main() -> int:
         mode=args.mode,
         allow_overrun=args.allow_overrun,
         log_level=args.log_level,
+        aggregate=args.aggregate,
+        quorum=quorum,
+        tie_breaker=args.tie_breaker,
+        schema=schema_path,
+        judge=args.judge,
+        max_concurrency=max_concurrency,
+        rpm=rpm,
     )
 
 

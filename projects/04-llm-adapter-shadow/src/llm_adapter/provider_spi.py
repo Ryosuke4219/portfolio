@@ -87,7 +87,7 @@ class ProviderResponse:
     tokens_in: int | None = None
     tokens_out: int | None = None
     raw: Any | None = None
-    _token_usage: TokenUsage = field(init=False, repr=False)
+    _token_usage: TokenUsage = field(init=False, repr=False, compare=False)
 
     def __init__(
         self,
@@ -100,18 +100,23 @@ class ProviderResponse:
         tokens_out: int | None = None,
         raw: Any | None = None,
     ) -> None:
+        # required
         self.text = text
         self.latency_ms = latency_ms
+        # optionals
         self.model = model
         self.finish_reason = finish_reason
+        self.raw = raw
+        # 初期トークン値（token_usage 未指定時のフォールバック元）
         self.tokens_in = tokens_in
         self.tokens_out = tokens_out
-        self.raw = raw
+        # token_usage 正規化（指定優先、無指定なら tokens_in/out から推定）
         if token_usage is None:
             token_usage = TokenUsage(
                 prompt=int(self.tokens_in or 0),
                 completion=int(self.tokens_out or 0),
             )
+        # setter を経由して同期させる
         self.token_usage = token_usage
 
     # 互換エイリアス
@@ -123,8 +128,8 @@ class ProviderResponse:
     def input_tokens(self) -> int:
         if not SUPPRESS_TOKEN_USAGE_DEPRECATION:
             warnings.warn(
-                "ProviderResponse.input_tokens は非推奨です。"
-                " ProviderResponse.token_usage.prompt を利用してください。",
+                "ProviderResponse.input_tokens is deprecated. "
+                "Use ProviderResponse.token_usage.prompt instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -134,8 +139,8 @@ class ProviderResponse:
     def output_tokens(self) -> int:
         if not SUPPRESS_TOKEN_USAGE_DEPRECATION:
             warnings.warn(
-                "ProviderResponse.output_tokens は非推奨です。"
-                " ProviderResponse.token_usage.completion を利用してください。",
+                "ProviderResponse.output_tokens is deprecated. "
+                "Use ProviderResponse.token_usage.completion instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
