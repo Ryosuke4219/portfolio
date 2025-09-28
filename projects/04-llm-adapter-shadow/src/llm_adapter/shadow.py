@@ -52,7 +52,8 @@ def _to_path_str(path: MetricsPath) -> str | None:
 
 
 def _tokens_total(res: ProviderResponse) -> int:
-    return res.input_tokens + res.output_tokens
+    usage = res.token_usage
+    return usage.total
 
 
 def run_with_shadow(

@@ -194,6 +194,7 @@ class AsyncRunner:
                 allow_private_model=True,
             )
             raise
+        token_usage = response.token_usage
         log_provider_call(
             event_logger,
             request_fingerprint=request_fingerprint,
@@ -203,8 +204,8 @@ class AsyncRunner:
             total_providers=total_providers,
             status="ok",
             latency_ms=response.latency_ms,
-            tokens_in=response.input_tokens,
-            tokens_out=response.output_tokens,
+            tokens_in=token_usage.prompt,
+            tokens_out=token_usage.completion,
             error=None,
             metadata=metadata,
             shadow_used=shadow is not None,
@@ -282,8 +283,9 @@ class AsyncRunner:
                     last_err = err
                     raise
                 else:
-                    tokens_in = response.input_tokens
-                    tokens_out = response.output_tokens
+                    usage = response.token_usage
+                    tokens_in = usage.prompt
+                    tokens_out = usage.completion
                     cost_usd = estimate_cost(provider, tokens_in, tokens_out)
                     log_run_metric(
                         event_logger,
@@ -346,8 +348,9 @@ class AsyncRunner:
                         workers,
                         max_concurrency=self._config.max_concurrency,
                     )
-                    tokens_in = response.input_tokens
-                    tokens_out = response.output_tokens
+                    usage = response.token_usage
+                    tokens_in = usage.prompt
+                    tokens_out = usage.completion
                     cost_usd = estimate_cost(provider, tokens_in, tokens_out)
                     log_run_metric(
                         event_logger,
@@ -442,8 +445,9 @@ class AsyncRunner:
                                 response,
                                 shadow_metrics,
                             ) = winner_entry
-                            tokens_in = response.input_tokens
-                            tokens_out = response.output_tokens
+                            usage = response.token_usage
+                            tokens_in = usage.prompt
+                            tokens_out = usage.completion
                             cost_usd = estimate_cost(provider, tokens_in, tokens_out)
                             log_run_metric(
                                 event_logger,
@@ -481,8 +485,9 @@ class AsyncRunner:
                             last_err = ParallelExecutionError("consensus resolution failed")
                     else:
                         _attempt_index, provider, response, _metrics = results[0]
-                        tokens_in = response.input_tokens
-                        tokens_out = response.output_tokens
+                        usage = response.token_usage
+                        tokens_in = usage.prompt
+                        tokens_out = usage.completion
                         cost_usd = estimate_cost(provider, tokens_in, tokens_out)
                         log_run_metric(
                             event_logger,
