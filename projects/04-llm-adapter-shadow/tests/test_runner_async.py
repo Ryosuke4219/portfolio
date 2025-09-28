@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 import pytest
 from _pytest.recwarn import WarningsRecorder
@@ -417,6 +417,26 @@ def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
     assert slow.finished is True
 
 
+def test_async_parallel_any_rate_limit_does_not_retry() -> None:
+    providers = [
+        _AsyncProbeProvider("rl_a", delay=0.0, failures=[RateLimitError("a")]),
+        _AsyncProbeProvider("rl_b", delay=0.0, failures=[RateLimitError("b")]),
+    ]
+    runner = AsyncRunner(
+        providers,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="rl", model="model-parallel-any-rl")
+
+    async def _execute() -> None:
+        with pytest.raises(ParallelExecutionError):
+            await runner.run_async(request)
+
+    asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
+
+    assert [provider.invocations for provider in providers] == [1, 1]
+
+
 def test_async_consensus_quorum_failure() -> None:
     provider_a = _AsyncProbeProvider("pa", delay=0.01, text="A")
     provider_b = _AsyncProbeProvider("pb", delay=0.01, text="B")
@@ -564,3 +584,23 @@ def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
     assert result.primary_response.text == "fast:gather"
     assert [(p.cancelled, p.finished) for p in (fast, slow, ready)] == [(False, True)] * 3
     assert logger_all.of_type("retry") == []
+
+
+def test_async_parallel_all_rate_limit_does_not_retry() -> None:
+    providers = [
+        _AsyncProbeProvider("rl_all_a", delay=0.0, failures=[RateLimitError("a")]),
+        _AsyncProbeProvider("rl_all_b", delay=0.0, failures=[RateLimitError("b")]),
+    ]
+    runner = AsyncRunner(
+        providers,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="rl-all", model="model-parallel-all-rl")
+
+    async def _execute() -> None:
+        with pytest.raises(RateLimitError):
+            await runner.run_async(request)
+
+    asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
+
+    assert [provider.invocations for provider in providers] == [1, 1]
