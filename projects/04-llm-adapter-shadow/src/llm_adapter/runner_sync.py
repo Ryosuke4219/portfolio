@@ -394,13 +394,13 @@ class Runner:
             def worker() -> ProviderInvocationResult:
                 next_attempt = reserve_attempt()
                 if next_attempt is None:
-                    error = ParallelExecutionError("max attempts exhausted")
+                    failure = ParallelExecutionError("max attempts exhausted")
                     result = ProviderInvocationResult(
                         provider=provider,
                         attempt=index,
                         total_providers=total_providers,
                         response=None,
-                        error=error,
+                        error=failure,
                         latency_ms=None,
                         tokens_in=None,
                         tokens_out=None,
@@ -408,7 +408,7 @@ class Runner:
                         shadow_metrics_extra=None,
                     )
                     results[index - 1] = result
-                    raise error
+                    raise failure
                 attempt_index = next_attempt
                 while True:
                     result = self._invoke_provider_sync(
@@ -426,16 +426,16 @@ class Runner:
                     results[index - 1] = result
                     if result.response is not None:
                         return result
-                    error = result.error
-                    if error is None:
-                        error = ParallelExecutionError("provider returned no response")
-                        result.error = error
-                    delay = compute_retry_delay(error) if allow_retry else None
+                    err = result.error
+                    if err is None:
+                        err = ParallelExecutionError("provider returned no response")
+                        result.error = err
+                    delay = compute_retry_delay(err) if allow_retry else None
                     if delay is None:
-                        raise error
+                        raise err
                     next_attempt = reserve_attempt()
                     if next_attempt is None:
-                        raise error
+                        raise err
                     retry_attempt = record_retry_event()
                     if event_logger is not None:
                         event_logger.emit(
@@ -445,7 +445,7 @@ class Runner:
                                 "provider": provider.name(),
                                 "attempt": attempt_index,
                                 "retry_attempt": retry_attempt,
-                                "error_type": type(error).__name__,
+                                "error_type": type(err).__name__,
                             },
                         )
                     if delay > 0:
