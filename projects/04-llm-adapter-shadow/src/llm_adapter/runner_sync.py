@@ -364,6 +364,13 @@ class Runner:
                     capture_shadow_metrics=capture_shadow,
                 )
                 results[index - 1] = result
+                if result.response is None:
+                    error = result.error
+                    if error is not None:
+                        raise error
+                    error = ParallelExecutionError("provider returned no response")
+                    result.error = error
+                    raise error
                 return result
 
             return worker
