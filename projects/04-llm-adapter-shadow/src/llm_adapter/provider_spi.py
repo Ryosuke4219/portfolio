@@ -4,7 +4,7 @@ import asyncio
 import inspect
 import warnings
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
 from .utils import ensure_str_list
@@ -78,11 +78,10 @@ class TokenUsage:
         return self.prompt + self.completion
 
 
-@dataclass
+@dataclass(init=False)
 class ProviderResponse:
     text: str
     latency_ms: int
-    token_usage: InitVar[TokenUsage | None] = None
     model: str | None = None
     finish_reason: str | None = None
     tokens_in: int | None = None
@@ -90,20 +89,30 @@ class ProviderResponse:
     raw: Any | None = None
     _token_usage: TokenUsage = field(init=False, repr=False)
 
-    def __post_init__(self, token_usage: TokenUsage | None) -> None:
-        prompt_tokens = int(self.tokens_in or 0)
-        completion_tokens = int(self.tokens_out or 0)
-        if token_usage is not None:
-            prompt_tokens = token_usage.prompt
-            completion_tokens = token_usage.completion
-            self._token_usage = token_usage
-        else:
-            self._token_usage = TokenUsage(
-                prompt=prompt_tokens,
-                completion=completion_tokens,
+    def __init__(
+        self,
+        text: str,
+        latency_ms: int,
+        token_usage: TokenUsage | None = None,
+        model: str | None = None,
+        finish_reason: str | None = None,
+        tokens_in: int | None = None,
+        tokens_out: int | None = None,
+        raw: Any | None = None,
+    ) -> None:
+        self.text = text
+        self.latency_ms = latency_ms
+        self.model = model
+        self.finish_reason = finish_reason
+        self.tokens_in = tokens_in
+        self.tokens_out = tokens_out
+        self.raw = raw
+        if token_usage is None:
+            token_usage = TokenUsage(
+                prompt=int(self.tokens_in or 0),
+                completion=int(self.tokens_out or 0),
             )
-        self.tokens_in = prompt_tokens
-        self.tokens_out = completion_tokens
+        self.token_usage = token_usage
 
     # 互換エイリアス
     @property
@@ -132,10 +141,12 @@ class ProviderResponse:
             )
         return self.tokens_out or 0
 
-    def _get_token_usage(self) -> TokenUsage:
+    @property
+    def token_usage(self) -> TokenUsage:
         return self._token_usage
 
-    def _set_token_usage(self, value: TokenUsage | None) -> None:
+    @token_usage.setter
+    def token_usage(self, value: TokenUsage | None) -> None:
         if value is None:
             value = TokenUsage(
                 prompt=int(self.tokens_in or 0),
@@ -159,13 +170,6 @@ class AsyncProviderSPI(Protocol):
     def name(self) -> str: ...
     def capabilities(self) -> set[str]: ...
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse: ...
-
-
-setattr(
-    ProviderResponse,
-    "token_usage",
-    property(ProviderResponse._get_token_usage, ProviderResponse._set_token_usage),
-)
 
 
 class _AsyncProviderAdapter(AsyncProviderSPI):
