@@ -26,7 +26,7 @@ from .provider_spi import (
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
     ParallelExecutionError,
-    compute_consensus,
+    resolve_consensus,
     run_parallel_all_async,
     run_parallel_any_async,
 )
@@ -343,7 +343,7 @@ class AsyncRunner:
                 else:
                     if mode is RunnerMode.CONSENSUS:
                         try:
-                            consensus = compute_consensus(
+                            consensus = resolve_consensus(
                                 [response for _, _, response in results],
                                 config=self._config.consensus,
                             )
