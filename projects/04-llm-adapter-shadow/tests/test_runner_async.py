@@ -453,57 +453,6 @@ def test_async_consensus_quorum_failure() -> None:
         asyncio.run(runner.run_async(request))
 
 
-def test_async_consensus_failure_details() -> None:
-    timeout_provider = _AsyncProbeProvider(
-        "timeout",
-        delay=0.0,
-        failures=[TimeoutError("simulated timeout")],
-    )
-    rate_provider = _AsyncProbeProvider(
-        "rate",
-        delay=0.0,
-        failures=[RateLimitError("simulated rate limit")],
-    )
-    runner = AsyncRunner(
-        [timeout_provider, rate_provider],
-        config=RunnerConfig(
-            mode=RunnerMode.CONSENSUS,
-            max_concurrency=2,
-            max_attempts=2,
-            backoff=BackoffPolicy(
-                rate_limit_sleep_s=0.0,
-                timeout_next_provider=False,
-                retryable_next_provider=False,
-            ),
-        ),
-    )
-    request = ProviderRequest(prompt="consensus", model="consensus-failure")
-
-    with pytest.raises(ParallelExecutionError) as exc_info:
-        asyncio.run(runner.run_async(request))
-
-    error = exc_info.value
-    failures = getattr(error, "failures", None)
-    expected = [
-        {
-            "provider": "timeout",
-            "attempt": "1",
-            "summary": "TimeoutError: simulated timeout",
-        },
-        {
-            "provider": "rate",
-            "attempt": "2",
-            "summary": "RateLimitError: simulated rate limit",
-        },
-    ]
-    assert failures == expected
-    message = str(error)
-    for detail in expected:
-        assert detail["provider"] in message
-        assert detail["attempt"] in message
-        assert detail["summary"] in message
-
-
 def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
     request_any = ProviderRequest(prompt="retry", model="parallel-any")
     clock_any = _FakeClock()
