@@ -5,15 +5,45 @@ import asyncio
 import pytest
 
 from src.llm_adapter.errors import RateLimitError, RetriableError
-from src.llm_adapter.provider_spi import ProviderRequest
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import AsyncRunner
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
+from src.llm_adapter.runner_config import (
+    BackoffPolicy,
+    ConsensusConfig,
+    RunnerConfig,
+    RunnerMode,
+)
+from src.llm_adapter.runner_parallel import ParallelExecutionError
 
 from tests.shadow._runner_test_helpers import (
     FakeLogger,
     _ErrorProvider,
     _SuccessProvider,
 )
+
+
+class _SchemaFailingProvider(ProviderSPI):
+    def __init__(self, name: str, text: str) -> None:
+        self._name = name
+        self._text = text
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return {"chat"}
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        return ProviderResponse(
+            text=self._text,
+            latency_ms=5,
+            tokens_in=5,
+            tokens_out=5,
+            model=request.model,
+        )
+
+    def estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
+        return 0.0
 
 
 @pytest.mark.asyncio
@@ -72,3 +102,45 @@ def test_async_retryable_error_logs_family() -> None:
 
     chain_event = logger.of_type("provider_chain_failed")[0]
     assert chain_event["last_error_family"] == "retryable"
+
+
+@pytest.mark.asyncio
+def test_async_consensus_propagates_schema_failures() -> None:
+    providers = [
+        _SchemaFailingProvider("bad-json", "not json"),
+        _SchemaFailingProvider("missing-key", '{"foo": 1}'),
+    ]
+    config = RunnerConfig(
+        mode=RunnerMode.CONSENSUS,
+        consensus=ConsensusConfig(
+            schema='{"type": "object", "required": ["answer"]}'
+        ),
+    )
+    runner = AsyncRunner(providers, config=config)
+    request = ProviderRequest(prompt="hello", model="demo-model")
+
+    async def _run() -> None:
+        await runner.run_async(request, shadow_metrics_path="unused.jsonl")
+
+    with pytest.raises(ParallelExecutionError) as excinfo:
+        asyncio.run(_run())
+
+    error = excinfo.value
+    assert hasattr(error, "failures")
+    assert error.failures == [
+        {
+            "index": 0,
+            "attempt": 1,
+            "provider": "bad-json",
+            "reason": "invalid json: Expecting value",
+        },
+        {
+            "index": 1,
+            "attempt": 2,
+            "provider": "missing-key",
+            "reason": "missing keys: answer",
+        },
+    ]
+    message = str(error)
+    assert "bad-json" in message
+    assert "missing-key" in message
