@@ -6,9 +6,16 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from src.llm_adapter.provider_spi import ProviderRequest
+import pytest
+from src.llm_adapter.provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    TokenUsage,
+)
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, Runner
+from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
+from src.llm_adapter.runner_parallel import ParallelExecutionError
 
 
 class _CapturingLogger:
@@ -22,13 +29,51 @@ class _CapturingLogger:
         return [payload for kind, payload in self.events if kind == event_type]
 
 
+class _AsyncProbeProvider:
+    def __init__(self, name: str, *, delay: float, text: str | None = None) -> None:
+        self._name = name
+        self._delay = delay
+        self._text = text or name
+        self.cancelled = False
+        self.finished = False
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
+        try:
+            await asyncio.sleep(self._delay)
+            return ProviderResponse(
+                text=f"{self._text}:{request.prompt}",
+                latency_ms=int(self._delay * 1000),
+                token_usage=TokenUsage(prompt=1, completion=1),
+                model=request.model,
+            )
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        finally:
+            self.finished = True
+
+
 def test_async_runner_matches_sync(tmp_path: Path) -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     sync_runner = Runner([primary])
     async_runner = AsyncRunner([primary])
 
-    sync_request = ProviderRequest(prompt="hello", metadata={"trace_id": "t1"}, model="primary-model")
-    async_request = ProviderRequest(prompt="hello", metadata={"trace_id": "t1"}, model="primary-model")
+    sync_request = ProviderRequest(
+        prompt="hello",
+        metadata={"trace_id": "t1"},
+        model="primary-model",
+    )
+    async_request = ProviderRequest(
+        prompt="hello",
+        metadata={"trace_id": "t1"},
+        model="primary-model",
+    )
 
     sync_metrics = tmp_path / "sync-metrics.jsonl"
     async_metrics = tmp_path / "async-metrics.jsonl"
@@ -155,3 +200,49 @@ def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_error"] == "TimeoutError"
     assert diff_event["shadow_error_message"] == "simulated timeout"
     assert diff_event["shadow_duration_ms"] >= 0
+
+
+def test_async_parallel_any_returns_first_completion() -> None:
+    slow = _AsyncProbeProvider("slow", delay=0.1, text="slow")
+    fast = _AsyncProbeProvider("fast", delay=0.01, text="fast")
+    runner = AsyncRunner(
+        [slow, fast],
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="hi", model="model-parallel-any")
+
+    response = asyncio.run(runner.run_async(request))
+
+    assert response.text.startswith("fast:")
+
+
+def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
+    slow = _AsyncProbeProvider("slow", delay=0.2, text="slow")
+    fast = _AsyncProbeProvider("fast", delay=0.01, text="fast")
+    runner = AsyncRunner(
+        [slow, fast],
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="hi", model="model-parallel-cancel")
+
+    response = asyncio.run(runner.run_async(request))
+
+    assert response.text.startswith("fast:")
+    assert slow.cancelled is True
+    assert slow.finished is True
+
+
+def test_async_consensus_quorum_failure() -> None:
+    provider_a = _AsyncProbeProvider("pa", delay=0.01, text="A")
+    provider_b = _AsyncProbeProvider("pb", delay=0.01, text="B")
+    runner = AsyncRunner(
+        [provider_a, provider_b],
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            consensus=ConsensusConfig(quorum=2),
+        ),
+    )
+    request = ProviderRequest(prompt="topic", model="model-consensus")
+
+    with pytest.raises(ParallelExecutionError):
+        asyncio.run(runner.run_async(request))
