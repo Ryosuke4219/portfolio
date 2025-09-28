@@ -524,6 +524,8 @@ def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
         config=RunnerConfig(
             mode=RunnerMode.PARALLEL_ANY,
             backoff=BackoffPolicy(rate_limit_sleep_s=0.25, timeout_next_provider=False),
+            # 既定ではリトライしないためテストで旧来どおり 3 回試行させる
+            max_attempts=4,
         ),
     )
 
