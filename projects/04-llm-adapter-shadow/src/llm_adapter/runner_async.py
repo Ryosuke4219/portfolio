@@ -435,6 +435,7 @@ class AsyncRunner:
                                         "winner_latency_ms": consensus.response.latency_ms,
                                         "tie_break_applied": consensus.tie_break_applied,
                                         "tie_break_reason": consensus.tie_break_reason,
+                                        "tie_breaker_selected": consensus.tie_breaker_selected,
                                         "rounds": consensus.rounds,
                                         "scores": consensus.scores,
                                         "schema_checked": consensus.schema_checked,
@@ -480,6 +481,7 @@ class AsyncRunner:
                                         "winner_score": consensus.winner_score,
                                         "rounds": consensus.rounds,
                                         "tie_break_reason": consensus.tie_break_reason,
+                                        "tie_breaker_selected": consensus.tie_breaker_selected,
                                         "judge": consensus.judge_name,
                                         "judge_score": consensus.judge_score,
                                     }
