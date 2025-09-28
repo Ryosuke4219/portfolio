@@ -169,6 +169,7 @@ class ConsensusResult:
     tie_breaker: str | None
     tie_break_applied: bool
     tie_break_reason: str | None
+    tie_breaker_selected: str | None
     winner_score: float
     abstained: int
     rounds: int
@@ -185,13 +186,16 @@ class _Candidate:
     entries: list[tuple[int, ProviderResponse]] = field(default_factory=list)
     votes: int = 0
     score: float = 0.0
+    best_score: float = 0.0
     latency: int = 0
     cost: float = 0.0
 
     def record(self, index: int, response: ProviderResponse) -> None:
         self.entries.append((index, response))
         self.votes += 1
-        self.score += _extract_score(response)
+        value = _extract_score(response)
+        self.score += value
+        self.best_score = value if self.votes == 1 else max(self.best_score, value)
         latency = int(response.latency_ms)
         cost = float((response.tokens_in or 0) + (response.tokens_out or 0))
         self.latency = latency if self.votes == 1 else min(self.latency, latency)
@@ -222,19 +226,68 @@ def _load_judge(path: str) -> Callable[[Sequence[ProviderResponse]], Any]:
     return cast(Callable[[Sequence[ProviderResponse]], Any], judge)
 
 
+def _select_candidates(
+    strategy: str, candidates: Mapping[str, _Candidate]
+) -> tuple[list[_Candidate], float, dict[str, float] | None]:
+    normalized = strategy.strip().lower()
+    if normalized == "majority":
+        pivot_votes = max(candidate.votes for candidate in candidates.values())
+        pool = [
+            candidate
+            for candidate in candidates.values()
+            if candidate.votes == pivot_votes
+        ]
+        return pool, float(pivot_votes), None
+    if normalized == "weighted":
+        scores = {text: candidate.score for text, candidate in candidates.items()}
+        pivot_score = max(scores.values())
+        pool = [
+            candidate
+            for candidate in candidates.values()
+            if math.isclose(
+                candidate.score, pivot_score, rel_tol=1e-9, abs_tol=1e-9
+            )
+        ]
+        return pool, float(pivot_score), scores
+    if normalized == "max_score":
+        scores = {text: candidate.best_score for text, candidate in candidates.items()}
+        pivot_score = max(scores.values())
+        pool = [
+            candidate
+            for candidate in candidates.values()
+            if math.isclose(
+                candidate.best_score, pivot_score, rel_tol=1e-9, abs_tol=1e-9
+            )
+        ]
+        return pool, float(pivot_score), scores
+    raise ValueError(f"unsupported consensus strategy: {strategy!r}")
+
+
+def _tie_break_by_latency(candidates: Sequence[_Candidate]) -> tuple[list[_Candidate], str]:
+    best = min(candidate.latency for candidate in candidates)
+    narrowed = [candidate for candidate in candidates if candidate.latency == best]
+    return narrowed, f"latency(min={best})"
+
+
+def _tie_break_by_cost(candidates: Sequence[_Candidate]) -> tuple[list[_Candidate], str]:
+    best_cost = min(candidate.cost for candidate in candidates)
+    narrowed = [candidate for candidate in candidates if candidate.cost == best_cost]
+    return narrowed, "cost(min)"
+
+
 def _apply_tie_breaker(
     name: str, candidates: Sequence[_Candidate]
-) -> tuple[list[_Candidate], str]:
+) -> tuple[list[_Candidate], str, str]:
     normalized = name.strip().lower()
-    if normalized == "latency":
-        best = min(candidate.latency for candidate in candidates)
-        narrowed = [candidate for candidate in candidates if candidate.latency == best]
-        return narrowed, f"latency(min={best})"
-    if normalized == "cost":
-        best_cost = min(candidate.cost for candidate in candidates)
-        narrowed = [candidate for candidate in candidates if candidate.cost == best_cost]
-        return narrowed, "cost(min)"
-    raise ValueError(f"unknown tie_breaker: {name!r}")
+    handlers: dict[str, Callable[[Sequence[_Candidate]], tuple[list[_Candidate], str]]] = {
+        "latency": _tie_break_by_latency,
+        "cost": _tie_break_by_cost,
+    }
+    handler = handlers.get(normalized)
+    if handler is None:
+        raise ValueError(f"unknown tie_breaker: {name!r}")
+    narrowed, reason = handler(candidates)
+    return narrowed, reason, normalized
 
 
 def _invoke_judge(
@@ -263,9 +316,7 @@ def compute_consensus(
         raise ValueError("responses must not be empty")
     if config is None:
         config = ConsensusConfig()
-    strategy = (config.strategy or "majority").strip().lower()
-    if strategy not in {"majority", "weighted"}:
-        raise ValueError(f"unsupported consensus strategy: {config.strategy!r}")
+    strategy = (config.strategy or "majority").strip()
     tie_breaker = (config.tie_breaker or "").strip().lower() or None
     if tie_breaker is not None and tie_breaker not in {"latency", "cost"}:
         raise ValueError(f"unsupported tie_breaker: {config.tie_breaker!r}")
@@ -312,28 +363,15 @@ def compute_consensus(
         candidate.record(index, response)
 
     tally = {text: candidate.votes for text, candidate in candidates.items()}
-    scores = {text: candidate.score for text, candidate in candidates.items()}
     if not tally:
         raise ParallelExecutionError("consensus tally is empty")
 
-    if strategy == "majority":
-        pivot_votes = max(tally.values())
-        pool = [
-            candidate for candidate in candidates.values() if candidate.votes == pivot_votes
-        ]
-        winner_score = float(pivot_votes)
-    else:
-        pivot_score = max(scores.values())
-        pool = [
-            candidate
-            for candidate in candidates.values()
-            if math.isclose(candidate.score, pivot_score, rel_tol=1e-9, abs_tol=1e-9)
-        ]
-        winner_score = float(pivot_score)
+    pool, winner_score, score_map = _select_candidates(strategy, candidates)
 
     tie_break_applied = len(pool) > 1
     rounds = 1
     tie_break_reason = None
+    tie_breaker_selected: str | None = None
     judge_name: str | None = None
     judge_score: float | None = None
     remaining = pool
@@ -342,7 +380,9 @@ def compute_consensus(
     if tie_break_applied and tie_breaker is not None:
         if max_rounds is not None and rounds >= max_rounds:
             raise ParallelExecutionError("consensus max_rounds exhausted")
-        remaining, tie_break_reason = _apply_tie_breaker(tie_breaker, remaining)
+        remaining, tie_break_reason, tie_breaker_selected = _apply_tie_breaker(
+            tie_breaker, remaining
+        )
         rounds += 1
 
     if len(remaining) > 1 and config.judge:
@@ -379,6 +419,7 @@ def compute_consensus(
         tie_breaker=config.tie_breaker,
         tie_break_applied=tie_break_applied,
         tie_break_reason=tie_break_reason,
+        tie_breaker_selected=tie_breaker_selected,
         winner_score=winner_score,
         abstained=len(collected) - len(valid_entries),
         rounds=rounds,
@@ -386,7 +427,7 @@ def compute_consensus(
         schema_failures=schema_failures,
         judge_name=judge_name,
         judge_score=judge_score,
-        scores=scores if strategy == "weighted" else None,
+        scores=score_map,
     )
 
 
