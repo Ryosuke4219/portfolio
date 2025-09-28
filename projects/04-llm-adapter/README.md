@@ -107,6 +107,29 @@ Windows で環境変数を毎回設定する手間を省くため、`--env .env`
 
 `--prompts` を指定すると JSONL バッチを実行できます（内部で `adapter/run_compare.py` を呼び出します）。
 
+### run_compare のモードと集約オプション
+
+`adapter/run_compare.py` は以下の比較モードを提供します。
+
+| `--mode` | 概要 |
+| -------- | ---- |
+| `sequential` | プロバイダを順番に実行（旧 `serial` 相当） |
+| `parallel-any` | 並列実行で最初の成功を採用（旧 `parallel` 相当） |
+| `parallel-all` | 全プロバイダを並列実行し全件を記録 |
+| `consensus` | 複数応答から合意形成を試みる |
+
+追加オプションとして、`--aggregate <strategy>`、`--quorum <n>`、`--tie-breaker <name>`、`--judge <config>`、`--schema <json>` を指定すると、集約・判定のルールを細かく制御できます。レート制御は `--max-concurrency` と `--rpm` で設定してください。
+
+```bash
+python adapter/run_compare.py \
+  --providers adapter/config/providers/simulated.yaml \
+  --prompts datasets/golden/tasks.jsonl \
+  --mode consensus --aggregate judge --quorum 2 \
+  --judge adapter/config/providers/judge.yaml --schema schemas/output.json
+```
+
+> `--aggregate` などを省略した場合は従来通り単純な応答比較として動作します。
+
 ### Google Gemini を利用する
 
 実プロバイダとして Google Gemini を呼び出す場合は、API キーを `GEMINI_API_KEY` に設定し、Gemini 用の設定ファイルを指定します。
@@ -167,7 +190,7 @@ python adapter/run_compare.py \
 | コマンド                                                                                                                      | 説明                                                         |
 | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `python adapter/run_compare.py --providers adapter/config/providers/simulated.yaml --prompts datasets/golden/tasks.jsonl` | 指定プロバイダ構成とゴールデンタスクを比較実行し、`data/runs-metrics.jsonl` に追記します。 |
-| `python adapter/run_compare.py --providers <a,b> --mode parallel --repeat 3 --metrics tmp/metrics.jsonl`                  | 複数プロバイダを並列実行し、出力先をカスタマイズします。                               |
+| `python adapter/run_compare.py --providers <a,b> --mode parallel-any --repeat 3 --metrics tmp/metrics.jsonl`              | 複数プロバイダを並列実行し、出力先をカスタマイズします。                               |
 | `python tools/report/metrics/cli.py --metrics data/runs-metrics.jsonl --out reports/index.html`                       | JSONL メトリクスを HTML ダッシュボードに変換します。                           |
 
 > `--budgets` で `adapter/config/budgets.yaml` を差し替えると、実行ごとのコスト上限や停止条件を変更できます。
@@ -180,7 +203,7 @@ python adapter/run_compare.py \
   --providers adapter/config/providers/simulated.yaml \
   --prompts datasets/golden/tasks.jsonl \
   --repeat 2 \
-  --mode serial
+  --mode sequential
 # => data/runs-metrics.jsonl に追記（プロジェクト直下に data/ が自動生成されます）
 
 # 2. 収集したメトリクスを HTML に変換
