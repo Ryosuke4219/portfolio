@@ -9,6 +9,7 @@ import math
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import (
     FIRST_COMPLETED,
+    Future,
     ThreadPoolExecutor,
     as_completed,
     wait,
@@ -46,7 +47,19 @@ def run_parallel_any_sync(
     max_workers = _normalize_concurrency(len(workers), max_concurrency)
     errors: list[BaseException] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_map = {executor.submit(worker): idx for idx, worker in enumerate(workers)}
+        worker_iter = iter(enumerate(workers))
+        future_map: dict[Future[T], int] = {}
+
+        def _submit_next() -> None:
+            try:
+                idx, worker = next(worker_iter)
+            except StopIteration:
+                return
+            future_map[executor.submit(worker)] = idx
+
+        for _ in range(max_workers):
+            _submit_next()
+
         while future_map:
             done, _ = wait(future_map, return_when=FIRST_COMPLETED)
             for future in done:
@@ -55,8 +68,9 @@ def run_parallel_any_sync(
                     result = future.result()
                 except BaseException as exc:  # noqa: BLE001
                     errors.append(exc)
+                    _submit_next()
                     continue
-                for pending in future_map:
+                for pending in list(future_map):
                     pending.cancel()
                 return result
     raise ParallelExecutionError("all workers failed") from errors[-1] if errors else None
