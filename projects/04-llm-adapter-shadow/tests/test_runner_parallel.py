@@ -3,13 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 from src.llm_adapter.errors import TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
 from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
@@ -183,6 +184,88 @@ def test_runner_parallel_any_returns_success_after_fast_failure() -> None:
 
     assert response.text == "slow-ok"
 
+
+def test_runner_parallel_any_retries_same_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _RetryProvider:
+        def __init__(self, name: str) -> None:
+            self._name = name
+            self._calls = 0
+
+        def name(self) -> str:
+            return self._name
+
+        def capabilities(self) -> set[str]:
+            return set()
+
+        @property
+        def calls(self) -> int:
+            return self._calls
+
+        def invoke(self, request: ProviderRequest) -> ProviderResponse:
+            self._calls += 1
+            if self._calls == 1:
+                raise TimeoutError("transient timeout")
+            return ProviderResponse(
+                text="retry-success",
+                latency_ms=1,
+                token_usage=TokenUsage(prompt=1, completion=1),
+                model=request.model,
+                finish_reason="stop",
+            )
+
+    class _FallbackProvider(_StaticProvider):
+        def __init__(self) -> None:
+            super().__init__("fallback", "fallback-response", latency_ms=5)
+            self.calls = 0
+
+        def invoke(self, request: ProviderRequest) -> ProviderResponse:
+            self.calls += 1
+            return super().invoke(request)
+
+    class _RecordingLogger:
+        def __init__(self) -> None:
+            self.events: list[dict[str, object]] = []
+
+        def emit(self, event_type: str, record: Mapping[str, object]) -> None:
+            payload = dict(record)
+            payload.setdefault("event", event_type)
+            self.events.append(payload)
+
+    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+    retry_provider = _RetryProvider("retryable")
+    fallback_provider = _FallbackProvider()
+    logger = _RecordingLogger()
+
+    backoff = BackoffPolicy(
+        rate_limit_sleep_s=0.0,
+        timeout_next_provider=False,
+        retryable_next_provider=False,
+    )
+    runner = Runner(
+        [retry_provider, fallback_provider],
+        logger=logger,
+        config=RunnerConfig(
+            mode=RunnerMode.PARALLEL_ANY,
+            max_concurrency=1,
+            max_attempts=3,
+            backoff=backoff,
+        ),
+    )
+    request = ProviderRequest(prompt="hello", model="m-retry")
+
+    response = runner.run(request, shadow_metrics_path=tmp_path / "metrics.jsonl")
+
+    assert response.text == "retry-success"
+    assert retry_provider.calls == 2
+    assert fallback_provider.calls == 0
+    retry_events = [event for event in logger.events if event.get("event") == "retry"]
+    assert len(retry_events) == 1
+    retry_event = retry_events[0]
+    assert retry_event["provider"] == "retryable"
+    assert retry_event["attempt"] == 1
+    assert retry_event["error_type"] == "TimeoutError"
 
 def test_consensus_vote_event_and_shadow_delta(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
