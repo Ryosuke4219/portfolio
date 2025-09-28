@@ -15,7 +15,7 @@ from concurrent.futures import (
     wait,
 )
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from .provider_spi import ProviderResponse
 from .runner_config import ConsensusConfig
@@ -219,7 +219,7 @@ def _load_judge(path: str) -> Callable[[Sequence[ProviderResponse]], Any]:
     judge = getattr(module, attr, None)
     if not callable(judge):
         raise ValueError(f"judge callable {path!r} is not callable")
-    return judge
+    return cast(Callable[[Sequence[ProviderResponse]], Any], judge)
 
 
 def _apply_tie_breaker(
@@ -317,17 +317,19 @@ def compute_consensus(
         raise ParallelExecutionError("consensus tally is empty")
 
     if strategy == "majority":
-        pivot = max(tally.values())
-        pool = [candidate for candidate in candidates.values() if candidate.votes == pivot]
-        winner_score = float(pivot)
+        pivot_votes = max(tally.values())
+        pool = [
+            candidate for candidate in candidates.values() if candidate.votes == pivot_votes
+        ]
+        winner_score = float(pivot_votes)
     else:
-        pivot = max(scores.values())
+        pivot_score = max(scores.values())
         pool = [
             candidate
             for candidate in candidates.values()
-            if math.isclose(candidate.score, pivot, rel_tol=1e-9, abs_tol=1e-9)
+            if math.isclose(candidate.score, pivot_score, rel_tol=1e-9, abs_tol=1e-9)
         ]
-        winner_score = float(pivot)
+        winner_score = float(pivot_score)
 
     tie_break_applied = len(pool) > 1
     rounds = 1
