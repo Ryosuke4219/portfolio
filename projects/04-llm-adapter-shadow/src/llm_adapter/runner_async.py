@@ -313,10 +313,11 @@ class AsyncRunner:
             attempt_count = total_providers
 
             capture_shadow, retry_attempts = mode is RunnerMode.CONSENSUS, 0
+            attempt_labels = [index for index in range(1, total_providers + 1)]
 
             async def _handle_parallel_retry(
                 worker_index: int, attempt_index: int, error: BaseException
-            ) -> float | None:
+            ) -> tuple[int, float] | None:
                 nonlocal retry_attempts, attempt_count
                 provider, _ = providers[worker_index]
                 next_attempt_total = total_providers + retry_attempts + 1
@@ -334,7 +335,9 @@ class AsyncRunner:
                     and next_attempt_total > limit
                 ):
                     return None
-                retry_attempts, attempt_count = retry_attempts + 1, next_attempt_total
+                retry_attempt = retry_attempts + 1
+                retry_attempts, attempt_count = retry_attempt, next_attempt_total
+                attempt_labels[worker_index] = next_attempt_total
                 if event_logger is not None:
                     event_logger.emit(
                         "retry",
@@ -342,17 +345,19 @@ class AsyncRunner:
                             "request_fingerprint": request_fingerprint,
                             "provider": provider.name(),
                             "attempt": attempt_index,
-                            "retry_attempt": retry_attempts,
+                            "retry_attempt": retry_attempt,
+                            "next_attempt": next_attempt_total,
                             "error_type": type(error).__name__,
                         },
                     )
-                return delay
+                return next_attempt_total, delay
             def _build_worker(
+                worker_index: int,
                 provider: ProviderSPI | AsyncProviderSPI,
                 async_provider: AsyncProviderSPI,
-                attempt_index: int,
             ) -> WorkerFactory:
                 async def _worker() -> WorkerResult:
+                    attempt_index = attempt_labels[worker_index]
                     response, shadow_metrics = await self._invoke_provider_async(
                         provider,
                         async_provider,
@@ -372,8 +377,8 @@ class AsyncRunner:
                 return _worker
 
             workers: list[WorkerFactory] = [
-                _build_worker(provider, async_provider, index)
-                for index, (provider, async_provider) in enumerate(providers, start=1)
+                _build_worker(index, provider, async_provider)
+                for index, (provider, async_provider) in enumerate(providers)
             ]
 
             try:
@@ -414,6 +419,8 @@ class AsyncRunner:
                 results = await run_parallel_all_async(
                     workers,
                     max_concurrency=self._config.max_concurrency,
+                    max_attempts=self._config.max_attempts,
+                    on_retry=_handle_parallel_retry,
                 )
             except Exception as err:  # noqa: BLE001
                 last_err = err

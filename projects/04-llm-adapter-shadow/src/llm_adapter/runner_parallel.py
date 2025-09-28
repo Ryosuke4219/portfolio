@@ -27,6 +27,8 @@ T = TypeVar("T")
 SyncWorker = Callable[[], T]
 AsyncWorker = Callable[[], Awaitable[T]]
 
+RetryDirective = float | tuple[int, float] | None
+
 
 class ParallelExecutionError(RuntimeError):
     """Raised when all parallel workers fail to produce a response."""
@@ -124,12 +126,22 @@ def run_parallel_any_sync(
     raise ParallelExecutionError("all workers failed") from errors[-1] if errors else None
 
 
+def _normalize_retry_directive(
+    directive: RetryDirective,
+) -> tuple[int | None, float | None]:
+    if directive is None:
+        return None, None
+    if isinstance(directive, tuple):
+        return directive[0], directive[1]
+    return None, directive
+
+
 async def run_parallel_any_async(
     workers: Sequence[AsyncWorker[T]],
     *,
     max_concurrency: int | None = None,
     max_attempts: int | None = None,
-    on_retry: Callable[[int, int, BaseException], Awaitable[float | None] | float | None]
+    on_retry: Callable[[int, int, BaseException], Awaitable[RetryDirective] | RetryDirective]
     | None = None,
 ) -> T:
     """Async variant of :func:`run_parallel_any_sync` with retry support."""
@@ -169,12 +181,17 @@ async def run_parallel_any_async(
                 raise
             except BaseException as exc:  # noqa: BLE001
                 delay: float | None = None
+                next_attempt: int | None = None
                 if on_retry is not None:
-                    maybe_delay = on_retry(index, attempt, exc)
-                    if asyncio.iscoroutine(maybe_delay):
-                        maybe_delay = await cast(Awaitable[float | None], maybe_delay)
-                    delay = cast(float | None, maybe_delay)
+                    directive = on_retry(index, attempt, exc)
+                    if asyncio.iscoroutine(directive):
+                        directive = await cast(Awaitable[RetryDirective], directive)
+                    next_attempt, delay = _normalize_retry_directive(
+                        cast(RetryDirective, directive)
+                    )
                 if delay is not None and delay >= 0:
+                    if next_attempt is not None:
+                        attempt = max(next_attempt - 1, attempt)
                     if delay > 0:
                         await asyncio.sleep(delay)
                     continue
@@ -216,7 +233,12 @@ def run_parallel_all_sync(
 
 
 async def run_parallel_all_async(
-    workers: Sequence[AsyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[AsyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    max_attempts: int | None = None,
+    on_retry: Callable[[int, int, BaseException], Awaitable[RetryDirective] | RetryDirective]
+    | None = None,
 ) -> list[T]:
     """Async variant of :func:`run_parallel_all_sync`."""
 
@@ -224,11 +246,47 @@ async def run_parallel_all_async(
         raise ValueError("workers must not be empty")
     limit = _normalize_concurrency(len(workers), max_concurrency)
     semaphore = asyncio.Semaphore(limit)
-    responses: list[T] = [None] * len(workers)  # type: ignore[list-item]
+    responses: list[T | None] = [None] * len(workers)
+    attempts_lock = asyncio.Lock()
+    attempts_used = 0
+
+    async def _reserve_attempt() -> bool:
+        nonlocal attempts_used
+        async with attempts_lock:
+            if max_attempts is not None and attempts_used >= max_attempts:
+                return False
+            attempts_used += 1
+            return True
 
     async def runner(index: int, worker: AsyncWorker[T]) -> None:
-        async with semaphore:
-            responses[index] = await worker()
+        attempt = 0
+        while await _reserve_attempt():
+            attempt += 1
+            try:
+                async with semaphore:
+                    responses[index] = await worker()
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:  # noqa: BLE001
+                delay: float | None = None
+                next_attempt: int | None = None
+                if on_retry is not None:
+                    directive = on_retry(index, attempt, exc)
+                    if asyncio.iscoroutine(directive):
+                        directive = await cast(Awaitable[RetryDirective], directive)
+                    next_attempt, delay = _normalize_retry_directive(
+                        cast(RetryDirective, directive)
+                    )
+                if delay is not None and delay >= 0:
+                    if next_attempt is not None:
+                        attempt = max(next_attempt - 1, attempt)
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                    continue
+                raise
+            else:
+                return
+        raise ParallelExecutionError("max attempts exhausted")
 
     tasks = [asyncio.create_task(runner(idx, worker)) for idx, worker in enumerate(workers)]
     try:
@@ -238,7 +296,7 @@ async def run_parallel_all_async(
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         raise
-    return responses
+    return cast(list[T], responses)
 
 
 @dataclass(slots=True)
