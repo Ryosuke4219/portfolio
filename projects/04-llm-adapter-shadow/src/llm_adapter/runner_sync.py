@@ -354,6 +354,15 @@ class Runner:
 
         capture_shadow = mode is RunnerMode.CONSENSUS
 
+        def handle_retry(error: Exception) -> None:
+            if isinstance(error, TimeoutError):
+                if not self._config.backoff.timeout_next_provider:
+                    raise error
+                return
+            if isinstance(error, RetryableError):
+                if not self._config.backoff.retryable_next_provider:
+                    raise error
+
         def make_worker(
             index: int, provider: ProviderSPI
         ) -> Callable[[], ProviderInvocationResult]:
@@ -396,6 +405,13 @@ class Runner:
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
                     raise fatal from None
+                for entry in results:
+                    if entry is None or entry.response is not None:
+                        continue
+                    error = entry.error
+                    if error is None:
+                        continue
+                    handle_retry(error)
                 response = winner.response
                 if response is None:
                     raise ParallelExecutionError("all workers failed")

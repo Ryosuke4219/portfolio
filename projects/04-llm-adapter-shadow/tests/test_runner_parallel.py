@@ -495,3 +495,43 @@ def test_consensus_vote_event_and_shadow_delta(
     )
     assert winner_diff["shadow_consensus_delta"]["votes_for"] == 2
     assert winner_diff["shadow_consensus_delta"]["votes_total"] == 3
+
+
+def test_parallel_any_propagates_timeout_when_next_provider_disabled() -> None:
+    timeout_provider = _RetryProbeProvider("timeout", [TimeoutError("boom")])
+    success_provider = _RetryProbeProvider("ok", ["success"], latency_s=0.01)
+    runner = Runner(
+        [timeout_provider, success_provider],
+        config=RunnerConfig(
+            mode=RunnerMode.PARALLEL_ANY,
+            backoff=BackoffPolicy(timeout_next_provider=False),
+            max_concurrency=2,
+        ),
+    )
+    request = ProviderRequest(prompt="hello", model="m-parallel-timeout")
+
+    with pytest.raises(TimeoutError):
+        runner.run(request)
+
+    assert timeout_provider.outcome_log == ["TimeoutError"]
+    assert success_provider.outcome_log[-1] == "ok"
+
+
+def test_parallel_any_propagates_retryable_when_next_provider_disabled() -> None:
+    rate_limited = _RetryProbeProvider("rate", [RateLimitError("slow down")])
+    success_provider = _RetryProbeProvider("ok", ["success"], latency_s=0.01)
+    runner = Runner(
+        [rate_limited, success_provider],
+        config=RunnerConfig(
+            mode=RunnerMode.PARALLEL_ANY,
+            backoff=BackoffPolicy(retryable_next_provider=False),
+            max_concurrency=2,
+        ),
+    )
+    request = ProviderRequest(prompt="hello", model="m-parallel-retryable")
+
+    with pytest.raises(RateLimitError):
+        runner.run(request)
+
+    assert rate_limited.outcome_log == ["RateLimitError"]
+    assert success_provider.outcome_log[-1] == "ok"
