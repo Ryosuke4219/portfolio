@@ -22,7 +22,7 @@ class _StaticProvider:
     def __init__(self, name: str, text: str, latency_ms: int) -> None:
         self._name = name
         self._text = text
-        self._latency_ms = latency_ms
+        self.latency_ms = latency_ms
 
     def name(self) -> str:
         return self._name
@@ -33,7 +33,7 @@ class _StaticProvider:
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         return ProviderResponse(
             text=self._text,
-            latency_ms=self._latency_ms,
+            latency_ms=self.latency_ms,
             token_usage=TokenUsage(prompt=1, completion=1),
             model=request.model,
             finish_reason="stop",
@@ -144,6 +144,18 @@ def test_consensus_vote_event_and_shadow_delta(
     assert consensus_event["votes"][response.text] == 2
     summaries = consensus_event["candidate_summaries"]
     assert {entry["provider"] for entry in summaries} == {"agree_a", "agree_b", "disagree"}
+
+    run_metric_events = {
+        item["provider"]: item["latency_ms"]
+        for item in payloads
+        if item.get("event") == "run_metric" and item.get("provider") is not None
+    }
+    expected_latencies = {
+        agree_a.name(): agree_a.latency_ms,
+        agree_b.name(): agree_b.latency_ms,
+        disagree.name(): disagree.latency_ms,
+    }
+    assert run_metric_events == expected_latencies
 
     winner_diff = next(
         item
