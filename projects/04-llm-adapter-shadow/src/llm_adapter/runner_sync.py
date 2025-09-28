@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
     ParallelAllResult,
     ParallelExecutionError,
+    RetryDirective,
     compute_consensus,
     run_parallel_all_sync,
     run_parallel_any_sync,
@@ -348,6 +350,20 @@ class Runner:
 
         total_providers = len(self.providers)
         results: list[ProviderInvocationResult | None] = [None] * total_providers
+        max_attempts_config = self._config.max_attempts
+        attempts_lock = threading.Lock()
+        attempts_used = 0
+
+        def reserve_attempt() -> int:
+            nonlocal attempts_used
+            with attempts_lock:
+                if (
+                    max_attempts_config is not None
+                    and attempts_used >= max_attempts_config
+                ):
+                    raise ParallelExecutionError("max attempts exhausted")
+                attempts_used += 1
+                return attempts_used
 
         capture_shadow = mode is RunnerMode.CONSENSUS
 
@@ -355,10 +371,11 @@ class Runner:
             index: int, provider: ProviderSPI
         ) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
+                attempt_index = reserve_attempt()
                 result = self._invoke_provider_sync(
                     provider,
                     request,
-                    attempt=index,
+                    attempt=attempt_index,
                     total_providers=total_providers,
                     event_logger=event_logger,
                     request_fingerprint=request_fingerprint,
@@ -367,7 +384,7 @@ class Runner:
                     metrics_path=metrics_path_str,
                     capture_shadow_metrics=capture_shadow,
                 )
-                results[index - 1] = result
+                results[index] = result
                 if result.response is None:
                     error = result.error
                     if error is not None:
@@ -381,14 +398,35 @@ class Runner:
 
         workers = [
             make_worker(index, provider)
-            for index, provider in enumerate(self.providers, start=1)
+            for index, provider in enumerate(self.providers)
         ]
+
+        backoff_policy = self._config.backoff
+
+        def handle_retry(
+            worker_index: int, worker_attempt: int, error: BaseException
+        ) -> RetryDirective:
+            if isinstance(error, RateLimitError):
+                delay = backoff_policy.rate_limit_sleep_s
+                return delay if delay >= 0 else 0.0
+            if isinstance(error, TimeoutError):
+                if not backoff_policy.timeout_next_provider:
+                    return None
+                return 0.0
+            if isinstance(error, RetryableError):
+                if not backoff_policy.retryable_next_provider:
+                    return None
+                return 0.0
+            return None
 
         skip_run_metric: tuple[ProviderInvocationResult, ...] | None = None
         try:
             if mode is RunnerMode.PARALLEL_ANY:
                 winner = run_parallel_any_sync(
-                    workers, max_concurrency=self._config.max_concurrency
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                    max_attempts=max_attempts_config,
+                    on_retry=handle_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
@@ -396,9 +434,7 @@ class Runner:
                 response = winner.response
                 if response is None:
                     raise ParallelExecutionError("all workers failed")
-                attempts_final = sum(1 for item in results if item is not None)
-                if attempts_final == 0:
-                    attempts_final = winner.attempt
+                attempts_final = attempts_used if attempts_used > 0 else winner.attempt
                 tokens_in = winner.tokens_in if winner.tokens_in is not None else 0
                 tokens_out = winner.tokens_out if winner.tokens_out is not None else 0
                 cost_usd = estimate_cost(winner.provider, tokens_in, tokens_out)
@@ -427,7 +463,10 @@ class Runner:
 
             if mode is RunnerMode.PARALLEL_ALL:
                 invocations = run_parallel_all_sync(
-                    workers, max_concurrency=self._config.max_concurrency
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                    max_attempts=max_attempts_config,
+                    on_retry=handle_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
@@ -442,7 +481,10 @@ class Runner:
 
             if mode is RunnerMode.CONSENSUS:
                 invocations = run_parallel_all_sync(
-                    workers, max_concurrency=self._config.max_concurrency
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                    max_attempts=max_attempts_config,
+                    on_retry=handle_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:

@@ -7,15 +7,11 @@ import importlib
 import inspect
 import json
 import math
+import threading
+from collections import deque
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Callable as TypingCallable
-from concurrent.futures import (
-    FIRST_COMPLETED,
-    Future,
-    ThreadPoolExecutor,
-    as_completed,
-    wait,
-)
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar, cast
 
@@ -102,7 +98,11 @@ def _normalize_concurrency(total: int, limit: int | None) -> int:
 
 
 def run_parallel_any_sync(
-    workers: Sequence[SyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[SyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    max_attempts: int | None = None,
+    on_retry: Callable[[int, int, BaseException], RetryDirective] | None = None,
 ) -> T:
     """Execute workers concurrently until the first success."""
 
@@ -110,34 +110,85 @@ def run_parallel_any_sync(
         raise ValueError("workers must not be empty")
     max_workers = _normalize_concurrency(len(workers), max_concurrency)
     errors: list[BaseException] = []
+    ready: deque[int] = deque(range(len(workers)))
+    future_map: dict[Future[T], int] = {}
+    attempts_lock = threading.Lock()
+    attempts_used = 0
+    worker_attempts = [0] * len(workers)
+    failures: set[int] = set()
+    last_errors: dict[int, BaseException] = {}
+
+    def _reserve_attempt(worker_index: int) -> bool:
+        nonlocal attempts_used
+        with attempts_lock:
+            if max_attempts is not None and attempts_used >= max_attempts:
+                return False
+            attempts_used += 1
+            worker_attempts[worker_index] += 1
+            return True
+
+    def _adjust_attempt(worker_index: int, next_attempt: int | None) -> None:
+        if next_attempt is None:
+            return
+        with attempts_lock:
+            worker_attempts[worker_index] = max(
+                next_attempt - 1, worker_attempts[worker_index]
+            )
+
+    def _sleep(delay: float | None) -> None:
+        if delay is None or delay <= 0:
+            return
+        threading.Event().wait(delay)
+
+    def _submit(executor: ThreadPoolExecutor, worker_index: int) -> bool:
+        if not _reserve_attempt(worker_index):
+            failures.add(worker_index)
+            return False
+        future_map[executor.submit(workers[worker_index])] = worker_index
+        return True
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        worker_iter = iter(enumerate(workers))
-        future_map: dict[Future[T], int] = {}
-
-        def _submit_next() -> None:
-            try:
-                idx, worker = next(worker_iter)
-            except StopIteration:
-                return
-            future_map[executor.submit(worker)] = idx
-
-        for _ in range(max_workers):
-            _submit_next()
+        while ready and len(future_map) < max_workers:
+            index = ready.popleft()
+            if not _submit(executor, index):
+                continue
 
         while future_map:
             done, _ = wait(future_map, return_when=FIRST_COMPLETED)
             for future in done:
-                future_map.pop(future, None)
+                worker_index = future_map.pop(future)
                 try:
                     result = future.result()
                 except BaseException as exc:  # noqa: BLE001
                     errors.append(exc)
-                    _submit_next()
+                    last_errors[worker_index] = exc
+                    delay: float | None = None
+                    next_attempt: int | None = None
+                    if on_retry is not None:
+                        directive = on_retry(
+                            worker_index, worker_attempts[worker_index], exc
+                        )
+                        next_attempt, delay = _normalize_retry_directive(directive)
+                    if delay is not None and delay >= 0:
+                        _adjust_attempt(worker_index, next_attempt)
+                        _sleep(delay)
+                        ready.append(worker_index)
+                    else:
+                        failures.add(worker_index)
                     continue
                 for pending in list(future_map):
                     pending.cancel()
                 return result
-    raise ParallelExecutionError("all workers failed") from errors[-1] if errors else None
+
+            while ready and len(future_map) < max_workers:
+                index = ready.popleft()
+                if not _submit(executor, index):
+                    continue
+
+    if len(failures) == len(workers):
+        last_error = errors[-1] if errors else None
+        raise ParallelExecutionError("all workers failed") from last_error
+    raise ParallelExecutionError("all workers failed")
 
 
 def _normalize_retry_directive(
@@ -236,24 +287,98 @@ async def run_parallel_any_async(
 
 
 def run_parallel_all_sync(
-    workers: Sequence[SyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[SyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    max_attempts: int | None = None,
+    on_retry: Callable[[int, int, BaseException], RetryDirective] | None = None,
 ) -> list[T]:
     """Execute workers concurrently and return all successful results."""
 
     if not workers:
         raise ValueError("workers must not be empty")
     max_workers = _normalize_concurrency(len(workers), max_concurrency)
-    responses: list[T] = [None] * len(workers)  # type: ignore[list-item]
+    responses: list[T | None] = [None] * len(workers)
+    attempts_lock = threading.Lock()
+    attempts_used = 0
+    worker_attempts = [0] * len(workers)
+    ready: deque[int] = deque(range(len(workers)))
+    future_map: dict[Future[T], int] = {}
+    last_errors: dict[int, BaseException] = {}
+
+    def _reserve_attempt(worker_index: int) -> bool:
+        nonlocal attempts_used
+        with attempts_lock:
+            if max_attempts is not None and attempts_used >= max_attempts:
+                return False
+            attempts_used += 1
+            worker_attempts[worker_index] += 1
+            return True
+
+    def _adjust_attempt(worker_index: int, next_attempt: int | None) -> None:
+        if next_attempt is None:
+            return
+        with attempts_lock:
+            worker_attempts[worker_index] = max(
+                next_attempt - 1, worker_attempts[worker_index]
+            )
+
+    def _sleep(delay: float | None) -> None:
+        if delay is None or delay <= 0:
+            return
+        threading.Event().wait(delay)
+
+    def _submit(executor: ThreadPoolExecutor, worker_index: int) -> bool:
+        if not _reserve_attempt(worker_index):
+            return False
+        future_map[executor.submit(workers[worker_index])] = worker_index
+        return True
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_map = {executor.submit(worker): idx for idx, worker in enumerate(workers)}
-        try:
-            for future in as_completed(future_map):
-                responses[future_map[future]] = future.result()
-        except BaseException:
-            for pending in future_map:
-                pending.cancel()
-            raise
-    return responses
+        while ready and len(future_map) < max_workers:
+            index = ready.popleft()
+            if not _submit(executor, index):
+                error = last_errors.get(index)
+                if error is not None:
+                    raise error
+                raise ParallelExecutionError("max attempts exhausted")
+
+        while future_map:
+            done, _ = wait(future_map, return_when=FIRST_COMPLETED)
+            for future in done:
+                worker_index = future_map.pop(future)
+                try:
+                    responses[worker_index] = future.result()
+                except BaseException as exc:  # noqa: BLE001
+                    delay: float | None = None
+                    next_attempt: int | None = None
+                    last_errors[worker_index] = exc
+                    if on_retry is not None:
+                        directive = on_retry(
+                            worker_index, worker_attempts[worker_index], exc
+                        )
+                        next_attempt, delay = _normalize_retry_directive(directive)
+                    if delay is not None and delay >= 0:
+                        _adjust_attempt(worker_index, next_attempt)
+                        _sleep(delay)
+                        ready.append(worker_index)
+                    else:
+                        for pending in future_map:
+                            pending.cancel()
+                        raise
+            while ready and len(future_map) < max_workers:
+                index = ready.popleft()
+                if not _submit(executor, index):
+                    error = last_errors.get(index)
+                    if error is not None:
+                        for pending in future_map:
+                            pending.cancel()
+                        raise error
+                    raise ParallelExecutionError("max attempts exhausted")
+
+    if any(response is None for response in responses):
+        raise ParallelExecutionError("all workers failed")
+    return cast(list[T], responses)
 
 
 async def run_parallel_all_async(
