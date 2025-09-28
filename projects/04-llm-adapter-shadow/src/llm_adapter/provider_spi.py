@@ -4,7 +4,7 @@ import asyncio
 import inspect
 import warnings
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
 from .utils import ensure_str_list
@@ -78,11 +78,10 @@ class TokenUsage:
         return self.prompt + self.completion
 
 
-@dataclass
+@dataclass(init=False)
 class ProviderResponse:
     text: str
     latency_ms: int
-    token_usage: InitVar[TokenUsage | None] = None
     model: str | None = None
     finish_reason: str | None = None
     tokens_in: int | None = None
@@ -90,19 +89,35 @@ class ProviderResponse:
     raw: Any | None = None
     _token_usage: TokenUsage = field(init=False, repr=False, compare=False)
 
-    def __post_init__(self, token_usage: TokenUsage | None) -> None:
-        prompt_tokens = int(self.tokens_in or 0)
-        completion_tokens = int(self.tokens_out or 0)
-        usage = token_usage or TokenUsage(
-            prompt=prompt_tokens,
-            completion=completion_tokens,
-        )
-        self._token_usage = usage
-        self.tokens_in = usage.prompt
-        self.tokens_out = usage.completion
-
-    def _get_token_usage(self) -> TokenUsage:
-        return self._token_usage
+    def __init__(
+        self,
+        text: str,
+        latency_ms: int,
+        token_usage: TokenUsage | None = None,
+        model: str | None = None,
+        finish_reason: str | None = None,
+        tokens_in: int | None = None,
+        tokens_out: int | None = None,
+        raw: Any | None = None,
+    ) -> None:
+        # required
+        self.text = text
+        self.latency_ms = latency_ms
+        # optionals
+        self.model = model
+        self.finish_reason = finish_reason
+        self.raw = raw
+        # 初期トークン値（token_usage 未指定時のフォールバック元）
+        self.tokens_in = tokens_in
+        self.tokens_out = tokens_out
+        # token_usage 正規化（指定優先、無指定なら tokens_in/out から推定）
+        if token_usage is None:
+            token_usage = TokenUsage(
+                prompt=int(self.tokens_in or 0),
+                completion=int(self.tokens_out or 0),
+            )
+        # setter を経由して同期させる
+        self.token_usage = token_usage
 
     # 互換エイリアス
     @property
@@ -111,23 +126,43 @@ class ProviderResponse:
 
     @property
     def input_tokens(self) -> int:
-        warnings.warn(
-            "ProviderResponse.input_tokens is deprecated and will be removed in a future release. "
-            "Use ProviderResponse.token_usage.prompt when logging token counts.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        if not SUPPRESS_TOKEN_USAGE_DEPRECATION:
+            warnings.warn(
+                "ProviderResponse.input_tokens is deprecated. "
+                "Use ProviderResponse.token_usage.prompt instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         return self.tokens_in or 0
 
     @property
     def output_tokens(self) -> int:
-        warnings.warn(
-            "ProviderResponse.output_tokens is deprecated and will be removed in a future release. "
-            "Use ProviderResponse.token_usage.completion when logging token counts.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        if not SUPPRESS_TOKEN_USAGE_DEPRECATION:
+            warnings.warn(
+                "ProviderResponse.output_tokens is deprecated. "
+                "Use ProviderResponse.token_usage.completion instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         return self.tokens_out or 0
+
+    @property
+    def token_usage(self) -> TokenUsage:
+        return self._token_usage
+
+    @token_usage.setter
+    def token_usage(self, value: TokenUsage | None) -> None:
+        if value is None:
+            value = TokenUsage(
+                prompt=int(self.tokens_in or 0),
+                completion=int(self.tokens_out or 0),
+            )
+        self._token_usage = value
+        self.tokens_in = value.prompt
+        self.tokens_out = value.completion
+
+
+SUPPRESS_TOKEN_USAGE_DEPRECATION = False
 
 
 class ProviderSPI(Protocol):
@@ -140,9 +175,6 @@ class AsyncProviderSPI(Protocol):
     def name(self) -> str: ...
     def capabilities(self) -> set[str]: ...
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse: ...
-
-
-cast(Any, ProviderResponse).token_usage = property(ProviderResponse._get_token_usage)
 
 
 class _AsyncProviderAdapter(AsyncProviderSPI):
