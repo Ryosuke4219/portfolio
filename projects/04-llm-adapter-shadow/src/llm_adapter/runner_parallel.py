@@ -242,6 +242,14 @@ async def run_parallel_all_async(
 
 
 @dataclass(slots=True)
+class ConsensusFailure:
+    provider: str
+    attempt: int
+    error_type: str
+    error_message: str | None
+
+
+@dataclass(slots=True)
 class ConsensusResult:
     response: ProviderResponse
     votes: int
@@ -262,6 +270,7 @@ class ConsensusResult:
     judge_name: str | None
     judge_score: float | None
     scores: dict[str, float] | None
+    failures: tuple[ConsensusFailure, ...]
 
 
 @dataclass(slots=True)
@@ -433,7 +442,10 @@ def invoke_consensus_judge(
 
 
 def compute_consensus(
-    responses: Iterable[ProviderResponse], *, config: ConsensusConfig | None = None
+    responses: Iterable[ProviderResponse],
+    *,
+    config: ConsensusConfig | None = None,
+    failures: Iterable[ConsensusFailure] | None = None,
 ) -> ConsensusResult:
     """Return the majority response according to ``config``."""
 
@@ -510,6 +522,8 @@ def compute_consensus(
     if votes < quorum:
         raise ParallelExecutionError("consensus quorum not reached")
 
+    failure_records = tuple(failures or ())
+
     return ConsensusResult(
         response=winner.primary,
         votes=votes,
@@ -530,11 +544,13 @@ def compute_consensus(
         judge_name=judge_name,
         judge_score=judge_score,
         scores=score_map,
+        failures=failure_records,
     )
 
 
 __all__ = [
     "ParallelExecutionError",
+    "ConsensusFailure",
     "ConsensusResult",
     "invoke_consensus_judge",
     "validate_consensus_schema",

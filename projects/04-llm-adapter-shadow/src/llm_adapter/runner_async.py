@@ -25,6 +25,7 @@ from .provider_spi import (
 )
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
+    ConsensusFailure,
     ParallelAllResult,
     ParallelExecutionError,
     compute_consensus,
@@ -48,8 +49,9 @@ from .utils import content_hash, elapsed_ms
 WorkerResult = tuple[
     int,
     ProviderSPI | AsyncProviderSPI,
-    ProviderResponse,
+    ProviderResponse | None,
     ShadowMetrics | None,
+    Exception | None,
 ]
 WorkerFactory = Callable[[], Awaitable[WorkerResult]]
 
@@ -351,28 +353,40 @@ class AsyncRunner:
                 provider: ProviderSPI | AsyncProviderSPI,
                 async_provider: AsyncProviderSPI,
                 attempt_index: int,
+                *,
+                allow_failures: bool,
             ) -> WorkerFactory:
                 async def _worker() -> WorkerResult:
-                    response, shadow_metrics = await self._invoke_provider_async(
-                        provider,
-                        async_provider,
-                        request,
-                        attempt=attempt_index,
-                        total_providers=total_providers,
-                        event_logger=event_logger,
-                        request_fingerprint=request_fingerprint,
-                        metadata=metadata,
-                        shadow=shadow,
-                        shadow_async=shadow_async,
-                        metrics_path=metrics_path_str,
-                        capture_shadow_metrics=capture_shadow,
-                    )
-                    return attempt_index, provider, response, shadow_metrics
+                    try:
+                        response, shadow_metrics = await self._invoke_provider_async(
+                            provider,
+                            async_provider,
+                            request,
+                            attempt=attempt_index,
+                            total_providers=total_providers,
+                            event_logger=event_logger,
+                            request_fingerprint=request_fingerprint,
+                            metadata=metadata,
+                            shadow=shadow,
+                            shadow_async=shadow_async,
+                            metrics_path=metrics_path_str,
+                            capture_shadow_metrics=capture_shadow,
+                        )
+                    except Exception as error:  # noqa: BLE001
+                        if not allow_failures:
+                            raise
+                        return attempt_index, provider, None, None, error
+                    return attempt_index, provider, response, shadow_metrics, None
 
                 return _worker
 
             workers: list[WorkerFactory] = [
-                _build_worker(provider, async_provider, index)
+                _build_worker(
+                    provider,
+                    async_provider,
+                    index,
+                    allow_failures=mode is RunnerMode.CONSENSUS,
+                )
                 for index, (provider, async_provider) in enumerate(providers, start=1)
             ]
 
@@ -383,12 +397,15 @@ class AsyncRunner:
                         provider,
                         response,
                         shadow_metrics,
+                        error,
                     ) = await run_parallel_any_async(
                         workers,
                         max_concurrency=self._config.max_concurrency,
                         max_attempts=self._config.max_attempts,
                         on_retry=_handle_parallel_retry,
                     )
+                    if error is not None or response is None:
+                        raise ParallelExecutionError("all workers failed")
                     usage = response.token_usage
                     tokens_in = usage.prompt
                     tokens_out = usage.completion
@@ -423,9 +440,29 @@ class AsyncRunner:
                 else:
                     if mode is RunnerMode.CONSENSUS:
                         try:
+                            successful_entries = [
+                                (attempt, provider, response, metrics)
+                                for attempt, provider, response, metrics, error in results
+                                if response is not None
+                            ]
+                            if not successful_entries:
+                                raise ParallelExecutionError("all workers failed")
+                            consensus_failures = [
+                                ConsensusFailure(
+                                    provider=provider.name(),
+                                    attempt=attempt,
+                                    error_type=type(error).__name__
+                                    if error is not None
+                                    else "UnknownError",
+                                    error_message=str(error) if error is not None else None,
+                                )
+                                for attempt, provider, response, _metrics, error in results
+                                if response is None
+                            ]
                             consensus = compute_consensus(
-                                [response for _, _, response, _ in results],
+                                [response for _, _, response, _ in successful_entries],
                                 config=self._config.consensus,
+                                failures=consensus_failures,
                             )
                         except ParallelExecutionError as err:
                             last_err = err
@@ -437,7 +474,7 @@ class AsyncRunner:
                                     response,
                                     metrics,
                                 )
-                                for attempt, provider, response, metrics in results
+                                for attempt, provider, response, metrics in successful_entries
                                 if response is consensus.response
                             )
                             votes_against = (
@@ -457,7 +494,16 @@ class AsyncRunner:
                                             "consensus", response.text
                                         ),
                                     }
-                                    for _, provider, response, _ in results
+                                    for _, provider, response, _ in successful_entries
+                                ]
+                                failure_summaries = [
+                                    {
+                                        "provider": failure.provider,
+                                        "attempt": failure.attempt,
+                                        "error_type": failure.error_type,
+                                        "error_message": failure.error_message,
+                                    }
+                                    for failure in consensus.failures
                                 ]
                                 event_logger.emit(
                                     "consensus_vote",
@@ -471,6 +517,7 @@ class AsyncRunner:
                                         "votes_for": consensus.votes,
                                         "votes_against": votes_against,
                                         "abstained": consensus.abstained,
+                                        "failures_total": len(consensus.failures),
                                         "winner_provider": winner_entry[1].name(),
                                         "winner_score": consensus.winner_score,
                                         "winner_latency_ms": consensus.response.latency_ms,
@@ -485,6 +532,7 @@ class AsyncRunner:
                                         "judge_score": consensus.judge_score,
                                         "votes": dict(consensus.tally),
                                         "candidate_summaries": candidate_summaries,
+                                        "failures": failure_summaries,
                                     },
                                 )
                             (
@@ -525,6 +573,7 @@ class AsyncRunner:
                                         "tie_breaker_selected": consensus.tie_breaker_selected,
                                         "judge": consensus.judge_name,
                                         "judge_score": consensus.judge_score,
+                                        "failures_total": len(consensus.failures),
                                     }
                                 }
                                 if not shadow_payload.get("shadow_ok", True):
@@ -532,13 +581,13 @@ class AsyncRunner:
                                     if error is not None:
                                         extra["shadow_consensus_error"] = error
                                 shadow_metrics.emit(extra)
-                            for _, _, _, metrics in results:
+                            for _, _, _, metrics in successful_entries:
                                 if metrics is not None and metrics is not shadow_metrics:
                                     metrics.emit()
                             return response
                             last_err = ParallelExecutionError("consensus resolution failed")
                     else:
-                        _attempt_index, provider, response, _metrics = results[0]
+                        _attempt_index, provider, response, _metrics, _error = results[0]
                         usage = response.token_usage
                         tokens_in = usage.prompt
                         tokens_out = usage.completion
@@ -564,8 +613,8 @@ class AsyncRunner:
                         )
 
         if mode is RunnerMode.CONSENSUS:
-            for _, _, _, metrics in results:
-                if metrics is not None:
+            for _, _, response, metrics, _ in results:
+                if metrics is not None and response is not None:
                     metrics.emit()
 
         if event_logger is not None:

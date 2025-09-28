@@ -19,6 +19,7 @@ from .observability import EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
+    ConsensusFailure,
     ParallelAllResult,
     ParallelExecutionError,
     compute_consensus,
@@ -52,6 +53,7 @@ class ProviderInvocationResult:
     tokens_out: int | None
     shadow_metrics: ShadowMetrics | None
     shadow_metrics_extra: dict[str, object] | None
+    succeeded: bool
 
 
 class Runner:
@@ -163,6 +165,7 @@ class Runner:
             tokens_out=tokens_out,
             shadow_metrics=shadow_metrics,
             shadow_metrics_extra=None,
+            succeeded=error is None and response is not None,
         )
 
     def _log_parallel_results(
@@ -415,12 +418,27 @@ class Runner:
                     for res in invocations
                     if res.response is not None
                 ]
-                if len(successful) != len(invocations):
+                if not successful:
                     raise ParallelExecutionError("all workers failed")
                 responses_for_consensus = [response for _, response in successful]
+                consensus_failures = [
+                    ConsensusFailure(
+                        provider=invocation.provider.name(),
+                        attempt=invocation.attempt,
+                        error_type=type(invocation.error).__name__
+                        if invocation.error is not None
+                        else "UnknownError",
+                        error_message=str(invocation.error)
+                        if invocation.error is not None
+                        else None,
+                    )
+                    for invocation in invocations
+                    if invocation.response is None
+                ]
                 consensus = compute_consensus(
                     responses_for_consensus,
                     config=self._config.consensus,
+                    failures=consensus_failures,
                 )
                 winner_invocation = next(
                     invocation
@@ -442,34 +460,45 @@ class Runner:
                         }
                         for invocation, response in successful
                     ]
+                    failure_summaries = [
+                        {
+                            "provider": failure.provider,
+                            "attempt": failure.attempt,
+                            "error_type": failure.error_type,
+                            "error_message": failure.error_message,
+                        }
+                        for failure in consensus.failures
+                    ]
                     event_logger.emit(
                         "consensus_vote",
                         {
                             "request_fingerprint": request_fingerprint,
-                                "strategy": consensus.strategy,
+                            "strategy": consensus.strategy,
                                 "tie_breaker": consensus.tie_breaker,
                                 "min_votes": consensus.min_votes,
                                 "score_threshold": consensus.score_threshold,
                                 "voters_total": consensus.total_voters,
-                                "votes_for": consensus.votes,
-                                "votes_against": votes_against,
-                                "abstained": consensus.abstained,
-                                "winner_provider": winner_invocation.provider.name(),
-                                "winner_score": consensus.winner_score,
-                                "winner_latency_ms": consensus.response.latency_ms,
-                                "tie_break_applied": consensus.tie_break_applied,
-                                "tie_break_reason": consensus.tie_break_reason,
-                                "tie_breaker_selected": consensus.tie_breaker_selected,
-                                "rounds": consensus.rounds,
-                                "scores": consensus.scores,
-                                "schema_checked": consensus.schema_checked,
-                                "schema_failures": consensus.schema_failures,
-                                "judge": consensus.judge_name,
-                                "judge_score": consensus.judge_score,
-                                "votes": dict(consensus.tally),
-                                "candidate_summaries": candidate_summaries,
-                            },
-                        )
+                            "votes_for": consensus.votes,
+                            "votes_against": votes_against,
+                            "abstained": consensus.abstained,
+                            "failures_total": len(consensus.failures),
+                            "winner_provider": winner_invocation.provider.name(),
+                            "winner_score": consensus.winner_score,
+                            "winner_latency_ms": consensus.response.latency_ms,
+                            "tie_break_applied": consensus.tie_break_applied,
+                            "tie_break_reason": consensus.tie_break_reason,
+                            "tie_breaker_selected": consensus.tie_breaker_selected,
+                            "rounds": consensus.rounds,
+                            "scores": consensus.scores,
+                            "schema_checked": consensus.schema_checked,
+                            "schema_failures": consensus.schema_failures,
+                            "judge": consensus.judge_name,
+                            "judge_score": consensus.judge_score,
+                            "votes": dict(consensus.tally),
+                            "candidate_summaries": candidate_summaries,
+                            "failures": failure_summaries,
+                        },
+                    )
                 if winner_invocation.shadow_metrics is not None:
                     shadow_payload = winner_invocation.shadow_metrics.payload
                     extra: dict[str, object] = {
@@ -483,6 +512,7 @@ class Runner:
                             "tie_breaker_selected": consensus.tie_breaker_selected,
                             "judge": consensus.judge_name,
                             "judge_score": consensus.judge_score,
+                            "failures_total": len(consensus.failures),
                         }
                     }
                     if not shadow_payload.get("shadow_ok", True):
