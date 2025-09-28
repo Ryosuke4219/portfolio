@@ -215,6 +215,35 @@ class Runner:
                 shadow_used=shadow_used,
             )
 
+    def _run_parallel_all(
+        self,
+        workers: Sequence[Callable[[], ProviderInvocationResult]],
+        max_attempts: int | None,
+        on_retry: Callable[[int, int, BaseException], RetryDirective],
+    ) -> Sequence[ProviderInvocationResult]:
+        try:
+            return run_parallel_all_sync(
+                workers,
+                max_concurrency=self._config.max_concurrency,
+                max_attempts=max_attempts,
+                on_retry=on_retry,
+            )
+        except TypeError as error:
+            if not self._retry_keyword_unsupported(error):
+                raise
+            try:
+                return run_parallel_all_sync(
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                )
+            except TypeError as fallback_error:  # pragma: no cover - defensive
+                raise fallback_error from error
+
+    @staticmethod
+    def _retry_keyword_unsupported(error: TypeError) -> bool:
+        message = str(error)
+        return "max_attempts" in message or "on_retry" in message
+
     def _extract_fatal_error(
         self, results: Sequence[ProviderInvocationResult | None]
     ) -> FatalError | None:
@@ -462,11 +491,10 @@ class Runner:
                 return response
 
             if mode is RunnerMode.PARALLEL_ALL:
-                invocations = run_parallel_all_sync(
+                invocations = self._run_parallel_all(
                     workers,
-                    max_concurrency=self._config.max_concurrency,
-                    max_attempts=max_attempts_config,
-                    on_retry=handle_retry,
+                    max_attempts_config,
+                    handle_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
@@ -480,11 +508,10 @@ class Runner:
                 )
 
             if mode is RunnerMode.CONSENSUS:
-                invocations = run_parallel_all_sync(
+                invocations = self._run_parallel_all(
                     workers,
-                    max_concurrency=self._config.max_concurrency,
-                    max_attempts=max_attempts_config,
-                    on_retry=handle_retry,
+                    max_attempts_config,
+                    handle_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
