@@ -458,6 +458,7 @@ class Runner:
                     failure_details: list[dict[str, str]] = []
                     for invocation in invocations:
                         provider_name = invocation.provider.name()
+                        attempt_label = str(invocation.attempt)
                         error = invocation.error
                         summary = (
                             f"{type(error).__name__}: {error}"
@@ -465,10 +466,14 @@ class Runner:
                             else "unknown error"
                         )
                         failure_details.append(
-                            {"provider": provider_name, "summary": summary}
+                            {
+                                "provider": provider_name,
+                                "attempt": attempt_label,
+                                "summary": summary,
+                            }
                         )
                     detail_text = "; ".join(
-                        f"{item['provider']}: {item['summary']}"
+                        f"{item['provider']} (attempt {item['attempt']}): {item['summary']}"
                         for item in failure_details
                     )
                     message = "all workers failed"
