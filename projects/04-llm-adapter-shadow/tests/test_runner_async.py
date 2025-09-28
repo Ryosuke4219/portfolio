@@ -59,6 +59,28 @@ class _AsyncProbeProvider:
             self.finished = True
 
 
+class _StaticProvider:
+    def __init__(self, name: str, text: str, latency_ms: int) -> None:
+        self._name = name
+        self._text = text
+        self._latency_ms = latency_ms
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        return ProviderResponse(
+            text=self._text,
+            latency_ms=self._latency_ms,
+            token_usage=TokenUsage(prompt=1, completion=1),
+            model=request.model,
+            finish_reason="stop",
+        )
+
+
 def test_async_runner_matches_sync(tmp_path: Path) -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     sync_runner = Runner([primary])
@@ -200,6 +222,57 @@ def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_error"] == "TimeoutError"
     assert diff_event["shadow_error_message"] == "simulated timeout"
     assert diff_event["shadow_duration_ms"] >= 0
+
+
+def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+
+    agree_text = "agree: async"
+    agree_a = _StaticProvider("agree_a", agree_text, latency_ms=5)
+    agree_b = _StaticProvider("agree_b", agree_text, latency_ms=7)
+    disagree = _StaticProvider("disagree", "disagree: async", latency_ms=9)
+    shadow = MockProvider("shadow", base_latency_ms=1, error_markers=set())
+
+    runner = AsyncRunner(
+        [agree_a, agree_b, disagree],
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=3,
+            consensus=ConsensusConfig(quorum=2),
+        ),
+    )
+
+    request = ProviderRequest(prompt="async hello", model="m-async-consensus")
+    metrics_path = tmp_path / "async-consensus.jsonl"
+
+    response = asyncio.run(
+        runner.run_async(
+            request,
+            shadow=shadow,
+            shadow_metrics_path=metrics_path,
+        )
+    )
+
+    assert response.text == agree_text
+    payloads = [
+        json.loads(line)
+        for line in metrics_path.read_text().splitlines()
+        if line.strip()
+    ]
+    consensus_event = next(
+        item for item in payloads if item.get("event") == "consensus_vote"
+    )
+    assert consensus_event["votes_for"] == 2
+    assert consensus_event["votes_against"] == 1
+    assert consensus_event["winner_provider"] == "agree_a"
+
+    winner_diff = next(
+        item
+        for item in payloads
+        if item.get("event") == "shadow_diff"
+        and item.get("primary_provider") == "agree_a"
+    )
+    assert winner_diff["shadow_consensus_delta"]["votes_total"] == 3
 
 
 def test_async_parallel_any_returns_first_completion() -> None:

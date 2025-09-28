@@ -145,6 +145,16 @@ async def run_parallel_all_async(
 class ConsensusResult:
     response: ProviderResponse
     votes: int
+    tally: dict[str, int]
+    total_voters: int
+    strategy: str
+    min_votes: int | None
+    score_threshold: float | None
+    tie_breaker: str | None
+    tie_break_applied: bool
+    tie_break_reason: str | None
+    winner_score: float
+    abstained: int
 
 
 def compute_consensus(
@@ -159,12 +169,28 @@ def compute_consensus(
         config = ConsensusConfig()
     quorum = config.quorum or len(collected)
     counter = Counter(response.text.strip() for response in collected)
-    top_text, votes = counter.most_common(1)[0]
+    rankings = counter.most_common()
+    top_text, votes = rankings[0]
+    tie_break_applied = len(rankings) > 1 and rankings[1][1] == votes
+    tie_break_reason = config.tie_breaker if tie_break_applied else None
     if votes < quorum:
         raise ParallelExecutionError("consensus quorum not reached")
     for response in collected:
         if response.text.strip() == top_text:
-            return ConsensusResult(response=response, votes=votes)
+            return ConsensusResult(
+                response=response,
+                votes=votes,
+                tally=dict(counter),
+                total_voters=len(collected),
+                strategy=config.strategy,
+                min_votes=config.quorum,
+                score_threshold=None,
+                tie_breaker=config.tie_breaker,
+                tie_break_applied=tie_break_applied,
+                tie_break_reason=tie_break_reason,
+                winner_score=float(votes),
+                abstained=0,
+            )
     raise RuntimeError("consensus resolution failed")
 
 

@@ -6,6 +6,8 @@ import asyncio
 import contextlib
 import threading
 import time
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,26 @@ from .utils import content_hash
 
 MetricsPath = str | Path | None
 DEFAULT_METRICS_PATH = "artifacts/runs-metrics.jsonl"
+
+
+@dataclass(slots=True)
+class ShadowMetrics:
+    payload: dict[str, Any]
+    logger: EventLogger | None
+
+    def extend(self, extra: Mapping[str, Any] | None = None) -> None:
+        if not extra:
+            return
+        self.payload.update(dict(extra))
+
+    def emit(self, extra: Mapping[str, Any] | None = None) -> None:
+        if extra:
+            self.extend(extra)
+        if self.logger is None:
+            return
+        payload = dict(self.payload)
+        payload.setdefault("ts", int(time.time() * 1000))
+        self.logger.emit("shadow_diff", payload)
 
 
 def _to_path_str(path: MetricsPath) -> str | None:
@@ -40,7 +62,8 @@ def run_with_shadow(
     metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
     *,
     logger: EventLogger | None = None,
-) -> ProviderResponse:
+    capture_metrics: bool = False,
+) -> ProviderResponse | tuple[ProviderResponse, ShadowMetrics | None]:
     """Invoke ``primary`` while optionally mirroring the call on ``shadow``.
 
     The shadow execution runs on a background thread and *never* affects the
@@ -150,10 +173,21 @@ def run_with_shadow(
             if event_logger is None and metrics_path_str is not None:
                 event_logger = JsonlLogger(metrics_path_str)
 
-            if event_logger is not None:
-                payload = dict(record)
-                payload.setdefault("ts", int(time.time() * 1000))
-                event_logger.emit("shadow_diff", payload)
+            metrics: ShadowMetrics | None
+            if capture_metrics:
+                metrics = ShadowMetrics(record, event_logger)
+            elif event_logger is not None:
+                metrics = ShadowMetrics(record, event_logger)
+                metrics.emit()
+                metrics = None
+            else:
+                metrics = None
+
+            if capture_metrics:
+                return primary_res, metrics
+
+    if capture_metrics:
+        return primary_res, None
 
     return primary_res
 
@@ -165,7 +199,8 @@ async def run_with_shadow_async(
     metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
     *,
     logger: EventLogger | None = None,
-) -> ProviderResponse:
+    capture_metrics: bool = False,
+) -> ProviderResponse | tuple[ProviderResponse, ShadowMetrics | None]:
     primary_async = ensure_async_provider(primary)
     shadow_async = ensure_async_provider(shadow) if shadow is not None else None
 
@@ -274,12 +309,28 @@ async def run_with_shadow_async(
             if event_logger is None and metrics_path_str is not None:
                 event_logger = JsonlLogger(metrics_path_str)
 
-            if event_logger is not None:
-                payload = dict(record)
-                payload.setdefault("ts", int(time.time() * 1000))
-                event_logger.emit("shadow_diff", payload)
+            metrics: ShadowMetrics | None
+            if capture_metrics:
+                metrics = ShadowMetrics(record, event_logger)
+            elif event_logger is not None:
+                metrics = ShadowMetrics(record, event_logger)
+                metrics.emit()
+                metrics = None
+            else:
+                metrics = None
+
+            if capture_metrics:
+                return primary_res, metrics
+
+    if capture_metrics:
+        return primary_res, None
 
     return primary_res
 
 
-__all__ = ["run_with_shadow", "run_with_shadow_async", "DEFAULT_METRICS_PATH"]
+__all__ = [
+    "run_with_shadow",
+    "run_with_shadow_async",
+    "DEFAULT_METRICS_PATH",
+    "ShadowMetrics",
+]
