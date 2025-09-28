@@ -1,203 +1,319 @@
 """応答集約ストラテジ。"""
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast, runtime_checkable
 
-from .loader import load_provider_config
-from .models import ProviderConfig
-from .providers import ProviderFactory
+# 依存は実行時読み込み。型は実体を使う（mypy用に直import）
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse  # noqa: E402
+
+# ===== 基本データ構造 =====
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class AggregationCandidate:
-    """集約対象の候補。"""
+    """集約対象となる各候補。"""
 
-    key: str
-    content: str
+    index: int
+    provider: str
+    response: ProviderResponse
+    text: str | None = None
     score: float | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class AggregationResult:
-    """集約処理の結果。"""
+    """集約の最終結果。"""
 
-    winner: AggregationCandidate
+    chosen: AggregationCandidate
+    candidates: list[AggregationCandidate]
+    strategy: str
     reason: str | None = None
-    raw: Mapping[str, Any] | None = None
+    tie_breaker_used: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
-class TieBreaker(ABC):
-    """同点時のタイブレーク戦略。"""
+# ===== タイブレーカー抽象 =====
 
-    name: str = "first"
 
-    @abstractmethod
+@runtime_checkable
+class TieBreaker(Protocol):
+    name: str
+
     def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
-        """同点候補の中から 1 件を選ぶ。"""
+        ...
 
 
-class FirstTieBreaker(TieBreaker):
-    """最初の候補を採用する単純なタイブレーク。"""
+class FirstTieBreaker:
+    """決定的：先勝（index最小）"""
+
+    name = "first"
 
     def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
         if not candidates:
-            raise ValueError("tie breaker requires candidates")
-        return candidates[0]
+            raise ValueError("TieBreaker: candidates must be non-empty")
+        return min(candidates, key=lambda c: c.index)
 
 
-class AggregationStrategy(ABC):
-    """応答集約戦略の抽象基底。"""
+class MaxScoreTieBreaker:
+    """スコア最大。全員 None の場合は First にフォールバック。"""
 
-    name: str = ""
+    name = "max_score"
 
-    def __init__(self, *, tie_breaker: TieBreaker | None = None) -> None:
-        self._tie_breaker = tie_breaker or FirstTieBreaker()
-
-    @abstractmethod
-    def aggregate(self, candidates: Sequence[AggregationCandidate]) -> AggregationResult:
-        """候補群を集約し単一の結果へ還元する。"""
-
-    @classmethod
-    def from_string(cls, value: str, **kwargs: Any) -> AggregationStrategy:
-        """文字列指定からストラテジを生成する。"""
-
-        key = value.strip().lower()
-        if key in {"majority", "majority-vote"}:
-            return MajorityVoteAggregation(**kwargs)
-        if key in {"score", "score-max"}:
-            return ScoreAggregation(**kwargs)
-        if key == "judge":
-            judge_cfg = kwargs.pop("judge", None)
-            if judge_cfg is None:
-                raise ValueError("judge strategy requires provider config")
-            return JudgeAggregation(judge=judge_cfg, **kwargs)
-        raise ValueError(f"unknown aggregation strategy: {value}")
+    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
+        if not candidates:
+            raise ValueError("TieBreaker: candidates must be non-empty")
+        if any(c.score is not None for c in candidates):
+            return max(
+                candidates,
+                key=lambda c: (c.score is not None, float(c.score or float("-inf")), -c.index),
+            )
+        return FirstTieBreaker().break_tie(candidates)
 
 
-class MajorityVoteAggregation(AggregationStrategy):
-    """単純多数決の集約。"""
+# ===== 集約ストラテジ抽象 =====
+
+
+@runtime_checkable
+class AggregationStrategy(Protocol):
+    name: str
+
+    def aggregate(
+        self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
+    ) -> AggregationResult:
+        ...
+
+    @staticmethod
+    def from_string(kind: str, **kwargs: Any) -> AggregationStrategy:
+        kind_norm = (kind or "").strip().lower()
+        if kind_norm in {"majority", "vote", "maj"}:
+            return cast(AggregationStrategy, MajorityVoteStrategy())
+        if kind_norm in {"max", "score", "top"}:
+            return cast(AggregationStrategy, MaxScoreStrategy())
+        if kind_norm in {"judge", "llm-judge"}:
+            try:
+                model = kwargs["model"]
+            except KeyError as e:
+                raise ValueError("JudgeStrategy requires `model=`") from e
+            provider_factory = kwargs.get("provider_factory")
+            if provider_factory is None:
+                raise ValueError("JudgeStrategy requires `provider_factory=`")
+            prompt_template = kwargs.get("prompt_template")
+            return cast(
+                AggregationStrategy,
+                JudgeStrategy(
+                    model=str(model),
+                    provider_factory=provider_factory,
+                    prompt_template=prompt_template,
+                ),
+            )
+        raise ValueError(f"Unknown aggregation strategy: {kind!r}")
+
+
+# ===== 既定ストラテジ実装 =====
+
+
+class MajorityVoteStrategy:
+    """テキスト同一性の多数決（完全一致）。引き分けはタイブレーカー。"""
 
     name = "majority"
 
-    def aggregate(self, candidates: Sequence[AggregationCandidate]) -> AggregationResult:
+    def aggregate(
+        self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
+    ) -> AggregationResult:
         if not candidates:
-            raise ValueError("no candidates to aggregate")
-        counts = Counter(candidate.content for candidate in candidates)
-        top = max(counts.values())
-        winners = [candidate for candidate in candidates if counts[candidate.content] == top]
-        if len({candidate.content for candidate in winners}) == 1:
-            winner = winners[0]
-        else:
-            winner = self._tie_breaker.break_tie(winners)
-        return AggregationResult(winner=winner, reason="majority", raw={"counts": dict(counts)})
+            raise ValueError("majority: candidates must be non-empty")
+
+        # 正規化：空(None/空文字)は "" として扱いカウント可能に
+        def norm(s: str | None) -> str:
+            return (s or "").strip()
+
+        buckets: dict[str, list[AggregationCandidate]] = {}
+        for candidate in candidates:
+            key = norm(candidate.text if candidate.text is not None else candidate.response.text)
+            buckets.setdefault(key, []).append(candidate)
+
+        # 最大票のバケットを抽出
+        max_bucket: list[AggregationCandidate] = []
+        max_count = -1
+        for bucket in buckets.values():
+            if len(bucket) > max_count:
+                max_bucket = bucket
+                max_count = len(bucket)
+
+        breaker = tiebreaker or FirstTieBreaker()
+        chosen = max_bucket[0] if len(max_bucket) == 1 else breaker.break_tie(max_bucket)
+        reason = f"majority({max_count})"
+        tie_used = None if len(max_bucket) == 1 else breaker.name
+
+        return AggregationResult(
+            chosen=chosen,
+            candidates=list(candidates),
+            strategy=self.name,
+            reason=reason,
+            tie_breaker_used=tie_used,
+            metadata={"bucket_size": max_count},
+        )
 
 
-class ScoreAggregation(AggregationStrategy):
-    """スコアの最大値を採用する集約。"""
+class MaxScoreStrategy:
+    """score 最大値を採用。全件 score=None の場合はタイブレーカー。"""
 
-    name = "score"
+    name = "max_score"
 
-    def aggregate(self, candidates: Sequence[AggregationCandidate]) -> AggregationResult:
+    def aggregate(
+        self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
+    ) -> AggregationResult:
         if not candidates:
-            raise ValueError("no candidates to aggregate")
-        if any(candidate.score is None for candidate in candidates):
-            raise ValueError("score aggregation requires candidate.score")
-        top = max(candidate.score for candidate in candidates if candidate.score is not None)
-        winners = [candidate for candidate in candidates if candidate.score == top]
-        winner = winners[0] if len(winners) == 1 else self._tie_breaker.break_tie(winners)
-        return AggregationResult(winner=winner, reason="score", raw={"top_score": top})
+            raise ValueError("max_score: candidates must be non-empty")
+
+        if any(candidate.score is not None for candidate in candidates):
+            chosen = max(
+                candidates,
+                key=lambda c: (c.score is not None, float(c.score or float("-inf")), -c.index),
+            )
+            return AggregationResult(
+                chosen=chosen,
+                candidates=list(candidates),
+                strategy=self.name,
+                reason=f"score={chosen.score}",
+                tie_breaker_used=None,
+                metadata=None,
+            )
+
+        breaker = tiebreaker or FirstTieBreaker()
+        chosen = breaker.break_tie(candidates)
+        return AggregationResult(
+            chosen=chosen,
+            candidates=list(candidates),
+            strategy=self.name,
+            reason="all scores are None → tie-break",
+            tie_breaker_used=breaker.name,
+            metadata=None,
+        )
 
 
-class JudgeAggregation(AggregationStrategy):
-    """判定用 LLM による集約。"""
+# --- Judge（LLM判定） ---
+
+
+class JudgeStrategy:
+    """
+    LLM ジャッジにより最良を選ぶ。
+    - provider_factory.create(model=...) で判定用プロバイダを作成
+    - 候補を列挙したプロンプトを与え、選択インデックスを抽出
+    """
 
     name = "judge"
 
     def __init__(
         self,
         *,
-        judge: ProviderConfig | str | Path,
-        tie_breaker: TieBreaker | None = None,
+        model: str,
+        provider_factory: Any,
         prompt_template: str | None = None,
     ) -> None:
-        super().__init__(tie_breaker=tie_breaker)
-        config = judge if isinstance(judge, ProviderConfig) else load_provider_config(Path(judge))
-        self._provider = ProviderFactory.create(config)
-        self._prompt_template = (
-            prompt_template
-            or "あなたは複数のモデル出力を審査する判定者です。\n最も適切な応答を選んでください。"
-        )
+        self._model = model
+        self._provider_factory = provider_factory
+        self._prompt_template = prompt_template or DEFAULT_JUDGE_TEMPLATE
 
-    def aggregate(self, candidates: Sequence[AggregationCandidate]) -> AggregationResult:
+    def aggregate(
+        self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
+    ) -> AggregationResult:
         if not candidates:
-            raise ValueError("no candidates to aggregate")
-        prompt = self._build_prompt(candidates)
-        response = self._provider.generate(prompt)
-        text = response.output_text.strip()
-        winner = self._select_winner(text.splitlines()[0].strip() if text else "", candidates)
-        reason = text or None
-        if winner is None:
-            winner = self._tie_breaker.break_tie(candidates)
-            reason = f"tie-break ({reason or 'empty'})"
+            raise ValueError("judge: candidates must be non-empty")
+
+        # プロンプト生成（1-basedで番号付け）
+        rows: list[str] = []
+        for index, candidate in enumerate(candidates, start=1):
+            raw = candidate.text if candidate.text is not None else candidate.response.text
+            text = raw.strip()
+            rows.append(f"{index}. {text}")
+
+        prompt = self._prompt_template.format(candidates="\n".join(rows))
+
+        # ジャッジプロバイダを作成して問い合わせ
+        judge = self._provider_factory.create(model=self._model)
+        request = ProviderRequest(model=self._model, prompt=prompt, max_tokens=16, temperature=0.0)
+        response: ProviderResponse = judge.invoke(request)
+
+        index_or_none = _parse_choice_index(response.text, total=len(candidates))
+        if index_or_none is None:
+            breaker = tiebreaker or FirstTieBreaker()
+            chosen = breaker.break_tie(candidates)
+            return AggregationResult(
+                chosen=chosen,
+                candidates=list(candidates),
+                strategy=self.name,
+                reason="judge parse failed → tie-break",
+                tie_breaker_used=breaker.name,
+                metadata={"judge_raw": response.text},
+            )
+
+        index = index_or_none
+        chosen = candidates[index]
         return AggregationResult(
-            winner=winner,
-            reason=reason,
-            raw={"prompt": prompt, "response": response.raw_output},
+            chosen=chosen,
+            candidates=list(candidates),
+            strategy=self.name,
+            reason=f"judge selected {index + 1}",
+            tie_breaker_used=None,
+            metadata={"judge_raw": response.text},
         )
 
-    def _build_prompt(self, candidates: Sequence[AggregationCandidate]) -> str:
-        lines = [self._prompt_template.strip(), ""]
-        for index, candidate in enumerate(candidates, 1):
-            lines.append(f"[{index}] {candidate.key}:\n{candidate.content.strip()}")
-        lines.append(
-            "\nRespond with the winning index on the first line and optionally a short reason."
-        )
-        return "\n".join(lines)
 
-    def _select_winner(
-        self, first_line: str, candidates: Sequence[AggregationCandidate]
-    ) -> AggregationCandidate | None:
-        if first_line.isdigit():
-            index = int(first_line)
-            if 1 <= index <= len(candidates):
-                return candidates[index - 1]
-        lowered = first_line.lower()
-        for index, candidate in enumerate(candidates, 1):
-            if lowered == candidate.key.lower() or lowered.startswith(str(index)):
-                return candidates[index - 1]
+DEFAULT_JUDGE_TEMPLATE = (
+    """You are a strict evaluator.
+Read the following candidates and choose the single best answer.
+
+Candidates:
+{candidates}
+
+Rules:
+- Output only the number of the chosen candidate on the first line (e.g., \"2\").
+- Do not add explanations.
+
+Answer with the number only.
+""".strip()
+)
+
+
+def _parse_choice_index(text: str, *, total: int) -> int | None:
+    """
+    返答から 1..total の整数を抽出して 0-based index を返す。
+    先頭行優先、なければ最小の妥当数字を拾う。
+    """
+
+    import re
+
+    if not text:
         return None
 
+    first_line = text.strip().splitlines()[0]
+    for chunk in (first_line, text):
+        match = re.search(r"\b([1-9][0-9]?)\b", chunk)
+        if not match:
+            continue
+        value = int(match.group(1))
+        if 1 <= value <= total:
+            return value - 1
+    return None
 
-def AggregationResolver(
-    strategy: str,
-    *,
-    tie_breaker: str | None = None,
-    judge: ProviderConfig | str | Path | None = None,
-    **kwargs: Any,
-) -> AggregationStrategy:
-    """集約ストラテジを解決するヘルパー。"""
 
-    name = tie_breaker.strip().lower() if tie_breaker else "first"
-    if name != "first":
-        raise ValueError(f"unknown tie breaker: {tie_breaker}")
-    options = dict(kwargs)
-    options["tie_breaker"] = FirstTieBreaker()
-    if strategy.strip().lower() == "judge":
-        if judge is None:
-            raise ValueError("judge strategy requires judge provider")
-        options["judge"] = judge
-    return AggregationStrategy.from_string(strategy, **options)
+# 便利ヘルパー：API/CLI から簡単に呼べるように
+def AggregationResolver(kind: str, **kwargs: Any) -> AggregationStrategy:
+    return AggregationStrategy.from_string(kind, **kwargs)
 
 
 __all__ = [
     "AggregationCandidate",
     "AggregationResult",
     "TieBreaker",
+    "FirstTieBreaker",
+    "MaxScoreTieBreaker",
     "AggregationStrategy",
     "AggregationResolver",
+    "JudgeStrategy",
+    "MajorityVoteStrategy",
+    "MaxScoreStrategy",
 ]

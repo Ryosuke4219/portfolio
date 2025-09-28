@@ -1,6 +1,16 @@
 """adapter.core パッケージの公開 API。"""
 
-from .aggregation import AggregationResolver  # noqa: F401
+from .aggregation import (  # noqa: F401
+    AggregationCandidate,
+    AggregationResolver,
+    AggregationResult,
+    AggregationStrategy,
+    FirstTieBreaker,
+    JudgeStrategy,
+    MajorityVoteStrategy,
+    MaxScoreStrategy,
+    MaxScoreTieBreaker,
+)
 from .budgets import BudgetManager  # noqa: F401
 from .config import (  # noqa: F401
     BudgetBook,
@@ -26,7 +36,12 @@ from .providers import ProviderFactory  # noqa: F401
 from .runners import CompareRunner  # noqa: F401
 
 __all__ = [
+    "AggregationCandidate",
     "AggregationResolver",
+    "AggregationResult",
+    "AggregationStrategy",
+    "FirstTieBreaker",
+    "JudgeStrategy",
     "BudgetManager",
     "BudgetBook",
     "BudgetRule",
@@ -45,6 +60,9 @@ __all__ = [
     "estimate_cost",
     "hash_text",
     "now_ts",
+    "MajorityVoteStrategy",
+    "MaxScoreStrategy",
+    "MaxScoreTieBreaker",
     "ProviderFactory",
     "CompareRunner",
 ]
