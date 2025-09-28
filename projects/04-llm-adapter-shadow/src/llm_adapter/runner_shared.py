@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Awaitable
+from typing import TYPE_CHECKING, Any
 
 from .errors import FatalError, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger, JsonlLogger

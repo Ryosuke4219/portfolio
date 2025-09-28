@@ -206,7 +206,7 @@ def _extract_score(response: ProviderResponse) -> float:
     raw = response.raw
     if isinstance(raw, Mapping):
         value = raw.get("score")
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
     return 0.0
 
