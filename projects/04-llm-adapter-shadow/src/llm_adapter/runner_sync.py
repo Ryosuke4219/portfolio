@@ -175,12 +175,16 @@ class Runner:
         metadata: dict[str, object],
         run_started: float,
         shadow_used: bool,
+        skip: tuple[ProviderInvocationResult, ...] | None = None,
     ) -> None:
+        skipped = skip or ()
         for result in results:
             if result is None:
                 continue
             if result.shadow_metrics is not None:
                 result.shadow_metrics.emit(result.shadow_metrics_extra)
+            if any(result is skipped_result for skipped_result in skipped):
+                continue
             status = "ok" if result.response is not None else "error"
             if status == "ok":
                 tokens_in = result.tokens_in if result.tokens_in is not None else 0
@@ -380,6 +384,7 @@ class Runner:
             for index, provider in enumerate(self.providers, start=1)
         ]
 
+        skip_run_metric: tuple[ProviderInvocationResult, ...] | None = None
         try:
             if mode is RunnerMode.PARALLEL_ANY:
                 winner = run_parallel_any_sync(
@@ -391,6 +396,33 @@ class Runner:
                 response = winner.response
                 if response is None:
                     raise ParallelExecutionError("all workers failed")
+                attempts_final = sum(1 for item in results if item is not None)
+                if attempts_final == 0:
+                    attempts_final = winner.attempt
+                tokens_in = winner.tokens_in if winner.tokens_in is not None else 0
+                tokens_out = winner.tokens_out if winner.tokens_out is not None else 0
+                cost_usd = estimate_cost(winner.provider, tokens_in, tokens_out)
+                latency_ms = (
+                    winner.latency_ms
+                    if winner.latency_ms is not None
+                    else elapsed_ms(run_started)
+                )
+                log_run_metric(
+                    event_logger,
+                    request_fingerprint=request_fingerprint,
+                    request=request,
+                    provider=winner.provider,
+                    status="ok",
+                    attempts=attempts_final,
+                    latency_ms=latency_ms,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    cost_usd=cost_usd,
+                    error=None,
+                    metadata=metadata,
+                    shadow_used=shadow_used,
+                )
+                skip_run_metric = (winner,)
                 return response
 
             if mode is RunnerMode.PARALLEL_ALL:
@@ -536,6 +568,7 @@ class Runner:
                 metadata=metadata,
                 run_started=run_started,
                 shadow_used=shadow_used,
+                skip=skip_run_metric,
             )
 
         raise RuntimeError(f"Unsupported runner mode: {mode}")
