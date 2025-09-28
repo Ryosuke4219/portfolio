@@ -13,7 +13,6 @@ from concurrent.futures import (
     FIRST_COMPLETED,
     Future,
     ThreadPoolExecutor,
-    as_completed,
     wait,
 )
 from dataclasses import dataclass, field
