@@ -30,6 +30,28 @@ export function parseListSection(lines, startIndex) {
   return { values, nextIndex: index - 1 };
 }
 
+const SECTION_PATTERNS = {
+  pre: /^pre\s*:\s*/i,
+  steps: /^steps?\s*:\s*/i,
+  expected: /^expected\s*:\s*/i,
+};
+
+export function handleSectionLine(sectionName, normalisedLine, lines, index, current) {
+  const pattern = SECTION_PATTERNS[sectionName];
+  if (!pattern?.test(normalisedLine)) return null;
+
+  const inlineValue = normalisedLine.replace(pattern, '').trim();
+  const targetArray = current[sectionName];
+  if (inlineValue) {
+    targetArray.push(inlineValue);
+    return { section: sectionName, nextIndex: index };
+  }
+
+  const { values, nextIndex } = parseListSection(lines, index + 1);
+  targetArray.push(...values);
+  return { section: sectionName, nextIndex };
+}
+
 export function parseSpecText(text) {
   const lines = text.split(/\r?\n/);
   let suite = '';
@@ -91,44 +113,16 @@ export function parseSpecText(text) {
       continue;
     }
 
-    if (/^pre\s*:/i.test(normalisedLine)) {
-      currentSection = 'pre';
-      const inlineValue = normalisedLine.replace(/^pre\s*:\s*/i, '').trim();
-      if (inlineValue) {
-        current.pre.push(inlineValue);
-      } else {
-        const { values, nextIndex } = parseListSection(lines, i + 1);
-        current.pre.push(...values);
-        i = nextIndex;
-      }
-      continue;
+    let sectionHandled = false;
+    for (const sectionName of ['pre', 'steps', 'expected']) {
+      const result = handleSectionLine(sectionName, normalisedLine, lines, i, current);
+      if (!result) continue;
+      currentSection = result.section;
+      i = result.nextIndex;
+      sectionHandled = true;
+      break;
     }
-
-    if (/^steps?\s*:/i.test(normalisedLine)) {
-      currentSection = 'steps';
-      const inlineValue = normalisedLine.replace(/^steps?\s*:\s*/i, '').trim();
-      if (inlineValue) {
-        current.steps.push(inlineValue);
-      } else {
-        const { values, nextIndex } = parseListSection(lines, i + 1);
-        current.steps.push(...values);
-        i = nextIndex;
-      }
-      continue;
-    }
-
-    if (/^expected\s*:/i.test(normalisedLine)) {
-      currentSection = 'expected';
-      const inlineValue = normalisedLine.replace(/^expected\s*:\s*/i, '').trim();
-      if (inlineValue) {
-        current.expected.push(inlineValue);
-      } else {
-        const { values, nextIndex } = parseListSection(lines, i + 1);
-        current.expected.push(...values);
-        i = nextIndex;
-      }
-      continue;
-    }
+    if (sectionHandled) continue;
 
     const tagsMatch = normalisedLine.match(/^(tags?)\s*:\s*(.+)$/i);
     if (tagsMatch) {
