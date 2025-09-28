@@ -7,16 +7,28 @@ import logging
 import os
 import re
 import uuid
-from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
 from statistics import median, pstdev
 from threading import Lock
 from time import perf_counter, sleep
 from typing import TYPE_CHECKING
-from collections.abc import Callable, Mapping, Sequence
 
+from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
+from src.llm_adapter.runner_parallel import (
+    ParallelExecutionError,
+    run_parallel_all_sync,
+    run_parallel_any_sync,
+)
+
+from .aggregation import (
+    AggregationCandidate,
+    AggregationResult,
+    AggregationStrategy,
+    FirstTieBreaker,
+    TieBreaker,
+)
 from .budgets import BudgetManager
 from .config import ProviderConfig
 from .datasets import GoldenTask
@@ -50,6 +62,59 @@ class SingleRunResult:
     raw_output: str
     stop_reason: str | None = None
     aggregate_output: str | None = None
+
+
+class _LatencyTieBreaker(TieBreaker):
+    name = "latency"
+
+    def __init__(self, lookup: Mapping[int, SingleRunResult]) -> None:
+        self._lookup = lookup
+
+    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
+        return min(
+            candidates,
+            key=lambda candidate: self._lookup[candidate.index].metrics.latency_ms,
+        )
+
+
+class _CostTieBreaker(TieBreaker):
+    name = "cost"
+
+    def __init__(self, lookup: Mapping[int, SingleRunResult]) -> None:
+        self._lookup = lookup
+
+    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
+        return min(
+            candidates,
+            key=lambda candidate: self._lookup[candidate.index].metrics.cost_usd,
+        )
+
+
+class _JudgeInvoker:
+    def __init__(self, provider: BaseProvider, config: ProviderConfig) -> None:
+        self._provider = provider
+        self._config = config
+
+    def invoke(self, request: object) -> JudgeProviderResponse:  # type: ignore[override]
+        prompt = getattr(request, "prompt_text", "") or getattr(request, "prompt", "")
+        response = self._provider.generate(prompt)
+        return JudgeProviderResponse(
+            text=response.output_text,
+            latency_ms=response.latency_ms,
+            tokens_in=response.input_tokens,
+            tokens_out=response.output_tokens,
+            raw={"provider": self._config.provider},
+        )
+
+
+class _JudgeProviderFactoryAdapter:
+    def __init__(self, config: ProviderConfig) -> None:
+        self._config = config
+
+    def create(self, *, model: str) -> _JudgeInvoker:  # type: ignore[override]
+        provider_config = replace(self._config, model=model)
+        provider = ProviderFactory.create(provider_config)
+        return _JudgeInvoker(provider, provider_config)
 
 
 class _TokenBucket:
@@ -123,11 +188,15 @@ class CompareRunner:
 
         self._schema_validator: _SchemaValidator | None = None
         self._token_bucket: _TokenBucket | None = None
+        self._judge_provider_config: ProviderConfig | None = (
+            runner_config.judge_provider if runner_config else None
+        )
 
     def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
         self._token_bucket = _TokenBucket(getattr(config, "rpm", None))
         self._schema_validator = _SchemaValidator(getattr(config, "schema", None))
+        self._judge_provider_config = getattr(config, "judge_provider", None)
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []
         for provider_config in self.provider_configs:
@@ -155,9 +224,7 @@ class CompareRunner:
                     batch, stop_reason = self._run_parallel_attempt(
                         providers, task, attempt, config
                     )
-                self._apply_aggregation(
-                    config.mode, config, [result for _, result in batch]
-                )
+                self._apply_aggregation(config.mode, config, batch)
                 for index, result in batch:
                     histories[index].append(result)
                 if stop_reason:
@@ -198,24 +265,40 @@ class CompareRunner:
         )
         stop_reason: str | None = None
         results: list[SingleRunResult | None] = [None] * len(providers)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {
-                executor.submit(
-                    self._run_single,
+
+        def build_worker(index: int, provider_config: ProviderConfig, provider: BaseProvider):
+            def worker() -> int:
+                nonlocal stop_reason
+                result = self._run_single(
                     provider_config,
                     provider,
                     task,
                     attempt_index,
                     config.mode,
-                ): index
-                for index, (provider_config, provider) in enumerate(providers)
-            }
-            for future in as_completed(future_map):
-                index = future_map[future]
-                result = future.result()
+                )
                 results[index] = result
                 if result.stop_reason and not stop_reason:
                     stop_reason = result.stop_reason
+                if (
+                    config.mode == "parallel-any"
+                    and result.metrics.status != "ok"
+                ):
+                    raise RuntimeError("parallel-any failure")
+                return index
+
+            return worker
+
+        workers = [
+            build_worker(index, provider_config, provider)
+            for index, (provider_config, provider) in enumerate(providers)
+        ]
+        if config.mode == "parallel-any":
+            try:
+                run_parallel_any_sync(workers, max_concurrency=max_workers)
+            except (ParallelExecutionError, RuntimeError):
+                pass
+        else:
+            run_parallel_all_sync(workers, max_concurrency=max_workers)
         batch = [
             (index, result)
             for index, result in enumerate(results)
@@ -227,72 +310,136 @@ class CompareRunner:
         self,
         mode: str,
         config: RunnerConfig,
-        batch: Sequence[SingleRunResult],
+        batch: Sequence[tuple[int, SingleRunResult]],
     ) -> None:
-        decision = self._select_aggregation(mode, config, batch)
-        if decision is None:
+        selection = self._select_aggregation(mode, config, batch)
+        if selection is None:
             return
-        winner = batch[decision.winner_index]
-        winner.aggregate_output = decision.output
+        decision, result_lookup, votes = selection
+        winner = result_lookup.get(decision.chosen.index)
+        if winner is None:
+            return
+        aggregate_output = decision.chosen.text or decision.chosen.response.text or ""
+        winner.aggregate_output = aggregate_output
         meta = dict(winner.metrics.ci_meta)
         meta["aggregate_mode"] = mode
-        aggregate_strategy = getattr(config, "aggregate", None)
-        if aggregate_strategy:
-            meta["aggregate_strategy"] = aggregate_strategy
-        meta["aggregate_hash"] = hash_text(decision.output)
-        if decision.votes is not None:
-            meta["aggregate_votes"] = decision.votes
+        meta["aggregate_strategy"] = decision.strategy
+        if decision.reason:
+            meta["aggregate_reason"] = decision.reason
+        if decision.tie_breaker_used:
+            meta["aggregate_tie_breaker"] = decision.tie_breaker_used
+        if decision.metadata:
+            for key, value in decision.metadata.items():
+                meta[f"aggregate_{key}"] = value
+        meta["aggregate_hash"] = hash_text(aggregate_output)
+        if votes is not None:
+            meta["aggregate_votes"] = votes
         winner.metrics.ci_meta = meta
 
     def _select_aggregation(
         self,
         mode: str,
         config: RunnerConfig,
-        batch: Sequence[SingleRunResult],
-    ) -> AggregationDecision | None:
-        ok_entries = [
-            (index, result)
-            for index, result in enumerate(batch)
+        batch: Sequence[tuple[int, SingleRunResult]],
+    ) -> tuple[AggregationResult, dict[int, SingleRunResult], int | None] | None:
+        if not batch:
+            return None
+        lookup: dict[int, SingleRunResult] = {index: result for index, result in batch}
+        candidates = [
+            AggregationCandidate(
+                index=index,
+                provider=result.metrics.provider,
+                response=JudgeProviderResponse(
+                    text=result.raw_output,
+                    latency_ms=result.metrics.latency_ms,
+                    tokens_in=result.metrics.input_tokens,
+                    tokens_out=result.metrics.output_tokens,
+                ),
+                text=result.raw_output,
+            )
+            for index, result in batch
             if result.metrics.status == "ok" and result.raw_output.strip()
         ]
-        if not ok_entries:
+        if not candidates:
             return None
-        strategy = getattr(config, "tie_breaker", None) or getattr(config, "aggregate", None)
+        strategy = self._resolve_aggregation_strategy(mode, config)
+        if strategy is None:
+            return None
+        tiebreaker = self._resolve_tie_breaker(config, lookup)
+        decision = strategy.aggregate(candidates, tiebreaker=tiebreaker)
+        votes: int | None = None
         if mode == "consensus":
-            counter = Counter(result.raw_output.strip() for _, result in ok_entries)
-            winner_text, votes = counter.most_common(1)[0]
-            quorum = getattr(config, "quorum", None) or len(ok_entries)
+            if decision.metadata:
+                raw_votes = decision.metadata.get("bucket_size")
+                if isinstance(raw_votes, int):
+                    votes = raw_votes
+            if votes is None:
+                chosen_text = decision.chosen.text or decision.chosen.response.text or ""
+                winner_output = chosen_text.strip()
+                votes = sum(
+                    1
+                    for result in lookup.values()
+                    if result.metrics.status == "ok"
+                    and result.raw_output.strip() == winner_output
+                )
+            quorum = getattr(config, "quorum", None) or len(candidates)
             if votes < quorum:
+                self._mark_consensus_failure(lookup.values(), quorum, votes)
                 return None
-            candidates = [
-                entry for entry in ok_entries if entry[1].raw_output.strip() == winner_text
-            ]
-            winner_index = self._resolve_tie_breaker(candidates, strategy)
-            return AggregationDecision(
-                winner_index=winner_index,
-                output=batch[winner_index].raw_output,
-                votes=votes,
+        return decision, lookup, votes
+
+    def _resolve_aggregation_strategy(
+        self, mode: str, config: RunnerConfig
+    ) -> AggregationStrategy | None:
+        aggregate = (getattr(config, "aggregate", None) or "").strip()
+        if not aggregate:
+            aggregate = "majority"
+        if aggregate.lower() in {"judge", "llm-judge"}:
+            judge_config = getattr(config, "judge_provider", None) or self._judge_provider_config
+            if judge_config is None:
+                raise ValueError("aggregate=judge requires judge provider configuration")
+            factory = _JudgeProviderFactoryAdapter(judge_config)
+            return AggregationStrategy.from_string(
+                aggregate,
+                model=judge_config.model,
+                provider_factory=factory,
             )
-        winner_index = self._resolve_tie_breaker(ok_entries, strategy)
-        return AggregationDecision(
-            winner_index=winner_index,
-            output=batch[winner_index].raw_output,
-        )
+        return AggregationStrategy.from_string(aggregate)
 
     def _resolve_tie_breaker(
         self,
-        candidates: Sequence[tuple[int, SingleRunResult]],
-        tie_breaker: str | None,
-    ) -> int:
-        if not candidates:
-            return 0
-        if tie_breaker == "latency":
-            chosen = min(candidates, key=lambda item: item[1].metrics.latency_ms)
-        elif tie_breaker == "cost":
-            chosen = min(candidates, key=lambda item: item[1].metrics.cost_usd)
-        else:
-            chosen = candidates[0]
-        return chosen[0]
+        config: RunnerConfig,
+        lookup: Mapping[int, SingleRunResult],
+    ) -> TieBreaker | None:
+        name = (getattr(config, "tie_breaker", None) or "").strip().lower()
+        if not name:
+            return None
+        if name == "latency":
+            return _LatencyTieBreaker(lookup)
+        if name == "cost":
+            return _CostTieBreaker(lookup)
+        if name == "first":
+            return FirstTieBreaker()
+        return None
+
+    def _mark_consensus_failure(
+        self,
+        results: Iterable[SingleRunResult],
+        quorum: int,
+        votes: int,
+    ) -> None:
+        message = f"consensus quorum not reached (votes={votes}, quorum={quorum})"
+        for result in results:
+            metrics = result.metrics
+            if metrics.status == "ok":
+                metrics.status = "error"
+            if not metrics.failure_kind:
+                metrics.failure_kind = "consensus_quorum"
+            if metrics.error_message:
+                if message not in metrics.error_message:
+                    metrics.error_message = f"{metrics.error_message} | {message}"
+            else:
+                metrics.error_message = message
 
     def _finalize_task(
         self,
