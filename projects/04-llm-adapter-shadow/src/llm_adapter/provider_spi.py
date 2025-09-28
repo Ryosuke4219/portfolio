@@ -129,7 +129,7 @@ class AsyncProviderSPI(Protocol):
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse: ...
 
 
-ProviderResponse.token_usage = property(ProviderResponse._get_token_usage)
+cast(Any, ProviderResponse).token_usage = property(ProviderResponse._get_token_usage)
 
 
 class _AsyncProviderAdapter(AsyncProviderSPI):
