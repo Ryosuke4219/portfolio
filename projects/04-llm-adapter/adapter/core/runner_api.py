@@ -122,6 +122,7 @@ def run_compare(
         budget_manager,
         metrics_path,
         allow_overrun=allow_overrun,
+        runner_config=config,
     )
     results = runner.run(repeat=max(repeat, 1), mode=config.mode)
     logging.getLogger(__name__).info("%d 件の試行を記録しました", len(results))

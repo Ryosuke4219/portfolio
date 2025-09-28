@@ -10,7 +10,10 @@ import uuid
 from pathlib import Path
 from time import perf_counter
 from statistics import median, pstdev
-from typing import List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Callable, List, Mapping, Optional, Sequence, Tuple
+
+if TYPE_CHECKING:
+    from .runner_api import RunnerConfig
 
 from .budgets import BudgetManager
 from .config import ProviderConfig
@@ -39,6 +42,8 @@ class CompareRunner:
         budget_manager: BudgetManager,
         metrics_path: Path,
         allow_overrun: bool = False,
+        runner_config: "RunnerConfig | None" = None,
+        resolver: Callable[..., object] | None = None,
     ) -> None:
         self.provider_configs = list(provider_configs)
         self.tasks = list(tasks)
@@ -46,6 +51,8 @@ class CompareRunner:
         self.metrics_path = metrics_path
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.allow_overrun = allow_overrun
+        self.runner_config = runner_config
+        self.resolver = resolver
 
     def run(self, repeat: int, mode: str) -> List[RunMetrics]:
         results: List[RunMetrics] = []
