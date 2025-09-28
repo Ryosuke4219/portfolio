@@ -3,13 +3,15 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, Sequence
 
 import pytest
-from src.llm_adapter.errors import TimeoutError
+from src.llm_adapter.errors import RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
 from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
@@ -42,6 +44,87 @@ class _StaticProvider:
             model=request.model,
             finish_reason="stop",
         )
+
+
+class _RetryProbeProvider:
+    def __init__(
+        self,
+        name: str,
+        outcomes: Sequence[object],
+        *,
+        latency_s: float = 0.0,
+    ) -> None:
+        if not outcomes:
+            raise ValueError("outcomes must not be empty")
+        self._name = name
+        self._outcomes = list(outcomes)
+        self._latency_s = latency_s
+        self.call_count = 0
+        self.outcome_log: list[str] = []
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        self.call_count += 1
+        if self._latency_s > 0:
+            time.sleep(self._latency_s)
+        index = self.call_count - 1
+        outcome = (
+            self._outcomes[index]
+            if index < len(self._outcomes)
+            else self._outcomes[-1]
+        )
+        if isinstance(outcome, Exception):
+            self.outcome_log.append(type(outcome).__name__)
+            raise outcome
+        self.outcome_log.append("ok")
+        if isinstance(outcome, ProviderResponse):
+            return outcome
+        text = str(outcome)
+        return ProviderResponse(
+            text=f"{self._name}:attempt{self.call_count}:{text}",
+            latency_ms=int(self._latency_s * 1000),
+            token_usage=TokenUsage(prompt=1, completion=1),
+            model=request.model,
+            finish_reason="stop",
+            raw={"attempt": self.call_count, "payload": text},
+        )
+
+
+class _RecordingThreadPoolExecutor(ThreadPoolExecutor):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.submitted: list[Future[Any]] = []
+
+    def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Future[Any]:
+        future = super().submit(fn, *args, **kwargs)
+        self.submitted.append(future)
+        return future
+
+
+def _install_recording_executor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[_RecordingThreadPoolExecutor]:
+    created: list[_RecordingThreadPoolExecutor] = []
+
+    class _Factory(_RecordingThreadPoolExecutor):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            created.append(self)
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_parallel.ThreadPoolExecutor",
+        _Factory,
+    )
+    return created
+
+
+def _read_metrics(path: Path) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -182,6 +265,97 @@ def test_runner_parallel_any_returns_success_after_fast_failure() -> None:
     response = runner.run(request)
 
     assert response.text == "slow-ok"
+
+
+def test_runner_parallel_any_retries_until_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    sleep_calls: list[float] = []
+    monkeypatch.setattr("time.sleep", lambda delay: sleep_calls.append(delay))
+    executors = _install_recording_executor(monkeypatch)
+    provider = _RetryProbeProvider(
+        "retry-any",
+        [RateLimitError("retry"), "final"],
+        latency_s=0.001,
+    )
+    runner = Runner(
+        [provider, provider, provider],
+        config=RunnerConfig(
+            mode=RunnerMode.PARALLEL_ANY,
+            max_concurrency=1,
+            max_attempts=2,
+            backoff=BackoffPolicy(rate_limit_sleep_s=0.05),
+        ),
+    )
+    request = ProviderRequest(prompt="retry", model="parallel-any-retry")
+    metrics_path = tmp_path / "parallel_any_retry.jsonl"
+
+    response = runner.run(request, shadow=None, shadow_metrics_path=metrics_path)
+
+    assert response.text.endswith("final")
+    assert provider.call_count == 2
+    assert len(sleep_calls) == provider.call_count
+    executor = executors[-1]
+    assert len(executor.submitted) == provider.call_count
+    assert all(f.done() or f.cancelled() for f in executor.submitted)
+
+    events = _read_metrics(metrics_path)
+    provider_calls = sorted(
+        (event for event in events if event["event"] == "provider_call"),
+        key=lambda event: event["attempt"],
+    )
+    assert [event["attempt"] for event in provider_calls] == [1, 2]
+    assert provider_calls[0]["status"] == "error"
+    assert provider_calls[0]["error_type"] == "RateLimitError"
+    assert provider_calls[1]["status"] == "ok"
+    run_metrics = [
+        event for event in events if event["event"] == "run_metric" and event["status"] == "ok"
+    ]
+    assert len(run_metrics) == 1
+    assert run_metrics[0]["attempts"] == 2
+
+
+def test_runner_parallel_all_exhausts_timeout_retries(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    sleep_calls: list[float] = []
+    monkeypatch.setattr("time.sleep", lambda delay: sleep_calls.append(delay))
+    executors = _install_recording_executor(monkeypatch)
+    provider = _RetryProbeProvider(
+        "retry-all",
+        [TimeoutError("first"), TimeoutError("second")],
+        latency_s=0.001,
+    )
+    runner = Runner(
+        [provider, provider],
+        config=RunnerConfig(
+            mode=RunnerMode.PARALLEL_ALL,
+            max_concurrency=1,
+            max_attempts=2,
+            backoff=BackoffPolicy(),
+        ),
+    )
+    request = ProviderRequest(prompt="timeout", model="parallel-all-retry")
+    metrics_path = tmp_path / "parallel_all_retry.jsonl"
+
+    with pytest.raises(TimeoutError):
+        runner.run(request, shadow=None, shadow_metrics_path=metrics_path)
+
+    assert provider.call_count == 2
+    assert len(sleep_calls) == provider.call_count
+    executor = executors[-1]
+    assert len(executor.submitted) == provider.call_count
+    assert all(f.done() or f.cancelled() for f in executor.submitted)
+
+    events = _read_metrics(metrics_path)
+    provider_calls = sorted(
+        (event for event in events if event["event"] == "provider_call"),
+        key=lambda event: event["attempt"],
+    )
+    assert [event["attempt"] for event in provider_calls] == [1, 2]
+    assert all(event["error_type"] == "TimeoutError" for event in provider_calls)
+    run_metrics = [event for event in events if event["event"] == "run_metric"]
+    assert [event["attempts"] for event in run_metrics] == [1, 2]
 
 
 def test_consensus_vote_event_and_shadow_delta(
