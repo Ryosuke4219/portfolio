@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import pytest
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+from src.llm_adapter.runner_async import AsyncRunner
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import ParallelExecutionError
 from src.llm_adapter.runner_sync import Runner
@@ -120,3 +122,74 @@ def test_runner_consensus_quorum_failure() -> None:
 
     with pytest.raises(ParallelExecutionError):
         runner.run(request)
+
+
+class _FakeClock:
+    def __init__(self) -> None:
+        self.value = 0.0
+
+    def monotonic(self) -> float:
+        return self.value
+
+    def sleep(self, duration: float) -> None:
+        self.value += duration
+
+    async def sleep_async(self, duration: float) -> None:
+        self.value += duration
+
+
+def _install_fake_rate_limiter(monkeypatch: pytest.MonkeyPatch, clock: _FakeClock) -> None:
+    from src.llm_adapter import runner_shared
+
+    def _factory(rpm: int | None) -> runner_shared.TokenBucketRateLimiter | None:
+        if rpm is None or rpm <= 0:
+            return None
+        return runner_shared.TokenBucketRateLimiter(
+            rpm,
+            clock=clock.monotonic,
+            sleep=clock.sleep,
+            async_sleep=clock.sleep_async,
+        )
+
+    monkeypatch.setattr(runner_shared, "create_rate_limiter", _factory)
+    from src.llm_adapter import runner_async as runner_async_mod
+    from src.llm_adapter import runner_sync as runner_sync_mod
+
+    monkeypatch.setattr(runner_async_mod, "create_rate_limiter", _factory)
+    monkeypatch.setattr(runner_sync_mod, "create_rate_limiter", _factory)
+
+
+@pytest.mark.parametrize("async_mode", [False, True])
+def test_runner_respects_rpm(monkeypatch: pytest.MonkeyPatch, async_mode: bool) -> None:
+    clock = _FakeClock()
+    _install_fake_rate_limiter(monkeypatch, clock)
+
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+    call_times: list[float] = []
+
+    def _provider(_: ProviderRequest) -> ProviderResponse:
+        call_times.append(clock.monotonic())
+        return _response("ok")
+
+    if async_mode:
+        class _AsyncProvider(_MockProvider):
+            async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
+                return _provider(request)
+
+        provider = _AsyncProvider("limited", _provider)
+        runner = AsyncRunner([provider], config=RunnerConfig(rpm=2))
+
+        async def _run() -> None:
+            await runner.run_async(request)
+            await runner.run_async(request)
+
+        asyncio.run(_run())
+    else:
+        provider = _MockProvider("limited", _provider)
+        runner = Runner([provider], config=RunnerConfig(rpm=2))
+        runner.run(request)
+        runner.run(request)
+
+    assert len(call_times) == 2
+    assert call_times[0] == pytest.approx(0.0)
+    assert call_times[1] == pytest.approx(30.0, abs=1e-6)

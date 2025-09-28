@@ -25,6 +25,7 @@ from .runner_parallel import (
 )
 from .runner_shared import (
     MetricsPath,
+    create_rate_limiter,
     error_family,
     estimate_cost,
     log_provider_call,
@@ -63,6 +64,7 @@ class Runner:
         self.providers: list[ProviderSPI] = list(providers)
         self._logger = logger
         self._config = config or RunnerConfig()
+        self._rate_limiter = create_rate_limiter(self._config.rpm)
 
     def _invoke_provider_sync(
         self,
@@ -83,6 +85,13 @@ class Runner:
         latency_ms: float
         tokens_in: int | None = None
         tokens_out: int | None = None
+        reservation = self._rate_limiter.reserve() if self._rate_limiter else None
+        if reservation is not None:
+            try:
+                reservation.wait_sync()
+            except Exception:
+                reservation.cancel()
+                raise
         try:
             response = run_with_shadow(
                 provider,
@@ -109,6 +118,9 @@ class Runner:
             usage = response.token_usage
             tokens_in = usage.prompt
             tokens_out = usage.completion
+        finally:
+            if reservation is not None:
+                reservation.commit()
         status = "ok" if error is None else "error"
         log_provider_call(
             event_logger,

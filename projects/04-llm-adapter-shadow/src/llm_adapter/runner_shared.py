@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import asyncio
+import time
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from .errors import FatalError, RateLimitError, RetryableError, SkipError
@@ -14,6 +17,82 @@ if TYPE_CHECKING:
     from .provider_spi import AsyncProviderSPI, ProviderRequest, ProviderSPI
 
 MetricsPath = str | Path | None
+
+
+class RateLimitReservation:
+    def __init__(
+        self,
+        limiter: TokenBucketRateLimiter,
+        wait_time: float,
+    ) -> None:
+        self._limiter = limiter
+        self._wait_time = wait_time
+        self._done = False
+
+    def wait_sync(self) -> None:
+        if self._wait_time > 0:
+            try:
+                self._limiter.sleep(self._wait_time)
+            except Exception:  # noqa: BLE001
+                self.cancel()
+                raise
+
+    async def wait_async(self) -> None:
+        if self._wait_time > 0:
+            try:
+                await self._limiter.async_sleep(self._wait_time)
+            except Exception:  # noqa: BLE001
+                self.cancel()
+                raise
+
+    def commit(self) -> None:
+        self._done = True
+
+    def cancel(self) -> None:
+        if self._done:
+            return
+        self._done = True
+        self._limiter.release()
+
+
+AsyncSleep = Callable[[float], Awaitable[None]]
+
+
+class TokenBucketRateLimiter:
+    def __init__(
+        self,
+        rpm: int,
+        *,
+        clock: Callable[[], float] | None = None,
+        sleep: Callable[[float], None] | None = None,
+        async_sleep: AsyncSleep | None = None,
+    ) -> None:
+        if rpm <= 0:
+            raise ValueError("rpm must be positive")
+        self._clock = clock or time.monotonic
+        self.sleep = sleep or time.sleep
+        self.async_sleep: AsyncSleep = async_sleep or asyncio.sleep
+        self._lock = Lock()
+        self._interval = 60.0 / float(rpm)
+        self._next_time = self._clock()
+
+    def reserve(self) -> RateLimitReservation:
+        with self._lock:
+            now = self._clock()
+            ready_at = max(self._next_time, now)
+            wait_time = max(ready_at - now, 0.0)
+            self._next_time = ready_at + self._interval
+        return RateLimitReservation(self, wait_time)
+
+    def release(self) -> None:
+        with self._lock:
+            self._next_time = max(self._clock(), self._next_time - self._interval)
+
+
+def create_rate_limiter(rpm: int | None) -> TokenBucketRateLimiter | None:
+    if rpm is None or rpm <= 0:
+        return None
+    return TokenBucketRateLimiter(rpm)
 
 
 def resolve_event_logger(
