@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from .errors import (
@@ -151,11 +151,14 @@ class Runner:
             if result is None:
                 continue
             status = "ok" if result.response is not None else "error"
-            tokens_in = result.tokens_in if status == "ok" else None
-            tokens_out = result.tokens_out if status == "ok" else None
-            cost_usd = 0.0
             if status == "ok":
+                tokens_in = result.tokens_in if result.tokens_in is not None else 0
+                tokens_out = result.tokens_out if result.tokens_out is not None else 0
                 cost_usd = estimate_cost(result.provider, tokens_in, tokens_out)
+            else:
+                tokens_in = None
+                tokens_out = None
+                cost_usd = 0.0
             log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -223,8 +226,10 @@ class Runner:
                     metrics_path=metrics_path_str,
                 )
                 if result.response is not None:
-                    tokens_in = result.tokens_in
-                    tokens_out = result.tokens_out
+                    tokens_in = result.tokens_in if result.tokens_in is not None else 0
+                    tokens_out = (
+                        result.tokens_out if result.tokens_out is not None else 0
+                    )
                     cost_usd = estimate_cost(
                         provider,
                         tokens_in,
@@ -303,7 +308,9 @@ class Runner:
         total_providers = len(self.providers)
         results: list[ProviderInvocationResult | None] = [None] * total_providers
 
-        def make_worker(index: int, provider: ProviderSPI):
+        def make_worker(
+            index: int, provider: ProviderSPI
+        ) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
                 result = self._invoke_provider_sync(
                     provider,
@@ -334,9 +341,10 @@ class Runner:
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
                     raise fatal from None
-                if winner.response is None:
+                response = winner.response
+                if response is None:
                     raise ParallelExecutionError("all workers failed")
-                return winner.response
+                return response
 
             if mode is RunnerMode.PARALLEL_ALL:
                 responses = run_parallel_all_sync(
@@ -345,10 +353,13 @@ class Runner:
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
                     raise fatal from None
-                for response in responses:
-                    if response.response is None:
+                for invocation in responses:
+                    if invocation.response is None:
                         raise ParallelExecutionError("all workers failed")
-                return responses[0].response
+                first_response = responses[0].response
+                if first_response is None:
+                    raise ParallelExecutionError("all workers failed")
+                return first_response
 
             if mode is RunnerMode.CONSENSUS:
                 responses = run_parallel_all_sync(
