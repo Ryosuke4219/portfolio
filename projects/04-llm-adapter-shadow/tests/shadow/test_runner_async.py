@@ -4,10 +4,11 @@ import asyncio
 
 import pytest
 
-from src.llm_adapter.errors import RateLimitError, RetriableError
+from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.runner import AsyncRunner
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
+from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
+from src.llm_adapter.runner_parallel import ParallelExecutionError
 
 from tests.shadow._runner_test_helpers import (
     FakeLogger,
@@ -72,3 +73,22 @@ def test_async_retryable_error_logs_family() -> None:
 
     chain_event = logger.of_type("provider_chain_failed")[0]
     assert chain_event["last_error_family"] == "retryable"
+
+
+@pytest.mark.asyncio
+def test_async_consensus_all_timeout_propagates_original_error() -> None:
+    providers = [
+        _ErrorProvider("slow-1", TimeoutError("too slow")),
+        _ErrorProvider("slow-2", TimeoutError("way too slow")),
+    ]
+    runner = AsyncRunner(
+        providers,
+        config=RunnerConfig(mode=RunnerMode.CONSENSUS),
+    )
+    request = ProviderRequest(prompt="hello", model="demo-model")
+
+    async def _run() -> None:
+        await runner.run_async(request, shadow_metrics_path="unused.jsonl")
+
+    with pytest.raises((ParallelExecutionError, TimeoutError)):
+        asyncio.run(_run())
