@@ -6,6 +6,7 @@ import asyncio
 import importlib
 import json
 import math
+import time
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Callable as TypingCallable
 from concurrent.futures import (
@@ -195,30 +196,105 @@ async def run_parallel_any_async(
 
 
 def run_parallel_all_sync(
-    workers: Sequence[SyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[SyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    max_attempts: int | None = None,
+    on_retry: Callable[[int, int, BaseException], float | None] | None = None,
 ) -> list[T]:
-    """Execute workers concurrently and return all successful results."""
+    """Execute workers concurrently and return all successful results.
+
+    Args:
+        workers: Callables to execute.
+        max_concurrency: Optional limit on in-flight workers.
+        max_attempts: Optional cap on attempts per worker.
+        on_retry: Optional hook invoked after failures; returning a non-negative
+            delay retries the same worker after sleeping for the given seconds.
+    """
 
     if not workers:
         raise ValueError("workers must not be empty")
     max_workers = _normalize_concurrency(len(workers), max_concurrency)
     responses: list[T] = [None] * len(workers)  # type: ignore[list-item]
+    attempts = [0] * len(workers)
+    completed = [False] * len(workers)
+    last_error: list[BaseException | None] = [None] * len(workers)
+
+    from collections import deque
+
+    ready: deque[int] = deque(range(len(workers)))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_map = {executor.submit(worker): idx for idx, worker in enumerate(workers)}
+        future_map: dict[Future[T], int] = {}
+
+        def _submit_available() -> None:
+            while ready and len(future_map) < max_workers:
+                index = ready.popleft()
+                if completed[index]:
+                    continue
+                if max_attempts is not None and attempts[index] >= max_attempts:
+                    continue
+                attempts[index] += 1
+                future_map[executor.submit(workers[index])] = index
+
+        _submit_available()
+
         try:
-            for future in as_completed(future_map):
-                responses[future_map[future]] = future.result()
+            while not all(completed):
+                if not future_map:
+                    break
+                done, _ = wait(future_map, return_when=FIRST_COMPLETED)
+                for future in done:
+                    index = future_map.pop(future)
+                    if completed[index]:
+                        continue
+                    try:
+                        responses[index] = future.result()
+                    except BaseException as exc:  # noqa: BLE001
+                        last_error[index] = exc
+                        delay: float | None = None
+                        if on_retry is not None:
+                            delay = on_retry(index, attempts[index], exc)
+                        if (
+                            delay is not None
+                            and delay >= 0
+                            and (max_attempts is None or attempts[index] < max_attempts)
+                        ):
+                            if delay > 0:
+                                time.sleep(delay)
+                            ready.append(index)
+                        else:
+                            completed[index] = True
+                    else:
+                        completed[index] = True
+                _submit_available()
         except BaseException:
             for pending in future_map:
                 pending.cancel()
             raise
+
+        for pending in future_map:
+            pending.cancel()
+
+    if not all(completed):
+        for index, done in enumerate(completed):
+            if not done:
+                raise ParallelExecutionError("all workers failed") from last_error[index]
+    if any(response is None for response in responses):  # type: ignore[truthy-function]
+        for index, response in enumerate(responses):
+            if response is None:
+                raise ParallelExecutionError("all workers failed") from last_error[index]
     return responses
 
 
 async def run_parallel_all_async(
-    workers: Sequence[AsyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[AsyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    max_attempts: int | None = None,
+    on_retry: Callable[[int, int, BaseException], Awaitable[float | None] | float | None]
+    | None = None,
 ) -> list[T]:
-    """Async variant of :func:`run_parallel_all_sync`."""
+    """Async variant of :func:`run_parallel_all_sync` with retry support."""
 
     if not workers:
         raise ValueError("workers must not be empty")
@@ -226,9 +302,37 @@ async def run_parallel_all_async(
     semaphore = asyncio.Semaphore(limit)
     responses: list[T] = [None] * len(workers)  # type: ignore[list-item]
 
+    async def _maybe_retry(index: int, attempt: int, exc: BaseException) -> bool:
+        delay: float | None = None
+        if on_retry is not None:
+            maybe_delay = on_retry(index, attempt, exc)
+            if asyncio.iscoroutine(maybe_delay):
+                maybe_delay = await cast(Awaitable[float | None], maybe_delay)
+            delay = cast(float | None, maybe_delay)
+        if delay is not None and delay >= 0:
+            if delay > 0:
+                await asyncio.sleep(delay)
+            return True
+        return False
+
     async def runner(index: int, worker: AsyncWorker[T]) -> None:
-        async with semaphore:
-            responses[index] = await worker()
+        attempt = 0
+        last_error: BaseException | None = None
+        while max_attempts is None or attempt < max_attempts:
+            attempt += 1
+            try:
+                async with semaphore:
+                    responses[index] = await worker()
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:  # noqa: BLE001
+                last_error = exc
+                if await _maybe_retry(index, attempt, exc):
+                    continue
+                break
+            else:
+                return
+        raise ParallelExecutionError("all workers failed") from last_error
 
     tasks = [asyncio.create_task(runner(idx, worker)) for idx, worker in enumerate(workers)]
     try:
