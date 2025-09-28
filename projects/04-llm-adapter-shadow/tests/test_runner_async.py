@@ -4,9 +4,10 @@ import asyncio
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 import pytest
+from _pytest.recwarn import WarningsRecorder
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
     ProviderResponse,
@@ -81,6 +82,20 @@ class _StaticProvider:
         )
 
 
+T = TypeVar("T")
+
+
+def _run_without_warnings(action: Callable[[], T]) -> T:
+    try:
+        warns_cm = pytest.warns(None)
+    except TypeError:
+        warns_cm = WarningsRecorder(_ispytest=True)
+    with warns_cm as warnings_record:
+        result = action()
+    assert len(warnings_record) == 0
+    return result
+
+
 def test_async_runner_matches_sync(tmp_path: Path) -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     sync_runner = Runner([primary])
@@ -119,11 +134,13 @@ def test_async_shadow_exec_uses_injected_logger(tmp_path: Path) -> None:
     request = ProviderRequest(prompt="hello", model="primary-model")
     metrics_path = tmp_path / "async-unused.jsonl"
 
-    response = asyncio.run(
-        runner.run_async(
-            request,
-            shadow=shadow,
-            shadow_metrics_path=metrics_path,
+    response = _run_without_warnings(
+        lambda: asyncio.run(
+            runner.run_async(
+                request,
+                shadow=shadow,
+                shadow_metrics_path=metrics_path,
+            )
         )
     )
 
@@ -165,11 +182,13 @@ def test_async_shadow_exec_records_metrics(tmp_path: Path) -> None:
     metadata = {"trace_id": "trace-async", "project_id": "proj-async"}
     request = ProviderRequest(prompt="hello", metadata=metadata, model="primary-model")
 
-    response = asyncio.run(
-        runner.run_async(
-            request,
-            shadow=shadow,
-            shadow_metrics_path=metrics_path,
+    response = _run_without_warnings(
+        lambda: asyncio.run(
+            runner.run_async(
+                request,
+                shadow=shadow,
+                shadow_metrics_path=metrics_path,
+            )
         )
     )
 
