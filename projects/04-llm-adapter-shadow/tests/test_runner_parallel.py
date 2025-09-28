@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from pathlib import Path
 
 import pytest
+from src.llm_adapter.errors import TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
@@ -142,6 +144,44 @@ def test_parallel_any_with_shadow_logs(tmp_path: Path, monkeypatch: pytest.Monke
     assert shadow_event["shadow_provider"] == "shadow"
     assert shadow_event["shadow_ok"] is False
     assert shadow_event["shadow_error"] == "TimeoutError"
+
+
+def test_runner_parallel_any_returns_success_after_fast_failure() -> None:
+    class _FailingProvider:
+        def __init__(self, name: str) -> None:
+            self._name = name
+
+        def name(self) -> str:
+            return self._name
+
+        def capabilities(self) -> set[str]:
+            return set()
+
+        def invoke(self, request: ProviderRequest) -> ProviderResponse:
+            raise TimeoutError("fast failure")
+
+    class _SlowProvider(_StaticProvider):
+        def __init__(self, name: str, text: str, latency_ms: int, delay: float) -> None:
+            super().__init__(name, text, latency_ms)
+            self._delay = delay
+
+        def invoke(self, request: ProviderRequest) -> ProviderResponse:
+            time.sleep(self._delay)
+            return super().invoke(request)
+
+    providers = [
+        _FailingProvider("fail-fast"),
+        _SlowProvider("slow-success", "slow-ok", latency_ms=5, delay=0.05),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=1),
+    )
+    request = ProviderRequest(prompt="hello", model="m-parallel-any")
+
+    response = runner.run(request)
+
+    assert response.text == "slow-ok"
 
 
 def test_consensus_vote_event_and_shadow_delta(
