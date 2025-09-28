@@ -14,7 +14,8 @@ from pathlib import Path
 from statistics import median, pstdev
 from threading import Lock
 from time import perf_counter, sleep
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Mapping, Sequence
 
 from .budgets import BudgetManager
 from .config import ProviderConfig
@@ -40,19 +41,19 @@ LOGGER = logging.getLogger(__name__)
 class AggregationDecision:
     winner_index: int
     output: str
-    votes: Optional[int] = None
+    votes: int | None = None
 
 
 @dataclass(slots=True)
 class SingleRunResult:
     metrics: RunMetrics
     raw_output: str
-    stop_reason: Optional[str] = None
-    aggregate_output: Optional[str] = None
+    stop_reason: str | None = None
+    aggregate_output: str | None = None
 
 
 class _TokenBucket:
-    def __init__(self, rpm: Optional[int]) -> None:
+    def __init__(self, rpm: int | None) -> None:
         self.capacity = rpm or 0
         self.tokens = float(self.capacity)
         self.updated = perf_counter()
@@ -78,8 +79,8 @@ class _TokenBucket:
 
 
 class _SchemaValidator:
-    def __init__(self, schema_path: Optional[Path]) -> None:
-        self.schema: Optional[Dict[str, object]] = None
+    def __init__(self, schema_path: Path | None) -> None:
+        self.schema: dict[str, object] | None = None
         if schema_path and schema_path.exists():
             with schema_path.open("r", encoding="utf-8") as fp:
                 self.schema = json.load(fp)
@@ -115,15 +116,15 @@ class CompareRunner:
         self.metrics_path = metrics_path
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.allow_overrun = allow_overrun
-        self._schema_validator: Optional[_SchemaValidator] = None
-        self._token_bucket: Optional[_TokenBucket] = None
+        self._schema_validator: _SchemaValidator | None = None
+        self._token_bucket: _TokenBucket | None = None
 
-    def run(self, repeat: int, config: "RunnerConfig") -> List[RunMetrics]:
+    def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
         self._token_bucket = _TokenBucket(getattr(config, "rpm", None))
         self._schema_validator = _SchemaValidator(getattr(config, "schema", None))
 
-        providers: List[Tuple[ProviderConfig, BaseProvider]] = []
+        providers: list[tuple[ProviderConfig, BaseProvider]] = []
         for provider_config in self.provider_configs:
             provider = ProviderFactory.create(provider_config)
             providers.append((provider_config, provider))
@@ -133,13 +134,13 @@ class CompareRunner:
                 provider_config.model,
             )
 
-        results: List[RunMetrics] = []
+        results: list[RunMetrics] = []
         if not providers:
             return results
 
-        stop_reason: Optional[str] = None
+        stop_reason: str | None = None
         for task in self.tasks:
-            histories: List[List[SingleRunResult]] = [[] for _ in providers]
+            histories: list[list[SingleRunResult]] = [[] for _ in providers]
             for attempt in range(repeat):
                 if config.mode == "sequential":
                     batch, stop_reason = self._run_sequential_attempt(
@@ -164,13 +165,13 @@ class CompareRunner:
 
     def _run_sequential_attempt(
         self,
-        providers: Sequence[Tuple[ProviderConfig, BaseProvider]],
+        providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
         mode: str,
-    ) -> Tuple[List[Tuple[int, SingleRunResult]], Optional[str]]:
-        batch: List[Tuple[int, SingleRunResult]] = []
-        stop_reason: Optional[str] = None
+    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
+        batch: list[tuple[int, SingleRunResult]] = []
+        stop_reason: str | None = None
         for index, (provider_config, provider) in enumerate(providers):
             result = self._run_single(provider_config, provider, task, attempt_index, mode)
             batch.append((index, result))
@@ -180,18 +181,18 @@ class CompareRunner:
 
     def _run_parallel_attempt(
         self,
-        providers: Sequence[Tuple[ProviderConfig, BaseProvider]],
+        providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
-        config: "RunnerConfig",
-    ) -> Tuple[List[Tuple[int, SingleRunResult]], Optional[str]]:
+        config: RunnerConfig,
+    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
             return [], None
         max_workers = self._normalize_concurrency(
             len(providers), getattr(config, "max_concurrency", None)
         )
-        stop_reason: Optional[str] = None
-        results: List[Optional[SingleRunResult]] = [None] * len(providers)
+        stop_reason: str | None = None
+        results: list[SingleRunResult | None] = [None] * len(providers)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {
                 executor.submit(
@@ -220,7 +221,7 @@ class CompareRunner:
     def _apply_aggregation(
         self,
         mode: str,
-        config: "RunnerConfig",
+        config: RunnerConfig,
         batch: Sequence[SingleRunResult],
     ) -> None:
         decision = self._select_aggregation(mode, config, batch)
@@ -241,9 +242,9 @@ class CompareRunner:
     def _select_aggregation(
         self,
         mode: str,
-        config: "RunnerConfig",
+        config: RunnerConfig,
         batch: Sequence[SingleRunResult],
-    ) -> Optional[AggregationDecision]:
+    ) -> AggregationDecision | None:
         ok_entries = [
             (index, result)
             for index, result in enumerate(batch)
@@ -275,8 +276,8 @@ class CompareRunner:
 
     def _resolve_tie_breaker(
         self,
-        candidates: Sequence[Tuple[int, SingleRunResult]],
-        tie_breaker: Optional[str],
+        candidates: Sequence[tuple[int, SingleRunResult]],
+        tie_breaker: str | None,
     ) -> int:
         if not candidates:
             return 0
@@ -291,9 +292,9 @@ class CompareRunner:
     def _finalize_task(
         self,
         task: GoldenTask,
-        providers: Sequence[Tuple[ProviderConfig, BaseProvider]],
+        providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         histories: Sequence[Sequence[SingleRunResult]],
-        results: List[RunMetrics],
+        results: list[RunMetrics],
     ) -> None:
         for index, (provider_config, _) in enumerate(providers):
             attempts = list(histories[index])
@@ -307,7 +308,7 @@ class CompareRunner:
                 self._append_metric(attempt.metrics)
 
     @staticmethod
-    def _normalize_concurrency(total: int, limit: Optional[int]) -> int:
+    def _normalize_concurrency(total: int, limit: int | None) -> int:
         if total <= 0:
             return 1
         if limit is None or limit <= 0:
@@ -342,7 +343,7 @@ class CompareRunner:
                 error_message,
             )
         )
-        schema_error: Optional[str] = None
+        schema_error: str | None = None
         validator = self._schema_validator
         if validator is not None:
             try:
@@ -384,7 +385,7 @@ class CompareRunner:
         provider_config: ProviderConfig,
         provider: BaseProvider,
         prompt: str,
-    ) -> Tuple[ProviderResponse, str, Optional[str], Optional[str], int]:
+    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
         response, status, failure_kind, error_message, latency_ms = self._invoke_provider(
             provider, prompt
         )
@@ -401,8 +402,8 @@ class CompareRunner:
         provider_config: ProviderConfig,
         latency_ms: int,
         status: str,
-        failure_kind: Optional[str],
-    ) -> Tuple[str, Optional[str]]:
+        failure_kind: str | None,
+    ) -> tuple[str, str | None]:
         if (
             provider_config.timeout_s > 0
             and latency_ms > provider_config.timeout_s * 1000
@@ -412,19 +413,19 @@ class CompareRunner:
         return status, failure_kind
 
     def _enforce_output_guard(
-        self, output_text: Optional[str], status: str, failure_kind: Optional[str]
-    ) -> Tuple[str, Optional[str]]:
+        self, output_text: str | None, status: str, failure_kind: str | None
+    ) -> tuple[str, str | None]:
         if (output_text is None or not output_text.strip()) and status == "ok":
             return "error", failure_kind or "guard_violation"
         return status, failure_kind
 
     def _invoke_provider(
         self, provider: BaseProvider, prompt: str
-    ) -> Tuple[ProviderResponse, str, Optional[str], Optional[str], int]:
+    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
         start = perf_counter()
         status = "ok"
-        failure_kind: Optional[str] = None
-        error_message: Optional[str] = None
+        failure_kind: str | None = None
+        error_message: str | None = None
         try:
             response = provider.generate(prompt)
         except Exception as exc:  # pragma: no cover - 実プロバイダ利用時の防御
@@ -449,12 +450,12 @@ class CompareRunner:
         mode: str,
         response: ProviderResponse,
         status: str,
-        failure_kind: Optional[str],
-        error_message: Optional[str],
+        failure_kind: str | None,
+        error_message: str | None,
         latency_ms: int,
         budget_snapshot: BudgetSnapshot,
         cost_usd: float,
-    ) -> Tuple[RunMetrics, str]:
+    ) -> tuple[RunMetrics, str]:
         output_text = response.output_text
         eval_metrics, eval_failure_kind = self._evaluate(task, output_text)
         eval_metrics.len_tokens = response.output_tokens
@@ -493,9 +494,9 @@ class CompareRunner:
     def _merge_eval_failure(
         self,
         status: str,
-        failure_kind: Optional[str],
-        eval_failure_kind: Optional[str],
-    ) -> Tuple[str, Optional[str]]:
+        failure_kind: str | None,
+        eval_failure_kind: str | None,
+    ) -> tuple[str, str | None]:
         if not eval_failure_kind:
             return status, failure_kind
         failure_kind = failure_kind or eval_failure_kind
@@ -503,7 +504,7 @@ class CompareRunner:
             status = "error"
         return status, failure_kind
 
-    def _compute_output_hash(self, output_text: Optional[str]) -> Optional[str]:
+    def _compute_output_hash(self, output_text: str | None) -> str | None:
         return hash_text(output_text) if output_text else None
 
     def _evaluate_budget(
@@ -511,9 +512,9 @@ class CompareRunner:
         provider_config: ProviderConfig,
         cost_usd: float,
         status: str,
-        failure_kind: Optional[str],
-        error_message: Optional[str],
-    ) -> Tuple[BudgetSnapshot, Optional[str], str, Optional[str], Optional[str]]:
+        failure_kind: str | None,
+        error_message: str | None,
+    ) -> tuple[BudgetSnapshot, str | None, str, str | None, str | None]:
         run_budget_limit = self.budget_manager.run_budget(provider_config.provider)
         run_budget_hit = run_budget_limit > 0 and cost_usd > run_budget_limit
         daily_stop_required = not self.budget_manager.notify_cost(
@@ -523,13 +524,13 @@ class CompareRunner:
             run_budget_usd=run_budget_limit,
             hit_stop=run_budget_hit or daily_stop_required,
         )
-        run_reason: Optional[str] = None
+        run_reason: str | None = None
         if run_budget_hit:
             run_reason = (
                 f"provider={provider_config.provider} run budget {run_budget_limit:.4f} USD exceeded "
                 f"(cost={cost_usd:.4f} USD)"
             )
-        daily_reason: Optional[str] = None
+        daily_reason: str | None = None
         if daily_stop_required:
             spent = self.budget_manager.spent_today(provider_config.provider)
             daily_limit = self.budget_manager.daily_budget(provider_config.provider)
@@ -537,7 +538,7 @@ class CompareRunner:
                 f"provider={provider_config.provider} daily budget {daily_limit:.4f} USD exceeded "
                 f"(spent={spent:.4f} USD)"
             )
-        stop_reason: Optional[str] = None
+        stop_reason: str | None = None
         if not self.allow_overrun:
             if daily_reason:
                 stop_reason = daily_reason
@@ -563,11 +564,11 @@ class CompareRunner:
             json.dump(metrics.to_json_dict(), fp, ensure_ascii=False)
             fp.write("\n")
 
-    def _evaluate(self, task: GoldenTask, output_text: str) -> Tuple[EvalMetrics, Optional[str]]:
+    def _evaluate(self, task: GoldenTask, output_text: str) -> tuple[EvalMetrics, str | None]:
         expected_type = str(task.expected.get("type", "regex"))
         expected_value = task.expected.get("value")
         eval_metrics = EvalMetrics()
-        failure_kind: Optional[str] = None
+        failure_kind: str | None = None
         if output_text is None:
             return eval_metrics, failure_kind
         if expected_type == "regex" and isinstance(expected_value, str):
@@ -614,19 +615,19 @@ class CompareRunner:
         gates = provider_config.quality_gates
         if gates.determinism_diff_rate_max <= 0 and gates.determinism_len_stdev_max <= 0:
             return
-        comparable: List[Tuple[RunMetrics, str]] = [
+        comparable: list[tuple[RunMetrics, str]] = [
             (metrics, output)
             for metrics, output in zip(metrics_list, outputs)
             if metrics.status == "ok" and output
         ]
         if len(comparable) < 2:
             return
-        diff_rates: List[float] = []
+        diff_rates: list[float] = []
         for idx, (_, output_a) in enumerate(comparable):
             for _, output_b in comparable[idx + 1 :]:
                 diff_rates.append(compute_diff_rate(output_a, output_b))
         median_diff = median(diff_rates) if diff_rates else 0.0
-        lengths: List[int] = [
+        lengths: list[int] = [
             metrics.eval.len_tokens
             if metrics.eval.len_tokens is not None
             else metrics.output_tokens

@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Iterable, List, Literal, Sequence, cast
+from typing import Literal, cast
+from collections.abc import Iterable, Sequence
 
 from .budgets import BudgetManager
 from .config import load_budget_book, load_provider_configs
@@ -129,7 +130,7 @@ def run_compare(
 
 
 def run_batch(provider_specs: Iterable[str], prompts_path: str) -> int:
-    provider_paths: List[Path] = [
+    provider_paths: list[Path] = [
         Path(spec).expanduser().resolve() for spec in provider_specs if spec
     ]
     if not provider_paths:
