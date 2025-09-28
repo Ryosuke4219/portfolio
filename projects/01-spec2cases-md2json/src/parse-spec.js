@@ -30,6 +30,26 @@ export function parseListSection(lines, startIndex) {
   return { values, nextIndex: index - 1 };
 }
 
+export function applySectionLine(
+  sectionName,
+  current,
+  inlineValue,
+  listResult,
+  currentIndex,
+) {
+  const targetArray = current[sectionName];
+  if (inlineValue) {
+    targetArray.push(inlineValue);
+  }
+  if (listResult) {
+    targetArray.push(...listResult.values);
+  }
+  return {
+    section: sectionName,
+    nextIndex: listResult ? listResult.nextIndex : currentIndex,
+  };
+}
+
 const SECTION_PATTERNS = {
   pre: /^pre\s*:\s*/i,
   steps: /^steps?\s*:\s*/i,
@@ -41,15 +61,22 @@ export function handleSectionLine(sectionName, normalisedLine, lines, index, cur
   if (!pattern?.test(normalisedLine)) return null;
 
   const inlineValue = normalisedLine.replace(pattern, '').trim();
-  const targetArray = current[sectionName];
   if (inlineValue) {
-    targetArray.push(inlineValue);
-    return { section: sectionName, nextIndex: index };
+    return applySectionLine(sectionName, current, inlineValue, null, index);
   }
 
-  const { values, nextIndex } = parseListSection(lines, index + 1);
-  targetArray.push(...values);
-  return { section: sectionName, nextIndex };
+  const listResult = parseListSection(lines, index + 1);
+  return applySectionLine(sectionName, current, null, listResult, index);
+}
+
+export function handleSectionDispatch(normalisedLine, lines, index, current) {
+  for (const sectionName of ['pre', 'steps', 'expected']) {
+    const result = handleSectionLine(sectionName, normalisedLine, lines, index, current);
+    if (result) {
+      return { handled: true, ...result };
+    }
+  }
+  return { handled: false, section: null, nextIndex: index };
 }
 
 export function parseSpecText(text) {
@@ -113,16 +140,12 @@ export function parseSpecText(text) {
       continue;
     }
 
-    let sectionHandled = false;
-    for (const sectionName of ['pre', 'steps', 'expected']) {
-      const result = handleSectionLine(sectionName, normalisedLine, lines, i, current);
-      if (!result) continue;
-      currentSection = result.section;
-      i = result.nextIndex;
-      sectionHandled = true;
-      break;
+    const sectionState = handleSectionDispatch(normalisedLine, lines, i, current);
+    if (sectionState.handled) {
+      currentSection = sectionState.section;
+      i = sectionState.nextIndex;
+      continue;
     }
-    if (sectionHandled) continue;
 
     const tagsMatch = normalisedLine.match(/^(tags?)\s*:\s*(.+)$/i);
     if (tagsMatch) {
