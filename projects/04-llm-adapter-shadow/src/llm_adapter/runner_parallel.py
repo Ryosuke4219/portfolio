@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from collections import Counter
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+import importlib
+import json
+import math
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import (
     FIRST_COMPLETED,
     ThreadPoolExecutor,
     as_completed,
     wait,
 )
-from dataclasses import dataclass
-from typing import TypeVar
+from dataclasses import dataclass, field
+from typing import Any, TypeVar
 
 from .provider_spi import ProviderResponse
 from .runner_config import ConsensusConfig
@@ -155,6 +157,86 @@ class ConsensusResult:
     tie_break_reason: str | None
     winner_score: float
     abstained: int
+    rounds: int
+    schema_checked: bool
+    schema_failures: dict[int, str]
+    judge_name: str | None
+    judge_score: float | None
+    scores: dict[str, float] | None
+
+
+@dataclass(slots=True)
+class _Candidate:
+    text: str
+    entries: list[tuple[int, ProviderResponse]] = field(default_factory=list)
+    votes: int = 0
+    score: float = 0.0
+    latency: int = 0
+    cost: float = 0.0
+
+    def record(self, index: int, response: ProviderResponse) -> None:
+        self.entries.append((index, response))
+        self.votes += 1
+        self.score += _extract_score(response)
+        latency = int(response.latency_ms)
+        cost = float((response.tokens_in or 0) + (response.tokens_out or 0))
+        self.latency = latency if self.votes == 1 else min(self.latency, latency)
+        self.cost = cost if self.votes == 1 else min(self.cost, cost)
+
+    @property
+    def primary(self) -> ProviderResponse:
+        return min(self.entries, key=lambda item: item[0])[1]
+
+
+def _extract_score(response: ProviderResponse) -> float:
+    raw = response.raw
+    if isinstance(raw, Mapping):
+        value = raw.get("score")
+        if isinstance(value, (int, float)):
+            return float(value)
+    return 0.0
+
+
+def _load_judge(path: str) -> Callable[[Sequence[ProviderResponse]], Any]:
+    module_name, _, attr = path.partition(":")
+    if not module_name or not attr:
+        raise ValueError("judge must be defined as 'module:callable'")
+    module = importlib.import_module(module_name)
+    judge = getattr(module, attr, None)
+    if not callable(judge):
+        raise ValueError(f"judge callable {path!r} is not callable")
+    return judge
+
+
+def _apply_tie_breaker(
+    name: str, candidates: Sequence[_Candidate]
+) -> tuple[list[_Candidate], str]:
+    normalized = name.strip().lower()
+    if normalized == "latency":
+        best = min(candidate.latency for candidate in candidates)
+        narrowed = [candidate for candidate in candidates if candidate.latency == best]
+        return narrowed, f"latency(min={best})"
+    if normalized == "cost":
+        best_cost = min(candidate.cost for candidate in candidates)
+        narrowed = [candidate for candidate in candidates if candidate.cost == best_cost]
+        return narrowed, "cost(min)"
+    raise ValueError(f"unknown tie_breaker: {name!r}")
+
+
+def _invoke_judge(
+    judge: Callable[[Sequence[ProviderResponse]], Any],
+    candidates: Sequence[_Candidate],
+) -> tuple[str, float | None]:
+    payload = judge([candidate.primary for candidate in candidates])
+    if isinstance(payload, Mapping):
+        choice, score = max(payload.items(), key=lambda item: float(item[1]))
+        return str(choice).strip(), float(score)
+    if isinstance(payload, tuple) and len(payload) == 2:
+        choice, score = payload
+        return str(choice).strip(), float(score)
+    if isinstance(payload, str):
+        return payload.strip(), None
+    raise TypeError("judge must return str, (choice, score) or mapping of scores")
 
 
 def compute_consensus(
@@ -167,31 +249,129 @@ def compute_consensus(
         raise ValueError("responses must not be empty")
     if config is None:
         config = ConsensusConfig()
-    quorum = config.quorum or len(collected)
-    counter = Counter(response.text.strip() for response in collected)
-    rankings = counter.most_common()
-    top_text, votes = rankings[0]
-    tie_break_applied = len(rankings) > 1 and rankings[1][1] == votes
-    tie_break_reason = config.tie_breaker if tie_break_applied else None
+    strategy = (config.strategy or "majority").strip().lower()
+    if strategy not in {"majority", "weighted"}:
+        raise ValueError(f"unsupported consensus strategy: {config.strategy!r}")
+    tie_breaker = (config.tie_breaker or "").strip().lower() or None
+    if tie_breaker is not None and tie_breaker not in {"latency", "cost"}:
+        raise ValueError(f"unsupported tie_breaker: {config.tie_breaker!r}")
+
+    schema_spec: dict[str, Any] | None = None
+    if config.schema:
+        try:
+            schema_spec = json.loads(config.schema)
+        except json.JSONDecodeError as exc:  # pragma: no cover - config error
+            raise ValueError("invalid consensus schema") from exc
+
+    valid_entries: list[tuple[int, ProviderResponse]] = []
+    schema_failures: dict[int, str] = {}
+    for index, response in enumerate(collected):
+        if schema_spec is None:
+            valid_entries.append((index, response))
+            continue
+        try:
+            parsed = json.loads(response.text)
+        except json.JSONDecodeError as exc:
+            schema_failures[index] = f"invalid json: {exc.msg}"
+            continue
+        expected_type = schema_spec.get("type")
+        if expected_type == "object" and not isinstance(parsed, Mapping):
+            schema_failures[index] = "expected object"
+            continue
+        required = schema_spec.get("required") or []
+        missing = [field for field in required if field not in parsed]
+        if missing:
+            schema_failures[index] = f"missing keys: {', '.join(map(str, missing))}"
+            continue
+        valid_entries.append((index, response))
+
+    if not valid_entries:
+        raise ParallelExecutionError("all responses failed schema validation")
+
+    candidates: dict[str, _Candidate] = {}
+    for index, response in valid_entries:
+        key = response.text.strip()
+        candidate = candidates.get(key)
+        if candidate is None:
+            candidate = _Candidate(text=key)
+            candidates[key] = candidate
+        candidate.record(index, response)
+
+    tally = {text: candidate.votes for text, candidate in candidates.items()}
+    scores = {text: candidate.score for text, candidate in candidates.items()}
+    if not tally:
+        raise ParallelExecutionError("consensus tally is empty")
+
+    if strategy == "majority":
+        pivot = max(tally.values())
+        pool = [candidate for candidate in candidates.values() if candidate.votes == pivot]
+        winner_score = float(pivot)
+    else:
+        pivot = max(scores.values())
+        pool = [
+            candidate
+            for candidate in candidates.values()
+            if math.isclose(candidate.score, pivot, rel_tol=1e-9, abs_tol=1e-9)
+        ]
+        winner_score = float(pivot)
+
+    tie_break_applied = len(pool) > 1
+    rounds = 1
+    tie_break_reason = None
+    judge_name: str | None = None
+    judge_score: float | None = None
+    remaining = pool
+    max_rounds = config.max_rounds
+
+    if tie_break_applied and tie_breaker is not None:
+        if max_rounds is not None and rounds >= max_rounds:
+            raise ParallelExecutionError("consensus max_rounds exhausted")
+        remaining, tie_break_reason = _apply_tie_breaker(tie_breaker, remaining)
+        rounds += 1
+
+    if len(remaining) > 1 and config.judge:
+        if max_rounds is not None and rounds >= max_rounds:
+            raise ParallelExecutionError("consensus max_rounds exhausted")
+        judge_name = config.judge
+        judge_callable = _load_judge(judge_name)
+        choice, judge_score = _invoke_judge(judge_callable, remaining)
+        for candidate in remaining:
+            if candidate.text == choice:
+                remaining = [candidate]
+                break
+        else:  # pragma: no cover - defensive guard
+            raise ParallelExecutionError("judge returned unknown choice")
+        rounds += 1
+
+    if len(remaining) > 1:
+        raise ParallelExecutionError("consensus tie could not be resolved")
+
+    winner = remaining[0]
+    votes = winner.votes
+    quorum = config.quorum or len(valid_entries)
     if votes < quorum:
         raise ParallelExecutionError("consensus quorum not reached")
-    for response in collected:
-        if response.text.strip() == top_text:
-            return ConsensusResult(
-                response=response,
-                votes=votes,
-                tally=dict(counter),
-                total_voters=len(collected),
-                strategy=config.strategy,
-                min_votes=config.quorum,
-                score_threshold=None,
-                tie_breaker=config.tie_breaker,
-                tie_break_applied=tie_break_applied,
-                tie_break_reason=tie_break_reason,
-                winner_score=float(votes),
-                abstained=0,
-            )
-    raise RuntimeError("consensus resolution failed")
+
+    return ConsensusResult(
+        response=winner.primary,
+        votes=votes,
+        tally=tally,
+        total_voters=len(collected),
+        strategy=config.strategy,
+        min_votes=config.quorum,
+        score_threshold=None,
+        tie_breaker=config.tie_breaker,
+        tie_break_applied=tie_break_applied,
+        tie_break_reason=tie_break_reason,
+        winner_score=winner_score,
+        abstained=len(collected) - len(valid_entries),
+        rounds=rounds,
+        schema_checked=schema_spec is not None,
+        schema_failures=schema_failures,
+        judge_name=judge_name,
+        judge_score=judge_score,
+        scores=scores if strategy == "weighted" else None,
+    )
 
 
 __all__ = [
