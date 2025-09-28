@@ -1,0 +1,115 @@
+import pytest
+
+from src.llm_adapter.provider_spi import ProviderResponse, TokenUsage
+from src.llm_adapter.runner_config import ConsensusConfig
+from src.llm_adapter.runner_parallel import (
+    ConsensusResult,
+    ParallelExecutionError,
+    compute_consensus,
+)
+
+
+def _response(
+    text: str,
+    latency: int,
+    *,
+    tokens_in: int = 1,
+    tokens_out: int = 1,
+    score: float | None = None,
+) -> ProviderResponse:
+    raw: dict[str, object] | None = None
+    if score is not None:
+        raw = {"score": float(score)}
+    return ProviderResponse(
+        text=text,
+        latency_ms=latency,
+        token_usage=TokenUsage(prompt=tokens_in, completion=tokens_out),
+        raw=raw,
+    )
+
+
+def fake_judge(responses: list[ProviderResponse]) -> tuple[str, float]:
+    winner = responses[-1].text.strip()
+    return winner, 0.75
+
+
+def test_majority_with_latency_tie_breaker() -> None:
+    responses = [
+        _response("A", 40),
+        _response("B", 5),
+        _response("A", 35),
+        _response("B", 7),
+    ]
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(strategy="majority", tie_breaker="latency", quorum=2),
+    )
+    assert isinstance(result, ConsensusResult)
+    assert result.response.text == "B"
+    assert result.votes == 2
+    assert result.tie_break_applied is True
+    assert result.tie_break_reason.startswith("latency")
+    assert result.rounds == 2
+
+
+def test_weighted_strategy_records_scores() -> None:
+    responses = [
+        _response("A", 10, tokens_in=5, tokens_out=5, score=0.4),
+        _response("A", 12, tokens_in=4, tokens_out=4, score=0.2),
+        _response("B", 9, tokens_in=1, tokens_out=1, score=0.3),
+        _response("B", 8, tokens_in=1, tokens_out=1, score=0.3),
+    ]
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(strategy="weighted", tie_breaker="cost", quorum=2),
+    )
+    assert result.response.text == "B"
+    assert result.scores is not None
+    assert result.scores["A"] == pytest.approx(0.6)
+    assert result.scores["B"] == pytest.approx(0.6)
+    assert result.winner_score == pytest.approx(0.6)
+    assert result.tie_break_reason == "cost(min)"
+
+
+def test_schema_validation_marks_abstentions() -> None:
+    schema = '{"type": "object", "required": ["value"]}'
+    responses = [
+        _response('{"value": "ok"}', 11),
+        _response('{"value": "ok"}', 13),
+        _response("not-json", 5),
+    ]
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(strategy="majority", schema=schema),
+    )
+    assert result.response.text == '{"value": "ok"}'
+    assert result.abstained == 1
+    assert result.schema_checked is True
+    assert set(result.schema_failures) == {2}
+
+
+def test_judge_breaks_tie() -> None:
+    responses = [_response("A", 10), _response("B", 10)]
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(
+            strategy="majority",
+            judge="tests.test_runner_consensus:fake_judge",
+            quorum=1,
+            max_rounds=3,
+        ),
+    )
+    assert result.response.text == "B"
+    assert result.tie_break_applied is True
+    assert result.judge_name == "tests.test_runner_consensus:fake_judge"
+    assert result.judge_score == pytest.approx(0.75)
+    assert result.rounds == 2
+
+
+def test_max_rounds_exhausted_raises() -> None:
+    responses = [_response("A", 10), _response("B", 10)]
+    with pytest.raises(ParallelExecutionError):
+        compute_consensus(
+            responses,
+            config=ConsensusConfig(strategy="majority", max_rounds=1),
+        )

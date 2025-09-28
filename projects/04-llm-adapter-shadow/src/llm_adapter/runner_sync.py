@@ -435,23 +435,29 @@ class Runner:
                         "consensus_vote",
                         {
                             "request_fingerprint": request_fingerprint,
-                            "strategy": consensus.strategy,
-                            "tie_breaker": consensus.tie_breaker,
-                            "min_votes": consensus.min_votes,
-                            "score_threshold": consensus.score_threshold,
-                            "voters_total": consensus.total_voters,
-                            "votes_for": consensus.votes,
-                            "votes_against": votes_against,
-                            "abstained": consensus.abstained,
-                            "winner_provider": winner_invocation.provider.name(),
-                            "winner_score": consensus.winner_score,
-                            "winner_latency_ms": consensus.response.latency_ms,
-                            "tie_break_applied": consensus.tie_break_applied,
-                            "tie_break_reason": consensus.tie_break_reason,
-                            "votes": dict(consensus.tally),
-                            "candidate_summaries": candidate_summaries,
-                        },
-                    )
+                                "strategy": consensus.strategy,
+                                "tie_breaker": consensus.tie_breaker,
+                                "min_votes": consensus.min_votes,
+                                "score_threshold": consensus.score_threshold,
+                                "voters_total": consensus.total_voters,
+                                "votes_for": consensus.votes,
+                                "votes_against": votes_against,
+                                "abstained": consensus.abstained,
+                                "winner_provider": winner_invocation.provider.name(),
+                                "winner_score": consensus.winner_score,
+                                "winner_latency_ms": consensus.response.latency_ms,
+                                "tie_break_applied": consensus.tie_break_applied,
+                                "tie_break_reason": consensus.tie_break_reason,
+                                "rounds": consensus.rounds,
+                                "scores": consensus.scores,
+                                "schema_checked": consensus.schema_checked,
+                                "schema_failures": consensus.schema_failures,
+                                "judge": consensus.judge_name,
+                                "judge_score": consensus.judge_score,
+                                "votes": dict(consensus.tally),
+                                "candidate_summaries": candidate_summaries,
+                            },
+                        )
                 if winner_invocation.shadow_metrics is not None:
                     shadow_payload = winner_invocation.shadow_metrics.payload
                     extra: dict[str, object] = {
@@ -459,6 +465,11 @@ class Runner:
                             "votes_for": consensus.votes,
                             "votes_total": consensus.total_voters,
                             "tie_break_applied": consensus.tie_break_applied,
+                            "winner_score": consensus.winner_score,
+                            "rounds": consensus.rounds,
+                            "tie_break_reason": consensus.tie_break_reason,
+                            "judge": consensus.judge_name,
+                            "judge_score": consensus.judge_score,
                         }
                     }
                     if not shadow_payload.get("shadow_ok", True):
