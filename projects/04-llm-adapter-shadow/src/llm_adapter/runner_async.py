@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
 from .errors import (
@@ -279,7 +279,7 @@ class AsyncRunner:
                 provider: ProviderSPI | AsyncProviderSPI,
                 async_provider: AsyncProviderSPI,
                 attempt_index: int,
-            ):
+            ) -> Callable[[], Awaitable[tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]]]:
                 async def _worker() -> tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]:
                     response = await self._invoke_provider_async(
                         provider,
@@ -298,7 +298,9 @@ class AsyncRunner:
 
                 return _worker
 
-            workers = [
+            workers: list[
+                Callable[[], Awaitable[tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]]]
+            ] = [
                 _build_worker(provider, async_provider, index)
                 for index, (provider, async_provider) in enumerate(providers, start=1)
             ]
