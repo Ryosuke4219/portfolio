@@ -195,12 +195,19 @@ async def run_parallel_any_async(
 
 
 def run_parallel_all_sync(
-    workers: Sequence[SyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[SyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    max_attempts: int | None = None,
+    on_retry: Callable[[int, int, BaseException], float | None] | None = None,
 ) -> list[T]:
     """Execute workers concurrently and return all successful results."""
 
     if not workers:
         raise ValueError("workers must not be empty")
+    if max_attempts is not None and max_attempts < len(workers):
+        raise ValueError("max_attempts must be at least the number of workers")
+    _ = on_retry
     max_workers = _normalize_concurrency(len(workers), max_concurrency)
     responses: list[T] = [None] * len(workers)  # type: ignore[list-item]
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

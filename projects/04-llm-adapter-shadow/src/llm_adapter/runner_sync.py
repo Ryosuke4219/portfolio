@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -175,6 +176,7 @@ class Runner:
         metadata: dict[str, object],
         run_started: float,
         shadow_used: bool,
+        attempt_count: int,
     ) -> None:
         for result in results:
             if result is None:
@@ -199,7 +201,7 @@ class Runner:
                 request=request,
                 provider=result.provider,
                 status=status,
-                attempts=result.attempt,
+                attempts=attempt_count,
                 latency_ms=latency_ms,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
@@ -346,37 +348,114 @@ class Runner:
         results: list[ProviderInvocationResult | None] = [None] * total_providers
 
         capture_shadow = mode is RunnerMode.CONSENSUS
+        max_attempts = self._config.max_attempts
+        attempt_lock = threading.Lock()
+        attempts_used = 0
+        retry_events = 0
+
+        def reserve_attempt() -> int | None:
+            nonlocal attempts_used
+            with attempt_lock:
+                if max_attempts is not None and attempts_used >= max_attempts:
+                    return None
+                attempts_used += 1
+                return attempts_used
+
+        def record_retry_event() -> int:
+            nonlocal retry_events
+            with attempt_lock:
+                retry_events += 1
+                return retry_events
+
+        def snapshot_attempts() -> int:
+            with attempt_lock:
+                return attempts_used
+
+        def compute_retry_delay(error: BaseException) -> float | None:
+            if isinstance(error, RateLimitError):
+                return max(self._config.backoff.rate_limit_sleep_s, 0.0)
+            if isinstance(error, TimeoutError):
+                return 0.0 if self._config.backoff.timeout_next_provider else None
+            if isinstance(error, RetryableError):
+                return 0.0 if self._config.backoff.retryable_next_provider else None
+            return None
+
+        def handle_parallel_retry(
+            _worker_index: int, _attempt_index: int, _error: BaseException
+        ) -> float | None:
+            return None
 
         def make_worker(
-            index: int, provider: ProviderSPI
+            index: int,
+            provider: ProviderSPI,
+            *,
+            allow_retry: bool,
         ) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
-                result = self._invoke_provider_sync(
-                    provider,
-                    request,
-                    attempt=index,
-                    total_providers=total_providers,
-                    event_logger=event_logger,
-                    request_fingerprint=request_fingerprint,
-                    metadata=metadata,
-                    shadow=shadow,
-                    metrics_path=metrics_path_str,
-                    capture_shadow_metrics=capture_shadow,
-                )
-                results[index - 1] = result
-                if result.response is None:
-                    error = result.error
-                    if error is not None:
-                        raise error
-                    error = ParallelExecutionError("provider returned no response")
-                    result.error = error
+                next_attempt = reserve_attempt()
+                if next_attempt is None:
+                    error = ParallelExecutionError("max attempts exhausted")
+                    result = ProviderInvocationResult(
+                        provider=provider,
+                        attempt=index,
+                        total_providers=total_providers,
+                        response=None,
+                        error=error,
+                        latency_ms=None,
+                        tokens_in=None,
+                        tokens_out=None,
+                        shadow_metrics=None,
+                        shadow_metrics_extra=None,
+                    )
+                    results[index - 1] = result
                     raise error
-                return result
+                attempt_index = next_attempt
+                while True:
+                    result = self._invoke_provider_sync(
+                        provider,
+                        request,
+                        attempt=attempt_index,
+                        total_providers=total_providers,
+                        event_logger=event_logger,
+                        request_fingerprint=request_fingerprint,
+                        metadata=metadata,
+                        shadow=shadow,
+                        metrics_path=metrics_path_str,
+                        capture_shadow_metrics=capture_shadow,
+                    )
+                    results[index - 1] = result
+                    if result.response is not None:
+                        return result
+                    error = result.error
+                    if error is None:
+                        error = ParallelExecutionError("provider returned no response")
+                        result.error = error
+                    delay = compute_retry_delay(error) if allow_retry else None
+                    if delay is None:
+                        raise error
+                    next_attempt = reserve_attempt()
+                    if next_attempt is None:
+                        raise error
+                    retry_attempt = record_retry_event()
+                    if event_logger is not None:
+                        event_logger.emit(
+                            "retry",
+                            {
+                                "request_fingerprint": request_fingerprint,
+                                "provider": provider.name(),
+                                "attempt": attempt_index,
+                                "retry_attempt": retry_attempt,
+                                "error_type": type(error).__name__,
+                            },
+                        )
+                    if delay > 0:
+                        time.sleep(delay)
+                    attempt_index = next_attempt
 
             return worker
 
         workers = [
-            make_worker(index, provider)
+            make_worker(index, provider, allow_retry=mode is RunnerMode.PARALLEL_ANY)
             for index, provider in enumerate(self.providers, start=1)
         ]
 
@@ -391,11 +470,33 @@ class Runner:
                 response = winner.response
                 if response is None:
                     raise ParallelExecutionError("all workers failed")
+                attempts_final = snapshot_attempts()
+                tokens_in = response.token_usage.prompt
+                tokens_out = response.token_usage.completion
+                cost_usd = estimate_cost(winner.provider, tokens_in, tokens_out)
+                log_run_metric(
+                    event_logger,
+                    request_fingerprint=request_fingerprint,
+                    request=request,
+                    provider=winner.provider,
+                    status="ok",
+                    attempts=attempts_final,
+                    latency_ms=elapsed_ms(run_started),
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    cost_usd=cost_usd,
+                    error=None,
+                    metadata=metadata,
+                    shadow_used=shadow_used,
+                )
                 return response
 
             if mode is RunnerMode.PARALLEL_ALL:
                 invocations = run_parallel_all_sync(
-                    workers, max_concurrency=self._config.max_concurrency
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                    max_attempts=self._config.max_attempts,
+                    on_retry=handle_parallel_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
@@ -410,7 +511,10 @@ class Runner:
 
             if mode is RunnerMode.CONSENSUS:
                 invocations = run_parallel_all_sync(
-                    workers, max_concurrency=self._config.max_concurrency
+                    workers,
+                    max_concurrency=self._config.max_concurrency,
+                    max_attempts=self._config.max_attempts,
+                    on_retry=handle_parallel_retry,
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
@@ -512,6 +616,7 @@ class Runner:
                 metadata=metadata,
                 run_started=run_started,
                 shadow_used=shadow_used,
+                attempt_count=snapshot_attempts(),
             )
 
         raise RuntimeError(f"Unsupported runner mode: {mode}")
