@@ -1,0 +1,35 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.6.0
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: pip install -r projects/04-llm-adapter-shadow/requirements.txt ruff mypy
+
+      - name: Run linters and checks
+        run: |
+          npm run lint:js
+          ruff check projects/04-llm-adapter-shadow tools
+          mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src projects/04-llm-adapter-shadow/tests tools
+          python -m compileall projects/04-llm-adapter-shadow
