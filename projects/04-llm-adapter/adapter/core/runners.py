@@ -7,10 +7,14 @@ import logging
 import os
 import re
 import uuid
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
-from time import perf_counter
 from statistics import median, pstdev
-from typing import List, Mapping, Optional, Sequence, Tuple
+from threading import Lock
+from time import perf_counter, sleep
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
 
 from .budgets import BudgetManager
 from .config import ProviderConfig
@@ -26,7 +30,72 @@ from .metrics import (
 )
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 
+if TYPE_CHECKING:  # pragma: no cover - 型補完用
+    from .runner_api import RunnerConfig
+
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class AggregationDecision:
+    winner_index: int
+    output: str
+    votes: Optional[int] = None
+
+
+@dataclass(slots=True)
+class SingleRunResult:
+    metrics: RunMetrics
+    raw_output: str
+    stop_reason: Optional[str] = None
+    aggregate_output: Optional[str] = None
+
+
+class _TokenBucket:
+    def __init__(self, rpm: Optional[int]) -> None:
+        self.capacity = rpm or 0
+        self.tokens = float(self.capacity)
+        self.updated = perf_counter()
+        self.lock = Lock()
+
+    def acquire(self) -> None:
+        if self.capacity <= 0:
+            return
+        refill_rate = self.capacity / 60.0
+        while True:
+            with self.lock:
+                now = perf_counter()
+                elapsed = now - self.updated
+                if elapsed > 0:
+                    self.tokens = min(
+                        float(self.capacity), self.tokens + elapsed * refill_rate
+                    )
+                    self.updated = now
+                if self.tokens >= 1.0:
+                    self.tokens -= 1.0
+                    return
+            sleep(max(1.0 / max(self.capacity, 1), 0.01))
+
+
+class _SchemaValidator:
+    def __init__(self, schema_path: Optional[Path]) -> None:
+        self.schema: Optional[Dict[str, object]] = None
+        if schema_path and schema_path.exists():
+            with schema_path.open("r", encoding="utf-8") as fp:
+                self.schema = json.load(fp)
+
+    def validate(self, payload: str) -> None:
+        if self.schema is None or not payload.strip():
+            return
+        data = json.loads(payload)
+        required = self.schema.get("required") if isinstance(self.schema, dict) else None
+        if isinstance(required, list):
+            missing = [field for field in required if field not in data]
+            if missing:
+                raise ValueError(f"missing required fields: {', '.join(missing)}")
+        expected_type = self.schema.get("type") if isinstance(self.schema, dict) else None
+        if expected_type == "object" and not isinstance(data, dict):
+            raise ValueError("schema type mismatch: expected object")
 
 
 class CompareRunner:
@@ -46,35 +115,204 @@ class CompareRunner:
         self.metrics_path = metrics_path
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.allow_overrun = allow_overrun
+        self._schema_validator: Optional[_SchemaValidator] = None
+        self._token_bucket: Optional[_TokenBucket] = None
 
-    def run(self, repeat: int, mode: str) -> List[RunMetrics]:
-        results: List[RunMetrics] = []
+    def run(self, repeat: int, config: "RunnerConfig") -> List[RunMetrics]:
+        repeat = max(repeat, 1)
+        self._token_bucket = _TokenBucket(getattr(config, "rpm", None))
+        self._schema_validator = _SchemaValidator(getattr(config, "schema", None))
+
+        providers: List[Tuple[ProviderConfig, BaseProvider]] = []
         for provider_config in self.provider_configs:
             provider = ProviderFactory.create(provider_config)
-            LOGGER.info("provider=%s model=%s を実行", provider_config.provider, provider_config.model)
-            for task in self.tasks:
-                attempt_metrics: List[RunMetrics] = []
-                attempt_outputs: List[str] = []
-                stop_reason: Optional[str] = None
-                for attempt in range(repeat):
-                    metrics, raw_output, budget_reason = self._run_single(
-                        provider_config, provider, task, attempt, mode
+            providers.append((provider_config, provider))
+            LOGGER.info(
+                "provider=%s model=%s を実行",
+                provider_config.provider,
+                provider_config.model,
+            )
+
+        results: List[RunMetrics] = []
+        if not providers:
+            return results
+
+        stop_reason: Optional[str] = None
+        for task in self.tasks:
+            histories: List[List[SingleRunResult]] = [[] for _ in providers]
+            for attempt in range(repeat):
+                if config.mode == "sequential":
+                    batch, stop_reason = self._run_sequential_attempt(
+                        providers, task, attempt, config.mode
                     )
-                    attempt_metrics.append(metrics)
-                    attempt_outputs.append(raw_output)
-                    if budget_reason:
-                        stop_reason = budget_reason
-                        break
-                self._apply_determinism_gate(
-                    provider_config, task, attempt_metrics, attempt_outputs
+                else:
+                    batch, stop_reason = self._run_parallel_attempt(
+                        providers, task, attempt, config
+                    )
+                self._apply_aggregation(
+                    config.mode, config, [result for _, result in batch]
                 )
-                for metrics in attempt_metrics:
-                    results.append(metrics)
-                    self._append_metric(metrics)
+                for index, result in batch:
+                    histories[index].append(result)
                 if stop_reason:
-                    LOGGER.warning("予算制約により実行を停止します: %s", stop_reason)
-                    return results
+                    break
+            self._finalize_task(task, providers, histories, results)
+            if stop_reason:
+                LOGGER.warning("予算制約により実行を停止します: %s", stop_reason)
+                break
         return results
+
+    def _run_sequential_attempt(
+        self,
+        providers: Sequence[Tuple[ProviderConfig, BaseProvider]],
+        task: GoldenTask,
+        attempt_index: int,
+        mode: str,
+    ) -> Tuple[List[Tuple[int, SingleRunResult]], Optional[str]]:
+        batch: List[Tuple[int, SingleRunResult]] = []
+        stop_reason: Optional[str] = None
+        for index, (provider_config, provider) in enumerate(providers):
+            result = self._run_single(provider_config, provider, task, attempt_index, mode)
+            batch.append((index, result))
+            if result.stop_reason and not stop_reason:
+                stop_reason = result.stop_reason
+        return batch, stop_reason
+
+    def _run_parallel_attempt(
+        self,
+        providers: Sequence[Tuple[ProviderConfig, BaseProvider]],
+        task: GoldenTask,
+        attempt_index: int,
+        config: "RunnerConfig",
+    ) -> Tuple[List[Tuple[int, SingleRunResult]], Optional[str]]:
+        if not providers:
+            return [], None
+        max_workers = self._normalize_concurrency(
+            len(providers), getattr(config, "max_concurrency", None)
+        )
+        stop_reason: Optional[str] = None
+        results: List[Optional[SingleRunResult]] = [None] * len(providers)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {
+                executor.submit(
+                    self._run_single,
+                    provider_config,
+                    provider,
+                    task,
+                    attempt_index,
+                    config.mode,
+                ): index
+                for index, (provider_config, provider) in enumerate(providers)
+            }
+            for future in as_completed(future_map):
+                index = future_map[future]
+                result = future.result()
+                results[index] = result
+                if result.stop_reason and not stop_reason:
+                    stop_reason = result.stop_reason
+        batch = [
+            (index, result)
+            for index, result in enumerate(results)
+            if result is not None
+        ]
+        return batch, stop_reason
+
+    def _apply_aggregation(
+        self,
+        mode: str,
+        config: "RunnerConfig",
+        batch: Sequence[SingleRunResult],
+    ) -> None:
+        decision = self._select_aggregation(mode, config, batch)
+        if decision is None:
+            return
+        winner = batch[decision.winner_index]
+        winner.aggregate_output = decision.output
+        meta = dict(winner.metrics.ci_meta)
+        meta["aggregate_mode"] = mode
+        aggregate_strategy = getattr(config, "aggregate", None)
+        if aggregate_strategy:
+            meta["aggregate_strategy"] = aggregate_strategy
+        meta["aggregate_hash"] = hash_text(decision.output)
+        if decision.votes is not None:
+            meta["aggregate_votes"] = decision.votes
+        winner.metrics.ci_meta = meta
+
+    def _select_aggregation(
+        self,
+        mode: str,
+        config: "RunnerConfig",
+        batch: Sequence[SingleRunResult],
+    ) -> Optional[AggregationDecision]:
+        ok_entries = [
+            (index, result)
+            for index, result in enumerate(batch)
+            if result.metrics.status == "ok" and result.raw_output.strip()
+        ]
+        if not ok_entries:
+            return None
+        strategy = getattr(config, "tie_breaker", None) or getattr(config, "aggregate", None)
+        if mode == "consensus":
+            counter = Counter(result.raw_output.strip() for _, result in ok_entries)
+            winner_text, votes = counter.most_common(1)[0]
+            quorum = getattr(config, "quorum", None) or len(ok_entries)
+            if votes < quorum:
+                return None
+            candidates = [
+                entry for entry in ok_entries if entry[1].raw_output.strip() == winner_text
+            ]
+            winner_index = self._resolve_tie_breaker(candidates, strategy)
+            return AggregationDecision(
+                winner_index=winner_index,
+                output=batch[winner_index].raw_output,
+                votes=votes,
+            )
+        winner_index = self._resolve_tie_breaker(ok_entries, strategy)
+        return AggregationDecision(
+            winner_index=winner_index,
+            output=batch[winner_index].raw_output,
+        )
+
+    def _resolve_tie_breaker(
+        self,
+        candidates: Sequence[Tuple[int, SingleRunResult]],
+        tie_breaker: Optional[str],
+    ) -> int:
+        if not candidates:
+            return 0
+        if tie_breaker == "latency":
+            chosen = min(candidates, key=lambda item: item[1].metrics.latency_ms)
+        elif tie_breaker == "cost":
+            chosen = min(candidates, key=lambda item: item[1].metrics.cost_usd)
+        else:
+            chosen = candidates[0]
+        return chosen[0]
+
+    def _finalize_task(
+        self,
+        task: GoldenTask,
+        providers: Sequence[Tuple[ProviderConfig, BaseProvider]],
+        histories: Sequence[Sequence[SingleRunResult]],
+        results: List[RunMetrics],
+    ) -> None:
+        for index, (provider_config, _) in enumerate(providers):
+            attempts = list(histories[index])
+            if not attempts:
+                continue
+            metrics_list = [attempt.metrics for attempt in attempts]
+            outputs = [attempt.raw_output for attempt in attempts]
+            self._apply_determinism_gate(provider_config, task, metrics_list, outputs)
+            for attempt in attempts:
+                results.append(attempt.metrics)
+                self._append_metric(attempt.metrics)
+
+    @staticmethod
+    def _normalize_concurrency(total: int, limit: Optional[int]) -> int:
+        if total <= 0:
+            return 1
+        if limit is None or limit <= 0:
+            return total
+        return max(1, min(total, limit))
 
     def _run_single(
         self,
@@ -83,7 +321,9 @@ class CompareRunner:
         task: GoldenTask,
         attempt_index: int,
         mode: str,
-    ) -> Tuple[RunMetrics, str, Optional[str]]:
+    ) -> SingleRunResult:
+        if self._token_bucket:
+            self._token_bucket.acquire()
         prompt = task.render_prompt()
         response, status, failure_kind, error_message, latency_ms = self._run_provider_call(
             provider_config,
@@ -102,6 +342,20 @@ class CompareRunner:
                 error_message,
             )
         )
+        schema_error: Optional[str] = None
+        validator = self._schema_validator
+        if validator is not None:
+            try:
+                validator.validate(response.output_text or "")
+            except ValueError as exc:
+                schema_error = str(exc)
+        if schema_error:
+            if status == "ok":
+                status = "error"
+            failure_kind = failure_kind or "schema_violation"
+            error_message = (
+                f"{error_message} | {schema_error}" if error_message else schema_error
+            )
         run_metrics, raw_output = self._build_metrics(
             provider_config,
             task,
@@ -115,7 +369,15 @@ class CompareRunner:
             budget_snapshot,
             cost_usd,
         )
-        return run_metrics, raw_output, stop_reason
+        if schema_error:
+            run_metrics.status = status
+            run_metrics.failure_kind = failure_kind
+            run_metrics.error_message = error_message
+        return SingleRunResult(
+            metrics=run_metrics,
+            raw_output=raw_output,
+            stop_reason=stop_reason,
+        )
 
     def _run_provider_call(
         self,

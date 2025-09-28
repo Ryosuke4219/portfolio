@@ -123,7 +123,7 @@ def run_compare(
         metrics_path,
         allow_overrun=allow_overrun,
     )
-    results = runner.run(repeat=max(repeat, 1), mode=config.mode)
+    results = runner.run(repeat=max(repeat, 1), config=config)
     logging.getLogger(__name__).info("%d 件の試行を記録しました", len(results))
     return 0
 
