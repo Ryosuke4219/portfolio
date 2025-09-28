@@ -8,14 +8,20 @@ from typing import Any, Callable, TypeVar
 
 import pytest
 from _pytest.recwarn import WarningsRecorder
+from src.llm_adapter.errors import RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
     ProviderResponse,
     TokenUsage,
 )
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import AsyncRunner, Runner
-from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
+from src.llm_adapter.runner import AsyncRunner, ParallelAllResult, Runner
+from src.llm_adapter.runner_config import (
+    BackoffPolicy,
+    ConsensusConfig,
+    RunnerConfig,
+    RunnerMode,
+)
 from src.llm_adapter.runner_parallel import ParallelExecutionError
 
 
@@ -45,12 +51,23 @@ class _CapturingLogger:
 
 
 class _AsyncProbeProvider:
-    def __init__(self, name: str, *, delay: float, text: str | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        delay: float,
+        text: str | None = None,
+        failures: list[BaseException] | None = None,
+        block: bool = False,
+    ) -> None:
         self._name = name
         self._delay = delay
         self._text = text or name
         self.cancelled = False
         self.finished = False
+        self.invocations = 0
+        self._failures = list(failures or [])
+        self._block = block
 
     def name(self) -> str:
         return self._name
@@ -59,8 +76,16 @@ class _AsyncProbeProvider:
         return set()
 
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
+        self.invocations += 1
         try:
-            if self._delay <= 0:
+
+            if self._failures:
+                raise self._failures.pop(0)
+            if self._block:
+                await asyncio.Event().wait()
+                latency_ms = 0
+            elif self._delay <= 0:
+
                 latency_ms = 0
             else:
                 await asyncio.sleep(self._delay)
@@ -112,6 +137,20 @@ def _run_without_warnings(action: Callable[[], T]) -> T:
         result = action()
     assert len(warnings_record) == 0
     return result
+
+
+def _patch_runner_sleep(
+    monkeypatch: pytest.MonkeyPatch,
+    clock: _FakeClock,
+    calls: list[float] | None = None,
+) -> None:
+    async def _fake_sleep(duration: float) -> None:
+        if calls is not None:
+            calls.append(duration)
+        await clock.async_sleep(duration)
+
+    monkeypatch.setattr("src.llm_adapter.runner_async.asyncio.sleep", _fake_sleep)
+    monkeypatch.setattr("src.llm_adapter.runner_parallel.asyncio.sleep", _fake_sleep)
 
 
 def test_async_runner_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -392,3 +431,85 @@ def test_async_consensus_quorum_failure() -> None:
 
     with pytest.raises(ParallelExecutionError):
         asyncio.run(runner.run_async(request))
+
+
+def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
+    request_any = ProviderRequest(prompt="retry", model="parallel-any")
+    clock_any = _FakeClock()
+    sleep_calls: list[float] = []
+    _patch_runner_sleep(monkeypatch, clock_any, sleep_calls)
+
+    flaky = _AsyncProbeProvider(
+        "primary",
+        delay=0.0,
+        text="ok",
+        failures=[RateLimitError("slow"), TimeoutError("later")],
+    )
+    blocker = _AsyncProbeProvider("secondary", delay=0.0, block=True)
+    logger = _CapturingLogger()
+    runner_any = AsyncRunner(
+        [flaky, blocker],
+        logger=logger,
+        config=RunnerConfig(
+            mode=RunnerMode.PARALLEL_ANY,
+            backoff=BackoffPolicy(rate_limit_sleep_s=0.25, timeout_next_provider=False),
+        ),
+    )
+
+    response = asyncio.run(runner_any.run_async(request_any, shadow_metrics_path="unused.jsonl"))
+    assert response.text == "ok:retry"
+    assert (
+        flaky.invocations,
+        flaky.cancelled,
+        flaky.finished,
+        blocker.cancelled,
+        blocker.finished,
+    ) == (3, False, True, True, True)
+    assert [event["error_type"] for event in logger.of_type("retry")] == [
+        "RateLimitError",
+        "TimeoutError",
+    ]
+
+    flaky_fail = _AsyncProbeProvider(
+        "limited",
+        delay=0.0,
+        text="never",
+        failures=[RateLimitError("first"), RateLimitError("second"), RateLimitError("third")],
+    )
+    runner_fail = AsyncRunner(
+        [flaky_fail],
+        config=RunnerConfig(
+            mode=RunnerMode.PARALLEL_ANY,
+            backoff=BackoffPolicy(rate_limit_sleep_s=0.1),
+            max_attempts=2,
+        ),
+    )
+
+    with pytest.raises(ParallelExecutionError):
+        asyncio.run(runner_fail.run_async(request_any, shadow_metrics_path="unused.jsonl"))
+
+    assert (
+        flaky_fail.invocations,
+        flaky_fail.cancelled,
+        flaky_fail.finished,
+    ) == (2, False, True)
+    assert sleep_calls == [0.25, 0.1]
+
+    request_all = ProviderRequest(prompt="gather", model="parallel-all")
+    _patch_runner_sleep(monkeypatch, _FakeClock())
+    fast = _AsyncProbeProvider("fast", delay=0.0, text="fast")
+    slow = _AsyncProbeProvider("slow", delay=0.1, text="slow")
+    ready = _AsyncProbeProvider("ready", delay=0.0, text="ready")
+    logger_all = _CapturingLogger()
+    runner_all = AsyncRunner(
+        [fast, slow, ready],
+        logger=logger_all,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL),
+    )
+
+    result = asyncio.run(runner_all.run_async(request_all, shadow_metrics_path="unused.jsonl"))
+    assert isinstance(result, ParallelAllResult)
+    assert [entry[1].name() for entry in result.invocations] == ["fast", "slow", "ready"]
+    assert result.primary_response.text == "fast:gather"
+    assert [(p.cancelled, p.finished) for p in (fast, slow, ready)] == [(False, True)] * 3
+    assert logger_all.of_type("retry") == []
