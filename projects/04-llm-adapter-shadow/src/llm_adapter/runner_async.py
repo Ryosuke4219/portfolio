@@ -467,7 +467,7 @@ class AsyncRunner:
                             if summary:
                                 message = f"{message} ({summary})"
                             error = ParallelExecutionError(message)
-                            setattr(error, "failures", consensus_results)
+                            error.failures = consensus_results
                             last_err = error
                         else:
                             try:
