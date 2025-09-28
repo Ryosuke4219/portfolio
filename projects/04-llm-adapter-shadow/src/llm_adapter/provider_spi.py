@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import warnings
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import InitVar, dataclass, field
 from typing import Any, Protocol, cast
@@ -110,10 +111,22 @@ class ProviderResponse:
 
     @property
     def input_tokens(self) -> int:
+        warnings.warn(
+            "ProviderResponse.input_tokens is deprecated and will be removed in a future release. "
+            "Use ProviderResponse.token_usage.prompt when logging token counts.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.tokens_in or 0
 
     @property
     def output_tokens(self) -> int:
+        warnings.warn(
+            "ProviderResponse.output_tokens is deprecated and will be removed in a future release. "
+            "Use ProviderResponse.token_usage.completion when logging token counts.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.tokens_out or 0
 
 
