@@ -10,7 +10,6 @@ from typing import Iterable, List, Literal, Sequence, cast
 from .budgets import BudgetManager
 from .config import load_budget_book, load_provider_configs
 from .datasets import load_golden_tasks
-from .runners import CompareRunner
 
 Mode = Literal["sequential", "parallel-any", "parallel-all", "consensus"]
 
@@ -115,6 +114,8 @@ def run_compare(
     tasks = load_golden_tasks(prompt_path)
     budget_book = load_budget_book(budgets_path)
     budget_manager = BudgetManager(budget_book)
+
+    from .runners import CompareRunner
 
     runner = CompareRunner(
         provider_configs,
