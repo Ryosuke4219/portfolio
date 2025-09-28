@@ -132,12 +132,10 @@ class ProviderResponse:
             )
         return self.tokens_out or 0
 
-    @property
-    def token_usage(self) -> TokenUsage:
+    def _get_token_usage(self) -> TokenUsage:
         return self._token_usage
 
-    @token_usage.setter
-    def token_usage(self, value: TokenUsage | None) -> None:
+    def _set_token_usage(self, value: TokenUsage | None) -> None:
         if value is None:
             value = TokenUsage(
                 prompt=int(self.tokens_in or 0),
@@ -161,6 +159,12 @@ class AsyncProviderSPI(Protocol):
     def name(self) -> str: ...
     def capabilities(self) -> set[str]: ...
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse: ...
+
+
+ProviderResponse.token_usage = property(
+    ProviderResponse._get_token_usage,
+    ProviderResponse._set_token_usage,
+)
 
 
 class _AsyncProviderAdapter(AsyncProviderSPI):
