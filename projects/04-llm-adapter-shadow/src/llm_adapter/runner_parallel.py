@@ -6,7 +6,8 @@ import asyncio
 import importlib
 import json
 import math
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable as TypingCallable
 from concurrent.futures import (
     FIRST_COMPLETED,
     Future,
@@ -15,7 +16,7 @@ from concurrent.futures import (
     wait,
 )
 from dataclasses import dataclass, field
-from typing import Any, Callable as TypingCallable, Generic, Iterator, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast
 
 from .provider_spi import ProviderResponse
 from .runner_config import ConsensusConfig
@@ -257,7 +258,7 @@ def _extract_score(response: ProviderResponse) -> float:
     raw = response.raw
     if isinstance(raw, Mapping):
         value = raw.get("score")
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
     return 0.0
 
