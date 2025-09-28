@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from .errors import (
     FatalError,
@@ -33,7 +34,7 @@ from .runner_shared import (
     log_run_metric,
     resolve_event_logger,
 )
-from .shadow import DEFAULT_METRICS_PATH, run_with_shadow
+from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow
 from .utils import content_hash, elapsed_ms
 
 
@@ -47,6 +48,8 @@ class ProviderInvocationResult:
     latency_ms: float
     tokens_in: int | None
     tokens_out: int | None
+    shadow_metrics: ShadowMetrics | None
+    shadow_metrics_extra: dict[str, object] | None
 
 
 class Runner:
@@ -78,6 +81,7 @@ class Runner:
         metadata: dict[str, object],
         shadow: ProviderSPI | None,
         metrics_path: MetricsPath,
+        capture_shadow_metrics: bool,
     ) -> ProviderInvocationResult:
         attempt_started = time.time()
         response: ProviderResponse | None = None
@@ -92,14 +96,31 @@ class Runner:
             except Exception:
                 reservation.cancel()
                 raise
+
         try:
-            response = run_with_shadow(
-                provider,
-                shadow,
-                request,
-                metrics_path=metrics_path,
-                logger=event_logger,
-            )
+            if capture_shadow_metrics:
+                response_with_metrics = run_with_shadow(
+                    provider,
+                    shadow,
+                    request,
+                    metrics_path=metrics_path,
+                    logger=event_logger,
+                    capture_metrics=True,
+                )
+                response, shadow_metrics = cast(
+                    tuple[ProviderResponse, ShadowMetrics | None],
+                    response_with_metrics,
+                )
+            else:
+                response_only = run_with_shadow(
+                    provider,
+                    shadow,
+                    request,
+                    metrics_path=metrics_path,
+                    logger=event_logger,
+                    capture_metrics=False,
+                )
+                response = cast(ProviderResponse, response_only)
         except Exception as exc:  # noqa: BLE001
             error = exc
             latency_ms = elapsed_ms(attempt_started)
@@ -146,6 +167,8 @@ class Runner:
             latency_ms=latency_ms,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
+            shadow_metrics=shadow_metrics,
+            shadow_metrics_extra=None,
         )
 
     def _log_parallel_results(
@@ -162,6 +185,8 @@ class Runner:
         for result in results:
             if result is None:
                 continue
+            if result.shadow_metrics is not None:
+                result.shadow_metrics.emit(result.shadow_metrics_extra)
             status = "ok" if result.response is not None else "error"
             if status == "ok":
                 tokens_in = result.tokens_in if result.tokens_in is not None else 0
@@ -236,6 +261,7 @@ class Runner:
                     metadata=metadata,
                     shadow=shadow,
                     metrics_path=metrics_path_str,
+                    capture_shadow_metrics=False,
                 )
                 if result.response is not None:
                     tokens_in = result.tokens_in if result.tokens_in is not None else 0
@@ -320,6 +346,8 @@ class Runner:
         total_providers = len(self.providers)
         results: list[ProviderInvocationResult | None] = [None] * total_providers
 
+        capture_shadow = mode is RunnerMode.CONSENSUS
+
         def make_worker(
             index: int, provider: ProviderSPI
         ) -> Callable[[], ProviderInvocationResult]:
@@ -334,6 +362,7 @@ class Runner:
                     metadata=metadata,
                     shadow=shadow,
                     metrics_path=metrics_path_str,
+                    capture_shadow_metrics=capture_shadow,
                 )
                 results[index - 1] = result
                 return result
@@ -374,22 +403,81 @@ class Runner:
                 return first_response
 
             if mode is RunnerMode.CONSENSUS:
-                responses = run_parallel_all_sync(
+                invocations = run_parallel_all_sync(
                     workers, max_concurrency=self._config.max_concurrency
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
                     raise fatal from None
-                provider_responses = [
-                    res.response
-                    for res in responses
+                successful: list[
+                    tuple[ProviderInvocationResult, ProviderResponse]
+                ] = [
+                    (res, res.response)
+                    for res in invocations
                     if res.response is not None
                 ]
-                if len(provider_responses) != len(responses):
+                if len(successful) != len(invocations):
                     raise ParallelExecutionError("all workers failed")
+                responses_for_consensus = [response for _, response in successful]
                 consensus = compute_consensus(
-                    provider_responses, config=self._config.consensus
+                    responses_for_consensus,
+                    config=self._config.consensus,
                 )
+                winner_invocation = next(
+                    invocation
+                    for invocation, response in successful
+                    if response is consensus.response
+                )
+                votes_against = consensus.total_voters - consensus.votes - consensus.abstained
+                if event_logger is not None:
+                    candidate_summaries = [
+                        {
+                            "provider": invocation.provider.name(),
+                            "latency_ms": response.latency_ms,
+                            "votes": consensus.tally.get(
+                                response.text.strip(), 0
+                            ),
+                            "text_hash": content_hash(
+                                "consensus", response.text
+                            ),
+                        }
+                        for invocation, response in successful
+                    ]
+                    event_logger.emit(
+                        "consensus_vote",
+                        {
+                            "request_fingerprint": request_fingerprint,
+                            "strategy": consensus.strategy,
+                            "tie_breaker": consensus.tie_breaker,
+                            "min_votes": consensus.min_votes,
+                            "score_threshold": consensus.score_threshold,
+                            "voters_total": consensus.total_voters,
+                            "votes_for": consensus.votes,
+                            "votes_against": votes_against,
+                            "abstained": consensus.abstained,
+                            "winner_provider": winner_invocation.provider.name(),
+                            "winner_score": consensus.winner_score,
+                            "winner_latency_ms": consensus.response.latency_ms,
+                            "tie_break_applied": consensus.tie_break_applied,
+                            "tie_break_reason": consensus.tie_break_reason,
+                            "votes": dict(consensus.tally),
+                            "candidate_summaries": candidate_summaries,
+                        },
+                    )
+                if winner_invocation.shadow_metrics is not None:
+                    shadow_payload = winner_invocation.shadow_metrics.payload
+                    extra: dict[str, object] = {
+                        "shadow_consensus_delta": {
+                            "votes_for": consensus.votes,
+                            "votes_total": consensus.total_voters,
+                            "tie_break_applied": consensus.tie_break_applied,
+                        }
+                    }
+                    if not shadow_payload.get("shadow_ok", True):
+                        error = shadow_payload.get("shadow_error")
+                        if error is not None:
+                            extra["shadow_consensus_error"] = error
+                    winner_invocation.shadow_metrics_extra = extra
                 return consensus.response
         except ParallelExecutionError as exc:
             fatal = self._extract_fatal_error(results)
