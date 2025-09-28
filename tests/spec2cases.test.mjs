@@ -1,6 +1,8 @@
 import assert from 'node:assert';
+import { test } from 'node:test';
 
 import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases-md2json/scripts/spec2cases.mjs';
+import { parseSpecText } from '../projects/01-spec2cases-md2json/src/parse-spec.js';
 import { SPEC2CASES_SAMPLE_SPEC_MD_PATH } from '../scripts/paths.mjs';
 
 test('markdown specs with headings are parsed into cases', () => {
@@ -31,4 +33,48 @@ test('markdown specs with headings are parsed into cases', () => {
 
   const errors = validateCasesSchema(result);
   assert.deepEqual(errors, []);
+});
+
+test('markdown sections keep order and multiline entries', () => {
+  const text = [
+    'suite: Regression',
+    'case: CASE-10',
+    'title: Inline',
+    'pre: inline pre',
+    '  continues',
+    'steps:',
+    '- first',
+    '  details',
+    '- second',
+    'expected:',
+    '- result one',
+    '  details',
+    'case: CASE-11',
+    'title: Reordered',
+    'expected:',
+    '- done',
+    'steps:',
+    '- first',
+    'pre:',
+    '- ready',
+    '',
+  ].join('\n');
+
+  const result = parseSpecText(text);
+
+  assert.equal(result.suite, 'Regression');
+  assert.equal(result.cases.length, 2);
+
+  const [first, second] = result.cases;
+  assert.equal(first.id, 'CASE-10');
+  assert.equal(first.title, 'Inline');
+  assert.deepEqual(first.pre, ['inline pre continues']);
+  assert.deepEqual(first.steps, ['first details', 'second']);
+  assert.deepEqual(first.expected, ['result one details']);
+
+  assert.equal(second.id, 'CASE-11');
+  assert.equal(second.title, 'Reordered');
+  assert.deepEqual(second.pre, ['ready']);
+  assert.deepEqual(second.steps, ['first']);
+  assert.deepEqual(second.expected, ['done']);
 });
