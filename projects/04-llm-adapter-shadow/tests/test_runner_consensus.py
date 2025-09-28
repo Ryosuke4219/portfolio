@@ -108,32 +108,49 @@ def test_schema_validation_marks_abstentions() -> None:
     assert result.response.text == '{"value": "ok"}'
     assert result.abstained == 1
     assert result.schema_checked is True
-    assert set(result.schema_failures) == {2}
+    assert result.rounds == 1
+    assert result.schema_failures[2].startswith("invalid json")
 
 
-def test_judge_breaks_tie() -> None:
-    responses = [_response("A", 10), _response("B", 10)]
+def test_judge_provider_handles_runoff_round() -> None:
+    responses = [
+        _response("A", 10),
+        _response("B", 10),
+        _response("A", 20),
+        _response("B", 20),
+    ]
     result = compute_consensus(
         responses,
         config=ConsensusConfig(
             strategy="majority",
+            tie_breaker="latency",
             judge="tests.test_runner_consensus:fake_judge",
-            quorum=1,
-            max_rounds=3,
+            quorum=2,
+            max_rounds=4,
         ),
     )
     assert result.response.text == "B"
     assert result.tie_break_applied is True
+    assert result.tie_break_reason == "latency(min=10)"
     assert result.judge_name == "tests.test_runner_consensus:fake_judge"
     assert result.judge_score == pytest.approx(0.75)
-    assert result.tie_breaker_selected is None
-    assert result.rounds == 2
+    assert result.rounds == 3
 
 
-def test_max_rounds_exhausted_raises() -> None:
-    responses = [_response("A", 10), _response("B", 10)]
+def test_max_rounds_exhausted_before_judge_round() -> None:
+    responses = [
+        _response("A", 10),
+        _response("B", 10),
+        _response("A", 20),
+        _response("B", 20),
+    ]
     with pytest.raises(ParallelExecutionError):
         compute_consensus(
             responses,
-            config=ConsensusConfig(strategy="majority", max_rounds=1),
+            config=ConsensusConfig(
+                strategy="majority",
+                tie_breaker="latency",
+                judge="tests.test_runner_consensus:fake_judge",
+                max_rounds=2,
+            ),
         )

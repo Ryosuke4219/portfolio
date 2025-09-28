@@ -306,6 +306,48 @@ def _invoke_judge(
     raise TypeError("judge must return str, (choice, score) or mapping of scores")
 
 
+def validate_consensus_schema(
+    responses: Sequence[ProviderResponse], schema: str | None
+) -> tuple[list[tuple[int, ProviderResponse]], dict[int, str], bool]:
+    if not schema:
+        return list(enumerate(responses)), {}, False
+
+    try:
+        schema_spec = json.loads(schema)
+    except json.JSONDecodeError as exc:  # pragma: no cover - config error
+        raise ValueError("invalid consensus schema") from exc
+    if not isinstance(schema_spec, Mapping):
+        raise ValueError("invalid consensus schema")
+
+    valid_entries: list[tuple[int, ProviderResponse]] = []
+    failures: dict[int, str] = {}
+    expected_type = schema_spec.get("type")
+    required_fields = [str(field) for field in schema_spec.get("required", [])]
+
+    for index, response in enumerate(responses):
+        try:
+            parsed = json.loads(response.text)
+        except json.JSONDecodeError as exc:
+            failures[index] = f"invalid json: {exc.msg}"
+            continue
+        if expected_type == "object" and not isinstance(parsed, Mapping):
+            failures[index] = "expected object"
+            continue
+        missing = [field for field in required_fields if field not in parsed]
+        if missing:
+            failures[index] = f"missing keys: {', '.join(missing)}"
+            continue
+        valid_entries.append((index, response))
+
+    return valid_entries, failures, True
+
+
+def invoke_consensus_judge(
+    judge: str, candidates: Sequence[_Candidate]
+) -> tuple[str, float | None]:
+    return _invoke_judge(_load_judge(judge), candidates)
+
+
 def compute_consensus(
     responses: Iterable[ProviderResponse], *, config: ConsensusConfig | None = None
 ) -> ConsensusResult:
@@ -321,34 +363,9 @@ def compute_consensus(
     if tie_breaker is not None and tie_breaker not in {"latency", "cost"}:
         raise ValueError(f"unsupported tie_breaker: {config.tie_breaker!r}")
 
-    schema_spec: dict[str, Any] | None = None
-    if config.schema:
-        try:
-            schema_spec = json.loads(config.schema)
-        except json.JSONDecodeError as exc:  # pragma: no cover - config error
-            raise ValueError("invalid consensus schema") from exc
-
-    valid_entries: list[tuple[int, ProviderResponse]] = []
-    schema_failures: dict[int, str] = {}
-    for index, response in enumerate(collected):
-        if schema_spec is None:
-            valid_entries.append((index, response))
-            continue
-        try:
-            parsed = json.loads(response.text)
-        except json.JSONDecodeError as exc:
-            schema_failures[index] = f"invalid json: {exc.msg}"
-            continue
-        expected_type = schema_spec.get("type")
-        if expected_type == "object" and not isinstance(parsed, Mapping):
-            schema_failures[index] = "expected object"
-            continue
-        required = schema_spec.get("required") or []
-        missing = [field for field in required if field not in parsed]
-        if missing:
-            schema_failures[index] = f"missing keys: {', '.join(map(str, missing))}"
-            continue
-        valid_entries.append((index, response))
+    valid_entries, schema_failures, schema_checked = validate_consensus_schema(
+        collected, config.schema
+    )
 
     if not valid_entries:
         raise ParallelExecutionError("all responses failed schema validation")
@@ -377,27 +394,28 @@ def compute_consensus(
     remaining = pool
     max_rounds = config.max_rounds
 
-    if tie_break_applied and tie_breaker is not None:
+    def _next_round() -> None:
+        nonlocal rounds
         if max_rounds is not None and rounds >= max_rounds:
             raise ParallelExecutionError("consensus max_rounds exhausted")
+        rounds += 1
+
+    if tie_break_applied and tie_breaker is not None:
+        _next_round()
         remaining, tie_break_reason, tie_breaker_selected = _apply_tie_breaker(
             tie_breaker, remaining
         )
-        rounds += 1
 
     if len(remaining) > 1 and config.judge:
-        if max_rounds is not None and rounds >= max_rounds:
-            raise ParallelExecutionError("consensus max_rounds exhausted")
+        _next_round()
         judge_name = config.judge
-        judge_callable = _load_judge(judge_name)
-        choice, judge_score = _invoke_judge(judge_callable, remaining)
+        choice, judge_score = invoke_consensus_judge(judge_name, remaining)
         for candidate in remaining:
             if candidate.text == choice:
                 remaining = [candidate]
                 break
         else:  # pragma: no cover - defensive guard
             raise ParallelExecutionError("judge returned unknown choice")
-        rounds += 1
 
     if len(remaining) > 1:
         raise ParallelExecutionError("consensus tie could not be resolved")
@@ -423,7 +441,7 @@ def compute_consensus(
         winner_score=winner_score,
         abstained=len(collected) - len(valid_entries),
         rounds=rounds,
-        schema_checked=schema_spec is not None,
+        schema_checked=schema_checked,
         schema_failures=schema_failures,
         judge_name=judge_name,
         judge_score=judge_score,
@@ -434,6 +452,8 @@ def compute_consensus(
 __all__ = [
     "ParallelExecutionError",
     "ConsensusResult",
+    "invoke_consensus_judge",
+    "validate_consensus_schema",
     "compute_consensus",
     "run_parallel_all_async",
     "run_parallel_all_sync",
