@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import asyncio
+import time
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from threading import Lock
+from typing import TYPE_CHECKING, Any, Awaitable
 
 from .errors import FatalError, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger, JsonlLogger
@@ -14,6 +17,119 @@ if TYPE_CHECKING:
     from .provider_spi import AsyncProviderSPI, ProviderRequest, ProviderSPI
 
 MetricsPath = str | Path | None
+
+
+class TokenPermit:
+    """Handle representing a leased token from :class:`TokenBucket`."""
+
+    __slots__ = ("_bucket", "_released")
+
+    def __init__(self, bucket: TokenBucket | None) -> None:
+        self._bucket = bucket
+        self._released = False
+
+    def release(self) -> None:
+        if self._released:
+            return
+        self._released = True
+        if self._bucket is not None:
+            self._bucket._release()
+
+
+class TokenBucket:
+    """Simple rate limiter based on a token bucket algorithm."""
+
+    __slots__ = (
+        "_capacity",
+        "_rate_per_second",
+        "_tokens",
+        "_clock",
+        "_sleep",
+        "_async_sleep",
+        "_lock",
+        "_last_refill",
+    )
+
+    def __init__(
+        self,
+        rpm: int | None,
+        *,
+        clock: Callable[[], float] | None = None,
+        sleep: Callable[[float], None] | None = None,
+        async_sleep: Callable[[float], Awaitable[object | None]] | None = None,
+    ) -> None:
+        if rpm is None or rpm <= 0:
+            self._capacity = None
+            self._rate_per_second = 0.0
+            self._tokens = 0.0
+        else:
+            capacity = float(rpm)
+            self._capacity = capacity
+            self._rate_per_second = capacity / 60.0
+            self._tokens = capacity
+        self._clock = clock or time.monotonic
+        self._sleep = sleep or time.sleep
+        self._async_sleep = async_sleep or asyncio.sleep
+        self._lock = Lock()
+        self._last_refill = self._clock()
+
+    def _enabled(self) -> bool:
+        return self._capacity is not None and self._rate_per_second > 0.0
+
+    def _refill(self, now: float) -> None:
+        if not self._enabled():
+            return
+        elapsed = now - self._last_refill
+        if elapsed <= 0.0:
+            return
+        assert self._capacity is not None
+        self._tokens = min(
+            self._capacity,
+            self._tokens + elapsed * self._rate_per_second,
+        )
+        self._last_refill = now
+
+    def _reserve(self) -> float | None:
+        if not self._enabled():
+            return None
+        now = self._clock()
+        self._refill(now)
+        if self._tokens >= 1.0:
+            self._tokens -= 1.0
+            return None
+        deficit = 1.0 - self._tokens
+        if self._rate_per_second <= 0.0:
+            return 0.0
+        return deficit / self._rate_per_second
+
+    def acquire(self) -> TokenPermit:
+        if not self._enabled():
+            return TokenPermit(None)
+        while True:
+            with self._lock:
+                wait = self._reserve()
+                if wait is None:
+                    return TokenPermit(self)
+            self._sleep(wait)
+
+    async def acquire_async(self) -> TokenPermit:
+        if not self._enabled():
+            return TokenPermit(None)
+        while True:
+            with self._lock:
+                wait = self._reserve()
+                if wait is None:
+                    return TokenPermit(self)
+            await self._async_sleep(wait)
+
+    def _release(self) -> None:
+        # Tokens are consumed when acquired; releasing simply refreshes the
+        # accounting timestamp to avoid drift when tests fast-forward time.
+        if not self._enabled():
+            return
+        with self._lock:
+            now = self._clock()
+            self._refill(now)
 
 
 def resolve_event_logger(

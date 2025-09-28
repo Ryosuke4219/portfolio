@@ -4,6 +4,7 @@ import time
 from typing import Callable
 
 import pytest
+import src.llm_adapter.runner_shared as runner_shared
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import ParallelExecutionError
@@ -120,3 +121,28 @@ def test_runner_consensus_quorum_failure() -> None:
 
     with pytest.raises(ParallelExecutionError):
         runner.run(request)
+
+
+def test_runner_sequential_respects_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_time = 0.0
+
+    def _monotonic() -> float:
+        return fake_time
+
+    def _sleep(duration: float) -> None:
+        nonlocal fake_time
+        fake_time += duration
+
+    monkeypatch.setattr(runner_shared.time, "monotonic", _monotonic)
+    monkeypatch.setattr(runner_shared.time, "sleep", _sleep)
+
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+    provider = _MockProvider("fast", lambda _: _response("fast"))
+    runner = Runner([provider], config=RunnerConfig(rpm=2))
+
+    runner.run(request)
+    runner.run(request)
+    before_third = fake_time
+    runner.run(request)
+
+    assert fake_time - before_third == pytest.approx(30.0)

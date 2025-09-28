@@ -32,6 +32,8 @@ from .runner_parallel import (
 )
 from .runner_shared import (
     MetricsPath,
+    TokenBucket,
+    TokenPermit,
     error_family,
     estimate_cost,
     log_provider_call,
@@ -68,6 +70,10 @@ class AsyncRunner:
         ]
         self._logger = logger
         self._config = config or RunnerConfig()
+        rpm = self._config.rpm
+        self._rate_limiter: TokenBucket | None = (
+            TokenBucket(rpm) if rpm is not None and rpm > 0 else None
+        )
 
     async def _invoke_provider_async(
         self,
@@ -88,7 +94,10 @@ class AsyncRunner:
         attempt_started = time.time()
         shadow_metrics: ShadowMetrics | None = None
         response: ProviderResponse
+        permit: TokenPermit | None = None
         try:
+            if self._rate_limiter is not None:
+                permit = await self._rate_limiter.acquire_async()
             if capture_shadow_metrics:
                 response_with_metrics = await run_with_shadow_async(
                     async_provider,
@@ -194,6 +203,9 @@ class AsyncRunner:
                 allow_private_model=True,
             )
             raise
+        finally:
+            if permit is not None:
+                permit.release()
         token_usage = response.token_usage
         log_provider_call(
             event_logger,

@@ -8,6 +8,7 @@ from typing import Any, Callable, TypeVar
 
 import pytest
 from _pytest.recwarn import WarningsRecorder
+import src.llm_adapter.runner_shared as runner_shared
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
     ProviderResponse,
@@ -199,6 +200,7 @@ def test_async_shadow_exec_records_metrics(tmp_path: Path) -> None:
     diff_event = next(item for item in payloads if item["event"] == "shadow_diff")
     call_event = next(item for item in payloads if item["event"] == "provider_call")
 
+
     assert diff_event["primary_provider"] == "primary"
     assert diff_event["shadow_provider"] == "shadow"
     assert diff_event["shadow_ok"] is True
@@ -217,6 +219,37 @@ def test_async_shadow_exec_records_metrics(tmp_path: Path) -> None:
     assert call_event["tokens_out"] == token_usage.completion
     assert call_event["trace_id"] == metadata["trace_id"]
     assert call_event["project_id"] == metadata["project_id"]
+
+
+def test_async_runner_respects_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_time = 0.0
+
+    def _monotonic() -> float:
+        return fake_time
+
+    def _sleep(duration: float) -> None:
+        nonlocal fake_time
+        fake_time += duration
+
+    async def _async_sleep(duration: float, result: object | None = None) -> object | None:
+        nonlocal fake_time
+        fake_time += duration
+        return result
+
+    monkeypatch.setattr(runner_shared.time, "monotonic", _monotonic)
+    monkeypatch.setattr(runner_shared.time, "sleep", _sleep)
+    monkeypatch.setattr(runner_shared.asyncio, "sleep", _async_sleep)
+
+    provider = _StaticProvider("fast", "ok", 1)
+    runner = AsyncRunner([provider], config=RunnerConfig(rpm=2))
+    request = ProviderRequest(prompt="hello", model="primary-model")
+
+    asyncio.run(runner.run_async(request))
+    asyncio.run(runner.run_async(request))
+    before_third = fake_time
+    asyncio.run(runner.run_async(request))
+
+    assert fake_time - before_third == pytest.approx(30.0)
 
 
 def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:

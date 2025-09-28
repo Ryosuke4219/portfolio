@@ -26,6 +26,8 @@ from .runner_parallel import (
 )
 from .runner_shared import (
     MetricsPath,
+    TokenBucket,
+    TokenPermit,
     error_family,
     estimate_cost,
     log_provider_call,
@@ -66,6 +68,10 @@ class Runner:
         self.providers: list[ProviderSPI] = list(providers)
         self._logger = logger
         self._config = config or RunnerConfig()
+        rpm = self._config.rpm
+        self._rate_limiter: TokenBucket | None = (
+            TokenBucket(rpm) if rpm is not None and rpm > 0 else None
+        )
 
     def _invoke_provider_sync(
         self,
@@ -88,7 +94,10 @@ class Runner:
         tokens_in: int | None = None
         tokens_out: int | None = None
         shadow_metrics: ShadowMetrics | None = None
+        permit: TokenPermit | None = None
         try:
+            if self._rate_limiter is not None:
+                permit = self._rate_limiter.acquire()
             if capture_shadow_metrics:
                 response_with_metrics = run_with_shadow(
                     provider,
@@ -130,6 +139,9 @@ class Runner:
             usage = response.token_usage
             tokens_in = usage.prompt
             tokens_out = usage.completion
+        finally:
+            if permit is not None:
+                permit.release()
         status = "ok" if error is None else "error"
         log_provider_call(
             event_logger,
