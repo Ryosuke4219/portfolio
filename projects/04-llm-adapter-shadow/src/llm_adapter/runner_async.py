@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import Any, cast
+from typing import Any, Literal, cast, overload
 
 from .errors import (
     FatalError,
@@ -46,13 +46,22 @@ from .runner_shared import (
 from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow_async
 from .utils import content_hash, elapsed_ms
 
-WorkerResult = tuple[
+WorkerSuccessResult = tuple[
     int,
     ProviderSPI | AsyncProviderSPI,
-    ProviderResponse | None,
+    ProviderResponse,
     ShadowMetrics | None,
-    Exception | None,
+    None,
 ]
+WorkerFailureResult = tuple[
+    int,
+    ProviderSPI | AsyncProviderSPI,
+    None,
+    ShadowMetrics | None,
+    Exception,
+]
+WorkerResult = WorkerSuccessResult | WorkerFailureResult
+WorkerSuccessFactory = Callable[[], Awaitable[WorkerSuccessResult]]
 WorkerFactory = Callable[[], Awaitable[WorkerResult]]
 
 
@@ -249,8 +258,6 @@ class AsyncRunner:
 
         mode = self._config.mode
         attempt_count = 0
-        results: list[WorkerResult] = []
-
         if mode is RunnerMode.SEQUENTIAL:
             for attempt_index, (provider, async_provider) in enumerate(providers, start=1):
                 attempt_count = attempt_index
@@ -349,49 +356,90 @@ class AsyncRunner:
                         },
                     )
                 return delay
+            @overload
+            def _build_worker(
+                provider: ProviderSPI | AsyncProviderSPI,
+                async_provider: AsyncProviderSPI,
+                attempt_index: int,
+                *,
+                allow_failures: Literal[True],
+            ) -> WorkerFactory:
+                ...
+
+            @overload
+            def _build_worker(
+                provider: ProviderSPI | AsyncProviderSPI,
+                async_provider: AsyncProviderSPI,
+                attempt_index: int,
+                *,
+                allow_failures: Literal[False],
+            ) -> WorkerSuccessFactory:
+                ...
+
             def _build_worker(
                 provider: ProviderSPI | AsyncProviderSPI,
                 async_provider: AsyncProviderSPI,
                 attempt_index: int,
                 *,
                 allow_failures: bool,
-            ) -> WorkerFactory:
-                async def _worker() -> WorkerResult:
-                    try:
-                        response, shadow_metrics = await self._invoke_provider_async(
-                            provider,
-                            async_provider,
-                            request,
-                            attempt=attempt_index,
-                            total_providers=total_providers,
-                            event_logger=event_logger,
-                            request_fingerprint=request_fingerprint,
-                            metadata=metadata,
-                            shadow=shadow,
-                            shadow_async=shadow_async,
-                            metrics_path=metrics_path_str,
-                            capture_shadow_metrics=capture_shadow,
-                        )
-                    except Exception as error:  # noqa: BLE001
-                        if not allow_failures:
-                            raise
-                        return attempt_index, provider, None, None, error
+            ) -> WorkerFactory | WorkerSuccessFactory:
+                if allow_failures:
+                    async def _worker_with_failures() -> WorkerResult:
+                        try:
+                            response, shadow_metrics = await self._invoke_provider_async(
+                                provider,
+                                async_provider,
+                                request,
+                                attempt=attempt_index,
+                                total_providers=total_providers,
+                                event_logger=event_logger,
+                                request_fingerprint=request_fingerprint,
+                                metadata=metadata,
+                                shadow=shadow,
+                                shadow_async=shadow_async,
+                                metrics_path=metrics_path_str,
+                                capture_shadow_metrics=capture_shadow,
+                            )
+                        except Exception as error:  # noqa: BLE001
+                            return attempt_index, provider, None, None, error
+                        return attempt_index, provider, response, shadow_metrics, None
+
+                    return _worker_with_failures
+
+                async def _worker_success() -> WorkerSuccessResult:
+                    response, shadow_metrics = await self._invoke_provider_async(
+                        provider,
+                        async_provider,
+                        request,
+                        attempt=attempt_index,
+                        total_providers=total_providers,
+                        event_logger=event_logger,
+                        request_fingerprint=request_fingerprint,
+                        metadata=metadata,
+                        shadow=shadow,
+                        shadow_async=shadow_async,
+                        metrics_path=metrics_path_str,
+                        capture_shadow_metrics=capture_shadow,
+                    )
                     return attempt_index, provider, response, shadow_metrics, None
 
-                return _worker
+                return _worker_success
 
-            workers: list[WorkerFactory] = [
-                _build_worker(
-                    provider,
-                    async_provider,
-                    index,
-                    allow_failures=mode is RunnerMode.CONSENSUS,
-                )
-                for index, (provider, async_provider) in enumerate(providers, start=1)
-            ]
+            enumerated_providers = list(enumerate(providers, start=1))
 
-            try:
-                if mode is RunnerMode.PARALLEL_ANY:
+            consensus_results: list[WorkerResult] | None = None
+
+            if mode is RunnerMode.PARALLEL_ANY:
+                workers_any: list[WorkerSuccessFactory] = [
+                    _build_worker(
+                        provider,
+                        async_provider,
+                        index,
+                        allow_failures=False,
+                    )
+                    for index, (provider, async_provider) in enumerated_providers
+                ]
+                try:
                     (
                         attempt_index,
                         provider,
@@ -399,13 +447,16 @@ class AsyncRunner:
                         shadow_metrics,
                         error,
                     ) = await run_parallel_any_async(
-                        workers,
+                        workers_any,
                         max_concurrency=self._config.max_concurrency,
                         max_attempts=self._config.max_attempts,
                         on_retry=_handle_parallel_retry,
                     )
-                    if error is not None or response is None:
-                        raise ParallelExecutionError("all workers failed")
+                except Exception as err:  # noqa: BLE001
+                    last_err = err
+                else:
+                    if error is not None:
+                        raise ParallelExecutionError("all workers failed") from error
                     usage = response.token_usage
                     tokens_in = usage.prompt
                     tokens_out = usage.completion
@@ -428,21 +479,31 @@ class AsyncRunner:
                     if shadow_metrics is not None:
                         shadow_metrics.emit()
                     return response
-                results = await run_parallel_all_async(
-                    workers,
-                    max_concurrency=self._config.max_concurrency,
-                )
-            except Exception as err:  # noqa: BLE001
-                last_err = err
-            else:
-                if not results:
-                    last_err = RuntimeError("No providers succeeded")
+            elif mode is RunnerMode.CONSENSUS:
+                workers_consensus: list[WorkerFactory] = [
+                    _build_worker(
+                        provider,
+                        async_provider,
+                        index,
+                        allow_failures=True,
+                    )
+                    for index, (provider, async_provider) in enumerated_providers
+                ]
+                try:
+                    consensus_results = await run_parallel_all_async(
+                        workers_consensus,
+                        max_concurrency=self._config.max_concurrency,
+                    )
+                except Exception as err:  # noqa: BLE001
+                    last_err = err
                 else:
-                    if mode is RunnerMode.CONSENSUS:
+                    if not consensus_results:
+                        last_err = RuntimeError("No providers succeeded")
+                    else:
                         try:
                             successful_entries = [
                                 (attempt, provider, response, metrics)
-                                for attempt, provider, response, metrics, error in results
+                                for attempt, provider, response, metrics, error in consensus_results
                                 if response is not None
                             ]
                             if not successful_entries:
@@ -451,13 +512,11 @@ class AsyncRunner:
                                 ConsensusFailure(
                                     provider=provider.name(),
                                     attempt=attempt,
-                                    error_type=type(error).__name__
-                                    if error is not None
-                                    else "UnknownError",
+                                    error_type=type(error).__name__,
                                     error_message=str(error) if error is not None else None,
                                 )
-                                for attempt, provider, response, _metrics, error in results
-                                if response is None
+                                for attempt, provider, _response, _metrics, error in consensus_results
+                                if error is not None
                             ]
                             consensus = compute_consensus(
                                 [response for _, _, response, _ in successful_entries],
@@ -585,9 +644,28 @@ class AsyncRunner:
                                 if metrics is not None and metrics is not shadow_metrics:
                                     metrics.emit()
                             return response
-                            last_err = ParallelExecutionError("consensus resolution failed")
+            else:
+                workers_all: list[WorkerSuccessFactory] = [
+                    _build_worker(
+                        provider,
+                        async_provider,
+                        index,
+                        allow_failures=False,
+                    )
+                    for index, (provider, async_provider) in enumerated_providers
+                ]
+                try:
+                    results_success: list[WorkerSuccessResult] = await run_parallel_all_async(
+                        workers_all,
+                        max_concurrency=self._config.max_concurrency,
+                    )
+                except Exception as err:  # noqa: BLE001
+                    last_err = err
+                else:
+                    if not results_success:
+                        last_err = RuntimeError("No providers succeeded")
                     else:
-                        _attempt_index, provider, response, _metrics, _error = results[0]
+                        _attempt_index, provider, response, _metrics, _error = results_success[0]
                         usage = response.token_usage
                         tokens_in = usage.prompt
                         tokens_out = usage.completion
@@ -607,14 +685,23 @@ class AsyncRunner:
                             metadata=metadata,
                             shadow_used=shadow is not None,
                         )
-                        return ParallelAllResult(
-                            results,
-                            lambda entry: entry[2],
+                        def _primary_response(entry: WorkerSuccessResult) -> ProviderResponse:
+                            return entry[2]
+
+                        result = ParallelAllResult[WorkerSuccessResult, ProviderResponse](
+                            results_success,
+                            _primary_response,
+                        )
+                        return cast(
+                            ParallelAllResult[WorkerResult, ProviderResponse],
+                            result,
                         )
 
-        if mode is RunnerMode.CONSENSUS:
-            for _, _, response, metrics, _ in results:
-                if metrics is not None and response is not None:
+        if mode is RunnerMode.CONSENSUS and consensus_results is not None:
+            for entry in consensus_results:
+                entry_response: ProviderResponse | None = entry[2]
+                metrics = entry[3]
+                if metrics is not None and entry_response is not None:
                     metrics.emit()
 
         if event_logger is not None:
