@@ -3,12 +3,14 @@ import { spawnSync } from 'node:child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { Readable } from 'node:stream';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases-md2json/scripts/spec2cases.mjs';
 import { generateTestsFromBlueprint } from '../projects/02-blueprint-to-playwright/scripts/blueprint_to_code.mjs';
 import { analyzeJUnitReport } from '../projects/03-ci-flaky/scripts/analyze-junit.mjs';
+import { parseJUnitStream } from '../projects/03-ci-flaky/src/junit-parser.js';
 import {
   LLM2PW_SAMPLE_BLUEPRINT_PATH,
   SPEC2CASES_SAMPLE_SPEC_TXT_PATH,
@@ -77,20 +79,62 @@ test('blueprint generation fails when scenario IDs would create duplicate filena
   );
 });
 
-test('junit analysis tracks flaky transitions', () => {
+test('junit analysis tracks flaky transitions', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'junit-db-'));
   const junitPath = path.join(tmpDir, 'junit-results.xml');
   const dbPath = path.join(tmpDir, 'database.json');
 
   const failing = `<testsuite><testcase classname="Login" name="HappyPath"><failure>boom</failure></testcase></testsuite>`;
   fs.writeFileSync(junitPath, failing, 'utf8');
-  const first = analyzeJUnitReport(junitPath, dbPath);
-  assert.equal(first.flaky.length, 0);
+  const first = await analyzeJUnitReport(junitPath, dbPath);
+  assert.equal(first.attemptsCount, 1);
 
   const passing = `<testsuite><testcase classname="Login" name="HappyPath"/></testsuite>`;
   fs.writeFileSync(junitPath, passing, 'utf8');
-  const second = analyzeJUnitReport(junitPath, dbPath);
-  assert.ok(second.flaky.includes('Login::HappyPath'));
+  const second = await analyzeJUnitReport(junitPath, dbPath);
+  assert.equal(second.attemptsCount, 1);
+
+  const readEntries = async (expected) => {
+    const deadline = Date.now() + 1000;
+    while (Date.now() < deadline) {
+      if (fs.existsSync(dbPath)) {
+        const text = fs.readFileSync(dbPath, 'utf8').trim();
+        if (text) {
+          const entries = text.split('\n').map((line) => JSON.parse(line));
+          if (!expected || entries.length === expected) return entries;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error('timed out waiting for junit log entries');
+  };
+
+  const [firstEntry, secondEntry] = await readEntries(2);
+  assert.equal(firstEntry.status, 'fail');
+  assert.equal(secondEntry.status, 'pass');
+  assert.equal(firstEntry.canonical_id, secondEntry.canonical_id);
+});
+
+test('parseJUnitStream aggregates attempts and classifies timeouts', async () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+    <testsuite name="Top">
+      <testcase classname="Login" name="Fast" time="0.2" />
+      <testcase classname="Login" name="Slow" time="4">
+        <failure message="unexpected"/>
+      </testcase>
+    </testsuite>`;
+
+  const stream = Readable.from([xml]);
+  const { attempts, suiteDurations } = await parseJUnitStream(stream, { timeoutFactor: 0.1 });
+
+  assert.equal(attempts.length, 2);
+  const slow = attempts.find((item) => item.name === 'Slow');
+  assert.ok(slow, 'expected slow testcase to be parsed');
+  assert.equal(slow.status, 'fail');
+  assert.equal(slow.failure_kind, 'timeout');
+
+  const durations = suiteDurations.get('Top');
+  assert.deepEqual([...durations].sort((a, b) => a - b), [200, 4000]);
 });
 
 test('playwright stub gracefully handles no-arg invocation', () => {

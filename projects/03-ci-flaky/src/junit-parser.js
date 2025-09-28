@@ -55,31 +55,99 @@ function decodeEntities(text) {
   });
 }
 
-export async function parseJUnitStream(readable, options = {}) {
-  const {
-    onTestcase,
-    filename = '<stdin>',
-  } = options;
+class JUnitAttemptBuilder {
+  constructor(options = {}) {
+    this.filename = options.filename ?? '<stdin>';
+    this.onTestcase = typeof options.onTestcase === 'function' ? options.onTestcase : null;
+    this.timeoutFactor = options.timeoutFactor ?? 3.0;
+    this.suiteStack = [];
+    this.nodeStack = [];
+    this.attempts = [];
+    this.suiteDurations = new Map();
+  }
 
-  const suiteStack = [];
-  const nodeStack = [];
-  const attempts = [];
-  const suiteDurations = new Map();
+  handle_open_tag(name, attrs) {
+    if (name === 'testsuite') {
+      this.#pushSuite(attrs);
+      const node = { type: 'testsuite', name, attrs, text: '' };
+      this.nodeStack.push(node);
+      return;
+    }
+    if (name === 'testcase') {
+      const node = {
+        type: 'testcase',
+        name,
+        attrs,
+        text: '',
+        failures: [],
+        errors: [],
+        skipped: null,
+        systemOut: [],
+        systemErr: [],
+      };
+      this.nodeStack.push(node);
+      return;
+    }
 
-  const pushSuite = (attrs) => {
-    const parent = suiteStack[suiteStack.length - 1];
+    const typeMap = {
+      failure: 'failure',
+      error: 'error',
+      skipped: 'skipped',
+      'system-out': 'system-out',
+      'system-err': 'system-err',
+    };
+    const mapped = typeMap[name] || 'generic';
+    const node = { type: mapped, name, attrs, text: '' };
+    this.nodeStack.push(node);
+  }
+
+  handle_close_tag(name) {
+    const node = this.nodeStack.pop();
+    if (!node || node.name !== name) {
+      throw new Error(`Unexpected closing tag </${name}> while parsing ${this.filename}`);
+    }
+    if (node.type === 'testsuite') {
+      this.#popSuite();
+    } else if (node.type === 'testcase') {
+      this.#finaliseTestcase(node);
+    } else {
+      this.#attachChildNode(node);
+    }
+  }
+
+  handle_text(text, info) {
+    const current = this.nodeStack[this.nodeStack.length - 1];
+    if (!current || typeof current.text !== 'string') return;
+    if (info?.isCData) {
+      current.text += text;
+    } else {
+      current.text += text;
+    }
+  }
+
+  apply_timeout_classification() {
+    applyTimeoutClassification(this.attempts, this.suiteDurations, this.timeoutFactor);
+  }
+
+  finalize() {
+    this.apply_timeout_classification();
+    return { attempts: this.attempts, suiteDurations: this.suiteDurations };
+  }
+
+  #pushSuite(attrs) {
+    const parent = this.suiteStack[this.suiteStack.length - 1];
     const baseName = attrs.name || attrs.id || attrs.package || attrs.file || 'suite';
     const fullName = parent && parent.fullName ? `${parent.fullName}.${baseName}` : baseName;
     const entry = { name: baseName, fullName, attrs };
-    suiteStack.push(entry);
-  };
+    this.suiteStack.push(entry);
+  }
 
-  const popSuite = () => {
-    suiteStack.pop();
-  };
+  #popSuite() {
+    this.suiteStack.pop();
+  }
 
-  const attachChildNode = (node) => {
-    const parent = nodeStack[nodeStack.length - 1];
+  #attachChildNode(node) {
+    const parent = this.nodeStack[this.nodeStack.length - 1];
     if (!parent) return;
     const textContent = decodeEntities(node.text || '').trim();
     if (parent.type === 'testcase') {
@@ -89,11 +157,11 @@ export async function parseJUnitStream(readable, options = {}) {
       else if (node.type === 'system-out') parent.systemOut.push({ ...node, text: textContent });
       else if (node.type === 'system-err') parent.systemErr.push({ ...node, text: textContent });
     }
-  };
+  }
 
-  const finaliseTestcase = (node) => {
-    const suiteName = buildSuiteName(suiteStack);
-    const className = buildClassName(node.attrs, suiteStack);
+  #finaliseTestcase(node) {
+    const suiteName = buildSuiteName(this.suiteStack);
+    const className = buildClassName(node.attrs, this.suiteStack);
     const params = node.attrs.parameters || node.attrs.params || node.attrs.param || null;
     const testName = node.attrs.name || node.attrs.id || 'unknown-test';
     const canonicalId = buildCanonicalId({ suite: suiteName, className, testName, params });
@@ -106,8 +174,8 @@ export async function parseJUnitStream(readable, options = {}) {
           ? 'fail'
           : 'pass';
 
-    if (!suiteDurations.has(suiteName)) suiteDurations.set(suiteName, []);
-    if (status !== 'skipped') suiteDurations.get(suiteName).push(durationMs);
+    if (!this.suiteDurations.has(suiteName)) this.suiteDurations.set(suiteName, []);
+    if (status !== 'skipped') this.suiteDurations.get(suiteName).push(durationMs);
 
     const failureNodes = status === 'fail' ? node.failures : status === 'error' ? node.errors : [];
     let failureMessage = null;
@@ -147,81 +215,23 @@ export async function parseJUnitStream(readable, options = {}) {
       retries: Number.parseInt(node.attrs.retries ?? node.attrs.retry ?? node.attrs.rerun ?? '0', 10) || 0,
     };
 
-    attempts.push(attempt);
-    if (typeof onTestcase === 'function') onTestcase(attempt);
-  };
+    this.attempts.push(attempt);
+    if (this.onTestcase) this.onTestcase(attempt);
+  }
+}
 
-  const handleOpenTag = (name, attrs) => {
-    if (name === 'testsuite') {
-      pushSuite(attrs);
-      const node = { type: 'testsuite', name, attrs, text: '' };
-      nodeStack.push(node);
-      return;
-    }
-    if (name === 'testcase') {
-      const node = {
-        type: 'testcase',
-        name,
-        attrs,
-        text: '',
-        failures: [],
-        errors: [],
-        skipped: null,
-        systemOut: [],
-        systemErr: [],
-      };
-      nodeStack.push(node);
-      return;
-    }
-
-    const typeMap = {
-      failure: 'failure',
-      error: 'error',
-      skipped: 'skipped',
-      'system-out': 'system-out',
-      'system-err': 'system-err',
-    };
-    const mapped = typeMap[name] || 'generic';
-    const node = { type: mapped, name, attrs, text: '' };
-    nodeStack.push(node);
-  };
-
-  const handleCloseTag = (name) => {
-    const node = nodeStack.pop();
-    if (!node || node.name !== name) {
-      throw new Error(`Unexpected closing tag </${name}> while parsing ${filename}`);
-    }
-    if (node.type === 'testsuite') {
-      popSuite();
-    } else if (node.type === 'testcase') {
-      finaliseTestcase(node);
-    } else {
-      attachChildNode(node);
-    }
-  };
-
-  const handleText = (text, info) => {
-    const current = nodeStack[nodeStack.length - 1];
-    if (!current || typeof current.text !== 'string') return;
-    if (info?.isCData) {
-      current.text += text;
-    } else {
-      current.text += text;
-    }
-  };
-
+export async function parseJUnitStream(readable, options = {}) {
+  const builder = new JUnitAttemptBuilder(options);
   const parser = new JUnitStreamParser({
-    filename,
-    onOpenTag: (name, attrs) => handleOpenTag(name, attrs),
-    onCloseTag: (name) => handleCloseTag(name),
-    onText: (text, info) => handleText(text, info),
+    filename: builder.filename,
+    onOpenTag: (name, attrs) => builder.handle_open_tag(name, attrs),
+    onCloseTag: (name) => builder.handle_close_tag(name),
+    onText: (text, info) => builder.handle_text(text, info),
   });
 
   await parser.parse(readable);
 
-  applyTimeoutClassification(attempts, suiteDurations, options.timeoutFactor ?? 3.0);
-
-  return { attempts, suiteDurations };
+  return builder.finalize();
 }
 
 export async function parseJUnitFile(filePath, options = {}) {
