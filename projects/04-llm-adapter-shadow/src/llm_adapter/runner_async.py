@@ -32,6 +32,7 @@ from .runner_parallel import (
 )
 from .runner_shared import (
     MetricsPath,
+    create_rate_limiter,
     error_family,
     estimate_cost,
     log_provider_call,
@@ -63,6 +64,7 @@ class AsyncRunner:
         ]
         self._logger = logger
         self._config = config or RunnerConfig()
+        self._rate_limiter = create_rate_limiter(self._config.rpm)
 
     async def _invoke_provider_async(
         self,
@@ -80,6 +82,13 @@ class AsyncRunner:
         metrics_path: str | None,
     ) -> ProviderResponse:
         attempt_started = time.time()
+        reservation = self._rate_limiter.reserve() if self._rate_limiter else None
+        if reservation is not None:
+            try:
+                await reservation.wait_async()
+            except Exception:
+                reservation.cancel()
+                raise
         try:
             response = await run_with_shadow_async(
                 async_provider,
@@ -170,6 +179,9 @@ class AsyncRunner:
                 allow_private_model=True,
             )
             raise
+        finally:
+            if reservation is not None:
+                reservation.commit()
         log_provider_call(
             event_logger,
             request_fingerprint=request_fingerprint,
