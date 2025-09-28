@@ -1,5 +1,9 @@
 import { listJsonlFiles, readJsonl } from './fs-utils.js';
 
+function isFailureStatus(status) {
+  return status === 'fail' || status === 'error';
+}
+
 function calculateImpact(avgDuration, baseline) {
   if (!avgDuration || !baseline) return 0;
   return Math.min(1, Math.log1p(avgDuration) / Math.log1p(baseline));
@@ -115,7 +119,7 @@ export function computeAggregates(runs, runOrder, config) {
         entry.attempts += 1;
         entry.durationTotal += attempt.duration_ms || 0;
         if (attempt.status === 'pass') entry.passes += 1;
-        else if (attempt.status === 'fail' || attempt.status === 'error') entry.fails += 1;
+        else if (isFailureStatus(attempt.status)) entry.fails += 1;
       }
 
       if (attempt.failure_kind) {
@@ -134,7 +138,7 @@ export function computeAggregates(runs, runOrder, config) {
         entry.failureSignatures.set(attempt.failure_signature, sig);
       }
 
-      if (attempt.status === 'fail' || attempt.status === 'error') {
+      if (isFailureStatus(attempt.status)) {
         const current = entry.latestFailure;
         if (!current || current.runIndex <= idx) {
           entry.latestFailure = {
@@ -153,7 +157,7 @@ export function computeAggregates(runs, runOrder, config) {
       const perRun = entry.perRun.get(idx) || { attempts: 0, fails: 0, passes: 0 };
       if (attempt.status !== 'skipped') {
         perRun.attempts += 1;
-        if (attempt.status === 'fail' || attempt.status === 'error') perRun.fails += 1;
+        if (isFailureStatus(attempt.status)) perRun.fails += 1;
         if (attempt.status === 'pass') perRun.passes += 1;
       }
       entry.perRun.set(idx, perRun);
@@ -222,7 +226,7 @@ export function determineFlaky(results, config, runOrder) {
     if (entry.passes === 0 || entry.fails === 0) continue;
     if (entry.score < threshold) continue;
     const failureRuns = entry.statuses
-      .filter((status) => status.status === 'fail' || status === 'error' || status.status === 'error')
+      .filter((status) => isFailureStatus(status.status))
       .map((status) => status.runIndex);
     const firstFailure = failureRuns.length ? Math.min(...failureRuns) : Number.POSITIVE_INFINITY;
     const isNew = runOrder.length <= newWindow
