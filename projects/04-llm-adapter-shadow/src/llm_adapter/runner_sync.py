@@ -442,8 +442,9 @@ class Runner:
                     message = "all workers failed"
                     if detail_text:
                         message = f"{message}: {detail_text}"
-                    error = ParallelExecutionError(message)
-                    setattr(error, "failures", failure_details)
+                    error = ParallelExecutionError(
+                        message, failures=failure_details
+                    )
                     raise error
                 if len(successful) != len(invocations):
                     raise ParallelExecutionError("all workers failed")
