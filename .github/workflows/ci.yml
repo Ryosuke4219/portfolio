@@ -34,17 +34,6 @@ jobs:
       - name: Generate E2E tests
         run: npm run e2e:gen
 
-      - name: Start demo server
-        run: |
-          npx -y http-server projects/02-blueprint-to-playwright/demo -p 5173 -c-1 &
-          for i in {1..30}; do
-            if curl -sSf http://localhost:5173 > /dev/null; then
-              echo "Demo server is up";
-              break;
-            fi
-            sleep 1
-          done
-
       - name: Run Playwright
         run: npm test
         env:
