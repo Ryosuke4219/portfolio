@@ -2,7 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import { loadWindowRuns, computeAggregates, determineFlaky, summarise } from '../analyzer.js';
+import {
+  loadWindowRuns,
+  computeAggregates,
+  determineFlaky,
+  summarise,
+  isFailureStatus,
+} from '../analyzer.js';
 import { loadConfig, resolveConfigPaths } from '../config.js';
 import { ensureDir } from '../fs-utils.js';
 import { resolveConfigPath } from './utils.js';
@@ -116,9 +122,9 @@ export async function runWeekly(args) {
       const tsValue = status.ts ? Date.parse(status.ts) : indexTs[status.runIndex] ?? null;
       if (!Number.isFinite(tsValue)) continue;
       if (tsValue >= cutoff) {
-        if (status.status === 'fail' || status.status === 'error') hadFailAfter = true;
+        if (isFailureStatus(status)) hadFailAfter = true;
         if (status.status !== 'skipped') executedAfter = true;
-      } else if (status.status === 'fail' || status.status === 'error') {
+      } else if (isFailureStatus(status)) {
         hadFailBefore = true;
       }
     }

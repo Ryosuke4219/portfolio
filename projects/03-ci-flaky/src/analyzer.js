@@ -19,6 +19,10 @@ function calculateRecency(perRunStats, runOrderLength, lambda) {
   return denom ? numerator / denom : 0;
 }
 
+export function isFailureStatus(status) {
+  return status?.status === 'fail' || status?.status === 'error';
+}
+
 class AggregatedEntry {
   constructor(key) {
     this.canonical_id = key;
@@ -234,7 +238,7 @@ export function determineFlaky(results, config, runOrder) {
     if (entry.passes === 0 || entry.fails === 0) continue;
     if (entry.score < threshold) continue;
     const failureRuns = entry.statuses
-      .filter((status) => status.status === 'fail' || status === 'error' || status.status === 'error')
+      .filter((status) => isFailureStatus(status))
       .map((status) => status.runIndex);
     const firstFailure = failureRuns.length ? Math.min(...failureRuns) : Number.POSITIVE_INFINITY;
     const isNew = runOrder.length <= newWindow

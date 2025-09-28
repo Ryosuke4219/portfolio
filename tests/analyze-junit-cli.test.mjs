@@ -6,7 +6,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { computeAggregates } from '../projects/03-ci-flaky/src/analyzer.js';
+import { computeAggregates, determineFlaky } from '../projects/03-ci-flaky/src/analyzer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -115,4 +115,27 @@ test('computeAggregates preserves scoring and ranking', () => {
   assert.deepEqual(second.trend, [0, 0]);
 
   assert.deepEqual([...failureKindTotals.entries()], [['assert', 1]]);
+});
+
+test('determineFlaky keeps entries with error attempts', () => {
+  const runOrder = ['run1', 'run2'];
+  const results = [
+    {
+      canonical_id: 'suite.class.error',
+      attempts: 2,
+      passes: 1,
+      fails: 1,
+      score: 0.9,
+      statuses: [
+        { runIndex: 0, status: 'error', run_id: 'run1', ts: '2024-01-01T00:00:00Z' },
+        { runIndex: 1, status: 'pass', run_id: 'run2', ts: '2024-01-02T00:00:00Z' },
+      ],
+    },
+  ];
+
+  const flaky = determineFlaky(results, {}, runOrder);
+  assert.equal(flaky.length, 1);
+  const [entry] = flaky;
+  assert.equal(entry.canonical_id, 'suite.class.error');
+  assert.ok(entry.is_new);
 });
