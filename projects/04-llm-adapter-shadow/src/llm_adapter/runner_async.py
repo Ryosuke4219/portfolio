@@ -24,6 +24,12 @@ from .provider_spi import (
     ensure_async_provider,
 )
 from .runner_config import RunnerConfig, RunnerMode
+from .runner_parallel import (
+    ParallelExecutionError,
+    compute_consensus,
+    run_parallel_all_async,
+    run_parallel_any_async,
+)
 from .runner_shared import (
     MetricsPath,
     error_family,
@@ -33,14 +39,11 @@ from .runner_shared import (
     log_run_metric,
     resolve_event_logger,
 )
-from .runner_parallel import (
-    ParallelExecutionError,
-    compute_consensus,
-    run_parallel_all_async,
-    run_parallel_any_async,
-)
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow_async
 from .utils import content_hash, elapsed_ms
+
+WorkerResult = tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]
+WorkerFactory = Callable[[], Awaitable[WorkerResult]]
 
 
 class AsyncRunner:
@@ -279,8 +282,8 @@ class AsyncRunner:
                 provider: ProviderSPI | AsyncProviderSPI,
                 async_provider: AsyncProviderSPI,
                 attempt_index: int,
-            ) -> Callable[[], Awaitable[tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]]]:
-                async def _worker() -> tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]:
+            ) -> WorkerFactory:
+                async def _worker() -> WorkerResult:
                     response = await self._invoke_provider_async(
                         provider,
                         async_provider,
@@ -298,9 +301,7 @@ class AsyncRunner:
 
                 return _worker
 
-            workers: list[
-                Callable[[], Awaitable[tuple[int, ProviderSPI | AsyncProviderSPI, ProviderResponse]]]
-            ] = [
+            workers: list[WorkerFactory] = [
                 _build_worker(provider, async_provider, index)
                 for index, (provider, async_provider) in enumerate(providers, start=1)
             ]
