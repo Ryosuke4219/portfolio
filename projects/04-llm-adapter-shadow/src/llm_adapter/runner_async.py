@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from .errors import (
     FatalError,
@@ -87,9 +87,10 @@ class AsyncRunner:
     ) -> tuple[ProviderResponse, ShadowMetrics | None]:
         attempt_started = time.time()
         shadow_metrics: ShadowMetrics | None = None
+        response: ProviderResponse
         try:
             if capture_shadow_metrics:
-                response, shadow_metrics = await run_with_shadow_async(
+                response_with_metrics = await run_with_shadow_async(
                     async_provider,
                     shadow_async,
                     request,
@@ -97,8 +98,12 @@ class AsyncRunner:
                     logger=event_logger,
                     capture_metrics=True,
                 )
+                response, shadow_metrics = cast(
+                    tuple[ProviderResponse, ShadowMetrics | None],
+                    response_with_metrics,
+                )
             else:
-                response = await run_with_shadow_async(
+                response_only = await run_with_shadow_async(
                     async_provider,
                     shadow_async,
                     request,
@@ -106,6 +111,7 @@ class AsyncRunner:
                     logger=event_logger,
                     capture_metrics=False,
                 )
+                response = cast(ProviderResponse, response_only)
         except RateLimitError as err:
             log_provider_call(
                 event_logger,
@@ -474,7 +480,7 @@ class AsyncRunner:
                             return response
                             last_err = ParallelExecutionError("consensus resolution failed")
                     else:
-                        _attempt_index, provider, response = results[0]
+                        _attempt_index, provider, response, _metrics = results[0]
                         tokens_in = response.input_tokens
                         tokens_out = response.output_tokens
                         cost_usd = estimate_cost(provider, tokens_in, tokens_out)

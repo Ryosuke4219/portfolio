@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from .errors import (
     FatalError,
@@ -89,7 +90,7 @@ class Runner:
         shadow_metrics: ShadowMetrics | None = None
         try:
             if capture_shadow_metrics:
-                response, shadow_metrics = run_with_shadow(
+                response_with_metrics = run_with_shadow(
                     provider,
                     shadow,
                     request,
@@ -97,8 +98,12 @@ class Runner:
                     logger=event_logger,
                     capture_metrics=True,
                 )
+                response, shadow_metrics = cast(
+                    tuple[ProviderResponse, ShadowMetrics | None],
+                    response_with_metrics,
+                )
             else:
-                response = run_with_shadow(
+                response_only = run_with_shadow(
                     provider,
                     shadow,
                     request,
@@ -106,6 +111,7 @@ class Runner:
                     logger=event_logger,
                     capture_metrics=False,
                 )
+                response = cast(ProviderResponse, response_only)
         except Exception as exc:  # noqa: BLE001
             error = exc
             latency_ms = elapsed_ms(attempt_started)
@@ -391,30 +397,39 @@ class Runner:
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
                     raise fatal from None
-                successful = [res for res in invocations if res.response is not None]
+                successful: list[
+                    tuple[ProviderInvocationResult, ProviderResponse]
+                ] = [
+                    (res, res.response)
+                    for res in invocations
+                    if res.response is not None
+                ]
                 if len(successful) != len(invocations):
                     raise ParallelExecutionError("all workers failed")
+                responses_for_consensus = [response for _, response in successful]
                 consensus = compute_consensus(
-                    [res.response for res in successful],
+                    responses_for_consensus,
                     config=self._config.consensus,
                 )
                 winner_invocation = next(
-                    res for res in successful if res.response is consensus.response
+                    invocation
+                    for invocation, response in successful
+                    if response is consensus.response
                 )
                 votes_against = consensus.total_voters - consensus.votes - consensus.abstained
                 if event_logger is not None:
                     candidate_summaries = [
                         {
-                            "provider": res.provider.name(),
-                            "latency_ms": res.response.latency_ms,
+                            "provider": invocation.provider.name(),
+                            "latency_ms": response.latency_ms,
                             "votes": consensus.tally.get(
-                                res.response.text.strip(), 0
+                                response.text.strip(), 0
                             ),
                             "text_hash": content_hash(
-                                "consensus", res.response.text
+                                "consensus", response.text
                             ),
                         }
-                        for res in successful
+                        for invocation, response in successful
                     ]
                     event_logger.emit(
                         "consensus_vote",
