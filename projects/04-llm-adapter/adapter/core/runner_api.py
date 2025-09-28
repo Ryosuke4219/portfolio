@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, cast
 
 from .budgets import BudgetManager
-from .config import load_budget_book, load_provider_configs
+from .config import (
+    ProviderConfig,
+    load_budget_book,
+    load_provider_config,
+    load_provider_configs,
+)
 from .datasets import load_golden_tasks
 
 Mode = Literal["sequential", "parallel-any", "parallel-all", "consensus"]
@@ -30,12 +35,14 @@ _MODE_ALIASES: dict[str, Mode] = {
 @dataclass(frozen=True)
 class RunnerConfig:
     """ランナーの制御パラメータ."""
+
     mode: Mode
     aggregate: str | None = None
     quorum: int | None = None
     tie_breaker: str | None = None
     schema: Path | None = None
-    judge: str | None = None
+    judge: Path | None = None
+    judge_provider: ProviderConfig | None = None
     max_concurrency: int | None = None
     rpm: int | None = None
 
@@ -99,16 +106,24 @@ def run_compare(
     logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO))
 
     resolved_mode = _normalize_mode(mode)
-    config = runner_config or RunnerConfig(
-        mode=resolved_mode,
-        aggregate=aggregate,
-        quorum=_sanitize_positive_int(quorum),
-        tie_breaker=tie_breaker,
-        schema=_resolve_optional_path(schema),
-        judge=judge,
-        max_concurrency=_sanitize_positive_int(max_concurrency),
-        rpm=_sanitize_positive_int(rpm),
-    )
+    judge_path = _resolve_optional_path(judge)
+    judge_provider = load_provider_config(judge_path) if judge_path else None
+    if runner_config is None:
+        config = RunnerConfig(
+            mode=resolved_mode,
+            aggregate=aggregate,
+            quorum=_sanitize_positive_int(quorum),
+            tie_breaker=tie_breaker,
+            schema=_resolve_optional_path(schema),
+            judge=judge_path,
+            judge_provider=judge_provider,
+            max_concurrency=_sanitize_positive_int(max_concurrency),
+            rpm=_sanitize_positive_int(rpm),
+        )
+    else:
+        config = runner_config
+        if judge_provider is not None and getattr(config, "judge_provider", None) is None:
+            config = replace(config, judge=judge_path, judge_provider=judge_provider)
 
     provider_configs = load_provider_configs(list(provider_paths))
     tasks = load_golden_tasks(prompt_path)
