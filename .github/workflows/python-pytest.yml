@@ -1,0 +1,44 @@
+name: python-pytest
+
+on:
+  workflow_call:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: projects/04-llm-adapter-shadow/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r projects/04-llm-adapter-shadow/requirements.txt
+
+      - name: Run pytest with coverage HTML
+        run: |
+          pytest \
+            --cov=projects/04-llm-adapter-shadow \
+            --cov-report=xml:projects/04-llm-adapter-shadow/coverage.xml \
+            --cov-report=html:projects/04-llm-adapter-shadow/htmlcov \
+            --cov-report=term-missing \
+            projects/04-llm-adapter-shadow/tests
+
+      - name: Upload Python coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage-artifacts
+          if-no-files-found: warn
+          path: |
+            projects/04-llm-adapter-shadow/htmlcov/**
+            projects/04-llm-adapter-shadow/coverage.xml

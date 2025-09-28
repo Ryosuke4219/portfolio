@@ -154,3 +154,10 @@ test('playwright stub treats install commands as no-ops', () => {
   assert.equal(result.status, 0, `expected exit code 0, received ${result.status}`);
   assert.match(result.stdout, /Skipping "playwright install"/);
 });
+
+test('python pytest runs exactly once in CI workflow', () => {
+  const ciWorkflowPath = path.join(rootDir, '.github', 'workflows', 'ci.yml');
+  const workflow = fs.readFileSync(ciWorkflowPath, 'utf8');
+  const matches = workflow.match(/pytest\b/g) ?? [];
+  assert.equal(matches.length, 1);
+});

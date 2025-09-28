@@ -65,7 +65,7 @@ jobs:
             projects/03-ci-flaky/out/**
             test-results/**
 
-  python-tests:
+  python-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -80,7 +80,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: projects/04-llm-adapter-shadow/requirements.txt
 
-      - name: Install Python dependencies
+      - name: Install Python lint dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r projects/04-llm-adapter-shadow/requirements.txt
@@ -98,25 +98,9 @@ jobs:
         if: always()
         run: mypy projects/04-llm-adapter-shadow/src --pretty --strict
 
-      - name: Run pytest with coverage HTML
-        if: always()
-        run: |
-          pytest \
-            --cov=projects/04-llm-adapter-shadow \
-            --cov-report=xml:projects/04-llm-adapter-shadow/coverage.xml \
-            --cov-report=html:projects/04-llm-adapter-shadow/htmlcov \
-            --cov-report=term-missing \
-            projects/04-llm-adapter-shadow/tests
-
-      - name: Upload Python coverage artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-coverage-artifacts
-          if-no-files-found: warn
-          path: |
-            projects/04-llm-adapter-shadow/htmlcov/**
-            projects/04-llm-adapter-shadow/coverage.xml
+  python-tests:
+    uses: ./.github/workflows/python-pytest.yml
+    secrets: inherit
 
   reports:
     needs:
