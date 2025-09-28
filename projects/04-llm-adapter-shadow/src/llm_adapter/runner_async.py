@@ -25,6 +25,7 @@ from .provider_spi import (
 )
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
+    ParallelAllResult,
     ParallelExecutionError,
     compute_consensus,
     run_parallel_all_async,
@@ -223,7 +224,7 @@ class AsyncRunner:
         request: ProviderRequest,
         shadow: ProviderSPI | AsyncProviderSPI | None = None,
         shadow_metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
-    ) -> ProviderResponse:
+    ) -> ProviderResponse | ParallelAllResult[WorkerResult, ProviderResponse]:
         last_err: Exception | None = None
         event_logger, metrics_path_str = resolve_event_logger(
             self._logger, shadow_metrics_path
@@ -557,7 +558,10 @@ class AsyncRunner:
                             metadata=metadata,
                             shadow_used=shadow is not None,
                         )
-                        return response
+                        return ParallelAllResult(
+                            results,
+                            lambda entry: entry[2],
+                        )
 
         if mode is RunnerMode.CONSENSUS:
             for _, _, _, metrics in results:

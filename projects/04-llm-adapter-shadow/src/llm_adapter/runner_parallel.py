@@ -6,7 +6,8 @@ import asyncio
 import importlib
 import json
 import math
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable as TypingCallable
 from concurrent.futures import (
     FIRST_COMPLETED,
     Future,
@@ -15,7 +16,7 @@ from concurrent.futures import (
     wait,
 )
 from dataclasses import dataclass, field
-from typing import Any, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast
 
 from .provider_spi import ProviderResponse
 from .runner_config import ConsensusConfig
@@ -29,6 +30,53 @@ AsyncWorker = Callable[[], Awaitable[T]]
 
 class ParallelExecutionError(RuntimeError):
     """Raised when all parallel workers fail to produce a response."""
+
+
+S = TypeVar("S")
+
+
+@dataclass(slots=True)
+class ParallelAllResult(Generic[T, S]):
+    """Container capturing every result from ``run_parallel_all_*`` helpers."""
+
+    items: Sequence[T]
+    _extract: TypingCallable[[T], S]
+
+    def __post_init__(self) -> None:
+        if not self.items:
+            raise ValueError("ParallelAllResult requires at least one item")
+
+    def __iter__(self) -> Iterator[T]:
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __getitem__(self, index: int) -> T:
+        return self.items[index]
+
+    @property
+    def invocations(self) -> Sequence[T]:
+        return self.items
+
+    @property
+    def responses(self) -> list[S]:
+        return [self._extract(item) for item in self.items]
+
+    @property
+    def primary_invocation(self) -> T:
+        return self.items[0]
+
+    @property
+    def primary_response(self) -> S:
+        return self._extract(self.primary_invocation)
+
+    def __getattr__(self, name: str) -> Any:
+        primary = self.primary_response
+        if hasattr(primary, name):
+            return getattr(primary, name)
+        msg = f"{type(self).__name__} has no attribute {name!r}"
+        raise AttributeError(msg)
 
 
 def _normalize_concurrency(total: int, limit: int | None) -> int:

@@ -19,6 +19,7 @@ from .observability import EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
+    ParallelAllResult,
     ParallelExecutionError,
     compute_consensus,
     run_parallel_all_sync,
@@ -224,7 +225,9 @@ class Runner:
         request: ProviderRequest,
         shadow: ProviderSPI | None = None,
         shadow_metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
-    ) -> ProviderResponse:
+    ) -> ProviderResponse | ParallelAllResult[
+        ProviderInvocationResult, ProviderResponse
+    ]:
         """Execute ``request`` with fallback semantics."""
 
         last_err: Exception | None = None
@@ -384,19 +387,19 @@ class Runner:
                 return response
 
             if mode is RunnerMode.PARALLEL_ALL:
-                responses = run_parallel_all_sync(
+                invocations = run_parallel_all_sync(
                     workers, max_concurrency=self._config.max_concurrency
                 )
                 fatal = self._extract_fatal_error(results)
                 if fatal is not None:
                     raise fatal from None
-                for invocation in responses:
+                for invocation in invocations:
                     if invocation.response is None:
                         raise ParallelExecutionError("all workers failed")
-                first_response = responses[0].response
-                if first_response is None:
-                    raise ParallelExecutionError("all workers failed")
-                return first_response
+                return ParallelAllResult(
+                    invocations,
+                    lambda invocation: cast(ProviderResponse, invocation.response),
+                )
 
             if mode is RunnerMode.CONSENSUS:
                 invocations = run_parallel_all_sync(

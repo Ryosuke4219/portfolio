@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
 from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
     ParallelExecutionError,
@@ -66,6 +68,51 @@ def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.votes == 2
     with pytest.raises(ParallelExecutionError):
         compute_consensus(responses, config=ConsensusConfig(quorum=3))
+
+
+def test_runner_parallel_all_returns_full_result() -> None:
+    providers = [
+        _StaticProvider("p1", "response-1", latency_ms=5),
+        _StaticProvider("p2", "response-2", latency_ms=7),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="hello", model="m-parallel")
+
+    result = runner.run(request)
+
+    assert isinstance(result, ParallelAllResult)
+    assert [response.text for response in result.responses] == [
+        "response-1",
+        "response-2",
+    ]
+    assert result.text == "response-1"
+
+
+def test_async_runner_parallel_all_returns_full_result() -> None:
+    async def _run() -> None:
+        providers = [
+            _StaticProvider("p1", "async-1", latency_ms=5),
+            _StaticProvider("p2", "async-2", latency_ms=7),
+        ]
+        runner = AsyncRunner(
+            providers,
+            config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL, max_concurrency=2),
+        )
+        request = ProviderRequest(prompt="hello", model="m-async-parallel")
+
+        result = await runner.run_async(request)
+
+        assert isinstance(result, ParallelAllResult)
+        assert [response.text for response in result.responses] == [
+            "async-1",
+            "async-2",
+        ]
+        assert result.text == "async-1"
+
+    asyncio.run(_run())
 
 
 def test_parallel_any_with_shadow_logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
