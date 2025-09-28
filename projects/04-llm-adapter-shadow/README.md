@@ -8,16 +8,17 @@
 
 > ℹ️ **本ポートフォリオで外部LLM APIを利用するのはこの04プロジェクトのみです。** 01〜03は決定的なスタブ／ルールベース処理で完結し、ネットワークやAPIキーを必要としません。
 
+## Key Features
+
+- **Parallel orchestration modes** — `parallel_any` は最初に成功したプロバイダを返し、`parallel_all` は全結果を収集、`consensus` は複数プロバイダで多数決（閾値／スコア重み）を行う。各モードは `RunnerConfig.consensus` や CLI オプションで切り替え可能。
+- **Shadow execution telemetry** — `run_with_shadow` でプライマリを待ちつつ、別スレッドで影プロバイダを実行。レスポンス差分やフィンガープリントを `artifacts/runs-metrics.jsonl` へ `shadow_diff` イベントとして記録。
+- **Fallback runner & retries** — `Runner` が `TimeoutError` / `RateLimitError` / `RetriableError` を捕捉し、次候補へ切り替え。`RateLimitError` は 0.05 秒のバックオフを入れて再試行し、`TimeoutError` / `RetriableError` は即座に次プロバイダへ進む。成功時は `provider_success`、失敗時は `provider_error` / `provider_chain_failed` を発火。
+- **Deterministic error simulation** — `MockProvider` はプロンプト中の `[TIMEOUT]` / `[RATELIMIT]` / `[INVALID_JSON]` を検知して対応する例外を投げ、異常系をテストから容易に再現。
+
 ## Motivation
 
 - 本番の意思決定を変えずに品質・レイテンシ差分を継続測定 → ベンダ選定や回帰検知に活用。
 - 異常系を**明示的に再現**できるため、フォールバックや再試行の動作確認が容易。
-
-## Key Features
-
-- **Shadow execution telemetry** — `run_with_shadow` でプライマリを待ちつつ、別スレッドで影プロバイダを実行。レスポンス差分やフィンガープリントを `artifacts/runs-metrics.jsonl` へ `shadow_diff` イベントとして記録。
-- **Fallback runner** — `Runner` が `TimeoutError` / `RateLimitError` / `RetriableError` を捕捉し、次候補へ切り替え。`RateLimitError` は 0.05 秒のバックオフを入れて再試行し、`TimeoutError` / `RetriableError` は即座に次プロバイダへ進む。成功時は `provider_success`、失敗時は `provider_error` / `provider_chain_failed` を発火。
-- **Deterministic error simulation** — `MockProvider` はプロンプト中の `[TIMEOUT]` / `[RATELIMIT]` / `[INVALID_JSON]` を検知して対応する例外を投げ、異常系をテストから容易に再現。
 
 ## Directory Layout
 
@@ -41,7 +42,7 @@ projects/04-llm-adapter-shadow/
 
 ## Usage
 
-### Quickstart — 04: LLM Adapter (Shadow/Fallback)
+### Quickstart — 04: LLM Adapter (Shadow/Fallback/Parallel)
 
 1. **セットアップ（Windows PowerShell）**
 
@@ -60,16 +61,20 @@ projects/04-llm-adapter-shadow/
    pytest -q
    ```
 
-3. **実行 & メトリクス確認**
+3. **実行 & メトリクス確認（並列モード含む）**
 
    ```powershell
    $env:OPENAI_API_KEY = "sk-..."        # 例: どれか1つは成功するプロバイダ
    $env:GEMINI_API_KEY = "..."          # 無しでも OK（Gemini は自動スキップ）
-   python demo_shadow.py
+   python demo_shadow.py --mode consensus --consensus-strategy majority
    Get-Content .\artifacts\runs-metrics.jsonl -Last 10
    ```
 
-   1行=1イベントの JSONL が追記されます（`provider_success` / `provider_error` / `provider_skipped` など）。
+   1行=1イベントの JSONL が追記されます（`provider_success` / `parallel_vote` / `provider_error` / `provider_skipped` など）。
+
+   - `--mode parallel_any` : 最初の成功レスポンスを採用。`parallel_first_success` イベントが追加。
+   - `--mode parallel_all` : 全レスポンスを収集し、`parallel_result` イベントを逐次記録。
+   - `--mode consensus` : 指定ストラテジで多数決。後述のメトリクスを `consensus_vote` イベントとして追記。
 
 4. **Gemini（google-genai）利用時の注意**
 
@@ -129,6 +134,31 @@ Gemini の構造化出力を利用したい場合は、`generation_config` に
 `demo_shadow.py` の `request_options` を編集するか、環境変数で
 `PRIMARY_OPTIONS` を与えて `ProviderRequest.options` に受け渡してください。Ollama 向けには `REQUEST_TIMEOUT_S`（または小文字の `request_timeout_s`）を指定するとリクエスト単位のタイムアウトを秒数で上書きできます。
 
+### RunnerConfig と CLI オプション対応表
+
+```toml
+[runner]
+mode = "consensus"              # "fallback" | "parallel_any" | "parallel_all" | "consensus"
+max_concurrency = 4              # 同時実行上限（parallel_* / consensus で有効）
+rpm = 120                        # 1分あたりの合計呼び出し上限
+
+[runner.consensus]
+strategy = "majority"            # "majority" | "weighted"
+min_votes = 2                    # 採択に必要な最小同意数
+score_threshold = 0.6            # weighted 時のスコア閾値
+tie_breaker = "latency"          # "latency" | "priority"
+```
+
+| RunnerConfig フィールド | CLI オプション | 説明 |
+| --- | --- | --- |
+| `mode` | `--mode {fallback,parallel_any,parallel_all,consensus}` | 実行モードの切替 |
+| `max_concurrency` | `--max-concurrency <int>` | 並列呼び出し数の上限 |
+| `rpm` | `--rpm <int>` | 1分あたりのプロバイダ呼び出し上限 |
+| `consensus.strategy` | `--consensus-strategy {majority,weighted}` | 投票方式の選択 |
+| `consensus.min_votes` | `--consensus-min-votes <int>` | 採択に必要な最小票数 |
+| `consensus.score_threshold` | `--consensus-score-threshold <float>` | weighted でのスコア合格ライン |
+| `consensus.tie_breaker` | `--consensus-tie-breaker {latency,priority}` | 票同数時のタイブレーク規則 |
+
 ### Run the tests
 
 ```bash
@@ -154,6 +184,16 @@ pytest -q
   - 成功時のみ `latency_gap_ms`, `shadow_text_len`, `shadow_token_usage_total` を追加。
   - 例外が発生した場合は `shadow_error_message` に詳細を格納。
 - `metrics_path=None` を渡すとメトリクス出力を無効化できます。
+
+### Consensus Metrics
+
+- `consensus` モードでは、1回の要求につき `consensus_vote` が記録され、以下のフィールドを出力します:
+  - `voters_total`, `votes_for`, `votes_against`, `abstained` — 投票の内訳。
+  - `strategy`, `min_votes`, `score_threshold`, `tie_breaker` — 実行時の合議設定。
+  - `winner_provider`, `winner_score`, `winner_latency_ms` — 採択候補と評価スコア。
+  - `tie_break_applied`, `tie_break_reason` — タイブレークを適用した場合の詳細。
+  - `candidate_summaries` — プロバイダごとのスコア／投票結果。
+- `run_with_shadow` と併用した場合は、合議結果に加えて `shadow_diff.shadow_consensus_delta` が追記され、採択案と影プロバイダとの差分（投票数 / スコア / タイブレーク要因の再評価結果）を記録します。影側で失敗した場合は `shadow_consensus_error` が併記されます。
 
 ### Example `shadow_diff`
 
