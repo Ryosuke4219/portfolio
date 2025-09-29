@@ -106,7 +106,10 @@ def _format_text(metrics: Mapping[str, Any]) -> str:
     lines.append(f"Suite: {suite}")
     lines.append(f"Cases: {metrics.get('case_count', 0)}")
     lines.append(
-        "Attempts: {attempts} (pass: {passed}, fail: {failed}, error: {error}, skipped: {skipped})".format(
+        (
+            "Attempts: {attempts} (pass: {passed}, fail: {failed}, "
+            "error: {error}, skipped: {skipped})"
+        ).format(
             attempts=metrics.get("attempt_count", 0),
             passed=metrics.get("status_breakdown", {}).get("pass", 0),
             failed=metrics.get("status_breakdown", {}).get("fail", 0),
@@ -151,7 +154,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.format == "json":
         indent = 2 if args.pretty else None
         separators = (",", ": ") if args.pretty else (",", ":")
-        text = json.dumps(metrics, ensure_ascii=False, indent=indent, separators=separators, sort_keys=True)
+        json_kwargs = {
+            "ensure_ascii": False,
+            "indent": indent,
+            "separators": separators,
+            "sort_keys": True,
+        }
+        text = json.dumps(metrics, **json_kwargs)
     else:
         text = _format_text(metrics)
 
