@@ -6,6 +6,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { Readable } from 'node:stream';
 import { test } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { parseSpecFile, validateCasesSchema } from '../projects/01-spec2cases-md2json/scripts/spec2cases.mjs';
@@ -105,7 +106,7 @@ test('junit analysis tracks flaky transitions', async () => {
           if (!expected || entries.length === expected) return entries;
         }
       }
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await delay(10);
     }
     throw new Error('timed out waiting for junit log entries');
   };
