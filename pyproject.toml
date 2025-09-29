@@ -17,6 +17,8 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 force-single-line = false
 known-first-party = ["llm_adapter"]
+order-by-type = false
+force-sort-within-sections = true
 
 [tool.mypy]
 python_version = "3.10"
