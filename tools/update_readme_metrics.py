@@ -49,8 +49,9 @@ def format_top_flaky(rows: list[dict[str, Any]]) -> str:
     for row in rows[:3]:
         cid = row.get("canonical_id") or "-"
         score = row.get("score")
-        if isinstance(score, int | float):
-            formatted.append(f"{len(formatted) + 1}. {cid} (score {score:.2f})")
+        if isinstance(score, (int, float)):  # noqa: UP038 - 明示的にタプル指定
+            score_display = f"{float(score):.2f}"
+            formatted.append(f"{len(formatted) + 1}. {cid} (score {score_display})")
         else:
             formatted.append(f"{len(formatted) + 1}. {cid}")
     return "<br/>".join(formatted)
