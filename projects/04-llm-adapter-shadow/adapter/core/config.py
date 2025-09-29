@@ -35,7 +35,7 @@ class ProviderConfig:
 def _coerce_path(config: str | Path | PathLike[str]) -> Path:
     if isinstance(config, Path):
         return config
-    if isinstance(config, (str, PathLike)):
+    if isinstance(config, str | PathLike):
         return Path(config)
     raise ConfigError("Config path must be a string or Path instance.")
 
