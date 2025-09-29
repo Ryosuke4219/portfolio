@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-
 from adapter import run_compare as run_compare_module
 from adapter.core import runner_api
 
@@ -50,14 +49,29 @@ def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert forwarded["rpm"] == 90
 
 
-def test_run_compare_sanitizes_runner_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_run_compare_sanitizes_runner_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     provider_path = tmp_path / "p.yaml"
     prompt_path = tmp_path / "prompts.jsonl"
     provider_path.write_text("{}\n", encoding="utf-8")
     prompt_path.write_text("{}\n", encoding="utf-8")
-    monkeypatch.setattr(runner_api, "load_provider_configs", lambda paths: ["cfg"])
-    monkeypatch.setattr(runner_api, "load_golden_tasks", lambda path: ["task"])
-    monkeypatch.setattr(runner_api, "load_budget_book", lambda path: "book")
+    monkeypatch.setattr(
+        runner_api,
+        "load_provider_configs",
+        lambda paths: ["cfg"],
+    )
+    monkeypatch.setattr(
+        runner_api,
+        "load_golden_tasks",
+        lambda path: ["task"],
+    )
+    monkeypatch.setattr(
+        runner_api,
+        "load_budget_book",
+        lambda path: "book",
+    )
     monkeypatch.setattr(runner_api, "BudgetManager", lambda book: "budget")
     captured: dict[str, object] = {}
 
