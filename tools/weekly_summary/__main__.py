@@ -18,7 +18,6 @@ from . import (
     filter_by_window,
     format_percentage,
     format_table,
-    coerce_str,
     load_flaky,
     load_runs,
     select_flaky_rows,
