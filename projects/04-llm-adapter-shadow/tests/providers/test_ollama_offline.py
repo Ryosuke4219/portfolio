@@ -5,7 +5,7 @@ import pytest
 from src.llm_adapter.errors import ProviderSkip
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.ollama import OllamaProvider
-from tests.helpers import fakes
+import tests.helpers.fakes as fakes
 
 
 def test_ollama_offline_skips_without_custom_session(monkeypatch: pytest.MonkeyPatch) -> None:
