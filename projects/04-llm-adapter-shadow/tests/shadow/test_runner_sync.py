@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import pytest
+
 from src.llm_adapter.errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderSPI
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
