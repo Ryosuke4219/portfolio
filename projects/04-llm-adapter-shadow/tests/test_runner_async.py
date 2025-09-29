@@ -396,7 +396,7 @@ def test_async_parallel_any_returns_first_completion() -> None:
     )
     request = ProviderRequest(prompt="hi", model="model-parallel-any")
 
-    response = asyncio.run(runner.run_async(request))
+    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
 
     assert response.text.startswith("fast:")
 
@@ -410,7 +410,7 @@ def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
     )
     request = ProviderRequest(prompt="hi", model="model-parallel-cancel")
 
-    response = asyncio.run(runner.run_async(request))
+    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.3))
 
     assert response.text.startswith("fast:")
     assert slow.cancelled is True
