@@ -117,7 +117,7 @@ def _main_impl() -> None:
         prev_rate_for_delta = previous_rate
 
     notes: list[str] = []
-    if wow_delta is not None and prev_pass_rate is not None:
+    if wow_delta is not None and prev_rate_for_delta is not None:
         notes.append(
             f"PassRate WoW: {wow_delta:+.2f}pp (prev {prev_rate_for_delta * 100:.2f}%)."
         )
