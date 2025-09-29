@@ -122,7 +122,7 @@ def _classify_error(
         )
     if has_auth_env and ("environment variable" in lower or "api key" in lower):
         return _msg(lang, "api_key_missing", env=auth_env), "env"
-    status_code = getattr(exc, "status_code", None)
+    status_code = exc.status_code if hasattr(exc, "status_code") else None
     if (
         status_code == 429
         or "429" in lower
@@ -170,9 +170,11 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:  # argparse は内部で exit(2) を呼ぶ
-        return _coerce_exit_code(getattr(exc, "code", None))
+        code = exc.code if exc.code is not None else None
+        return _coerce_exit_code(code)
 
-    lang = _resolve_lang(getattr(args, "lang", None))
+    requested_lang = args.lang if args.lang is not None else None
+    lang = _resolve_lang(requested_lang)
     _configure_logging(args.json_logs)
     if args.env:
         _load_env_file(Path(args.env).expanduser().resolve(), lang)
@@ -209,7 +211,8 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     try:
         prompts = collect_prompts(args, parser, lang)
     except SystemExit as exc:
-        return _coerce_exit_code(getattr(exc, "code", None))
+        code = exc.code if exc.code is not None else None
+        return _coerce_exit_code(code)
 
     LOGGER.info("プロンプト数: %d", len(prompts))
     concurrency = _determine_concurrency(args.parallel, len(prompts))

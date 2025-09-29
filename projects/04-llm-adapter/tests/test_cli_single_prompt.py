@@ -6,6 +6,8 @@ import types
 from pathlib import Path
 
 from adapter import cli as cli_module
+from adapter.cli.prompts import _classify_error
+from adapter.cli.utils import _msg
 from adapter.core import providers as provider_module
 
 
@@ -205,6 +207,24 @@ def test_cli_rate_limit_exit_code(monkeypatch, tmp_path: Path, capfd) -> None:
     captured = capfd.readouterr()
     assert exit_code == 6
     assert "レート" in captured.err or "rate" in captured.err.lower()
+
+
+def test_classify_error_rate_limit_status_code() -> None:
+    config = types.SimpleNamespace(provider="fake", auth_env="NONE")
+
+    class RateLimitedError(Exception):
+        status_code = 429
+
+    message, kind = _classify_error(RateLimitedError("Too many requests"), config, "ja")
+    assert kind == "rate"
+    assert message == _msg("ja", "rate_limited")
+
+
+def test_classify_error_system_exit_provider_error() -> None:
+    config = types.SimpleNamespace(provider="fake", auth_env="NONE")
+    message, kind = _classify_error(SystemExit("fatal"), config, "ja")
+    assert kind == "provider"
+    assert message == _msg("ja", "provider_error", error="fatal")
 
 
 def test_cli_doctor(monkeypatch, tmp_path: Path, capsys) -> None:
