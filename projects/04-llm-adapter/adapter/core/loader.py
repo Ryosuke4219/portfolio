@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, MutableMapping
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, MutableMapping, Tuple, Union
+from typing import cast
 
 from pydantic import ValidationError
 
@@ -48,21 +49,21 @@ def _format_validation_error(path: Path, exc: ValidationError) -> str:
     return f"設定ファイルの検証に失敗しました ({path}): {summary}"
 
 
-def _load_yaml(path: Union[str, Path]) -> MutableMapping[str, Any]:
+def _load_yaml(path: str | Path) -> MutableMapping[str, object]:
     path = Path(path)
     text = path.read_text(encoding="utf-8")
     if yaml is not None:
         data = yaml.safe_load(text)
         if not isinstance(data, MutableMapping):
             raise ValueError(f"YAML の内容が辞書ではありません: {path}")
-        return data
+        return cast(MutableMapping[str, object], data)
     return _load_yaml_without_dependency(text, path)
 
 
-def _load_yaml_without_dependency(text: str, path: Path) -> MutableMapping[str, Any]:
+def _load_yaml_without_dependency(text: str, path: Path) -> MutableMapping[str, object]:
     """PyYAML が無い環境向けの簡易 YAML パーサ。"""
 
-    def convert(value: str) -> Any:
+    def convert(value: str) -> object:
         value = value.strip()
         if value == "":
             return ""
@@ -82,8 +83,8 @@ def _load_yaml_without_dependency(text: str, path: Path) -> MutableMapping[str, 
                 return value[1:-1]
             return value
 
-    root: MutableMapping[str, Any] = {}
-    stack: List[Tuple[MutableMapping[str, Any], int]] = [(root, 0)]
+    root: dict[str, object] = {}
+    stack: list[tuple[MutableMapping[str, object], int]] = [(root, 0)]
     for raw_line in text.splitlines():
         if not raw_line.strip() or raw_line.lstrip().startswith("#"):
             continue
@@ -100,7 +101,7 @@ def _load_yaml_without_dependency(text: str, path: Path) -> MutableMapping[str, 
             raise ValueError(f"インデントが不正です: {path}: {line}")
         current = stack[-1][0]
         if value == "":
-            new_dict: MutableMapping[str, Any] = {}
+            new_dict: dict[str, object] = {}
             current[key] = new_dict
             stack.append((new_dict, indent + 2))
         else:
@@ -108,7 +109,7 @@ def _load_yaml_without_dependency(text: str, path: Path) -> MutableMapping[str, 
     return root
 
 
-def load_provider_config(path: Union[str, Path]) -> ProviderConfig:
+def load_provider_config(path: str | Path) -> ProviderConfig:
     """単一のプロバイダ設定を読み込む。"""
 
     path = Path(path)
@@ -153,7 +154,7 @@ def load_provider_config(path: Union[str, Path]) -> ProviderConfig:
     )
 
 
-def load_provider_configs(paths: Iterable[Path]) -> List[ProviderConfig]:
+def load_provider_configs(paths: Iterable[Path]) -> list[ProviderConfig]:
     """複数のプロバイダ設定を読み込む。"""
 
     return [load_provider_config(path) for path in paths]
@@ -163,15 +164,27 @@ def load_budget_book(path: Path) -> BudgetBook:
     """予算設定を読み込む。"""
 
     data = _load_yaml(path)
-    default_raw = data.get("default", {})
-    overrides_raw = data.get("overrides", {})
+    default_raw_obj = data.get("default", {})
+    default_raw: MutableMapping[str, object]
+    if isinstance(default_raw_obj, MutableMapping):
+        default_raw = default_raw_obj
+    else:
+        default_raw = cast(MutableMapping[str, object], {})
+    overrides_raw_obj = data.get("overrides", {})
+    overrides_raw: MutableMapping[str, object]
+    if isinstance(overrides_raw_obj, MutableMapping):
+        overrides_raw = overrides_raw_obj
+    else:
+        overrides_raw = cast(MutableMapping[str, object], {})
     default_rule = BudgetRule(
         run_budget_usd=float(default_raw.get("run_budget_usd", 0.0)),
         daily_budget_usd=float(default_raw.get("daily_budget_usd", 0.0)),
         stop_on_budget_exceed=bool(default_raw.get("stop_on_budget_exceed", False)),
     )
-    overrides: Dict[str, BudgetRule] = {}
+    overrides: dict[str, BudgetRule] = {}
     for provider_name, rule_raw in overrides_raw.items():
+        if not isinstance(provider_name, str) or not isinstance(rule_raw, MutableMapping):
+            continue
         overrides[provider_name] = BudgetRule(
             run_budget_usd=float(rule_raw.get("run_budget_usd", default_rule.run_budget_usd)),
             daily_budget_usd=float(
