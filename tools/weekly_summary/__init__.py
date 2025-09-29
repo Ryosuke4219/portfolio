@@ -157,7 +157,7 @@ def select_flaky_rows(
 def to_float(value: object) -> float | None:
     if isinstance(value, bool):
         return float(value)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     if isinstance(value, str):
         if value == "":
@@ -174,7 +174,7 @@ def coerce_str(value: object) -> str | None:
         return value
     if isinstance(value, bool):
         return str(value)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return str(value)
     return None
 
