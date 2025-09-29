@@ -9,7 +9,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 README_MARKERS_NOT_FOUND = (
     "README markers <!-- qa-metrics:start --> / <!-- qa-metrics:end --> not found"
 )
@@ -87,10 +86,8 @@ def format_recent_runs(items: list[dict[str, Any]]) -> list[str]:
         flaky_count = item.get("flaky_count") or 0
         flaky_delta = format_int_delta(item.get("flaky_delta"))
         lines.append(
-            (
-                f"- {run_id} ({ts}): Pass Rate {pass_rate}{pass_delta} / "
-                f"Flaky {flaky_count}件{flaky_delta}"
-            )
+            f"- {run_id} ({ts}): Pass Rate {pass_rate}{pass_delta} / "
+            f"Flaky {flaky_count}件{flaky_delta}"
         )
     return lines
 
