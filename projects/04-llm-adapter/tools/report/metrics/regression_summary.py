@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 from .data import load_baseline_expectations
 from .utils import coerce_optional_float, latest_metrics_by_key
 
 
-def _format_rate(value: Optional[float]) -> str:
+def _format_rate(value: float | None) -> str:
     if value is None:
         return "-"
     return f"{value:.3f}"
 
 
-def _extract_diff_rate(metric: Mapping[str, object]) -> Optional[float]:
+def _extract_diff_rate(metric: Mapping[str, object]) -> float | None:
     eval_payload = metric.get("eval")
     if isinstance(eval_payload, Mapping):
         diff = eval_payload.get("diff_rate")
@@ -30,7 +30,7 @@ def _extract_diff_rate(metric: Mapping[str, object]) -> Optional[float]:
 
 
 def build_regression_summary(
-    metrics: Sequence[Mapping[str, object]], golden_dir: Optional[Path]
+    metrics: Sequence[Mapping[str, object]], golden_dir: Path | None
 ) -> str:
     if not golden_dir:
         return "<p>baseline データが指定されていません。</p>"
@@ -41,8 +41,8 @@ def build_regression_summary(
     if not expectations:
         return "<p>baseline 出力がまだ登録されていません。</p>"
     latest_map = latest_metrics_by_key(metrics)
-    rows: List[Dict[str, object]] = []
-    seen_keys: set[Tuple[str, str, str]] = set()
+    rows: list[dict[str, object]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
     for expectation in expectations:
         provider = str(expectation.get("provider", "")).strip()
         model = str(expectation.get("model", "")).strip()
@@ -131,7 +131,7 @@ def build_regression_summary(
     summary_html = (
         f"<p>PASS: {pass_count} / FAIL: {fail_count} / OTHER: {other_count}</p>"
     )
-    table_rows: List[str] = []
+    table_rows: list[str] = []
     for row in rows:
         notes_parts = [row["notes"], row["detail"]]
         notes_cell = "<br />".join(

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Dict, Mapping, Sequence, Tuple
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 
 
 def parse_iso_ts(value: object) -> datetime:
@@ -14,11 +14,11 @@ def parse_iso_ts(value: object) -> datetime:
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.min.replace(tzinfo=UTC)
         if parsed.tzinfo is None:
-            return parsed.replace(tzinfo=timezone.utc)
+            return parsed.replace(tzinfo=UTC)
         return parsed
-    return datetime.min.replace(tzinfo=timezone.utc)
+    return datetime.min.replace(tzinfo=UTC)
 
 
 def coerce_optional_float(value: object) -> float | None:
@@ -34,10 +34,10 @@ def coerce_optional_float(value: object) -> float | None:
 
 def latest_metrics_by_key(
     metrics: Sequence[Mapping[str, object]]
-) -> Dict[Tuple[str, str, str], Mapping[str, object]]:
+) -> dict[tuple[str, str, str], Mapping[str, object]]:
     """Return the latest metric for each ``(provider, model, prompt_id)`` tuple."""
 
-    latest: Dict[Tuple[str, str, str], Tuple[datetime, Mapping[str, object]]] = {}
+    latest: dict[tuple[str, str, str], tuple[datetime, Mapping[str, object]]] = {}
     for metric in metrics:
         provider = metric.get("provider")
         model = metric.get("model")
