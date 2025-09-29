@@ -17,7 +17,7 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-single-line = false
-known-first-party = ["llm_adapter", "src.llm_adapter", "src", "tests"]
+known-first-party = ["adapter", "llm_adapter", "src.llm_adapter", "src", "tests"]
 order-by-type = false
 force-sort-within-sections = true
 
