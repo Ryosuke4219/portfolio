@@ -1,6 +1,7 @@
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
+import process from 'node:process';
 import url from 'url';
 
 import { LLM2PW_DEMO_DIR } from '../../scripts/paths.mjs';
