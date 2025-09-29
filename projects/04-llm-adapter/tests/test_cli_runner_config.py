@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-# Standard library
 from pathlib import Path
 from types import SimpleNamespace
 
-# Third-party
 import pytest
 
-# First-party
 import adapter.cli.doctor as doctor
 import adapter.core.runner_api as runner_api
 import adapter.run_compare as run_compare_module
