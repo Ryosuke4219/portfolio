@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
 
@@ -9,9 +10,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.report.metrics import data as data_mod
-from tools.report.metrics import regression_summary as regression_mod
-from tools.report.metrics import weekly_summary as weekly_mod
+data_mod = importlib.import_module("tools.report.metrics.data")
+regression_mod = importlib.import_module("tools.report.metrics.regression_summary")
+weekly_mod = importlib.import_module("tools.report.metrics.weekly_summary")
 
 
 def test_load_metrics_handles_missing_file(tmp_path: Path) -> None:
