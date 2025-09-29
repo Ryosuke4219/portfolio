@@ -118,12 +118,13 @@ def error_family(error: Exception | None) -> str | None:
 
 
 def estimate_cost(provider: object, tokens_in: int, tokens_out: int) -> float:
-    estimator = getattr(provider, "estimate_cost", None)
-    if callable(estimator):
-        try:
-            return float(estimator(tokens_in, tokens_out))
-        except Exception:  # pragma: no cover - defensive guard
-            return 0.0
+    if hasattr(provider, "estimate_cost"):
+        estimator = provider.estimate_cost
+        if callable(estimator):
+            try:
+                return float(estimator(tokens_in, tokens_out))
+            except Exception:  # pragma: no cover - defensive guard
+                return 0.0
     return 0.0
 
 
@@ -141,9 +142,10 @@ def provider_model(provider: object, *, allow_private: bool = False) -> str | No
 def _provider_name(provider: ProviderSPI | AsyncProviderSPI | None) -> str | None:
     if provider is None:
         return None
-    name = getattr(provider, "name", None)
-    if callable(name):
-        return str(name())
+    if hasattr(provider, "name"):
+        name = provider.name
+        if callable(name):
+            return str(name())
     return None
 
 
