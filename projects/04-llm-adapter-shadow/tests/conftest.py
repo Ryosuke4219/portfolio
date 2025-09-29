@@ -1,6 +1,7 @@
-from pathlib import Path
 import sys
 import warnings
+from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 
@@ -15,7 +16,7 @@ def _fast_mock_provider_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _suppress_provider_response_alias_deprecations() -> None:
+def _suppress_provider_response_alias_deprecations() -> Generator[None, None, None]:
     with warnings.catch_warnings():
         warnings.filterwarnings(
             "ignore",
