@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 # Third-party imports
 import pytest
 
@@ -10,7 +12,9 @@ from src.llm_adapter.providers.ollama import OllamaProvider
 from tests.helpers.fakes import FakeResponse, FakeSession
 
 
-def test_ollama_provider_prefers_base_url_over_legacy(monkeypatch):
+def test_ollama_provider_prefers_base_url_over_legacy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://env-base")
     monkeypatch.setenv("OLLAMA_HOST", "http://legacy-host")
     provider = OllamaProvider(
@@ -22,7 +26,7 @@ def test_ollama_provider_prefers_base_url_over_legacy(monkeypatch):
     assert provider._host == "http://env-base"
 
 
-def test_ollama_provider_legacy_host_fallback(monkeypatch):
+def test_ollama_provider_legacy_host_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     monkeypatch.setenv("OLLAMA_HOST", "http://legacy-host")
     provider = OllamaProvider(
@@ -34,15 +38,21 @@ def test_ollama_provider_legacy_host_fallback(monkeypatch):
     assert provider._host == "http://legacy-host"
 
 
-def test_ollama_provider_auto_pull_and_chat(monkeypatch):
+def test_ollama_provider_auto_pull_and_chat(monkeypatch: pytest.MonkeyPatch) -> None:
     class Session(FakeSession):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self._chat_called = False
-            self.last_timeout = None
-            self.last_payload: dict | None = None
+            self.last_timeout: float | None = None
+            self.last_payload: dict[str, Any] | None = None
 
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, Any] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             self.calls.append((url, json, stream))
             if url.endswith("/api/show"):
                 self._show_calls += 1
@@ -85,21 +95,29 @@ def test_ollama_provider_auto_pull_and_chat(monkeypatch):
     assert session._chat_called
     assert session.last_timeout == pytest.approx(30.0)
     assert session.last_payload is not None
-    assert "REQUEST_TIMEOUT_S" not in session.last_payload
-    assert "request_timeout_s" not in session.last_payload
+    last_payload = session.last_payload
+    assert "REQUEST_TIMEOUT_S" not in last_payload
+    assert "request_timeout_s" not in last_payload
 
     show_calls = [url for url, *_ in session.calls if url.endswith("/api/show")]
     assert len(show_calls) == 2
 
     chat_payload = next(payload for url, payload, _ in session.calls if url.endswith("/api/chat"))
+    assert chat_payload is not None
     assert chat_payload["model"] == "gemma3n:e2b"
     assert chat_payload["messages"] == [{"role": "user", "content": "hello"}]
     assert chat_payload["stream"] is False
 
 
-def test_ollama_provider_merges_request_options():
+def test_ollama_provider_merges_request_options() -> None:
     class Session(FakeSession):
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, Any] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             self.calls.append((url, json, stream))
             if url.endswith("/api/show"):
                 return FakeResponse(status_code=200, payload={})
@@ -122,7 +140,7 @@ def test_ollama_provider_merges_request_options():
         max_tokens=32,
         temperature=0.4,
         top_p=0.9,
-        stop=["END"],
+        stop=("END",),
         timeout_s=5.0,
         options={"options": {"stop": ["ALT"], "seed": 99}, "stream": True},
         model="gemma3",
@@ -130,6 +148,7 @@ def test_ollama_provider_merges_request_options():
     provider.invoke(request)
 
     chat_payload = next(payload for url, payload, _ in session.calls if url.endswith("/api/chat"))
+    assert chat_payload is not None
     assert chat_payload["stream"] is True
     assert chat_payload["model"] == "gemma3"
     options_payload = chat_payload["options"]
@@ -150,14 +169,20 @@ def test_ollama_provider_merges_request_options():
     ],
 )
 def test_ollama_provider_auto_pull_error_mapping(
-    status_code: int, expected: type[Exception], provider_request_model
-):
+    status_code: int, expected: type[Exception], provider_request_model: str
+) -> None:
     class Session(FakeSession):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.pull_response: FakeResponse | None = None
 
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, Any] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             self.calls.append((url, json, stream))
             if url.endswith("/api/show"):
                 self._show_calls += 1
@@ -181,14 +206,20 @@ def test_ollama_provider_auto_pull_error_mapping(
     assert session.pull_response.closed
 
 
-def test_ollama_provider_request_timeout_override():
+def test_ollama_provider_request_timeout_override() -> None:
     class Session(FakeSession):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
-            self.last_timeout = None
-            self.last_payload: dict | None = None
+            self.last_timeout: float | None = None
+            self.last_payload: dict[str, Any] | None = None
 
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, Any] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             if url.endswith("/api/show"):
                 return FakeResponse(status_code=200, payload={})
             if url.endswith("/api/chat"):
@@ -215,9 +246,10 @@ def test_ollama_provider_request_timeout_override():
     assert response.text == "ok"
     assert session.last_timeout == pytest.approx(2.5)
     assert session.last_payload is not None
-    assert "REQUEST_TIMEOUT_S" not in session.last_payload
-    assert "request_timeout_s" not in session.last_payload
-    assert session.last_payload.get("extra") is True
+    last_payload = session.last_payload
+    assert "REQUEST_TIMEOUT_S" not in last_payload
+    assert "request_timeout_s" not in last_payload
+    assert last_payload.get("extra") is True
 
 
 @pytest.mark.parametrize(
@@ -227,13 +259,21 @@ def test_ollama_provider_request_timeout_override():
         (504, TimeoutError),
     ],
 )
-def test_ollama_provider_maps_auth_error(status_code: int, expected: type[Exception]):
+def test_ollama_provider_maps_auth_error(
+    status_code: int, expected: type[Exception]
+) -> None:
     class Session(FakeSession):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.last_chat_response: FakeResponse | None = None
 
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, Any] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             if url.endswith("/api/show"):
                 return FakeResponse(status_code=200, payload={})
             if url.endswith("/api/chat"):
