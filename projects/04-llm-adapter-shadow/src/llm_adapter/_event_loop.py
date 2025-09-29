@@ -1,3 +1,5 @@
+# ruff: noqa: I001
+
 """AsyncIO event loop helpers.
 
 このモジュールは pytest-socket により ``socket.socket`` が禁止されている
@@ -9,6 +11,7 @@ from __future__ import annotations
 import os
 import socket
 import warnings
+
 from asyncio import unix_events
 from collections.abc import Callable
 
