@@ -13,6 +13,7 @@ from src.llm_adapter.errors import (
     TimeoutError,
 )
 from src.llm_adapter.provider_spi import ProviderRequest
+from src.llm_adapter.providers import gemini as gemini_module
 from src.llm_adapter.providers.gemini import GeminiProvider
 
 from tests.helpers.fakes import RecordGeminiClient
@@ -132,8 +133,6 @@ def test_gemini_provider_uses_request_model_override_and_finish_reason():
 
 
 def test_gemini_provider_skips_without_api_key(monkeypatch, provider_request_model):
-    from src.llm_adapter.providers import gemini as gemini_module
-
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "")
     stub_module = SimpleNamespace(Client=lambda **_: SimpleNamespace(models=None, responses=None))
