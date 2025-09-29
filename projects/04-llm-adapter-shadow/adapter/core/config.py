@@ -4,7 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping
+from typing import Any
 
 import yaml
 
