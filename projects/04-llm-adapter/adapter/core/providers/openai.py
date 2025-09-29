@@ -47,10 +47,13 @@ def _coerce_mapping(value: Any) -> MutableMapping[str, Any]:
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
-    rate_limit_cls = getattr(_openai, "RateLimitError", None)
-    if rate_limit_cls is not None and isinstance(exc, rate_limit_cls):
-        return True
-    return exc.__class__.__name__ == "RateLimitError"
+    if _openai is None:
+        return exc.__class__.__name__ == "RateLimitError"
+    try:
+        rate_limit_cls = _openai.RateLimitError
+    except AttributeError:
+        return exc.__class__.__name__ == "RateLimitError"
+    return isinstance(exc, rate_limit_cls)
 
 
 def _split_endpoint(value: str | None) -> tuple[str | None, str | None]:
