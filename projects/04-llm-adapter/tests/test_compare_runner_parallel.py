@@ -217,3 +217,60 @@ def test_consensus_quorum_failure_marks_metrics(
         assert metric.failure_kind == "consensus_quorum"
         assert metric.error_message and "quorum" in metric.error_message
         assert "aggregate_strategy" not in metric.ci_meta
+
+
+def test_runner_config_dataclass_initializes_helpers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    token_bucket_args: list[int | None] = []
+    schema_args: list[Path | None] = []
+
+    class RecordingTokenBucket:
+        def __init__(self, rpm: int | None) -> None:
+            token_bucket_args.append(rpm)
+
+        def acquire(self) -> None:
+            return None
+
+    class RecordingSchemaValidator:
+        def __init__(self, schema: Path | None) -> None:
+            schema_args.append(schema)
+
+        def validate(self, payload: str) -> None:
+            return None
+
+    from adapter.core import runners as runners_module
+
+    monkeypatch.setattr(runners_module, "_TokenBucket", RecordingTokenBucket)
+    monkeypatch.setattr(runners_module, "_SchemaValidator", RecordingSchemaValidator)
+
+    class SingleCallProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(
+                output_text="ok",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=1,
+            )
+
+    monkeypatch.setitem(ProviderFactory._registry, "single", SingleCallProvider)
+
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text("{}", encoding="utf-8")
+
+    runner = CompareRunner(
+        [
+            _make_provider_config(
+                tmp_path, name="single", provider="single", model="model"
+            )
+        ],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_helpers.jsonl",
+    )
+    config = RunnerConfig(mode="sequential", rpm=3, schema=schema_path)
+
+    runner.run(repeat=1, config=config)
+
+    assert token_bucket_args == [3]
+    assert schema_args == [schema_path]
