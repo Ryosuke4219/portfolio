@@ -1,10 +1,10 @@
 """Provider configuration loader used by the shadow test-suite."""
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 import yaml
