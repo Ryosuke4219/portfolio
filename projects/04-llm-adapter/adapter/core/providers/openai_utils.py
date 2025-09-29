@@ -234,8 +234,11 @@ class OpenAIClientFactory:
         if organization:
             openai_module.organization = organization  # type: ignore[attr-defined]
         if default_headers:
-            headers = getattr(openai_module, "_default_headers", {})
-            headers = dict(headers)
+            if hasattr(openai_module, "_default_headers"):
+                headers_source = openai_module._default_headers  # type: ignore[attr-defined]
+            else:
+                headers_source = {}
+            headers = dict(headers_source)
             headers.update(default_headers)
             openai_module._default_headers = headers  # type: ignore[attr-defined]
         return openai_module
