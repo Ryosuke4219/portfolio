@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import adapter.cli.doctor as doctor
-import adapter.core.runner_api as runner_api
+from adapter.cli import doctor
+from adapter.core import runner_api
 import adapter.run_compare as run_compare_module
 
 
@@ -61,8 +61,8 @@ def test_run_compare_sanitizes_runner_config(
     prompt_path.write_text("{}\n", encoding="utf-8")
     monkeypatch.setattr(
         runner_api,
-        "load_provider_configs",
-        lambda paths: ["cfg"],
+        "load_budget_book",
+        lambda path: "book",
     )
     monkeypatch.setattr(
         runner_api,
@@ -71,8 +71,8 @@ def test_run_compare_sanitizes_runner_config(
     )
     monkeypatch.setattr(
         runner_api,
-        "load_budget_book",
-        lambda path: "book",
+        "load_provider_configs",
+        lambda paths: ["cfg"],
     )
     monkeypatch.setattr(runner_api, "BudgetManager", lambda book: "budget")
     captured: dict[str, object] = {}
