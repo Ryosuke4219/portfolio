@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Dict
-
 from .config import BudgetBook, BudgetRule
 
 
@@ -21,7 +19,7 @@ class BudgetManager:
 
     def __init__(self, book: BudgetBook) -> None:
         self.book = book
-        self._states: Dict[str, BudgetState] = {}
+        self._states: dict[str, BudgetState] = {}
         self._today = date.today()
 
     def _rule_for(self, provider_name: str) -> BudgetRule:

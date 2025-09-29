@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, UTC
 from statistics import median
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -26,19 +27,19 @@ class RunMetric(BaseModel):
     output_tokens: int
     cost_usd: float = 0.0
     status: str = "ok"
-    error: Optional[str] = None
+    error: str | None = None
     prompt_sha256: str = Field(..., description="content hash without secrets")
 
     @classmethod
     def from_resp(
         cls,
-        cfg: "ProviderConfig",
-        resp: "ProviderResponse",
+        cfg: ProviderConfig,
+        resp: ProviderResponse,
         prompt: str,
         *,
         cost_usd: float = 0.0,
         error: str | None = None,
-    ) -> "RunMetric":
+    ) -> RunMetric:
         latency_ms = getattr(resp, "latency_ms", 0)
         input_tokens = getattr(resp, "input_tokens", 0)
         output_tokens = getattr(resp, "output_tokens", 0)
@@ -61,9 +62,9 @@ class RunMetric(BaseModel):
 class EvalMetrics:
     """評価結果。"""
 
-    exact_match: Optional[bool] = None
-    diff_rate: Optional[float] = None
-    len_tokens: Optional[int] = None
+    exact_match: bool | None = None
+    diff_rate: float | None = None
+    len_tokens: int | None = None
 
 
 @dataclass
@@ -94,16 +95,16 @@ class RunMetrics:
     latency_ms: int
     cost_usd: float
     status: str
-    failure_kind: Optional[str]
-    error_message: Optional[str]
-    output_text: Optional[str]
-    output_hash: Optional[str]
+    failure_kind: str | None
+    error_message: str | None
+    output_text: str | None
+    output_hash: str | None
     eval: EvalMetrics = field(default_factory=EvalMetrics)
     budget: BudgetSnapshot = field(default_factory=lambda: BudgetSnapshot(0.0, False))
     ci_meta: Mapping[str, Any] = field(default_factory=dict)
 
-    def to_json_dict(self) -> Dict[str, Any]:
-        payload = asdict(self)
+    def to_json_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = asdict(self)
         payload["eval"] = {k: v for k, v in payload["eval"].items() if v is not None}
         return payload
 
@@ -111,7 +112,7 @@ class RunMetrics:
 def now_ts() -> str:
     """UTC ISO 時刻を返す。"""
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def hash_text(text: str) -> str:
@@ -129,7 +130,7 @@ def compute_cost_usd(prompt_tokens: int, completion_tokens: int, prompt_price: f
     return round(prompt_cost + completion_cost, 6)
 
 
-def estimate_cost(config: "ProviderConfig", input_tokens: int, output_tokens: int) -> float:
+def estimate_cost(config: ProviderConfig, input_tokens: int, output_tokens: int) -> float:
     """プロバイダ設定に基づいて概算コストを算出する。"""
 
     pricing = getattr(config, "pricing", None)
@@ -146,7 +147,7 @@ def estimate_cost(config: "ProviderConfig", input_tokens: int, output_tokens: in
     return compute_cost_usd(input_tokens, output_tokens, prompt_price, completion_price)
 
 
-def tokenize(text: str) -> List[str]:
+def tokenize(text: str) -> list[str]:
     """簡易トークン化。"""
 
     return text.split()
