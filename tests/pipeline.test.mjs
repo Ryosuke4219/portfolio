@@ -157,9 +157,66 @@ test('playwright stub treats install commands as no-ops', () => {
   assert.match(result.stdout, /Skipping "playwright install"/);
 });
 
+function extractRunCommands(yamlText) {
+  const lines = yamlText.split(/\r?\n/);
+  const commands = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const match = line.match(/^(\s*)run:\s*(.*)$/);
+    if (!match) continue;
+
+    const [, indent, value] = match;
+    if (value === '|' || value === '>') {
+      const blockIndent = indent.length + 2;
+      const blockLines = [];
+      let cursor = index + 1;
+      while (cursor < lines.length) {
+        const current = lines[cursor];
+        const currentIndent = current.match(/^\s*/)[0].length;
+        if (currentIndent <= indent.length && current.trim() !== '') break;
+        if (currentIndent < blockIndent && current.trim() === '') {
+          blockLines.push('');
+          cursor += 1;
+          continue;
+        }
+        if (currentIndent < blockIndent) break;
+        blockLines.push(current.slice(blockIndent));
+        cursor += 1;
+      }
+      commands.push(blockLines.join('\n'));
+      index = cursor - 1;
+      continue;
+    }
+
+    commands.push(value.trim());
+  }
+
+  return commands;
+}
+
+function containsPytestExecution(command) {
+  const executionPatterns = [
+    /\bpytest\.main\b/, // python -c "... pytest.main(..." pattern
+    /\bpython(?:\s+-\w+)*\s+-m\s+pytest\b/, // python -m pytest ...
+  ];
+
+  const directPytestPattern = /(^|[;&|])\s*pytest(\s|$)/;
+
+  return command
+    .split(/\r?\n/)
+    .some((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return false;
+      if (executionPatterns.some((pattern) => pattern.test(trimmed))) return true;
+      return directPytestPattern.test(trimmed);
+    });
+}
+
 test('python pytest runs exactly once in CI workflow', () => {
   const ciWorkflowPath = path.join(rootDir, '.github', 'workflows', 'ci.yml');
   const workflow = fs.readFileSync(ciWorkflowPath, 'utf8');
-  const matches = workflow.match(/pytest\b/g) ?? [];
-  assert.equal(matches.length, 1);
+  const runCommands = extractRunCommands(workflow);
+  const executions = runCommands.filter(containsPytestExecution);
+  assert.equal(executions.length, 1);
 });
