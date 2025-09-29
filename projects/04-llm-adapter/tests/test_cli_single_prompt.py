@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import types
+from types import SimpleNamespace
 
 from adapter import cli as cli_module
 from adapter.cli import prompt_runner
@@ -273,7 +273,7 @@ def test_cli_rate_limit_exit_code(monkeypatch, tmp_path: Path, capfd) -> None:
 
 
 def test_classify_error_rate_limit_status_code() -> None:
-    config = types.SimpleNamespace(provider="fake", auth_env="NONE")
+    config = SimpleNamespace(provider="fake", auth_env="NONE")
 
     class RateLimitedError(Exception):
         status_code = 429
@@ -286,7 +286,7 @@ def test_classify_error_rate_limit_status_code() -> None:
 
 
 def test_classify_error_system_exit_provider_error() -> None:
-    config = types.SimpleNamespace(provider="fake", auth_env="NONE")
+    config = SimpleNamespace(provider="fake", auth_env="NONE")
     message, kind = prompts_module._classify_error(SystemExit("fatal"), config, "ja")
     assert kind == "provider"
     assert message == prompts_module._msg("ja", "provider_error", error="fatal")
@@ -299,7 +299,7 @@ def test_cli_doctor(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
     monkeypatch.setenv("LLM_ADAPTER_RPM", "120")
 
-    fake_dotenv = types.SimpleNamespace()
+    fake_dotenv = SimpleNamespace()
     monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
 
     monkeypatch.setattr(cli_module.socket, "gethostbyname", lambda host: "127.0.0.1")
