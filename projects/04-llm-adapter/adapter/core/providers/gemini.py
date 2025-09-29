@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+import textwrap
 import time
-from typing import Any, Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
+from typing import Any
 
 from ..config import ProviderConfig
 from . import BaseProvider, ProviderResponse
@@ -19,7 +21,13 @@ except ModuleNotFoundError:  # pragma: no cover - SDK 未導入時
 
 def _resolve_api_key(env_name: str | None) -> str:
     if not env_name:
-        raise RuntimeError("Gemini プロバイダを利用するには auth_env に API キーの環境変数を指定してください")
+        raise RuntimeError(
+            textwrap.dedent(
+                """
+                Gemini プロバイダを利用するには auth_env に API キーの環境変数を指定してください
+                """
+            ).strip()
+        )
     value = os.getenv(env_name)
     if not value:
         raise RuntimeError(f"Gemini API キーが環境変数 '{env_name}' に見つかりません")
@@ -75,29 +83,49 @@ def _call_with_optional_safety(
         raise
 
 
-def _invoke_gemini(client: Any, model: str, contents: Sequence[Mapping[str, Any]] | None, config: Mapping[str, Any] | None, safety_settings: Sequence[Mapping[str, Any]] | None) -> Any:
-    models_api = getattr(client, "models", None)
-    if models_api and hasattr(models_api, "generate_content"):
-        func = getattr(models_api, "generate_content")
-        return _call_with_optional_safety(
-            func,
-            model=model,
-            config=config,
-            safety_settings=safety_settings,
-            payload_key="contents",
-            payload=contents,
-        )
-    responses_api = getattr(client, "responses", None)
-    if responses_api and hasattr(responses_api, "generate"):
-        func = getattr(responses_api, "generate")
-        return _call_with_optional_safety(
-            func,
-            model=model,
-            config=config,
-            safety_settings=safety_settings,
-            payload_key="input",
-            payload=contents,
-        )
+def _invoke_gemini(
+    client: Any,
+    model: str,
+    contents: Sequence[Mapping[str, Any]] | None,
+    config: Mapping[str, Any] | None,
+    safety_settings: Sequence[Mapping[str, Any]] | None,
+) -> Any:
+    try:
+        models_api = client.models
+    except AttributeError:
+        models_api = None
+    if models_api is not None:
+        try:
+            func = models_api.generate_content
+        except AttributeError:
+            pass
+        else:
+            return _call_with_optional_safety(
+                func,
+                model=model,
+                config=config,
+                safety_settings=safety_settings,
+                payload_key="contents",
+                payload=contents,
+            )
+    try:
+        responses_api = client.responses
+    except AttributeError:
+        responses_api = None
+    if responses_api is not None:
+        try:
+            func = responses_api.generate
+        except AttributeError:
+            pass
+        else:
+            return _call_with_optional_safety(
+                func,
+                model=model,
+                config=config,
+                safety_settings=safety_settings,
+                payload_key="input",
+                payload=contents,
+            )
     raise AttributeError("Gemini クライアントが対応する generate メソッドを提供していません")
 
 
@@ -183,7 +211,9 @@ class GeminiProvider(BaseProvider):
         self._client = _genai.Client(api_key=api_key)  # type: ignore[call-arg]
         self._model = config.model
         base_config = _prepare_generation_config(config)
-        self._generation_config: Mapping[str, Any] | None = dict(base_config) if base_config else None
+        self._generation_config: Mapping[str, Any] | None = (
+            dict(base_config) if base_config else None
+        )
         safety_settings = _prepare_safety_settings(config)
         self._safety_settings: Sequence[Mapping[str, Any]] | None = (
             list(safety_settings) if safety_settings else None
