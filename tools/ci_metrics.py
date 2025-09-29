@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import datetime as dt
 from pathlib import Path
 
-from weekly_summary import load_runs, parse_iso8601  # type: ignore
+from weekly_summary import coerce_str, load_runs, parse_iso8601
 
 PASS_STATUSES = {"pass", "passed"}
 FAIL_STATUSES = {"fail", "failed"}
@@ -18,7 +18,7 @@ ERROR_STATUSES = {"error", "errored"}
 class RunRecord:
     run_id: str
     timestamp: dt.datetime | None
-    records: list[dict]
+    records: list[dict[str, object]]
 
 
 @dataclass
@@ -44,15 +44,19 @@ def normalize_status(value: str | None) -> str:
     return "other"
 
 
-def _group_runs(runs: Iterable[dict]) -> list[RunRecord]:
+def _group_runs(runs: Iterable[dict[str, object]]) -> list[RunRecord]:
     grouped: dict[str, RunRecord] = {}
     for record in runs:
-        run_id = record.get("run_id")
-        if not run_id:
+        run_id = coerce_str(record.get("run_id"))
+        if run_id is None:
             continue
-        ts = parse_iso8601(record.get("ts"))
+        ts = parse_iso8601(coerce_str(record.get("ts")))
         if run_id not in grouped:
-            grouped[run_id] = RunRecord(run_id=run_id, timestamp=ts, records=[record])
+            grouped[run_id] = RunRecord(
+                run_id=run_id,
+                timestamp=ts,
+                records=[record],
+            )
         else:
             grouped_record = grouped[run_id]
             grouped_record.records.append(record)
@@ -71,7 +75,7 @@ def _group_runs(runs: Iterable[dict]) -> list[RunRecord]:
 
 
 def compute_run_history(
-    runs: Iterable[dict], *, window_size: int = 5
+    runs: Iterable[dict[str, object]], *, window_size: int = 5
 ) -> list[RunMetrics]:
     grouped_runs = _group_runs(runs)
     if not grouped_runs:
@@ -86,12 +90,12 @@ def compute_run_history(
         total = passes = fails = errors = 0
         for record in sorted(
             run.records,
-            key=lambda item: parse_iso8601(item.get("ts"))
+            key=lambda item: parse_iso8601(coerce_str(item.get("ts")))
             or run.timestamp
             or dt.datetime.min.replace(tzinfo=dt.UTC),
         ):
             total += 1
-            status = normalize_status(record.get("status"))
+            status = normalize_status(coerce_str(record.get("status")))
             if status == "pass":
                 passes += 1
             elif status == "fail":
@@ -99,8 +103,8 @@ def compute_run_history(
             elif status == "error":
                 errors += 1
 
-            canonical_id = record.get("canonical_id")
-            if not canonical_id:
+            canonical_id = coerce_str(record.get("canonical_id"))
+            if canonical_id is None:
                 continue
             bucket = history.get(canonical_id)
             if bucket is None:
@@ -136,11 +140,13 @@ def compute_run_history(
     return metrics
 
 
-def compute_recent_deltas(history: list[RunMetrics], limit: int = 3) -> list[dict]:
+def compute_recent_deltas(
+    history: list[RunMetrics], limit: int = 3
+) -> list[dict[str, object]]:
     if not history:
         return []
 
-    recent: list[dict] = []
+    recent: list[dict[str, object]] = []
     start_index = max(0, len(history) - max(limit, 0))
     for idx in range(start_index, len(history)):
         entry = history[idx]
