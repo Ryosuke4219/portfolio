@@ -9,9 +9,10 @@ from ._requests_compat import ResponseProtocol, SessionProtocol, requests_except
 
 _streaming_error_candidates: list[type[BaseException]] = []
 for _attr in ("ChunkedEncodingError", "ProtocolError"):
-    _candidate = getattr(requests_exceptions, _attr, None)
-    if isinstance(_candidate, type) and issubclass(_candidate, BaseException):
-        _streaming_error_candidates.append(_candidate)
+    if hasattr(requests_exceptions, _attr):
+        _candidate = getattr(requests_exceptions, _attr)
+        if isinstance(_candidate, type) and issubclass(_candidate, BaseException):
+            _streaming_error_candidates.append(_candidate)
 
 if _streaming_error_candidates:
     _STREAMING_ERRORS: tuple[type[BaseException], ...] = tuple(_streaming_error_candidates)
@@ -39,7 +40,9 @@ class _StreamingResponseWrapper:
 
     @property
     def closed(self) -> bool:
-        return bool(getattr(self._response, "closed", False))
+        if hasattr(self._response, "closed"):
+            return bool(self._response.closed)
+        return False
 
     def json(self) -> Any:
         return self._response.json()
