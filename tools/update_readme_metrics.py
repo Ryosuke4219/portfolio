@@ -10,11 +10,21 @@ from pathlib import Path
 from typing import Any
 
 
+README_MARKERS_NOT_FOUND = (
+    "README markers <!-- qa-metrics:start --> / <!-- qa-metrics:end --> not found"
+)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Update README QA metrics table")
     parser.add_argument("--readme", type=Path, default=Path("README.md"), help="Path to README")
     parser.add_argument("--source", type=Path, required=True, help="Path to metrics JSON")
-    parser.add_argument("--report-url", type=str, required=True, help="Public URL to the latest report")
+    parser.add_argument(
+        "--report-url",
+        type=str,
+        required=True,
+        help="Public URL to the latest report",
+    )
     return parser.parse_args()
 
 
@@ -77,7 +87,10 @@ def format_recent_runs(items: list[dict[str, Any]]) -> list[str]:
         flaky_count = item.get("flaky_count") or 0
         flaky_delta = format_int_delta(item.get("flaky_delta"))
         lines.append(
-            f"- {run_id} ({ts}): Pass Rate {pass_rate}{pass_delta} / Flaky {flaky_count}件{flaky_delta}"
+            (
+                f"- {run_id} ({ts}): Pass Rate {pass_rate}{pass_delta} / "
+                f"Flaky {flaky_count}件{flaky_delta}"
+            )
         )
     return lines
 
@@ -127,7 +140,7 @@ def replace_section(text: str, new_lines: list[str]) -> str:
     start_marker = "<!-- qa-metrics:start -->"
     end_marker = "<!-- qa-metrics:end -->"
     if start_marker not in text or end_marker not in text:
-        raise ValueError("README markers <!-- qa-metrics:start --> / <!-- qa-metrics:end --> not found")
+        raise ValueError(README_MARKERS_NOT_FOUND)
     start_index = text.index(start_marker) + len(start_marker)
     end_index = text.index(end_marker)
     before = text[:start_index]
