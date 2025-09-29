@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, UTC
-from statistics import median
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from statistics import median
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
@@ -122,11 +122,20 @@ def hash_text(text: str) -> str:
     return f"sha256:{digest}"
 
 
-def compute_cost_usd(prompt_tokens: int, completion_tokens: int, prompt_price: float, completion_price: float) -> float:
+def _cost_for_tokens(tokens: int, price_per_thousand: float) -> float:
+    return (tokens / 1000.0) * price_per_thousand
+
+
+def compute_cost_usd(
+    prompt_tokens: int,
+    completion_tokens: int,
+    prompt_price: float,
+    completion_price: float,
+) -> float:
     """トークン数と単価からコストを算出する。"""
 
-    prompt_cost = (prompt_tokens / 1000.0) * prompt_price
-    completion_cost = (completion_tokens / 1000.0) * completion_price
+    prompt_cost = _cost_for_tokens(prompt_tokens, prompt_price)
+    completion_cost = _cost_for_tokens(completion_tokens, completion_price)
     return round(prompt_cost + completion_cost, 6)
 
 
