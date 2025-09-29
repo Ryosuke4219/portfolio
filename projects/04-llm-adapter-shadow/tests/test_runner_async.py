@@ -422,8 +422,10 @@ def test_async_parallel_any_rate_limit_does_not_retry() -> None:
         _AsyncProbeProvider("rl_a", delay=0.0, failures=[RateLimitError("a")]),
         _AsyncProbeProvider("rl_b", delay=0.0, failures=[RateLimitError("b")]),
     ]
+    logger = _CapturingLogger()
     runner = AsyncRunner(
         providers,
+        logger=logger,
         config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
     )
     request = ProviderRequest(prompt="rl", model="model-parallel-any-rl")
@@ -435,6 +437,7 @@ def test_async_parallel_any_rate_limit_does_not_retry() -> None:
     asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
     assert [provider.invocations for provider in providers] == [1, 1]
+    assert logger.of_type("retry") == []
 
 
 def test_async_consensus_quorum_failure() -> None:
@@ -591,8 +594,10 @@ def test_async_parallel_all_rate_limit_does_not_retry() -> None:
         _AsyncProbeProvider("rl_all_a", delay=0.0, failures=[RateLimitError("a")]),
         _AsyncProbeProvider("rl_all_b", delay=0.0, failures=[RateLimitError("b")]),
     ]
+    logger = _CapturingLogger()
     runner = AsyncRunner(
         providers,
+        logger=logger,
         config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL, max_concurrency=2),
     )
     request = ProviderRequest(prompt="rl-all", model="model-parallel-all-rl")
@@ -604,3 +609,4 @@ def test_async_parallel_all_rate_limit_does_not_retry() -> None:
     asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
     assert [provider.invocations for provider in providers] == [1, 1]
+    assert logger.of_type("retry") == []
