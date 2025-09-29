@@ -6,6 +6,10 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 import time
 from typing import Any, cast
 
+from ._event_loop import ensure_socket_free_event_loop_policy
+
+ensure_socket_free_event_loop_policy()
+
 from .errors import (
     FatalError,
     ProviderSkip,
