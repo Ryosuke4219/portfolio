@@ -31,6 +31,7 @@ def test_timeout_fallback() -> None:
 
     request = ProviderRequest(prompt="[TIMEOUT] hello", model="fallback-model")
     response = runner.run(request)
+    assert isinstance(response, ProviderResponse)
 
     _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
@@ -42,6 +43,7 @@ def test_ratelimit_retry_fallback() -> None:
     runner = Runner([p1, p2])
 
     response = runner.run(ProviderRequest(prompt="[RATELIMIT] test", model="fallback-model"))
+    assert isinstance(response, ProviderResponse)
     assert response.text.startswith("echo(p2):")
 
 
@@ -57,6 +59,7 @@ def test_ratelimit_backoff_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = Runner([p1, p2])
 
     response = runner.run(ProviderRequest(prompt="[RATELIMIT] backoff", model="fallback-model"))
+    assert isinstance(response, ProviderResponse)
 
     _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
@@ -68,6 +71,7 @@ def test_invalid_json_fallback() -> None:
     runner = Runner([p1, p2])
 
     response = runner.run(ProviderRequest(prompt="[INVALID_JSON] test", model="fallback-model"))
+    assert isinstance(response, ProviderResponse)
     assert response.text.startswith("echo(p2):")
 
 
@@ -83,6 +87,7 @@ def test_timeout_no_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = Runner([p1, p2])
 
     response = runner.run(ProviderRequest(prompt="[TIMEOUT] no-wait", model="fallback-model"))
+    assert isinstance(response, ProviderResponse)
 
     _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
@@ -99,6 +104,7 @@ def test_timeout_fallback_records_metrics(tmp_path: Path) -> None:
         shadow=None,
         shadow_metrics_path=metrics_path,
     )
+    assert isinstance(response, ProviderResponse)
 
     token_usage = _require_token_usage(response)
     assert response.text.startswith("echo(p2):")
