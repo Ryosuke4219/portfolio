@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hypothesis.strategies import SearchStrategy
 
 import pytest
 
@@ -11,7 +14,6 @@ from src.llm_adapter.provider_spi import ProviderRequest
 hypothesis = pytest.importorskip("hypothesis")
 
 st = hypothesis.strategies
-SearchStrategy = hypothesis.strategies.SearchStrategy
 given = hypothesis.given
 
 

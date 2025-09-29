@@ -8,6 +8,7 @@ import pytest
 from src.llm_adapter.errors import ProviderSkip
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner import ParallelAllResult, Runner
+from src.llm_adapter.runner_sync import ProviderInvocationResult
 from src.llm_adapter.runner_config import RunnerConfig
 
 
@@ -94,7 +95,12 @@ def _run_and_collect(
     prompt: str = "hello",
     expect_exception: type[Exception] | None = None,
     config: RunnerConfig | None = None,
-) -> tuple[ProviderResponse | ParallelAllResult[..., ProviderResponse] | None, FakeLogger]:
+) -> tuple[
+    ProviderResponse
+    | ParallelAllResult[ProviderInvocationResult, ProviderResponse]
+    | None,
+    FakeLogger,
+]:
     logger = FakeLogger()
     runner = Runner(list(providers), logger=logger, config=config)
     request = ProviderRequest(prompt=prompt, model="demo-model")
