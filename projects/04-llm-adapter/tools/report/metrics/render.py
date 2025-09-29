@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
 from .html_report import render_html as _render_html
 from .regression_summary import build_regression_summary as _build_regression_summary
