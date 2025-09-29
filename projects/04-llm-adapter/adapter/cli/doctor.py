@@ -52,7 +52,11 @@ def _doctor_check_api(lang: str) -> tuple[str, str, str]:
     return "doctor_name_api", "fail", _msg(lang, "doctor_fix_api")
 
 
-def _doctor_check_dns(lang: str, socket_module: ModuleType, http_module: ModuleType) -> tuple[str, str, str]:
+def _doctor_check_dns(
+    lang: str,
+    socket_module: ModuleType,
+    http_module: ModuleType,
+) -> tuple[str, str, str]:
     host = "api.openai.com"
     try:
         socket_module.gethostbyname(host)
@@ -61,7 +65,11 @@ def _doctor_check_dns(lang: str, socket_module: ModuleType, http_module: ModuleT
             conn.getresponse()
         return "doctor_name_dns", "ok", host
     except Exception:
-        return "doctor_name_dns", "fail", _msg(lang, "doctor_fix_dns")
+        return (
+            "doctor_name_dns",
+            "fail",
+            _msg(lang, "doctor_fix_dns"),
+        )
 
 
 def _doctor_check_pythonioencoding(lang: str) -> tuple[str, str, str]:
@@ -83,11 +91,15 @@ def _doctor_check_windows_encoding(lang: str) -> tuple[str, str, str]:
 
 def _doctor_check_env_dependency(lang: str) -> tuple[str, str, str]:
     env_path = Path.cwd() / ".env"
+    has_dotenv = False
     try:
-        import dotenv  # type: ignore  # pragma: no cover - optional
-        has_dotenv = True
+        from importlib import import_module
+
+        import_module("dotenv")
     except Exception:  # pragma: no cover - optional依存
-        has_dotenv = False
+        pass
+    else:
+        has_dotenv = True
     if env_path.exists() and not has_dotenv:
         return "doctor_name_env_file", "fail", _msg(lang, "doctor_fix_env_file")
     if env_path.exists():
