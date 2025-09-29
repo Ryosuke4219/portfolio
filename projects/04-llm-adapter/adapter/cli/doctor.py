@@ -9,7 +9,6 @@ import sys
 from contextlib import closing
 from pathlib import Path
 from types import ModuleType
-from typing import List, Optional, Tuple
 
 from .utils import (
     EXIT_ENV_ERROR,
@@ -20,7 +19,7 @@ from .utils import (
 )
 
 
-def _doctor_check_python(lang: str) -> Tuple[str, str, str]:
+def _doctor_check_python(lang: str) -> tuple[str, str, str]:
     required = (3, 10)
     version = sys.version_info[:3]
     if version >= required:
@@ -29,7 +28,7 @@ def _doctor_check_python(lang: str) -> Tuple[str, str, str]:
     return "doctor_name_python", "fail", _msg(lang, "doctor_fix_python", required="3.10")
 
 
-def _doctor_check_os(lang: str) -> Tuple[str, str, str]:
+def _doctor_check_os(lang: str) -> tuple[str, str, str]:
     venv_active = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
     detail = _msg(
         lang,
@@ -40,7 +39,7 @@ def _doctor_check_os(lang: str) -> Tuple[str, str, str]:
     return "doctor_name_os", "ok", detail
 
 
-def _doctor_check_api(lang: str) -> Tuple[str, str, str]:
+def _doctor_check_api(lang: str) -> tuple[str, str, str]:
     candidates = [
         name
         for name in os.environ
@@ -53,7 +52,7 @@ def _doctor_check_api(lang: str) -> Tuple[str, str, str]:
     return "doctor_name_api", "fail", _msg(lang, "doctor_fix_api")
 
 
-def _doctor_check_dns(lang: str, socket_module: ModuleType, http_module: ModuleType) -> Tuple[str, str, str]:
+def _doctor_check_dns(lang: str, socket_module: ModuleType, http_module: ModuleType) -> tuple[str, str, str]:
     host = "api.openai.com"
     try:
         socket_module.gethostbyname(host)
@@ -65,14 +64,14 @@ def _doctor_check_dns(lang: str, socket_module: ModuleType, http_module: ModuleT
         return "doctor_name_dns", "fail", _msg(lang, "doctor_fix_dns")
 
 
-def _doctor_check_pythonioencoding(lang: str) -> Tuple[str, str, str]:
+def _doctor_check_pythonioencoding(lang: str) -> tuple[str, str, str]:
     value = os.getenv("PYTHONIOENCODING", "")
     if value.lower() == "utf-8":
         return "doctor_name_encoding", "ok", "utf-8"
     return "doctor_name_encoding", "fail", _msg(lang, "doctor_fix_encoding")
 
 
-def _doctor_check_windows_encoding(lang: str) -> Tuple[str, str, str]:
+def _doctor_check_windows_encoding(lang: str) -> tuple[str, str, str]:
     if not sys.platform.startswith("win"):
         return "doctor_name_windows", "ok", "N/A"
     stdout_enc = (getattr(sys.stdout, "encoding", "") or "").lower()
@@ -82,7 +81,7 @@ def _doctor_check_windows_encoding(lang: str) -> Tuple[str, str, str]:
     return "doctor_name_windows", "fail", _msg(lang, "doctor_fix_windows")
 
 
-def _doctor_check_env_dependency(lang: str) -> Tuple[str, str, str]:
+def _doctor_check_env_dependency(lang: str) -> tuple[str, str, str]:
     env_path = Path.cwd() / ".env"
     try:
         import dotenv  # type: ignore  # pragma: no cover - optional
@@ -98,14 +97,16 @@ def _doctor_check_env_dependency(lang: str) -> Tuple[str, str, str]:
     return "doctor_name_env_file", "warn", _msg(lang, "doctor_fix_env_file")
 
 
-def _doctor_check_rpm(lang: str) -> Tuple[str, str, str]:
+def _doctor_check_rpm(lang: str) -> tuple[str, str, str]:
     value = os.getenv("LLM_ADAPTER_RPM")
     if value and value.isdigit() and int(value) > 0:
         return "doctor_name_rpm", "ok", _msg(lang, "doctor_info_rpm", rpm=value)
     return "doctor_name_rpm", "warn", _msg(lang, "doctor_fix_rpm")
 
 
-def _doctor_checks(lang: str, socket_module: ModuleType, http_module: ModuleType) -> List[Tuple[str, str, str]]:
+def _doctor_checks(
+    lang: str, socket_module: ModuleType, http_module: ModuleType
+) -> list[tuple[str, str, str]]:
     return [
         _doctor_check_python(lang),
         _doctor_check_os(lang),
@@ -119,9 +120,9 @@ def _doctor_checks(lang: str, socket_module: ModuleType, http_module: ModuleType
 
 
 def run_doctor(
-    argv: Optional[List[str]],
-    socket_module: Optional[ModuleType] = None,
-    http_module: Optional[ModuleType] = None,
+    argv: list[str] | None,
+    socket_module: ModuleType | None = None,
+    http_module: ModuleType | None = None,
 ) -> int:
     parser = argparse.ArgumentParser("llm-adapter doctor")
     parser.add_argument("--lang", choices=("ja", "en"), help="診断結果の言語")
