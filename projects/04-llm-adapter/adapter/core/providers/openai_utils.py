@@ -8,6 +8,19 @@ from typing import Any
 
 from ..config import ProviderConfig
 
+
+def _read_attr(obj: Any, name: str) -> Any:
+    """属性アクセス時の例外を抑制しつつ値を取得する。"""
+
+    if obj is None:
+        return None
+    if hasattr(obj, name):
+        try:
+            return getattr(obj, name)
+        except AttributeError:
+            return None
+    return None
+
 _API_ORDER = ("responses", "chat_completions", "completions")
 
 
@@ -35,17 +48,13 @@ def build_chat_messages(system_prompt: str | None, user_prompt: str) -> list[Map
 
 
 def extract_text_from_response(response: Any) -> str:
-    text: Any
-    if hasattr(response, "output_text"):
-        text = response.output_text
-    else:
-        text = getattr(response, "output_text", None)
+    text: Any = _read_attr(response, "output_text")
     if isinstance(text, str) and text.strip():
         return text
-    text = getattr(response, "text", None)
+    text = _read_attr(response, "text")
     if isinstance(text, str) and text.strip():
         return text
-    choices = response.choices if hasattr(response, "choices") else None
+    choices = _read_attr(response, "choices")
     if isinstance(choices, Sequence) and choices:
         first = choices[0]
         if isinstance(first, Mapping):
@@ -66,15 +75,15 @@ def extract_text_from_response(response: Any) -> str:
             text_value = first.get("text")
             if isinstance(text_value, str) and text_value.strip():
                 return text_value
-        message_attr = getattr(first, "message", None)
+        message_attr = _read_attr(first, "message")
         if isinstance(message_attr, Mapping):
             content_attr = message_attr.get("content")
             if isinstance(content_attr, str) and content_attr.strip():
                 return content_attr
-        text_attr = getattr(first, "text", None)
+        text_attr = _read_attr(first, "text")
         if isinstance(text_attr, str) and text_attr.strip():
             return text_attr
-    output = response.output if hasattr(response, "output") else None
+    output = _read_attr(response, "output")
     if isinstance(output, Sequence):
         parts: list[str] = []
         for item in output:
@@ -120,24 +129,28 @@ def extract_text_from_response(response: Any) -> str:
 def extract_usage_tokens(response: Any, prompt: str, output_text: str) -> tuple[int, int]:
     prompt_tokens = 0
     completion_tokens = 0
-    usage = response.usage if hasattr(response, "usage") else None
+    usage = _read_attr(response, "usage")
     if usage is not None:
-        if hasattr(usage, "prompt_tokens"):
-            prompt_tokens = int(usage.prompt_tokens or 0)
+        prompt_attr = _read_attr(usage, "prompt_tokens")
+        if prompt_attr is not None:
+            prompt_tokens = int(prompt_attr or 0)
         elif isinstance(usage, Mapping):
             prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
         if prompt_tokens <= 0:
-            if hasattr(usage, "input_tokens"):
-                prompt_tokens = int(usage.input_tokens or 0)
+            input_attr = _read_attr(usage, "input_tokens")
+            if input_attr is not None:
+                prompt_tokens = int(input_attr or 0)
             elif isinstance(usage, Mapping):
                 prompt_tokens = int(usage.get("input_tokens", 0) or 0)
-        if hasattr(usage, "completion_tokens"):
-            completion_tokens = int(usage.completion_tokens or 0)
+        completion_attr = _read_attr(usage, "completion_tokens")
+        if completion_attr is not None:
+            completion_tokens = int(completion_attr or 0)
         elif isinstance(usage, Mapping):
             completion_tokens = int(usage.get("completion_tokens", 0) or 0)
         if completion_tokens <= 0:
-            if hasattr(usage, "output_tokens"):
-                completion_tokens = int(usage.output_tokens or 0)
+            output_attr = _read_attr(usage, "output_tokens")
+            if output_attr is not None:
+                completion_tokens = int(output_attr or 0)
             elif isinstance(usage, Mapping):
                 completion_tokens = int(usage.get("output_tokens", 0) or 0)
     if prompt_tokens <= 0 or completion_tokens <= 0:
