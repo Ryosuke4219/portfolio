@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Mapping, MutableMapping, Optional
 
 _PROMPT_PATTERN = re.compile(r"{{\s*(?P<key>[a-zA-Z0-9_\.]+)\s*}}")
 
@@ -32,7 +32,7 @@ class GoldenTask:
         return _PROMPT_PATTERN.sub(replace, self.prompt_template)
 
 
-def _lookup_nested(payload: Mapping[str, object], dotted_key: str) -> Optional[object]:
+def _lookup_nested(payload: Mapping[str, object], dotted_key: str) -> object | None:
     parts = dotted_key.split(".")
     current: object = payload
     for part in parts:
@@ -43,10 +43,10 @@ def _lookup_nested(payload: Mapping[str, object], dotted_key: str) -> Optional[o
     return current
 
 
-def load_golden_tasks(path: Path) -> List[GoldenTask]:
+def load_golden_tasks(path: Path) -> list[GoldenTask]:
     """JSONL 形式のゴールデンタスクを読み込む。"""
 
-    tasks: List[GoldenTask] = []
+    tasks: list[GoldenTask] = []
     with path.open("r", encoding="utf-8") as fp:
         for line in fp:
             line = line.strip()
