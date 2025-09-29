@@ -87,21 +87,27 @@ def build_svg(entries: list[dict]) -> str:
             y = axis_top + chart_height * (1 - float(pass_rate))
             pass_points.append((x, y))
             circles_pass.append(
-                f'<circle cx="{x:.2f}" cy="{y:.2f}" r="5" fill="{PASS_COLOR}" stroke="{BG_COLOR}" stroke-width="1" />'
+                f'<circle cx="{x:.2f}" cy="{y:.2f}" '
+                f'r="5" fill="{PASS_COLOR}" '
+                f'stroke="{BG_COLOR}" stroke-width="1" />'
             )
         flaky_count = entry.get("flaky_count") or 0
         flaky_ratio = flaky_count / max_flaky if max_flaky else 0.0
         y_flaky = axis_top + chart_height * (1 - flaky_ratio)
         flaky_points.append((x, y_flaky))
         circles_flaky.append(
-            f'<circle cx="{x:.2f}" cy="{y_flaky:.2f}" r="4" fill="{BG_COLOR}" stroke="{FLAKY_COLOR}" stroke-width="2" />'
+            f'<circle cx="{x:.2f}" cy="{y_flaky:.2f}" '
+            f'r="4" fill="{BG_COLOR}" '
+            f'stroke="{FLAKY_COLOR}" stroke-width="2" />'
         )
-        x_labels.append(
-            f'<text x="{x:.2f}" y="{axis_bottom + 25:.2f}" fill="{TEXT_COLOR}" font-size="12" text-anchor="middle">{run_id}</text>'
-        )
+        labels = [(axis_bottom + 25, "12", run_id)]
         if ts:
+            labels.append((axis_bottom + 42, "11", ts[:10]))
+        for y_value, font_size, text in labels:
             x_labels.append(
-                f'<text x="{x:.2f}" y="{axis_bottom + 42:.2f}" fill="{TEXT_COLOR}" font-size="11" text-anchor="middle">{ts[:10]}</text>'
+                f'<text x="{x:.2f}" y="{y_value:.2f}" '
+                f'fill="{TEXT_COLOR}" font-size="{font_size}" '
+                f'text-anchor="middle">{text}</text>'
             )
 
     grid_lines: list[str] = []
@@ -110,10 +116,15 @@ def build_svg(entries: list[dict]) -> str:
         y = axis_top + chart_height * (1 - step)
         label = int(step * 100)
         grid_lines.append(
-            f'<line x1="{axis_left}" y1="{y:.2f}" x2="{axis_right}" y2="{y:.2f}" stroke="{GRID_COLOR}" stroke-width="0.5" stroke-dasharray="4 4" />'
+            f'<line x1="{axis_left}" y1="{y:.2f}" '
+            f'x2="{axis_right}" y2="{y:.2f}" '
+            f'stroke="{GRID_COLOR}" stroke-width="0.5" '
+            'stroke-dasharray="4 4" />'
         )
         grid_lines.append(
-            f'<text x="{axis_left - 12}" y="{y + 4:.2f}" fill="{TEXT_COLOR}" font-size="12" text-anchor="end">{label}%</text>'
+            f'<text x="{axis_left - 12}" y="{y + 4:.2f}" '
+            f'fill="{TEXT_COLOR}" font-size="12" '
+            f'text-anchor="end">{label}%</text>'
         )
 
     flaky_ticks = max(1, min(max_flaky, 6))
@@ -122,48 +133,98 @@ def build_svg(entries: list[dict]) -> str:
         value = flaky_step * idx
         y = axis_top + chart_height * (1 - (value / max_flaky if max_flaky else 0.0))
         grid_lines.append(
-            f'<text x="{axis_right + 12}" y="{y + 4:.2f}" fill="{TEXT_COLOR}" font-size="12" text-anchor="start">{value:.0f}</text>'
+            f'<text x="{axis_right + 12}" y="{y + 4:.2f}" '
+            f'fill="{TEXT_COLOR}" font-size="12" '
+            f'text-anchor="start">{value:.0f}</text>'
         )
 
     pass_polyline = build_polyline(pass_points)
     flaky_polyline = build_polyline(flaky_points)
 
     legend = (
-        f'<rect x="{axis_left}" y="{MARGIN_TOP - 40}" width="260" height="28" rx="6" ry="6" fill="#f1f5f9" />'
-        f'<line x1="{axis_left + 12}" y1="{MARGIN_TOP - 26}" x2="{axis_left + 52}" y2="{MARGIN_TOP - 26}" stroke="{PASS_COLOR}" stroke-width="2" />'
-        f'<text x="{axis_left + 60}" y="{MARGIN_TOP - 22}" fill="{TEXT_COLOR}" font-size="13">Pass Rate (%)</text>'
-        f'<line x1="{axis_left + 150}" y1="{MARGIN_TOP - 26}" x2="{axis_left + 190}" y2="{MARGIN_TOP - 26}" stroke="{FLAKY_COLOR}" stroke-width="2" />'
-        f'<text x="{axis_left + 198}" y="{MARGIN_TOP - 22}" fill="{TEXT_COLOR}" font-size="13">Flaky Count</text>'
+        f'<rect x="{axis_left}" y="{MARGIN_TOP - 40}" '
+        'width="260" height="28" rx="6" ry="6" fill="#f1f5f9" />'
+        f'<line x1="{axis_left + 12}" y1="{MARGIN_TOP - 26}" '
+        f'x2="{axis_left + 52}" y2="{MARGIN_TOP - 26}" '
+        f'stroke="{PASS_COLOR}" stroke-width="2" />'
+        f'<text x="{axis_left + 60}" y="{MARGIN_TOP - 22}" '
+        f'fill="{TEXT_COLOR}" font-size="13">Pass Rate (%)</text>'
+        f'<line x1="{axis_left + 150}" y1="{MARGIN_TOP - 26}" '
+        f'x2="{axis_left + 190}" y2="{MARGIN_TOP - 26}" '
+        f'stroke="{FLAKY_COLOR}" stroke-width="2" />'
+        f'<text x="{axis_left + 198}" y="{MARGIN_TOP - 22}" '
+        f'fill="{TEXT_COLOR}" font-size="13">Flaky Count</text>'
     )
 
     svg = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}" viewBox="0 0 {WIDTH} {HEIGHT}">',
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            f'width="{WIDTH}" height="{HEIGHT}" '
+            f'viewBox="0 0 {WIDTH} {HEIGHT}">'
+        ),
         f'<rect width="100%" height="100%" fill="{BG_COLOR}" />',
-        f'<text x="{WIDTH / 2:.2f}" y="{MARGIN_TOP - 20:.2f}" text-anchor="middle" font-size="20" fill="{TEXT_COLOR}">CI Pass Rate & Flaky Trend</text>',
+        (
+            f'<text x="{WIDTH / 2:.2f}" y="{MARGIN_TOP - 20:.2f}" '
+            'text-anchor="middle" font-size="20" '
+            f'fill="{TEXT_COLOR}">CI Pass Rate & Flaky Trend</text>'
+        ),
         *grid_lines,
-        f'<line x1="{axis_left}" y1="{axis_bottom}" x2="{axis_right}" y2="{axis_bottom}" stroke="{TEXT_COLOR}" stroke-width="1" />',
-        f'<line x1="{axis_left}" y1="{axis_top}" x2="{axis_left}" y2="{axis_bottom}" stroke="{TEXT_COLOR}" stroke-width="1" />',
-        f'<line x1="{axis_right}" y1="{axis_top}" x2="{axis_right}" y2="{axis_bottom}" stroke="{TEXT_COLOR}" stroke-width="1" />',
+        (
+            f'<line x1="{axis_left}" y1="{axis_bottom}" '
+            f'x2="{axis_right}" y2="{axis_bottom}" '
+            f'stroke="{TEXT_COLOR}" stroke-width="1" />'
+        ),
+        (
+            f'<line x1="{axis_left}" y1="{axis_top}" '
+            f'x2="{axis_left}" y2="{axis_bottom}" '
+            f'stroke="{TEXT_COLOR}" stroke-width="1" />'
+        ),
+        (
+            f'<line x1="{axis_right}" y1="{axis_top}" '
+            f'x2="{axis_right}" y2="{axis_bottom}" '
+            f'stroke="{TEXT_COLOR}" stroke-width="1" />'
+        ),
     ]
 
     if pass_polyline:
         svg.append(
-            f'<polyline points="{pass_polyline}" fill="none" stroke="{PASS_COLOR}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />'
+            (
+                f'<polyline points="{pass_polyline}" fill="none" '
+                f'stroke="{PASS_COLOR}" stroke-width="3" '
+                'stroke-linejoin="round" stroke-linecap="round" />'
+            )
         )
     svg.extend(circles_pass)
 
     if flaky_polyline:
         svg.append(
-            f'<polyline points="{flaky_polyline}" fill="none" stroke="{FLAKY_COLOR}" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round" stroke-linecap="round" />'
+            (
+                f'<polyline points="{flaky_polyline}" fill="none" '
+                f'stroke="{FLAKY_COLOR}" stroke-width="2" '
+                'stroke-dasharray="6 4" stroke-linejoin="round" '
+                'stroke-linecap="round" />'
+            )
         )
     svg.extend(circles_flaky)
 
     svg.extend(x_labels)
     svg.append(
-        f'<text x="{axis_left - 50}" y="{(axis_top + axis_bottom) / 2:.2f}" transform="rotate(-90 {axis_left - 50},{(axis_top + axis_bottom) / 2:.2f})" fill="{TEXT_COLOR}" font-size="14" text-anchor="middle">Pass Rate (%)</text>'
+        (
+            f'<text x="{axis_left - 50}" '
+            f'y="{(axis_top + axis_bottom) / 2:.2f}" '
+            f'transform="rotate(-90 {axis_left - 50},{(axis_top + axis_bottom) / 2:.2f})" '
+            f'fill="{TEXT_COLOR}" font-size="14" '
+            'text-anchor="middle">Pass Rate (%)</text>'
+        )
     )
     svg.append(
-        f'<text x="{axis_right + 50}" y="{(axis_top + axis_bottom) / 2:.2f}" transform="rotate(90 {axis_right + 50},{(axis_top + axis_bottom) / 2:.2f})" fill="{TEXT_COLOR}" font-size="14" text-anchor="middle">Flaky Count</text>'
+        (
+            f'<text x="{axis_right + 50}" '
+            f'y="{(axis_top + axis_bottom) / 2:.2f}" '
+            f'transform="rotate(90 {axis_right + 50},{(axis_top + axis_bottom) / 2:.2f})" '
+            f'fill="{TEXT_COLOR}" font-size="14" '
+            'text-anchor="middle">Flaky Count</text>'
+        )
     )
     svg.append(legend)
     svg.append('</svg>')
