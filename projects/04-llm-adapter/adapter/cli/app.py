@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterable
 from functools import lru_cache
 from importlib import import_module
 from types import ModuleType
-from typing import Iterable, List, Optional
 
 try:  # pragma: no cover - optional dependency
     import typer
@@ -70,7 +70,7 @@ if typer is not None:  # pragma: no branch - import-time decision
 
         _exit_with(_run_doctor_from_iterable(ctx.args))
 
-    def main(argv: Optional[List[str]] = None) -> int:
+    def main(argv: list[str] | None = None) -> int:
         try:
             app(args=list(argv) if argv is not None else None, standalone_mode=False)
         except typer.Exit as exc:  # pragma: no cover - Typer converts to Exit
@@ -85,14 +85,14 @@ else:  # pragma: no cover - exercised when Typer is unavailable
 
     app = _FallbackApp()
 
-    def run(argv: Optional[List[str]] = None) -> int:
+    def run(argv: list[str] | None = None) -> int:
         return _run_prompts_from_iterable(argv or [])
 
-    def doctor(argv: Optional[List[str]] = None) -> int:
+    def doctor(argv: list[str] | None = None) -> int:
         return _run_doctor_from_iterable(argv or [])
 
-    def main(argv: Optional[List[str]] = None) -> int:
-        args = list((argv if argv is not None else sys.argv[1:]))
+    def main(argv: list[str] | None = None) -> int:
+        args = list(argv if argv is not None else sys.argv[1:])
         if args and args[0] == "doctor":
             return doctor(args[1:])
         return run(args)
