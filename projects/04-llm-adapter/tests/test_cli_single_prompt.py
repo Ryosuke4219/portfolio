@@ -7,8 +7,10 @@ import sys
 from types import SimpleNamespace
 
 from adapter import cli as cli_module
-from adapter.cli import prompt_runner
-from adapter.cli import prompts as prompts_module
+from adapter.cli import (
+    prompt_runner,
+    prompts as prompts_module,
+)
 from adapter.core import providers as provider_module
 from adapter.core.models import (
     PricingConfig,
