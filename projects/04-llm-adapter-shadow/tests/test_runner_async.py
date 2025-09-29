@@ -131,7 +131,7 @@ T = TypeVar("T")
 
 def _run_without_warnings(action: Callable[[], T]) -> T:
     try:
-        warns_cm = pytest.warns(None)
+        warns_cm = pytest.warns(None)  # type: ignore[call-overload]
     except TypeError:
         warns_cm = WarningsRecorder(_ispytest=True)
     with warns_cm as warnings_record:
