@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from types import SimpleNamespace
+from collections.abc import Callable, Iterator
+from types import SimpleNamespace, TracebackType
 from typing import Any, cast
 
 from src.llm_adapter.providers import ollama as ollama_module
@@ -12,7 +12,7 @@ class FakeResponse:
         self,
         *,
         status_code: int,
-        payload: dict | None = None,
+        payload: dict[str, Any] | None = None,
         lines: list[bytes] | None = None,
         iter_lines_exception: Exception | None = None,
     ) -> None:
@@ -24,12 +24,13 @@ class FakeResponse:
 
     def raise_for_status(self) -> None:
         if not (200 <= self.status_code < 300):
-            raise ollama_module.requests_exceptions.HTTPError(response=self)
+            http_error = cast(Any, ollama_module.requests_exceptions.HTTPError)
+            raise http_error(response=self)
 
-    def json(self) -> dict:
+    def json(self) -> dict[str, Any]:
         return self._payload
 
-    def iter_lines(self):
+    def iter_lines(self) -> Iterator[bytes]:
         if self._iter_lines_exception is not None:
             raise self._iter_lines_exception
         yield from self._lines
@@ -37,20 +38,31 @@ class FakeResponse:
     def close(self) -> None:
         self.closed = True
 
-    def __enter__(self):  # pragma: no cover - context protocol
+    def __enter__(self) -> FakeResponse:  # pragma: no cover - context protocol
         return self
 
-    def __exit__(self, exc_type, exc, tb):  # pragma: no cover - context protocol
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool:  # pragma: no cover - context protocol
         self.close()
         return False
 
 
 class FakeSession:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict | None, bool]] = []
+        self.calls: list[tuple[str, dict[str, Any] | None, bool]] = []
         self._show_calls = 0
 
-    def post(self, url: str, json: dict | None = None, stream: bool = False, timeout=None):
+    def post(
+        self,
+        url: str,
+        json: dict[str, Any] | None = None,
+        stream: bool = False,
+        timeout: float | None = None,
+    ) -> FakeResponse:
         """Override in subclasses."""  # pragma: no cover - patched in tests
         raise NotImplementedError
 
