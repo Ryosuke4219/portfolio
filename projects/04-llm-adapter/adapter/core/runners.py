@@ -431,7 +431,8 @@ class CompareRunner:
     def _resolve_aggregation_strategy(
         self, mode: str, config: RunnerConfig
     ) -> AggregationStrategy | None:
-        aggregate = (getattr(config, "aggregate", None) or "").strip()
+        aggregate_raw = config.aggregate
+        aggregate = (aggregate_raw or "").strip()
         if not aggregate:
             aggregate = "majority"
         if aggregate.lower() in {"judge", "llm-judge"}:
