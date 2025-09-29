@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 
 
