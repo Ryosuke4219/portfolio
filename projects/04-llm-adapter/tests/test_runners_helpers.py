@@ -16,10 +16,7 @@ from adapter.core.models import (
     RateLimitConfig,
     RetryConfig,
 )
-from adapter.core.providers import (
-    BaseProvider,
-    ProviderResponse,
-)
+from adapter.core.providers import BaseProvider, ProviderResponse
 from adapter.core.runners import CompareRunner
 
 

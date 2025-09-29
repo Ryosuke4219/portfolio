@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import (
+    Callable,
+    Mapping,
+)
 from types import SimpleNamespace
 from typing import Any, cast
 
