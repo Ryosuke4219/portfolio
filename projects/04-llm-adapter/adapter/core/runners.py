@@ -9,18 +9,13 @@ import re
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from functools import lru_cache
+from importlib import import_module
 from pathlib import Path
 from statistics import median, pstdev
 from threading import Lock
 from time import perf_counter, sleep
-from typing import TYPE_CHECKING
-
-from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
-from src.llm_adapter.runner_parallel import (
-    ParallelExecutionError,
-    run_parallel_all_sync,
-    run_parallel_any_sync,
-)
+from typing import TYPE_CHECKING, Any
 
 from .aggregation import (
     AggregationCandidate,
@@ -28,6 +23,7 @@ from .aggregation import (
     AggregationStrategy,
     FirstTieBreaker,
     TieBreaker,
+    _resolve_provider_spi,
 )
 from .budgets import BudgetManager
 from .config import ProviderConfig
@@ -44,7 +40,55 @@ from .metrics import (
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
+    from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
+
     from .runner_api import RunnerConfig
+else:  # pragma: no cover - 実行時は遅延解決
+    JudgeProviderResponse = Any  # type: ignore[assignment]
+
+
+def _provider_response_cls() -> type[Any]:
+    return _resolve_provider_spi()[1]
+
+
+@lru_cache(maxsize=1)
+def _resolve_runner_parallel() -> tuple[
+    type[BaseException], Callable[..., object], Callable[..., object]
+]:
+    candidates = ("src.llm_adapter.runner_parallel", "llm_adapter.runner_parallel")
+    last_error: ModuleNotFoundError | None = None
+    for module_name in candidates:
+        try:
+            module = import_module(module_name)
+        except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
+            last_error = exc
+            continue
+        return (
+            module.ParallelExecutionError,
+            module.run_parallel_all_sync,
+            module.run_parallel_any_sync,
+        )
+
+    message = (
+        "Runner parallel module is unavailable. Install `llm-adapter` or ensure "
+        "`src.llm_adapter.runner_parallel` can be imported."
+    )
+    raise ModuleNotFoundError(message) from last_error
+
+
+def run_parallel_all_sync(workers: Sequence[Callable[[], int]], *, max_concurrency: int) -> None:
+    _, run_all, _ = _resolve_runner_parallel()
+    run_all(workers, max_concurrency=max_concurrency)
+
+
+def run_parallel_any_sync(workers: Sequence[Callable[[], int]], *, max_concurrency: int) -> None:
+    _, _, run_any = _resolve_runner_parallel()
+    run_any(workers, max_concurrency=max_concurrency)
+
+
+def _parallel_execution_error() -> type[BaseException]:
+    error_cls, _, _ = _resolve_runner_parallel()
+    return error_cls
 
 LOGGER = logging.getLogger(__name__)
 
@@ -98,7 +142,8 @@ class _JudgeInvoker:
     def invoke(self, request: object) -> JudgeProviderResponse:  # type: ignore[override]
         prompt = getattr(request, "prompt_text", "") or getattr(request, "prompt", "")
         response = self._provider.generate(prompt)
-        return JudgeProviderResponse(
+        response_cls = _provider_response_cls()
+        return response_cls(
             text=response.output_text,
             latency_ms=response.latency_ms,
             tokens_in=response.input_tokens,
@@ -295,7 +340,7 @@ class CompareRunner:
         if config.mode == "parallel-any":
             try:
                 run_parallel_any_sync(workers, max_concurrency=max_workers)
-            except (ParallelExecutionError, RuntimeError):
+            except (_parallel_execution_error(), RuntimeError):
                 pass
         else:
             run_parallel_all_sync(workers, max_concurrency=max_workers)
@@ -349,7 +394,7 @@ class CompareRunner:
             AggregationCandidate(
                 index=index,
                 provider=result.metrics.provider,
-                response=JudgeProviderResponse(
+                response=_provider_response_cls()(
                     text=result.raw_output,
                     latency_ms=result.metrics.latency_ms,
                     tokens_in=result.metrics.input_tokens,

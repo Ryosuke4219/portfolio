@@ -3,10 +3,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, cast, runtime_checkable
+from functools import lru_cache
+from importlib import import_module
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
-# 依存は実行時読み込み。型は実体を使う（mypy用に直import）
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse  # noqa: E402
+if TYPE_CHECKING:  # pragma: no cover - 型検査用
+    from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+else:  # pragma: no cover - 実行時は遅延ロード
+    ProviderRequest = Any  # type: ignore[assignment]
+    ProviderResponse = Any  # type: ignore[assignment]
 
 # ===== 基本データ構造 =====
 
@@ -232,10 +237,18 @@ class JudgeStrategy:
 
         prompt = self._prompt_template.format(candidates="\n".join(rows))
 
+        # Provider SPI を遅延ロード
+        provider_request_cls, _ = _resolve_provider_spi()
+
         # ジャッジプロバイダを作成して問い合わせ
         judge = self._provider_factory.create(model=self._model)
-        request = ProviderRequest(model=self._model, prompt=prompt, max_tokens=16, temperature=0.0)
-        response: ProviderResponse = judge.invoke(request)
+        request = provider_request_cls(
+            model=self._model,
+            prompt=prompt,
+            max_tokens=16,
+            temperature=0.0,
+        )
+        response = cast(ProviderResponse, judge.invoke(request))
 
         index_or_none = _parse_choice_index(response.text, total=len(candidates))
         if index_or_none is None:
@@ -303,6 +316,27 @@ def _parse_choice_index(text: str, *, total: int) -> int | None:
 # 便利ヘルパー：API/CLI から簡単に呼べるように
 def AggregationResolver(kind: str, **kwargs: Any) -> AggregationStrategy:
     return AggregationStrategy.from_string(kind, **kwargs)
+
+
+@lru_cache(maxsize=1)
+def _resolve_provider_spi() -> tuple[type[Any], type[Any]]:
+    """Provider SPI 実装を遅延取得する。"""
+
+    candidates = ("src.llm_adapter.provider_spi", "llm_adapter.provider_spi")
+    last_error: ModuleNotFoundError | None = None
+    for module_name in candidates:
+        try:
+            module = import_module(module_name)
+        except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
+            last_error = exc
+            continue
+        return module.ProviderRequest, module.ProviderResponse
+
+    message = (
+        "Provider SPI module is unavailable. Install `llm-adapter` or "
+        "ensure `src.llm_adapter.provider_spi` can be imported."
+    )
+    raise ModuleNotFoundError(message) from last_error
 
 
 __all__ = [

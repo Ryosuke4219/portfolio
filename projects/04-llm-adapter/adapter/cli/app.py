@@ -21,16 +21,19 @@ def _cli_namespace() -> ModuleType:
 
 
 def _provider_factory() -> object:
-    return getattr(_cli_namespace(), "ProviderFactory")
+    namespace = _cli_namespace()
+    return namespace.ProviderFactory
 
 
 def _socket_module() -> ModuleType:
-    return getattr(_cli_namespace(), "socket")
+    namespace = _cli_namespace()
+    return namespace.socket
 
 
 def _http_module() -> ModuleType:
-    http_pkg = getattr(_cli_namespace(), "http")
-    return getattr(http_pkg, "client")
+    namespace = _cli_namespace()
+    http_pkg = namespace.http
+    return http_pkg.client
 
 
 def _run_prompts_from_iterable(args: Iterable[str]) -> int:
