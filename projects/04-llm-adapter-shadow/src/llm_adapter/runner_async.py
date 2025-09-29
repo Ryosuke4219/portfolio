@@ -270,7 +270,7 @@ class AsyncRunner:
                 )
             return details
 
-        if mode is RunnerMode.SEQUENTIAL:
+        if mode == RunnerMode.SEQUENTIAL:
             for attempt_index, (provider, async_provider) in enumerate(providers, start=1):
                 attempt_count = attempt_index
                 try:
@@ -333,7 +333,7 @@ class AsyncRunner:
         else:
             attempt_count = total_providers
 
-            capture_shadow, retry_attempts = mode is RunnerMode.CONSENSUS, 0
+            capture_shadow, retry_attempts = mode == RunnerMode.CONSENSUS, 0
             attempt_labels = [index for index in range(1, total_providers + 1)]
             limit = self._config.max_attempts
 
@@ -345,7 +345,7 @@ class AsyncRunner:
                 next_attempt_total = total_providers + retry_attempts + 1
                 delay: float | None = None
                 if isinstance(error, RateLimitError):
-                    if mode is RunnerMode.PARALLEL_ANY:
+                    if mode == RunnerMode.PARALLEL_ANY:
                         delay = float(
                             max(0.0, self._config.backoff.rate_limit_sleep_s)
                         )
@@ -419,7 +419,7 @@ class AsyncRunner:
             ]
 
             try:
-                if mode is RunnerMode.PARALLEL_ANY:
+                if mode == RunnerMode.PARALLEL_ANY:
                     (
                         attempt_index,
                         provider,
@@ -465,7 +465,7 @@ class AsyncRunner:
                 if results is None or not results:
                     last_err = RuntimeError("No providers succeeded")
                 else:
-                    if mode is RunnerMode.CONSENSUS and results is not None:
+                    if mode == RunnerMode.CONSENSUS and results is not None:
                         successful_entries = [
                             entry
                             for entry in results
@@ -627,12 +627,12 @@ class AsyncRunner:
                             lambda entry: entry[2],
                         )
 
-        if mode is RunnerMode.CONSENSUS and results is not None:
+        if mode == RunnerMode.CONSENSUS and results is not None:
             for _, _, _, metrics in results:
                 if metrics is not None:
                     metrics.emit()
 
-        if mode is RunnerMode.CONSENSUS:
+        if mode == RunnerMode.CONSENSUS:
             failure_details = _collect_failure_details()
             no_success = (
                 results is None
