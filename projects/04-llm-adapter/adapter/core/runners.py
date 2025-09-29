@@ -471,14 +471,14 @@ class CompareRunner:
         config: RunnerConfig,
         lookup: Mapping[int, SingleRunResult],
     ) -> TieBreaker | None:
-        name = (getattr(config, "tie_breaker", None) or "").strip().lower()
-        if not name:
+        tie_name = (config.tie_breaker or "").strip().lower()
+        if not tie_name:
             return None
-        if name == "latency":
+        if tie_name == "latency":
             return _LatencyTieBreaker(lookup)
-        if name == "cost":
+        if tie_name == "cost":
             return _CostTieBreaker(lookup)
-        if name == "first":
+        if tie_name == "first":
             return FirstTieBreaker()
         return None
 
