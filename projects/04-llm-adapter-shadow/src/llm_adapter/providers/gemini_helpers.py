@@ -56,10 +56,12 @@ def coerce_usage(value: Any) -> TokenUsage:
     if value is None:
         return TokenUsage(prompt=prompt_tokens, completion=completion_tokens)
 
-    usage_obj = getattr(value, "usage_metadata", None)
-    if usage_obj is not None:
-        prompt_tokens = int(getattr(usage_obj, "input_tokens", 0) or 0)
-        completion_tokens = int(getattr(usage_obj, "output_tokens", 0) or 0)
+    if hasattr(value, "usage_metadata"):
+        usage_obj = value.usage_metadata
+        if hasattr(usage_obj, "input_tokens"):
+            prompt_tokens = int(usage_obj.input_tokens or 0)
+        if hasattr(usage_obj, "output_tokens"):
+            completion_tokens = int(usage_obj.output_tokens or 0)
     else:
         if hasattr(value, "to_dict"):
             payload = value.to_dict()
@@ -76,24 +78,27 @@ def coerce_usage(value: Any) -> TokenUsage:
 
 
 def coerce_output_text(response: Any) -> str:
-    text = getattr(response, "text", None)
-    if isinstance(text, str) and text:
-        return text
+    if hasattr(response, "text"):
+        text = response.text
+        if isinstance(text, str) and text:
+            return text
 
-    text = getattr(response, "output_text", None)
-    if isinstance(text, str) and text:
-        return text
+    if hasattr(response, "output_text"):
+        text = response.output_text
+        if isinstance(text, str) and text:
+            return text
 
-    candidates = getattr(response, "candidates", None)
+    candidates = response.candidates if hasattr(response, "candidates") else None
     if isinstance(candidates, Iterable):
         for candidate in candidates:
             if isinstance(candidate, Mapping):
                 candidate_text = candidate.get("text")
                 if isinstance(candidate_text, str) and candidate_text:
                     return candidate_text
-            text_attr = getattr(candidate, "text", None)
-            if isinstance(text_attr, str) and text_attr:
-                return text_attr
+            if hasattr(candidate, "text"):
+                text_attr = candidate.text
+                if isinstance(text_attr, str) and text_attr:
+                    return text_attr
 
     if hasattr(response, "to_dict"):
         payload = response.to_dict()
@@ -121,7 +126,7 @@ def coerce_finish_reason(response: Any) -> str | None:
             return text or None
         return None
 
-    candidates = getattr(response, "candidates", None)
+    candidates = response.candidates if hasattr(response, "candidates") else None
     first_candidate: Any | None = None
     if isinstance(candidates, Iterable):
         for candidate in candidates:
@@ -145,8 +150,10 @@ def coerce_finish_reason(response: Any) -> str | None:
         if finish:
             return finish
 
-    finish_attr = getattr(first_candidate, "finish_reason", None)
-    return _normalize(finish_attr)
+    if hasattr(first_candidate, "finish_reason"):
+        return _normalize(first_candidate.finish_reason)
+
+    return None
 
 
 def merge_generation_config(
