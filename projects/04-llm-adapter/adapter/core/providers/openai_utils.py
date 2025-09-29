@@ -116,7 +116,7 @@ def extract_text_from_response(response: Any) -> str:
 def extract_usage_tokens(response: Any, prompt: str, output_text: str) -> tuple[int, int]:
     prompt_tokens = 0
     completion_tokens = 0
-    usage = getattr(response, "usage", None)
+    usage = response.usage if hasattr(response, "usage") else None
     if usage is not None:
         prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
         if prompt_tokens <= 0:
