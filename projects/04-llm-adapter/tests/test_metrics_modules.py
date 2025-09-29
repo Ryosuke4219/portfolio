@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+# ruff: noqa: I001
+
 import importlib
-import sys
 from pathlib import Path
+import sys
 
 import pytest
 
