@@ -21,6 +21,7 @@ __all__ = [
     "count_new_defects",
     "select_flaky_rows",
     "to_float",
+    "coerce_str",
     "format_percentage",
     "format_table",
     "week_over_week_notes",
@@ -79,7 +80,8 @@ def filter_by_window(
 ) -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
     for item in items:
-        ts = parse_iso8601(item.get("ts"))
+        ts_value = coerce_str(item.get("ts"))
+        ts = parse_iso8601(ts_value)
         if ts is None:
             continue
         if start <= ts < end:
@@ -90,7 +92,10 @@ def filter_by_window(
 def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
     passes = fails = errors = 0
     for run in runs:
-        status = (run.get("status") or "").lower()
+        status_raw = coerce_str(run.get("status"))
+        if status_raw is None:
+            continue
+        status = status_raw.lower()
         if status == "pass":
             passes += 1
         elif status in {"fail", "failed"}:
@@ -137,7 +142,9 @@ def select_flaky_rows(
         return []
     selected: list[dict[str, object]] = []
     for row in rows:
-        as_of_raw = row.get("as_of") or row.get("generated_at")
+        as_of_raw = coerce_str(row.get("as_of"))
+        if as_of_raw is None:
+            as_of_raw = coerce_str(row.get("generated_at"))
         as_of_dt = parse_iso8601(as_of_raw) if as_of_raw else None
         if as_of_dt is None:
             selected.append(row)
@@ -147,13 +154,29 @@ def select_flaky_rows(
     return selected
 
 
-def to_float(value: str | None) -> float | None:
-    if value is None or value == "":
-        return None
-    try:
+def to_float(value: object) -> float | None:
+    if isinstance(value, bool):
         return float(value)
-    except ValueError:
-        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        if value == "":
+            return None
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+def coerce_str(value: object) -> str | None:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return str(value)
+    return None
 
 
 def format_percentage(value: float | None) -> str:
@@ -167,16 +190,18 @@ def format_table(rows: list[dict[str, object]]) -> list[str]:
     divider = "|-----:|--------------|---------:|------:|------:|"
     body: list[str] = [header, divider]
     for idx, row in enumerate(rows, start=1):
-        attempts = row.get("attempts") or row.get("Attempts") or "0"
-        p_fail = to_float(row.get("p_fail"))
-        score = to_float(row.get("score"))
+        attempts_value = to_float(row.get("attempts"))
+        if attempts_value is None:
+            attempts_value = to_float(row.get("Attempts"))
+        p_fail_value = to_float(row.get("p_fail"))
+        score_value = to_float(row.get("score"))
         body.append(
             "| {rank} | {cid} | {attempts} | {p_fail:.2f} | {score:.2f} |".format(
                 rank=idx,
-                cid=row.get("canonical_id", "-"),
-                attempts=int(float(attempts)) if attempts else 0,
-                p_fail=p_fail or 0.0,
-                score=score or 0.0,
+                cid=coerce_str(row.get("canonical_id")) or "-",
+                attempts=int(attempts_value) if attempts_value is not None else 0,
+                p_fail=p_fail_value or 0.0,
+                score=score_value or 0.0,
             )
         )
     if len(body) == 2:
@@ -187,13 +212,21 @@ def format_table(rows: list[dict[str, object]]) -> list[str]:
 def week_over_week_notes(
     current_rows: list[dict[str, object]], previous_rows: list[dict[str, object]]
 ) -> tuple[list[str], list[str]]:
-    current_ids = [row.get("canonical_id") for row in current_rows if row.get("canonical_id")]
-    previous_ids = [row.get("canonical_id") for row in previous_rows if row.get("canonical_id")]
+    current_ids = [
+        canonical_id
+        for row in current_rows
+        for canonical_id in [coerce_str(row.get("canonical_id"))]
+        if canonical_id
+    ]
+    previous_ids = [
+        canonical_id
+        for row in previous_rows
+        for canonical_id in [coerce_str(row.get("canonical_id"))]
+        if canonical_id
+    ]
     entered = [cid for cid in current_ids if cid not in previous_ids]
     exited = [cid for cid in previous_ids if cid not in current_ids]
     return entered, exited
-
-
 def build_front_matter(today: dt.date, days: int) -> list[str]:
     return [
         "---",
