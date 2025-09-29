@@ -7,7 +7,7 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ..errors import ConfigError, RetriableError
+from ..errors import ConfigError, ProviderSkip, RetriableError
 from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from ._requests_compat import (
     SessionProtocol,
@@ -46,9 +46,34 @@ class OllamaProvider(BaseProvider):
         super().__init__(name=provider_name, model=model)
         env_host = os.environ.get("OLLAMA_BASE_URL") or os.environ.get("OLLAMA_HOST")
         self._host: str = host or env_host or DEFAULT_HOST
+
+        timeout_env = os.environ.get("OLLAMA_TIMEOUT_S")
+        if timeout_env is not None:
+            try:
+                timeout = float(timeout_env)
+            except (TypeError, ValueError):
+                pass
+        pull_timeout_env = os.environ.get("OLLAMA_PULL_TIMEOUT_S")
+        if pull_timeout_env is not None:
+            try:
+                pull_timeout = float(pull_timeout_env)
+            except (TypeError, ValueError):
+                pass
+
+        auto_pull_env = os.environ.get("OLLAMA_AUTO_PULL")
+        if auto_pull_env is not None and auto_pull_env.strip() == "0":
+            auto_pull = False
+
         self._timeout = timeout
         self._pull_timeout = pull_timeout
         self._auto_pull = auto_pull
+        self._offline = (
+            os.environ.get("LLM_ADAPTER_OFFLINE") == "1"
+            or os.environ.get("CI", "").lower() == "true"
+        )
+        session_provided = session is not None
+        client_provided = client is not None
+        self._allow_network = session_provided or client_provided
         self._ready_models: set[str] = set()
         if client is None:
             if session is None:
@@ -62,6 +87,9 @@ class OllamaProvider(BaseProvider):
         self._client = client
 
     def _ensure_model(self, model_name: str) -> None:
+        if self._offline and not self._allow_network:
+            raise ProviderSkip("offline mode: ollama network calls disabled")
+
         if model_name in self._ready_models:
             return
 
@@ -96,6 +124,9 @@ class OllamaProvider(BaseProvider):
     # ProviderSPI implementation
     # ------------------------------------------------------------------
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        if self._offline and not self._allow_network:
+            raise ProviderSkip("offline mode: ollama network calls disabled")
+
         model_name = request.model
         if not isinstance(model_name, str):
             raise ConfigError("OllamaProvider requires request.model to be set")
