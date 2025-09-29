@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from statistics import mean, median
-from typing import Dict, List, Mapping, Sequence, Tuple
 
 from .utils import coerce_optional_float
 
 
-def load_metrics(path: Path) -> List[Mapping[str, object]]:
+def load_metrics(path: Path) -> list[Mapping[str, object]]:
     """Load metrics from a JSON Lines file if it exists."""
 
     if not path.exists():
         return []
-    metrics: List[Mapping[str, object]] = []
+    metrics: list[Mapping[str, object]] = []
     with path.open("r", encoding="utf-8") as fp:
         for line in fp:
             line = line.strip()
@@ -26,7 +26,7 @@ def load_metrics(path: Path) -> List[Mapping[str, object]]:
     return metrics
 
 
-def compute_overview(metrics: Sequence[Mapping[str, object]]) -> Dict[str, object]:
+def compute_overview(metrics: Sequence[Mapping[str, object]]) -> dict[str, object]:
     """Summarise the overall metrics such as success rate and cost."""
 
     total = len(metrics)
@@ -52,20 +52,22 @@ def compute_overview(metrics: Sequence[Mapping[str, object]]) -> Dict[str, objec
     }
 
 
-def build_comparison_table(metrics: Sequence[Mapping[str, object]]) -> List[Dict[str, object]]:
+def build_comparison_table(
+    metrics: Sequence[Mapping[str, object]]
+) -> list[dict[str, object]]:
     """Aggregate metrics per (provider, model, prompt_id)."""
 
-    groups: Dict[Tuple[object, object, object], List[Mapping[str, object]]] = {}
+    groups: dict[tuple[object, object, object], list[Mapping[str, object]]] = {}
     for metric in metrics:
         key = (metric.get("provider"), metric.get("model"), metric.get("prompt_id"))
         groups.setdefault(key, []).append(metric)
-    table: List[Dict[str, object]] = []
+    table: list[dict[str, object]] = []
     for (provider, model, prompt_id), rows in sorted(groups.items()):
         attempts = len(rows)
         ok_count = sum(1 for row in rows if row.get("status") == "ok")
         avg_latency = mean(float(row.get("latency_ms", 0)) for row in rows)
         avg_cost = mean(float(row.get("cost_usd", 0.0)) for row in rows)
-        diff_rates: List[float] = []
+        diff_rates: list[float] = []
         for row in rows:
             eval_payload = row.get("eval", {})
             if isinstance(eval_payload, Mapping):
@@ -89,20 +91,24 @@ def build_comparison_table(metrics: Sequence[Mapping[str, object]]) -> List[Dict
     return table
 
 
-def build_latency_histogram_data(metrics: Sequence[Mapping[str, object]]) -> Dict[str, List[float]]:
+def build_latency_histogram_data(
+    metrics: Sequence[Mapping[str, object]]
+) -> dict[str, list[float]]:
     """Prepare histogram data keyed by provider."""
 
-    hist: Dict[str, List[float]] = {}
+    hist: dict[str, list[float]] = {}
     for metric in metrics:
         provider = str(metric.get("provider"))
         hist.setdefault(provider, []).append(float(metric.get("latency_ms", 0)))
     return hist
 
 
-def build_scatter_data(metrics: Sequence[Mapping[str, object]]) -> Dict[str, List[Dict[str, object]]]:
+def build_scatter_data(
+    metrics: Sequence[Mapping[str, object]]
+) -> dict[str, list[dict[str, object]]]:
     """Prepare scatter plot data keyed by provider."""
 
-    scatter: Dict[str, List[Dict[str, object]]] = {}
+    scatter: dict[str, list[dict[str, object]]] = {}
     for metric in metrics:
         provider = str(metric.get("provider"))
         scatter.setdefault(provider, []).append(
@@ -117,7 +123,7 @@ def build_scatter_data(metrics: Sequence[Mapping[str, object]]) -> Dict[str, Lis
 
 def build_failure_summary(
     metrics: Sequence[Mapping[str, object]]
-) -> Tuple[int, List[Dict[str, object]]]:
+) -> tuple[int, list[dict[str, object]]]:
     """Return failure counts and the top three failure kinds."""
 
     counter: Counter[str] = Counter()
@@ -135,10 +141,10 @@ def build_failure_summary(
 
 def build_determinism_alerts(
     metrics: Sequence[Mapping[str, object]]
-) -> List[Dict[str, object]]:
+) -> list[dict[str, object]]:
     """Collect repeated non-deterministic failures."""
 
-    alerts: Dict[Tuple[object, object, object], int] = {}
+    alerts: dict[tuple[object, object, object], int] = {}
     for metric in metrics:
         if metric.get("failure_kind") != "non_deterministic":
             continue
@@ -148,7 +154,7 @@ def build_determinism_alerts(
             metric.get("prompt_id"),
         )
         alerts[key] = alerts.get(key, 0) + 1
-    rows: List[Dict[str, object]] = []
+    rows: list[dict[str, object]] = []
     for (provider, model, prompt_id), count in sorted(alerts.items()):
         rows.append(
             {
@@ -161,10 +167,12 @@ def build_determinism_alerts(
     return rows
 
 
-def load_baseline_expectations(baseline_dir: Path) -> List[Mapping[str, object]]:
+def load_baseline_expectations(
+    baseline_dir: Path,
+) -> list[Mapping[str, object]]:
     """Load baseline expectations from ``*.jsonl`` files and JSON documents."""
 
-    entries: List[Mapping[str, object]] = []
+    entries: list[Mapping[str, object]] = []
     if not baseline_dir.exists():
         return entries
     for path in sorted(baseline_dir.glob("*.jsonl")):

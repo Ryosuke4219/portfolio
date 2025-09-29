@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from string import Template
-from typing import List, Mapping, Sequence
 
 
 def render_html(
@@ -17,7 +17,7 @@ def render_html(
     failure_summary: Sequence[Mapping[str, object]],
     determinism_alerts: Sequence[Mapping[str, object]],
 ) -> str:
-    rows_html: List[str] = []
+    rows_html: list[str] = []
     for row in comparison_table:
         diff_value = row.get("avg_diff_rate")
         diff_text = diff_value if diff_value is not None else "-"
