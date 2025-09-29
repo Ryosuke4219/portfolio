@@ -42,3 +42,12 @@ class RunnerConfig:
     max_concurrency: int | None = None
     rpm: int | None = None
     consensus: ConsensusConfig | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.mode, RunnerMode):
+            normalized = self.mode
+        else:
+            mode_value = self.mode.value if isinstance(self.mode, Enum) else self.mode
+            normalized = RunnerMode(mode_value)
+
+        object.__setattr__(self, "mode", normalized)

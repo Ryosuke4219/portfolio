@@ -2,12 +2,29 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from enum import Enum
 
 import pytest
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import ParallelExecutionError
 from src.llm_adapter.runner_sync import Runner
+
+
+class _ExternalRunnerMode(Enum):
+    PARALLEL_ANY = "parallel_any"
+
+
+def test_runner_config_accepts_string_mode() -> None:
+    config = RunnerConfig(mode="parallel_any")
+
+    assert config.mode is RunnerMode.PARALLEL_ANY
+
+
+def test_runner_config_accepts_foreign_enum() -> None:
+    config = RunnerConfig(mode=_ExternalRunnerMode.PARALLEL_ANY)
+
+    assert config.mode is RunnerMode.PARALLEL_ANY
 
 
 class _FakeClock:
