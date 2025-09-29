@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from types import SimpleNamespace
 from typing import Any, cast, NoReturn
 
@@ -16,6 +16,10 @@ from src.llm_adapter.errors import (
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers import gemini as gemini_module
 from src.llm_adapter.providers.gemini import GeminiProvider
+from src.llm_adapter.providers.gemini_client import (
+    GeminiModelsAPI,
+    GeminiResponsesAPI,
+)
 from tests.helpers.fakes import RecordGeminiClient
 
 
@@ -103,21 +107,30 @@ def test_gemini_provider_uses_request_model_override_and_finish_reason() -> None
     class _Client:
         def __init__(self) -> None:
             self.calls: list[dict[str, Any]] = []
-            self.responses: None = None
+            self.responses: GeminiResponsesAPI | None = None
 
             class _Models:
                 def __init__(self, outer: _Client) -> None:
                     self._outer = outer
 
-                def generate_content(self, **kwargs: Any) -> SimpleNamespace:
-                    self._outer.calls.append(kwargs)
+                def generate_content(
+                    self,
+                    *,
+                    model: str,
+                    contents: Sequence[Mapping[str, Any]] | None,
+                    config: Any | None = None,
+                ) -> SimpleNamespace:
+                    recorded: dict[str, Any] = {"model": model, "contents": contents}
+                    if config is not None:
+                        recorded["config"] = config
+                    self._outer.calls.append(recorded)
                     return SimpleNamespace(
                         text="ok",
                         usage_metadata=SimpleNamespace(input_tokens=2, output_tokens=3),
                         candidates=[SimpleNamespace(finish_reason="STOP")],
                     )
 
-            self.models = _Models(self)
+            self.models: GeminiModelsAPI | None = _Models(self)
 
     client = _Client()
     provider = GeminiProvider("gemini-1.5-pro", client=client)
@@ -156,13 +169,19 @@ def test_gemini_provider_translates_rate_limit(provider_request_model: str) -> N
             self.status: str = "RESOURCE_EXHAUSTED"
 
     class _FailingModels:
-        def generate_content(self, **kwargs: Any) -> NoReturn:
+        def generate_content(
+            self,
+            *,
+            model: str,
+            contents: Sequence[Mapping[str, Any]] | None,
+            config: Any | None = None,
+        ) -> NoReturn:
             raise _ResourceExhaustedError()
 
     class _Client:
         def __init__(self) -> None:
-            self.models: _FailingModels = _FailingModels()
-            self.responses: None = None
+            self.models: GeminiModelsAPI | None = _FailingModels()
+            self.responses: GeminiResponsesAPI | None = None
 
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
@@ -186,13 +205,19 @@ def test_gemini_provider_translates_rate_limit_status_object(
             self.status: _StatusCode = _StatusCode("RESOURCE_EXHAUSTED")
 
     class _FailingModels:
-        def generate_content(self, **kwargs: Any) -> NoReturn:
+        def generate_content(
+            self,
+            *,
+            model: str,
+            contents: Sequence[Mapping[str, Any]] | None,
+            config: Any | None = None,
+        ) -> NoReturn:
             raise _RateLimitedError()
 
     class _Client:
         def __init__(self) -> None:
-            self.models: _FailingModels = _FailingModels()
-            self.responses: None = None
+            self.models: GeminiModelsAPI | None = _FailingModels()
+            self.responses: GeminiResponsesAPI | None = None
 
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
@@ -206,13 +231,19 @@ def test_gemini_provider_preserves_rate_limit_error_instances(
     raised_error = RateLimitError("rate limited")
 
     class _FailingModels:
-        def generate_content(self, **kwargs: Any) -> NoReturn:
+        def generate_content(
+            self,
+            *,
+            model: str,
+            contents: Sequence[Mapping[str, Any]] | None,
+            config: Any | None = None,
+        ) -> NoReturn:
             raise raised_error
 
     class _Client:
         def __init__(self) -> None:
-            self.models: _FailingModels = _FailingModels()
-            self.responses: None = None
+            self.models: GeminiModelsAPI | None = _FailingModels()
+            self.responses: GeminiResponsesAPI | None = None
 
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
@@ -238,13 +269,19 @@ def test_gemini_provider_translates_timeout_status_object(
             self.code: _StatusCode = _StatusCode("DEADLINE_EXCEEDED")
 
     class _FailingModels:
-        def generate_content(self, **kwargs: Any) -> NoReturn:
+        def generate_content(
+            self,
+            *,
+            model: str,
+            contents: Sequence[Mapping[str, Any]] | None,
+            config: Any | None = None,
+        ) -> NoReturn:
             raise _DeadlineExceededError()
 
     class _Client:
         def __init__(self) -> None:
-            self.models: _FailingModels = _FailingModels()
-            self.responses: None = None
+            self.models: GeminiModelsAPI | None = _FailingModels()
+            self.responses: GeminiResponsesAPI | None = None
 
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
@@ -258,13 +295,19 @@ def test_gemini_provider_preserves_timeout_error_instances(
     raised_error = TimeoutError("took too long")
 
     class _FailingModels:
-        def generate_content(self, **kwargs: Any) -> NoReturn:
+        def generate_content(
+            self,
+            *,
+            model: str,
+            contents: Sequence[Mapping[str, Any]] | None,
+            config: Any | None = None,
+        ) -> NoReturn:
             raise raised_error
 
     class _Client:
         def __init__(self) -> None:
-            self.models: _FailingModels = _FailingModels()
-            self.responses: None = None
+            self.models: GeminiModelsAPI | None = _FailingModels()
+            self.responses: GeminiResponsesAPI | None = None
 
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
@@ -293,13 +336,19 @@ def test_gemini_provider_translates_http_errors(
             self.response = SimpleNamespace(status_code=code)
 
     class _FailingModels:
-        def generate_content(self, **kwargs: Any) -> NoReturn:
+        def generate_content(
+            self,
+            *,
+            model: str,
+            contents: Sequence[Mapping[str, Any]] | None,
+            config: Any | None = None,
+        ) -> NoReturn:
             raise _HttpError(status_code)
 
     class _Client:
         def __init__(self) -> None:
-            self.models: _FailingModels = _FailingModels()
-            self.responses: None = None
+            self.models: GeminiModelsAPI | None = _FailingModels()
+            self.responses: GeminiResponsesAPI | None = None
 
     provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
