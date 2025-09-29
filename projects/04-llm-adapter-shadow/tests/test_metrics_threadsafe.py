@@ -1,9 +1,8 @@
 import json
-from pathlib import Path
 import threading
+from pathlib import Path
 
 import pytest
-
 from src.llm_adapter.metrics import log_event
 
 
