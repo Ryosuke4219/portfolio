@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 
 __all__ = [
     "RetryConfig",
@@ -56,11 +57,11 @@ class ProviderConfig:
     """プロバイダ設定。"""
 
     path: Path
-    schema_version: Optional[int]
+    schema_version: int | None
     provider: str
-    endpoint: Optional[str]
+    endpoint: str | None
     model: str
-    auth_env: Optional[str]
+    auth_env: str | None
     seed: int
     temperature: float
     top_p: float
