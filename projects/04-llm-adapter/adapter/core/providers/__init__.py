@@ -6,7 +6,7 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Type
+from typing import Any
 
 from ..config import ProviderConfig
 
@@ -56,7 +56,7 @@ class SimulatedProvider(BaseProvider):
         # 擬似レイテンシ（文字数に比例）
         latency_ms = min(len(prompt) * 5, 1500)
         time.sleep(latency_ms / 1000.0 / 100.0)
-        seed_material = f"{self.config.seed}:{self.config.model}:{prompt}".encode("utf-8")
+        seed_material = f"{self.config.seed}:{self.config.model}:{prompt}".encode()
         digest = hashlib.sha256(seed_material).hexdigest()
         normalized = prompt.lower()
         if "return success" in normalized:
@@ -79,10 +79,10 @@ class SimulatedProvider(BaseProvider):
 class ProviderFactory:
     """プロバイダ生成のためのファクトリ。"""
 
-    _registry: Dict[str, Type[BaseProvider]] = {"simulated": SimulatedProvider}
+    _registry: dict[str, type[BaseProvider]] = {"simulated": SimulatedProvider}
 
     @classmethod
-    def register(cls, provider_name: str, provider_cls: Type[BaseProvider]) -> None:
+    def register(cls, provider_name: str, provider_cls: type[BaseProvider]) -> None:
         cls._registry[provider_name] = provider_cls
 
     @classmethod
