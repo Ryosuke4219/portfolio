@@ -91,7 +91,9 @@ def test_ollama_provider_auto_pull_and_chat(monkeypatch: pytest.MonkeyPatch) -> 
     assert response.tokens_in == 3
     assert response.tokens_out == 5
     assert response.finish_reason == "stop"
-    assert response.raw["message"]["content"] == "hello"
+    raw = response.raw
+    assert isinstance(raw, dict)
+    assert raw["message"]["content"] == "hello"
     assert session._chat_called
     assert session.last_timeout == pytest.approx(30.0)
     assert session.last_payload is not None
@@ -102,7 +104,9 @@ def test_ollama_provider_auto_pull_and_chat(monkeypatch: pytest.MonkeyPatch) -> 
     show_calls = [url for url, *_ in session.calls if url.endswith("/api/show")]
     assert len(show_calls) == 2
 
-    chat_payload = next(payload for url, payload, _ in session.calls if url.endswith("/api/chat"))
+    chat_payload = next(
+        payload for url, payload, _ in session.calls if url.endswith("/api/chat")
+    )
     assert chat_payload is not None
     assert chat_payload["model"] == "gemma3n:e2b"
     assert chat_payload["messages"] == [{"role": "user", "content": "hello"}]
@@ -147,7 +151,9 @@ def test_ollama_provider_merges_request_options() -> None:
     )
     provider.invoke(request)
 
-    chat_payload = next(payload for url, payload, _ in session.calls if url.endswith("/api/chat"))
+    chat_payload = next(
+        payload for url, payload, _ in session.calls if url.endswith("/api/chat")
+    )
     assert chat_payload is not None
     assert chat_payload["stream"] is True
     assert chat_payload["model"] == "gemma3"
