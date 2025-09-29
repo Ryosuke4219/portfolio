@@ -346,16 +346,18 @@ class AsyncRunner:
                 next_attempt_total = total_providers + retry_attempts + 1
                 delay: float | None = None
                 if isinstance(error, RateLimitError):
-                    delay = max(0.0, float(self._config.backoff.rate_limit_sleep_s))
+                    delay = self._config.backoff.rate_limit_sleep_s
                 elif isinstance(error, TimeoutError):
                     if not self._config.backoff.timeout_next_provider:
                         delay = 0.0
                 elif isinstance(error, RetryableError):
                     if not self._config.backoff.retryable_next_provider:
                         delay = 0.0
+                elif is_parallel_any:
+                    return None
                 if delay is None:
                     return None
-                delay = max(0.0, float(delay))
+                delay_float = max(0.0, float(delay))
                 if limit is not None and next_attempt_total > limit:
                     return None
                 retry_attempt = retry_attempts + 1
