@@ -1,12 +1,32 @@
 """応答集約ストラテジ。"""
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
 
 # 依存は実行時読み込み。型は実体を使う（mypy用に直import）
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse  # noqa: E402
+try:  # pragma: no cover - 実環境では src.* が存在する
+    from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+    from .providers import ProviderResponse  # type: ignore
+
+    @dataclass(slots=True)
+    class ProviderRequest:  # type: ignore[override]
+        model: str
+        prompt: str = ""
+        messages: Sequence[Mapping[str, Any]] | None = None
+        max_tokens: int | None = None
+        temperature: float | None = None
+        top_p: float | None = None
+        stop: tuple[str, ...] | None = None
+        timeout_s: float | None = None
+        metadata: Mapping[str, Any] | None = None
+        options: dict[str, Any] = field(default_factory=dict)
+
+        @property
+        def prompt_text(self) -> str:
+            return self.prompt
 
 # ===== 基本データ構造 =====
 
