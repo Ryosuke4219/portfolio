@@ -98,11 +98,12 @@ def test_ollama_client_closes_responses_on_http_error(
 
 
 def test_ollama_client_closes_responses_on_stream_error():
-    stream_error_cls = getattr(
-        requests_exceptions,
-        "ChunkedEncodingError",
-        getattr(requests_exceptions, "ProtocolError", requests_exceptions.RequestException),
-    )
+    if hasattr(requests_exceptions, "ChunkedEncodingError"):
+        stream_error_cls = requests_exceptions.ChunkedEncodingError
+    elif hasattr(requests_exceptions, "ProtocolError"):
+        stream_error_cls = requests_exceptions.ProtocolError
+    else:
+        stream_error_cls = requests_exceptions.RequestException
 
     class Session(FakeSession):
         def __init__(self) -> None:
