@@ -435,7 +435,7 @@ class CompareRunner:
         if not aggregate:
             aggregate = "majority"
         if aggregate.lower() in {"judge", "llm-judge"}:
-            judge_config = getattr(config, "judge_provider", None) or self._judge_provider_config
+            judge_config = config.judge_provider or self._judge_provider_config
             if judge_config is None:
                 raise ValueError("aggregate=judge requires judge provider configuration")
             factory = _JudgeProviderFactoryAdapter(judge_config)
