@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, MutableMapping
+from types import ModuleType
 from pathlib import Path
 from typing import cast
 
@@ -18,10 +19,14 @@ from .models import (
 )
 from .schema import ProviderConfigModel
 
+yaml: ModuleType | None
+
 try:  # pragma: no cover - 依存がある場合はこちらを利用
-    import yaml  # type: ignore
-except Exception:  # pragma: no cover - フォールバックで処理
+    import yaml as _yaml
+except ImportError:  # pragma: no cover - フォールバックで処理
     yaml = None
+else:  # pragma: no cover - 依存がある場合はこちらを利用
+    yaml = _yaml
 
 __all__ = [
     "ConfigError",
