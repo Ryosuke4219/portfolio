@@ -19,6 +19,7 @@ from . import (
     format_table,
     load_flaky,
     load_runs,
+    coerce_str,
     select_flaky_rows,
     to_float,
     week_over_week_notes,
@@ -79,10 +80,13 @@ def _main_impl() -> None:
 
     failure_counter: Counter[str] = Counter()
     for run in current_runs:
-        status = (run.get("status") or "").lower()
+        status_raw = coerce_str(run.get("status"))
+        if status_raw is None:
+            continue
+        status = status_raw.lower()
         if status not in {"fail", "failed", "error"}:
             continue
-        kind = run.get("failure_kind") or "unknown"
+        kind = coerce_str(run.get("failure_kind")) or "unknown"
         failure_counter[kind] += 1
 
     top_failure = compute_failure_top(failure_counter)
@@ -101,13 +105,17 @@ def _main_impl() -> None:
 
     entered, exited = week_over_week_notes(current_flaky_sorted, previous_flaky_sorted)
     wow_delta = None
+    prev_rate_for_delta: float | None = None
     if pass_rate is not None and prev_pass_rate is not None:
-        wow_delta = (pass_rate - prev_pass_rate) * 100
+        current_rate = pass_rate
+        previous_rate = prev_pass_rate
+        wow_delta = (current_rate - previous_rate) * 100
+        prev_rate_for_delta = previous_rate
 
     notes: list[str] = []
-    if wow_delta is not None:
+    if wow_delta is not None and prev_rate_for_delta is not None:
         notes.append(
-            f"PassRate WoW: {wow_delta:+.2f}pp (prev {prev_pass_rate * 100:.2f}%)."
+            f"PassRate WoW: {wow_delta:+.2f}pp (prev {prev_rate_for_delta * 100:.2f}%)."
         )
     elif pass_rate is not None:
         notes.append(f"PassRate: {pass_rate * 100:.2f}% (過去週データ不足)")
