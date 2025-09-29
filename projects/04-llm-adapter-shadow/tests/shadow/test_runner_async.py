@@ -16,8 +16,11 @@ from tests.shadow._runner_test_helpers import (
 )
 
 
+pytestmark = pytest.mark.usefixtures("socket_enabled")
+
+
 @pytest.mark.asyncio
-def test_async_rate_limit_triggers_backoff_and_logs(
+async def test_async_rate_limit_triggers_backoff_and_logs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rate_limited = _ErrorProvider("rate-limit", RateLimitError("slow down"))
@@ -38,11 +41,8 @@ def test_async_rate_limit_triggers_backoff_and_logs(
     )
     request = ProviderRequest(prompt="hello", model="demo-model")
 
-    async def _run() -> None:
-        response = await runner.run_async(request, shadow_metrics_path="unused.jsonl")
-        assert response.text == "success:ok"
-
-    asyncio.run(_run())
+    response = await runner.run_async(request, shadow_metrics_path="unused.jsonl")
+    assert response.text == "success:ok"
 
     assert sleep_calls == [0.321]
     first_call = next(
@@ -56,16 +56,13 @@ def test_async_rate_limit_triggers_backoff_and_logs(
 
 
 @pytest.mark.asyncio
-def test_async_retryable_error_logs_family() -> None:
+async def test_async_retryable_error_logs_family() -> None:
     logger = FakeLogger()
     runner = AsyncRunner([_ErrorProvider("oops", RetriableError("nope"))], logger=logger)
     request = ProviderRequest(prompt="hello", model="demo-model")
 
-    async def _run() -> None:
-        await runner.run_async(request, shadow_metrics_path="unused.jsonl")
-
     with pytest.raises(RetriableError):
-        asyncio.run(_run())
+        await runner.run_async(request, shadow_metrics_path="unused.jsonl")
 
     provider_event = logger.of_type("provider_call")[0]
     assert provider_event["error_family"] == "retryable"
@@ -75,7 +72,7 @@ def test_async_retryable_error_logs_family() -> None:
 
 
 @pytest.mark.asyncio
-def test_async_consensus_all_timeout_propagates_original_error() -> None:
+async def test_async_consensus_all_timeout_propagates_original_error() -> None:
     providers = [
         _ErrorProvider("slow-1", TimeoutError("too slow")),
         _ErrorProvider("slow-2", TimeoutError("way too slow")),
@@ -86,8 +83,5 @@ def test_async_consensus_all_timeout_propagates_original_error() -> None:
     )
     request = ProviderRequest(prompt="hello", model="demo-model")
 
-    async def _run() -> None:
-        await runner.run_async(request, shadow_metrics_path="unused.jsonl")
-
     with pytest.raises((ParallelExecutionError, TimeoutError)):
-        asyncio.run(_run())
+        await runner.run_async(request, shadow_metrics_path="unused.jsonl")
