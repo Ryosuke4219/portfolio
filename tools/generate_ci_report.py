@@ -170,6 +170,25 @@ def render_markdown(
         if failure_kinds
         else "-"
     )
+    pass_rate_args = {
+        "pass_rate": format_percentage(pass_rate),
+        "passes": totals["passes"],
+        "executions": totals["executions"],
+    }
+    failures_args = {"fails": totals["fails"]}
+    errors_args = {"errors": totals["errors"]}
+    failure_kinds_args = {"summary": kinds_summary}
+    kpi_lines = [
+        "| 指標 | 値 |",
+        "|------|----|",
+        "| Pass Rate | {pass_rate} ({passes}/{executions}) |".format(
+            **pass_rate_args
+        ),
+        "| Failures | {fails} |".format(**failures_args),
+        "| Errors | {errors} |".format(**errors_args),
+        "| Top Failure Kinds | {summary} |".format(**failure_kinds_args),
+        "| ソースJSON | [latest.json](./latest.json) |",
+    ]
     lines: list[str] = [
         "---",
         "layout: default",
@@ -183,13 +202,7 @@ def render_markdown(
         f"- Data Last Updated: {last_updated or 'N/A'}",
         "",
         "## KPI",
-        "| 指標 | 値 |",
-        "|------|----|",
-        f"| Pass Rate | {format_percentage(pass_rate)} ({totals['passes']}/{totals['executions']}) |",
-        f"| Failures | {totals['fails']} |",
-        f"| Errors | {totals['errors']} |",
-        f"| Top Failure Kinds | {kinds_summary} |",
-        "| ソースJSON | [latest.json](./latest.json) |",
+        *kpi_lines,
         "",
         "## Top Flaky Tests",
         *format_flaky_markdown(flaky_rows),
@@ -260,7 +273,8 @@ def main() -> None:
     )
 
     args.out_json.parent.mkdir(parents=True, exist_ok=True)
-    args.out_json.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    json_text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    args.out_json.write_text(json_text, encoding="utf-8")
 
     totals = payload["totals"]
     markdown_lines = render_markdown(
