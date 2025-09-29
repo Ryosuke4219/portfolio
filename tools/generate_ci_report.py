@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from ci_metrics import compute_recent_deltas, compute_run_history
-from weekly_summary import (  # type: ignore
+from weekly_summary import (
     aggregate_status,
+    coerce_str,
     filter_by_window,
     format_percentage,
     load_flaky,
@@ -48,10 +49,10 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def compute_last_updated(runs: list[dict]) -> str | None:
+def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
     timestamps: list[dt.datetime] = []
     for run in runs:
-        ts = parse_iso8601(run.get("ts"))
+        ts = parse_iso8601(coerce_str(run.get("ts")))
         if ts is not None:
             timestamps.append(ts)
     if not timestamps:
@@ -60,14 +61,19 @@ def compute_last_updated(runs: list[dict]) -> str | None:
     return latest.isoformat().replace("+00:00", "Z")
 
 
-def summarize_failure_kinds(runs: list[dict], limit: int = 3) -> list[dict]:
+def summarize_failure_kinds(
+    runs: list[dict[str, object]], limit: int = 3
+) -> list[dict[str, object]]:
     counter: Counter[str] = Counter()
     for run in runs:
-        status = (run.get("status") or "").lower()
+        status_raw = coerce_str(run.get("status"))
+        if status_raw is None:
+            continue
+        status = status_raw.lower()
         if status not in {"fail", "failed", "error"}:
             continue
-        kind = run.get("failure_kind") or "unknown"
-        counter[str(kind)] += 1
+        kind = coerce_str(run.get("failure_kind")) or "unknown"
+        counter[kind] += 1
     most_common = counter.most_common(limit)
     return [
         {"kind": kind, "count": count}
@@ -75,25 +81,46 @@ def summarize_failure_kinds(runs: list[dict], limit: int = 3) -> list[dict]:
     ]
 
 
-def normalize_flaky_rows(rows: list[dict], limit: int = 3) -> list[dict]:
+def normalize_flaky_rows(
+    rows: list[dict[str, object]], limit: int = 3
+) -> list[dict[str, object]]:
     if not rows:
         return []
     sorted_rows = sorted(
         rows,
-        key=lambda row: to_float(row.get("score")) or 0.0,
+        key=lambda row: to_float(coerce_str(row.get("score"))) or 0.0,
         reverse=True,
     )
-    normalized: list[dict] = []
+    normalized: list[dict[str, object]] = []
     for idx, row in enumerate(sorted_rows[:limit], start=1):
-        attempts = row.get("attempts") or row.get("Attempts")
+        attempts_value = row.get("attempts") or row.get("Attempts")
+        attempts = 0
+        if isinstance(attempts_value, bool):
+            attempts = int(attempts_value)
+        elif isinstance(attempts_value, int):
+            attempts = attempts_value
+        elif isinstance(attempts_value, float):
+            attempts = int(attempts_value)
+        else:
+            attempts_str = coerce_str(attempts_value)
+            attempts_float = to_float(attempts_str)
+            if attempts_float is not None:
+                attempts = int(attempts_float)
         normalized.append(
             {
                 "rank": idx,
-                "canonical_id": row.get("canonical_id") or row.get("Canonical ID") or "-",
-                "attempts": int(float(attempts)) if attempts not in {None, ""} else 0,
-                "p_fail": to_float(row.get("p_fail")),
-                "score": to_float(row.get("score")),
-                "as_of": row.get("as_of") or row.get("generated_at"),
+                "canonical_id": (
+                    coerce_str(row.get("canonical_id"))
+                    or coerce_str(row.get("Canonical ID"))
+                    or "-"
+                ),
+                "attempts": attempts,
+                "p_fail": to_float(coerce_str(row.get("p_fail"))),
+                "score": to_float(coerce_str(row.get("score"))),
+                "as_of": (
+                    coerce_str(row.get("as_of"))
+                    or coerce_str(row.get("generated_at"))
+                ),
             }
         )
     return normalized
@@ -106,10 +133,10 @@ def build_json_payload(
     passes: int,
     fails: int,
     errors: int,
-    failure_kinds: list[dict],
-    flaky_rows: list[dict],
+    failure_kinds: list[dict[str, object]],
+    flaky_rows: list[dict[str, object]],
     last_updated: str | None,
-    recent_runs: list[dict],
+    recent_runs: list[dict[str, object]],
 ) -> dict[str, Any]:
     total = passes + fails + errors
     pass_rate = (passes / total) if total else None
@@ -130,7 +157,7 @@ def build_json_payload(
     }
 
 
-def format_flaky_markdown(rows: list[dict]) -> list[str]:
+def format_flaky_markdown(rows: list[dict[str, object]]) -> list[str]:
     header = "| Rank | Canonical ID | Attempts | p_fail | Score |"
     divider = "|-----:|--------------|---------:|------:|------:|"
     lines = [header, divider]
@@ -138,8 +165,10 @@ def format_flaky_markdown(rows: list[dict]) -> list[str]:
         lines.append("| - | データなし | 0 | 0.00 | 0.00 |")
         return lines
     for row in rows:
-        p_fail = row.get("p_fail")
-        score = row.get("score")
+        p_fail_value = row.get("p_fail")
+        p_fail = float(p_fail_value) if isinstance(p_fail_value, (int, float)) else None
+        score_value = row.get("score")
+        score = float(score_value) if isinstance(score_value, (int, float)) else None
         lines.append(
             "| {rank} | {cid} | {attempts} | {p_fail:.2f} | {score:.2f} |".format(
                 rank=row.get("rank", "-"),
@@ -158,8 +187,8 @@ def render_markdown(
     window_days: int,
     totals: dict[str, int],
     pass_rate: float | None,
-    failure_kinds: list[dict],
-    flaky_rows: list[dict],
+    failure_kinds: list[dict[str, object]],
+    flaky_rows: list[dict[str, object]],
     last_updated: str | None,
     runs_path: Path,
     flaky_path: Path,
@@ -259,6 +288,9 @@ def main() -> None:
 
     last_updated = compute_last_updated(filtered_runs)
 
+    executions = passes + fails + errors
+    pass_rate_value = (passes / executions) if executions else None
+
     payload = build_json_payload(
         generated_at=now,
         window_days=args.days,
@@ -275,17 +307,17 @@ def main() -> None:
     json_text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     args.out_json.write_text(json_text, encoding="utf-8")
 
-    totals = payload["totals"]
+    totals = {
+        "passes": passes,
+        "fails": fails,
+        "errors": errors,
+        "executions": executions,
+    }
     markdown_lines = render_markdown(
         today=now.date(),
         window_days=args.days,
-        totals={
-            "passes": totals["passes"],
-            "fails": totals["fails"],
-            "errors": totals["errors"],
-            "executions": totals["executions"],
-        },
-        pass_rate=payload["pass_rate"],
+        totals=totals,
+        pass_rate=pass_rate_value,
         failure_kinds=failure_kinds,
         flaky_rows=normalized_flaky,
         last_updated=last_updated,

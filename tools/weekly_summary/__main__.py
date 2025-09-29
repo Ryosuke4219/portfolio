@@ -17,6 +17,7 @@ from . import (
     filter_by_window,
     format_percentage,
     format_table,
+    coerce_str,
     load_flaky,
     load_runs,
     select_flaky_rows,
@@ -79,10 +80,13 @@ def _main_impl() -> None:
 
     failure_counter: Counter[str] = Counter()
     for run in current_runs:
-        status = (run.get("status") or "").lower()
+        status_raw = coerce_str(run.get("status"))
+        if status_raw is None:
+            continue
+        status = status_raw.lower()
         if status not in {"fail", "failed", "error"}:
             continue
-        kind = run.get("failure_kind") or "unknown"
+        kind = coerce_str(run.get("failure_kind")) or "unknown"
         failure_counter[kind] += 1
 
     top_failure = compute_failure_top(failure_counter)
@@ -92,7 +96,11 @@ def _main_impl() -> None:
     previous_flaky = select_flaky_rows(flaky_rows, previous_start, current_start)
 
     def sort_flaky(rows: list[dict[str, object]]) -> list[dict[str, object]]:
-        return sorted(rows, key=lambda row: to_float(row.get("score")) or 0.0, reverse=True)
+        return sorted(
+            rows,
+            key=lambda row: to_float(coerce_str(row.get("score"))) or 0.0,
+            reverse=True,
+        )
 
     current_flaky_sorted = sort_flaky(current_flaky)[:5]
     previous_flaky_sorted = sort_flaky(previous_flaky)[:5]
@@ -105,7 +113,7 @@ def _main_impl() -> None:
         wow_delta = (pass_rate - prev_pass_rate) * 100
 
     notes: list[str] = []
-    if wow_delta is not None:
+    if wow_delta is not None and prev_pass_rate is not None:
         notes.append(
             f"PassRate WoW: {wow_delta:+.2f}pp (prev {prev_pass_rate * 100:.2f}%)."
         )

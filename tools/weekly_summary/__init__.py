@@ -20,6 +20,7 @@ __all__ = [
     "extract_defect_dates",
     "count_new_defects",
     "select_flaky_rows",
+    "coerce_str",
     "to_float",
     "format_percentage",
     "format_table",
@@ -79,7 +80,7 @@ def filter_by_window(
 ) -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
     for item in items:
-        ts = parse_iso8601(item.get("ts"))
+        ts = parse_iso8601(coerce_str(item.get("ts")))
         if ts is None:
             continue
         if start <= ts < end:
@@ -90,7 +91,10 @@ def filter_by_window(
 def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
     passes = fails = errors = 0
     for run in runs:
-        status = (run.get("status") or "").lower()
+        status_raw = coerce_str(run.get("status"))
+        if status_raw is None:
+            continue
+        status = status_raw.lower()
         if status == "pass":
             passes += 1
         elif status in {"fail", "failed"}:
@@ -137,7 +141,7 @@ def select_flaky_rows(
         return []
     selected: list[dict[str, object]] = []
     for row in rows:
-        as_of_raw = row.get("as_of") or row.get("generated_at")
+        as_of_raw = coerce_str(row.get("as_of")) or coerce_str(row.get("generated_at"))
         as_of_dt = parse_iso8601(as_of_raw) if as_of_raw else None
         if as_of_dt is None:
             selected.append(row)
@@ -145,6 +149,17 @@ def select_flaky_rows(
         if start.date() <= as_of_dt.date() < end.date():
             selected.append(row)
     return selected
+
+
+def coerce_str(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    return None
 
 
 def to_float(value: str | None) -> float | None:
@@ -167,14 +182,16 @@ def format_table(rows: list[dict[str, object]]) -> list[str]:
     divider = "|-----:|--------------|---------:|------:|------:|"
     body: list[str] = [header, divider]
     for idx, row in enumerate(rows, start=1):
-        attempts = row.get("attempts") or row.get("Attempts") or "0"
-        p_fail = to_float(row.get("p_fail"))
-        score = to_float(row.get("score"))
+        attempts_value = row.get("attempts") or row.get("Attempts")
+        attempts_str = coerce_str(attempts_value)
+        attempts_float = to_float(attempts_str) if attempts_str is not None else None
+        p_fail = to_float(coerce_str(row.get("p_fail")))
+        score = to_float(coerce_str(row.get("score")))
         body.append(
             "| {rank} | {cid} | {attempts} | {p_fail:.2f} | {score:.2f} |".format(
                 rank=idx,
-                cid=row.get("canonical_id", "-"),
-                attempts=int(float(attempts)) if attempts else 0,
+                cid=coerce_str(row.get("canonical_id")) or "-",
+                attempts=int(attempts_float) if attempts_float is not None else 0,
                 p_fail=p_fail or 0.0,
                 score=score or 0.0,
             )
@@ -187,10 +204,18 @@ def format_table(rows: list[dict[str, object]]) -> list[str]:
 def week_over_week_notes(
     current_rows: list[dict[str, object]], previous_rows: list[dict[str, object]]
 ) -> tuple[list[str], list[str]]:
-    current_ids = [row.get("canonical_id") for row in current_rows if row.get("canonical_id")]
-    previous_ids = [row.get("canonical_id") for row in previous_rows if row.get("canonical_id")]
-    entered = [cid for cid in current_ids if cid not in previous_ids]
-    exited = [cid for cid in previous_ids if cid not in current_ids]
+    current_ids = [
+        coerce_str(row.get("canonical_id"))
+        for row in current_rows
+        if coerce_str(row.get("canonical_id"))
+    ]
+    previous_ids = [
+        coerce_str(row.get("canonical_id"))
+        for row in previous_rows
+        if coerce_str(row.get("canonical_id"))
+    ]
+    entered = [cid for cid in current_ids if cid and cid not in previous_ids]
+    exited = [cid for cid in previous_ids if cid and cid not in current_ids]
     return entered, exited
 
 
