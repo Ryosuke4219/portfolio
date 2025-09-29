@@ -9,9 +9,9 @@ from src.llm_adapter.provider_spi import (
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
+    compute_consensus,
     ConsensusResult,
     ParallelExecutionError,
-    compute_consensus,
 )
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 
@@ -194,7 +194,7 @@ def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> No
             shadow_metrics=None,
             shadow_metrics_extra=None,
         )
-        for index, (provider, error) in enumerate(zip(providers, errors), start=1)
+        for index, (provider, error) in enumerate(zip(providers, errors, strict=True), start=1)
     ]
 
     def _fake_run_parallel_all_sync(workers, *, max_concurrency=None):
