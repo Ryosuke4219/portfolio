@@ -1,4 +1,5 @@
 import pytest
+
 from src.llm_adapter.errors import RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
