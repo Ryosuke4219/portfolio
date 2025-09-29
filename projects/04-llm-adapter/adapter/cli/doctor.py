@@ -152,7 +152,8 @@ def run_doctor(
     except SystemExit as exc:
         return _coerce_exit_code(exc.code)
 
-    lang = _resolve_lang(getattr(args, "lang", None))
+    lang_value = args.lang if hasattr(args, "lang") else None
+    lang = _resolve_lang(lang_value)
     socket_mod = socket_module or socket
     http_mod = http_module or http.client
     print(_msg(lang, "doctor_header"))
