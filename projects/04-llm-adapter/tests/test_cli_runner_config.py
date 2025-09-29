@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import adapter.cli.doctor as doctor
-import adapter.core.runner_api as runner_api
+from adapter.cli import doctor
+from adapter.core import runner_api
 import adapter.run_compare as run_compare_module
 
 
