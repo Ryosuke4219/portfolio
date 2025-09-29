@@ -15,6 +15,7 @@ except ModuleNotFoundError:  # pragma: no cover - runtime fallback
 from .doctor import run_doctor
 from .prompts import run_prompts
 
+
 @lru_cache(maxsize=1)
 def _cli_namespace() -> ModuleType:
     return import_module(__name__.rsplit(".", 1)[0])
