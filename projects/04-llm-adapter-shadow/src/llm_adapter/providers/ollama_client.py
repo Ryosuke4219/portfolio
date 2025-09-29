@@ -2,17 +2,29 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from types import TracebackType
-from typing import Any
+from typing import Any, cast
 
 from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from ._requests_compat import ResponseProtocol, SessionProtocol, requests_exceptions
 
 _streaming_error_candidates: list[type[BaseException]] = []
-for _attr in ("ChunkedEncodingError", "ProtocolError"):
-    if hasattr(requests_exceptions, _attr):
-        _candidate = getattr(requests_exceptions, _attr)
-        if isinstance(_candidate, type) and issubclass(_candidate, BaseException):
-            _streaming_error_candidates.append(_candidate)
+_requests_exceptions_any = cast(Any, requests_exceptions)
+
+try:
+    _candidate = _requests_exceptions_any.ChunkedEncodingError
+except AttributeError:
+    pass
+else:
+    if isinstance(_candidate, type) and issubclass(_candidate, BaseException):
+        _streaming_error_candidates.append(_candidate)
+
+try:
+    _candidate = _requests_exceptions_any.ProtocolError
+except AttributeError:
+    pass
+else:
+    if isinstance(_candidate, type) and issubclass(_candidate, BaseException):
+        _streaming_error_candidates.append(_candidate)
 
 if _streaming_error_candidates:
     _STREAMING_ERRORS: tuple[type[BaseException], ...] = tuple(_streaming_error_candidates)
