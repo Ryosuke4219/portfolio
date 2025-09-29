@@ -7,9 +7,6 @@ import time
 from typing import Any, cast
 
 from ._event_loop import ensure_socket_free_event_loop_policy
-
-ensure_socket_free_event_loop_policy()
-
 from .errors import (
     FatalError,
     ProviderSkip,
@@ -47,6 +44,8 @@ from .runner_shared import (
 )
 from .shadow import DEFAULT_METRICS_PATH, run_with_shadow_async, ShadowMetrics
 from .utils import content_hash, elapsed_ms
+
+ensure_socket_free_event_loop_policy()
 
 WorkerResult = tuple[
     int,
