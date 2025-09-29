@@ -40,17 +40,14 @@ class RunMetric(BaseModel):
         cost_usd: float = 0.0,
         error: str | None = None,
     ) -> RunMetric:
-        latency_ms = getattr(resp, "latency_ms", 0)
-        input_tokens = getattr(resp, "input_tokens", 0)
-        output_tokens = getattr(resp, "output_tokens", 0)
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
         return cls(
             provider=cfg.provider,
             model=cfg.model,
             endpoint=(cfg.endpoint or "responses"),
-            latency_ms=int(latency_ms),
-            input_tokens=int(input_tokens),
-            output_tokens=int(output_tokens),
+            latency_ms=int(resp.latency_ms),
+            input_tokens=int(resp.input_tokens),
+            output_tokens=int(resp.output_tokens),
             cost_usd=float(cost_usd),
             status="error" if error else "ok",
             error=error,
