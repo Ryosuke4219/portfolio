@@ -196,17 +196,19 @@ class _AsyncProviderAdapter(AsyncProviderSPI):
     async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
         if self._async_invoke is not None:
             return await self._async_invoke(request)
-        invoke = getattr(self._provider, "invoke", None)
-        if not callable(invoke):
+        provider = self._provider
+        if not hasattr(provider, "invoke"):
             raise TypeError("Provider does not expose a synchronous invoke() method")
+        invoke = cast(Callable[[ProviderRequest], ProviderResponse], provider.invoke)
         return await asyncio.to_thread(invoke, request)
 
 
 def ensure_async_provider(provider: ProviderSPI | AsyncProviderSPI) -> AsyncProviderSPI:
-    invoke_async = getattr(provider, "invoke_async", None)
-    if callable(invoke_async):
+    if hasattr(provider, "invoke_async"):
+        async_provider = cast(AsyncProviderSPI, provider)
+        invoke_async = async_provider.invoke_async
         if inspect.iscoroutinefunction(invoke_async):
-            return cast(AsyncProviderSPI, provider)
+            return async_provider
 
         async def _invoke(request: ProviderRequest) -> ProviderResponse:
             result = invoke_async(request)
