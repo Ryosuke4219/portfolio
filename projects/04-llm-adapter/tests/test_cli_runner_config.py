@@ -8,9 +8,9 @@ from types import SimpleNamespace
 import pytest
 
 # First-party
-from adapter import run_compare as run_compare_module
 from adapter.cli import doctor
 from adapter.core import runner_api
+import adapter.run_compare as run_compare_module
 
 
 def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
