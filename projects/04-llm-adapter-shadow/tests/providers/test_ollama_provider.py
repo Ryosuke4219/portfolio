@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+# Third-party imports
 import pytest
 
-from src.llm_adapter.errors import (
-    AuthError,
-    RateLimitError,
-    TimeoutError,
-)
+# First-party imports
+from src.llm_adapter.errors import AuthError, RateLimitError, TimeoutError
+
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.ollama import OllamaProvider
 from tests.helpers.fakes import FakeResponse, FakeSession
