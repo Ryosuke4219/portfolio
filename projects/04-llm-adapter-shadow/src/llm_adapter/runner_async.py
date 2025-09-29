@@ -335,13 +335,12 @@ class AsyncRunner:
 
             capture_shadow, retry_attempts = mode is RunnerMode.CONSENSUS, 0
             attempt_labels = [index for index in range(1, total_providers + 1)]
+            limit = self._config.max_attempts
 
             async def _handle_parallel_retry(
                 worker_index: int, attempt_index: int, error: BaseException
             ) -> tuple[int, float] | None:
                 nonlocal retry_attempts, attempt_count
-                if self._config.max_attempts is None:
-                    return None
                 provider, _ = providers[worker_index]
                 next_attempt_total = total_providers + retry_attempts + 1
                 delay: float | None = None
@@ -353,10 +352,9 @@ class AsyncRunner:
                 elif isinstance(error, RetryableError):
                     if not self._config.backoff.retryable_next_provider:
                         delay = 0.0
-                if delay is None or (
-                    (limit := self._config.max_attempts) is not None
-                    and next_attempt_total > limit
-                ):
+                if delay is None:
+                    return None
+                if limit is not None and next_attempt_total > limit:
                     return None
                 retry_attempt = retry_attempts + 1
                 retry_attempts, attempt_count = retry_attempt, next_attempt_total
