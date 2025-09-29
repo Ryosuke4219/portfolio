@@ -249,7 +249,7 @@ class Runner:
         shadow_used = shadow is not None
         mode = self._config.mode
 
-        if mode is RunnerMode.SEQUENTIAL:
+        if mode == RunnerMode.SEQUENTIAL:
             max_attempts = self._config.max_attempts
             attempt_count = 0
             for loop_index, provider in enumerate(self.providers, start=1):
@@ -352,7 +352,7 @@ class Runner:
         total_providers = len(self.providers)
         results: list[ProviderInvocationResult | None] = [None] * total_providers
 
-        capture_shadow = mode is RunnerMode.CONSENSUS
+        capture_shadow = mode == RunnerMode.CONSENSUS
 
         def make_worker(
             index: int, provider: ProviderSPI
@@ -389,7 +389,7 @@ class Runner:
 
         attempts_override: dict[int, int] | None = None
         try:
-            if mode is RunnerMode.PARALLEL_ANY:
+            if mode == RunnerMode.PARALLEL_ANY:
                 winner = run_parallel_any_sync(
                     workers, max_concurrency=self._config.max_concurrency
                 )
@@ -405,7 +405,7 @@ class Runner:
                 attempts_override = {winner.attempt: attempts_final}
                 return response
 
-            if mode is RunnerMode.PARALLEL_ALL:
+            if mode == RunnerMode.PARALLEL_ALL:
                 invocations = run_parallel_all_sync(
                     workers, max_concurrency=self._config.max_concurrency
                 )
@@ -420,7 +420,7 @@ class Runner:
                     lambda invocation: cast(ProviderResponse, invocation.response),
                 )
 
-            if mode is RunnerMode.CONSENSUS:
+            if mode == RunnerMode.CONSENSUS:
                 invocations = run_parallel_all_sync(
                     workers, max_concurrency=self._config.max_concurrency
                 )
