@@ -11,8 +11,8 @@ import pytest
 from src.llm_adapter.errors import RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
+from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
     ParallelExecutionError,
