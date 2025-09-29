@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import socket
 import warnings
+from typing import Any, cast
 
 from asyncio import unix_events
 from collections.abc import Callable
@@ -59,10 +60,12 @@ def _probe_socketpair() -> bool:
 
 
 def _install_socketpair_fallback() -> None:
-    if getattr(unix_events._UnixSelectorEventLoop, "_llm_adapter_socket_patch", False):
+    loop_cls = cast(Any, unix_events._UnixSelectorEventLoop)
+
+    if getattr(loop_cls, "_llm_adapter_socket_patch", False):
         return
 
-    original_make_self_pipe = unix_events._UnixSelectorEventLoop._make_self_pipe
+    original_make_self_pipe = loop_cls._make_self_pipe
 
     def _patched_make_self_pipe(self: unix_events._UnixSelectorEventLoop) -> None:
         global _CAN_SOCKETPAIR
@@ -80,13 +83,14 @@ def _install_socketpair_fallback() -> None:
         rfd, wfd = os.pipe()
         os.set_blocking(rfd, False)
         os.set_blocking(wfd, False)
-        self._ssock = _PipeEndpoint(rfd, None)
-        self._csock = _PipeEndpoint(wfd, os.write)
-        self._internal_fds += 1
-        self._add_reader(self._ssock.fileno(), self._read_from_self)
+        loop = cast(Any, self)
+        loop._ssock = _PipeEndpoint(rfd, None)
+        loop._csock = _PipeEndpoint(wfd, os.write)
+        loop._internal_fds += 1
+        loop._add_reader(loop._ssock.fileno(), loop._read_from_self)
 
-    unix_events._UnixSelectorEventLoop._make_self_pipe = _patched_make_self_pipe  # type: ignore[assignment]
-    unix_events._UnixSelectorEventLoop._llm_adapter_socket_patch = True
+    loop_cls._make_self_pipe = _patched_make_self_pipe
+    loop_cls._llm_adapter_socket_patch = True
 
 
 def ensure_socket_free_event_loop_policy() -> None:
