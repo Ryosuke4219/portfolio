@@ -6,12 +6,8 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-from adapter.cli import (
-    prompt_runner,
-    prompts as prompts_module,
-)
-
-cli_module = sys.modules["adapter.cli"]
+import adapter.cli as cli_module
+from adapter.cli import prompt_runner, prompts as prompts_module
 from adapter.core import providers as provider_module
 from adapter.core.models import (
     PricingConfig,
