@@ -9,6 +9,7 @@ export default [
       'packages/**',
       'dist/**',
       'coverage/**',
+      'docs/reports/coverage/**',
       'projects/04-llm-adapter-shadow/**',
       'tests/playwright-report/**',
       'projects/02-blueprint-to-playwright/tests/generated/**',
