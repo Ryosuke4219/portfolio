@@ -72,7 +72,7 @@ jobs:
           bash scripts/run-node-suite.sh
           npm run ci:analyze
           npm run ci:issue
-          PYTHON=python3 node --test tests/e2e-shadow.test.mjs
+          node --test tests/e2e-shadow.test.mjs
       - name: Run Python tests (verbose, timeout, no network)
         env:
           LLM_ADAPTER_OFFLINE: "1"
