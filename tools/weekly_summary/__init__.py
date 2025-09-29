@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """Generate weekly QA summary markdown from run history and flaky ranking."""
-
 from __future__ import annotations
 
+from collections import Counter
+from collections.abc import Iterable
 import csv
 import datetime as dt
 import json
-import re
-from collections import Counter
-from collections.abc import Iterable
 from pathlib import Path
+import re
 
 __all__ = [
     "parse_iso8601",

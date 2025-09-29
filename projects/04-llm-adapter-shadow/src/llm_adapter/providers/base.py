@@ -1,5 +1,4 @@
 """共通プロバイダ基底クラス。"""
-
 from __future__ import annotations
 
 from abc import ABC

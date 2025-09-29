@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+import time
 from typing import cast
 
 from adapter.core import providers as provider_module
 from adapter.core.config import ProviderConfig
-from adapter.core.metrics import RunMetric, estimate_cost
+from adapter.core.metrics import estimate_cost, RunMetric
 
-from .utils import LOGGER, _sanitize_message
+from .utils import _sanitize_message, LOGGER
 
 ProviderResponse = provider_module.ProviderResponse
 Classifier = Callable[[Exception, ProviderConfig, str], tuple[str, str]]

@@ -1,8 +1,8 @@
 """Utility helpers for hashing request payloads and message normalization."""
 
+from collections.abc import Mapping, Sequence
 import hashlib
 import time
-from collections.abc import Mapping, Sequence
 from typing import Any
 
 

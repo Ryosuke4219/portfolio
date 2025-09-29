@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 from collections.abc import Iterable
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .utils import LOGGER, _msg, _sanitize_message
+from .utils import _msg, _sanitize_message, LOGGER
 
 if TYPE_CHECKING:
     from .prompt_runner import PromptResult

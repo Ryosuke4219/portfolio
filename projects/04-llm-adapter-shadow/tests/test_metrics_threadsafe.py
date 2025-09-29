@@ -1,11 +1,11 @@
 import json
+from pathlib import Path
 import sys
 import threading
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from src.llm_adapter.metrics import PrometheusMetricsExporter, log_event
+from src.llm_adapter.metrics import log_event, PrometheusMetricsExporter
 
 
 @pytest.mark.parametrize("thread_count,event_per_thread", [(8, 200)])

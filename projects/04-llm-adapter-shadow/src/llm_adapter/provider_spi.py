@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
-import warnings
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol, cast
+import inspect
+from typing import Any, cast, Protocol
+import warnings
 
 from .utils import ensure_str_list
 from .utils import extract_prompt_from_messages as _extract_prompt_from_messages

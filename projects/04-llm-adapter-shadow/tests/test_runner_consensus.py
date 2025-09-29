@@ -8,9 +8,9 @@ from src.llm_adapter.provider_spi import (
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
+    compute_consensus,
     ConsensusResult,
     ParallelExecutionError,
-    compute_consensus,
 )
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 

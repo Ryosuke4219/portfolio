@@ -1,9 +1,8 @@
 """Helpers for instantiating providers from configuration strings."""
-
 from __future__ import annotations
 
-import os
 from collections.abc import Callable, Mapping
+import os
 
 from ..provider_spi import ProviderSPI
 from .gemini import GeminiProvider

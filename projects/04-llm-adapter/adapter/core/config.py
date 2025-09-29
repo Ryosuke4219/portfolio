@@ -1,5 +1,4 @@
 """設定ファイル関連の公開 API ファサード。"""
-
 from __future__ import annotations
 
 from .loader import ConfigError, load_budget_book, load_provider_config, load_provider_configs

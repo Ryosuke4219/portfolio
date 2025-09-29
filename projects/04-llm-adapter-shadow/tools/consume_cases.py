@@ -1,11 +1,10 @@
 """Utility script to aggregate Node pipeline outputs for the shadow adapter demo."""
-
 from __future__ import annotations
 
 import argparse
-import json
 from collections import Counter
 from collections.abc import Iterable, Mapping, MutableMapping
+import json
 from pathlib import Path
 from typing import Any
 

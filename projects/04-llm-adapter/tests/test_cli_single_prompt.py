@@ -1,10 +1,10 @@
 import asyncio
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
 import types
-from pathlib import Path
 
 from adapter import cli as cli_module
 from adapter.cli import prompt_runner

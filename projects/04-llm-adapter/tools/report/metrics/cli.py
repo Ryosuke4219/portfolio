@@ -1,5 +1,4 @@
 """Command line entry points for the metrics report generator."""
-
 from __future__ import annotations
 
 import argparse

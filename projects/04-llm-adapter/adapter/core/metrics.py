@@ -1,13 +1,12 @@
 """メトリクス関連ユーティリティ。"""
-
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, UTC
+import hashlib
 from statistics import median
-from typing import TYPE_CHECKING, Any
+from typing import Any, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 

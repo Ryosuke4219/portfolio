@@ -1,5 +1,4 @@
 """Backward-compatible shim for the relocated metrics report CLI."""
-
 from __future__ import annotations
 
 from .metrics.cli import main

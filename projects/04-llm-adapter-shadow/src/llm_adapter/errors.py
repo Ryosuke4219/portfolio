@@ -5,7 +5,6 @@ Runner retry policy:
 - ``TimeoutError`` / ``RetriableError`` → immediately try the next provider with no delay.
 - ``ProviderSkip`` → simply recorded as a skip event; control moves on without retrying.
 """
-
 from __future__ import annotations
 
 from enum import Enum

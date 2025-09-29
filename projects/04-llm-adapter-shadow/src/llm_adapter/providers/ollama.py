@@ -1,18 +1,17 @@
 """Ollama provider with automatic model management."""
-
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import os
 import time
-from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..errors import ConfigError, ProviderSkip, RetriableError
 from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from ._requests_compat import (
-    SessionProtocol,
     create_session,
     requests_exceptions,
+    SessionProtocol,
 )
 from .base import BaseProvider
 from .ollama_client import OllamaClient

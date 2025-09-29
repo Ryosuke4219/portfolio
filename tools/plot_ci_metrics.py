@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Generate CI pass rate and flaky trend chart (SVG)."""
-
 from __future__ import annotations
 
 import argparse

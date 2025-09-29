@@ -1,9 +1,8 @@
 """Regression summary HTML generation for metrics reports."""
-
 from __future__ import annotations
 
-import html
 from collections.abc import Mapping, Sequence
+import html
 from pathlib import Path
 
 from .data import load_baseline_expectations

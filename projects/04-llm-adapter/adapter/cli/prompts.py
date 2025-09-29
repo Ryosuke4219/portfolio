@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections.abc import Iterable
 import os
+from pathlib import Path
 import socket
 import textwrap
-from collections.abc import Iterable
-from pathlib import Path
 
 from adapter.core import providers as provider_module
-from adapter.core.config import ProviderConfig, load_provider_config
+from adapter.core.config import load_provider_config, ProviderConfig
 
 from .prompt_io import collect_prompts, emit_results, write_metrics
-from .prompt_runner import PromptResult, RateLimiter, execute_prompts
+from .prompt_runner import execute_prompts, PromptResult, RateLimiter
 from .utils import (
+    _coerce_exit_code,
+    _configure_logging,
+    _msg,
+    _resolve_lang,
+    _sanitize_message,
     EXIT_ENV_ERROR,
     EXIT_INPUT_ERROR,
     EXIT_NETWORK_ERROR,
@@ -21,11 +26,6 @@ from .utils import (
     EXIT_PROVIDER_ERROR,
     EXIT_RATE_LIMIT,
     LOGGER,
-    _coerce_exit_code,
-    _configure_logging,
-    _msg,
-    _resolve_lang,
-    _sanitize_message,
 )
 
 ProviderFactory = provider_module.ProviderFactory

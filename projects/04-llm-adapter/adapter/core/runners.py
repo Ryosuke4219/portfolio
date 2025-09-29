@@ -1,19 +1,18 @@
 """比較ランナーの実装。"""
-
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 import json
 import logging
 import os
-import re
-import uuid
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, replace
 from pathlib import Path
+import re
 from statistics import median, pstdev
 from threading import Lock
 from time import perf_counter, sleep
 from typing import TYPE_CHECKING
+import uuid
 
 try:  # pragma: no cover - 実環境では src.* が存在する
     from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
@@ -74,12 +73,12 @@ from .config import ProviderConfig
 from .datasets import GoldenTask
 from .metrics import (
     BudgetSnapshot,
-    EvalMetrics,
-    RunMetrics,
     compute_diff_rate,
     estimate_cost,
+    EvalMetrics,
     hash_text,
     now_ts,
+    RunMetrics,
 )
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 

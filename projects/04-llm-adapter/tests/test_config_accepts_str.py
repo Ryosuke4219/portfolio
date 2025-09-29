@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from adapter.core.config import ConfigError, load_provider_config
 
 

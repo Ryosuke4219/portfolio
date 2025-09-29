@@ -1,11 +1,10 @@
 """Shared observability primitives for the shadow adapter."""
-
 from __future__ import annotations
 
-import json
-import sys
 from collections.abc import Iterable, Mapping
+import json
 from pathlib import Path
+import sys
 from threading import Lock
 from typing import Any, Protocol, TextIO
 

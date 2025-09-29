@@ -1,5 +1,4 @@
 """設定ファイル検証用の Pydantic モデル。"""
-
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field

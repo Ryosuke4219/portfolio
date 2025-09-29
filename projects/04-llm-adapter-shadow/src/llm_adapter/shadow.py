@@ -1,23 +1,22 @@
 """Shadow execution helpers."""
-
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import threading
-import time
 from collections.abc import Mapping
+import contextlib
 from dataclasses import dataclass
 from pathlib import Path
+import threading
+import time
 from typing import Any
 
 from .observability import EventLogger, JsonlLogger
 from .provider_spi import (
     AsyncProviderSPI,
+    ensure_async_provider,
     ProviderRequest,
     ProviderResponse,
     ProviderSPI,
-    ensure_async_provider,
 )
 from .utils import content_hash
 

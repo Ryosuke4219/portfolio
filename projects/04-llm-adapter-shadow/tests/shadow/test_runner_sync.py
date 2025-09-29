@@ -8,11 +8,11 @@ from src.llm_adapter.provider_spi import ProviderSPI
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
 
 from ._runner_test_helpers import (
-    FakeLogger,
     _ErrorProvider,
     _run_and_collect,
     _SkipProvider,
     _SuccessProvider,
+    FakeLogger,
 )
 
 

@@ -1,11 +1,10 @@
 """Lightweight JSONL metrics helpers with optional exporters."""
-
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
 from pathlib import Path
 from threading import Lock
+import time
 from types import MappingProxyType
 from typing import Any, Protocol
 

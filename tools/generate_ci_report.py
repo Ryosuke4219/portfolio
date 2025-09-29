@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Generate CI reliability snapshot in Markdown and JSON."""
-
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import datetime as dt
 import json
-from collections import Counter
 from pathlib import Path
 from typing import Any
 

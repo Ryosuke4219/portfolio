@@ -1,12 +1,11 @@
 """Compat utilities for optional ``requests`` dependency."""
-
 from __future__ import annotations
 
-import importlib
-import typing
 from collections.abc import Iterable
+import importlib
 from types import TracebackType
-from typing import Any, Protocol, cast
+import typing
+from typing import Any, cast, Protocol
 
 
 class ResponseProtocol(Protocol):
@@ -49,8 +48,8 @@ requests_exceptions: RequestsExceptionsProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover - typing time placeholders
     import requests as _requests_mod  # type: ignore[import-untyped]  # noqa: F401
-    from requests import Response as _RequestsResponse  # noqa: F401
     from requests import exceptions as _RequestsExceptions  # noqa: F401
+    from requests import Response as _RequestsResponse  # noqa: F401
 
 
 def _initialize_requests() -> tuple[
