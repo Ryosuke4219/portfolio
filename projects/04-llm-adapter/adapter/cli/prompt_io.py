@@ -43,7 +43,11 @@ def read_jsonl_prompts(path: Path, lang: str) -> list[str]:
     return prompts
 
 
-def collect_prompts(args: argparse.Namespace, parser: argparse.ArgumentParser, lang: str) -> list[str]:
+def collect_prompts(
+    args: argparse.Namespace,
+    parser: argparse.ArgumentParser,
+    lang: str,
+) -> list[str]:
     prompts: list[str] = []
     if args.prompt is not None:
         prompts.append(args.prompt)
@@ -56,13 +60,18 @@ def collect_prompts(args: argparse.Namespace, parser: argparse.ArgumentParser, l
             raise SystemExit from exc
         prompts.append(text.rstrip("\n"))
     if args.prompts:
-        prompts.extend(read_jsonl_prompts(Path(args.prompts).expanduser().resolve(), lang))
+        prompts_path = Path(args.prompts).expanduser().resolve()
+        prompts.extend(read_jsonl_prompts(prompts_path, lang))
     if not prompts:
         parser.error(_msg(lang, "prompt_sources_missing"))
     return prompts
 
 
-def emit_results(results: Iterable[PromptResult], output_format: str, include_prompts: bool) -> None:
+def emit_results(
+    results: Iterable[PromptResult],
+    output_format: str,
+    include_prompts: bool,
+) -> None:
     metrics = []
     for res in results:
         payload = res.metric.model_dump()
