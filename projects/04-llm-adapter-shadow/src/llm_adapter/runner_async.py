@@ -375,6 +375,7 @@ class AsyncRunner:
                         "retry_attempt": retry_attempt,
                         "next_attempt": next_attempt_total,
                         "error_type": type(error).__name__,
+                        "delay_seconds": delay,
                     }
                 return next_attempt_total, delay
             def _build_worker(
