@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import re
-from typing import Dict, Optional
 
 LOGGER = logging.getLogger("adapter.cli")
 
@@ -15,7 +14,7 @@ EXIT_NETWORK_ERROR = 4
 EXIT_PROVIDER_ERROR = 5
 EXIT_RATE_LIMIT = 6
 
-LANG_MESSAGES: Dict[str, Dict[str, str]] = {
+LANG_MESSAGES: dict[str, dict[str, str]] = {
     "ja": {
         "env_loaded": ".env を読み込みました: {path}",
         "prompt_sources_missing": "--prompt / --prompt-file / --prompts のいずれかを指定してください",
@@ -114,7 +113,7 @@ class JsonLogFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False)
 
 
-def _resolve_lang(requested: Optional[str]) -> str:
+def _resolve_lang(requested: str | None) -> str:
     env_lang = os.getenv("LLM_ADAPTER_LANG")
     for candidate in (requested, env_lang):
         if candidate:
@@ -157,7 +156,7 @@ def _configure_logging(as_json: bool) -> None:
     root.setLevel(logging.INFO)
 
 
-def _coerce_exit_code(value: Optional[int]) -> int:
+def _coerce_exit_code(value: int | None) -> int:
     if value is None:
         return EXIT_INPUT_ERROR
     try:
