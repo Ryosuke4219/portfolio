@@ -3,8 +3,40 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+      - '**/*.jsx'
+      - 'projects/**'
+      - 'tools/**'
+      - 'packages/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'eslint.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'pyproject.toml'
+      - '.github/workflows/**'
+      - '!docs/**'
   pull_request:
     branches: [main]
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+      - '**/*.jsx'
+      - 'projects/**'
+      - 'tools/**'
+      - 'packages/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'eslint.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'pyproject.toml'
+      - '.github/workflows/**'
+      - '!docs/**'
   workflow_dispatch:
 
 permissions:
