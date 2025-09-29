@@ -248,7 +248,6 @@ class AsyncRunner:
         total_providers = len(providers)
 
         mode = RunnerMode(self._config.mode)
-        is_parallel_any = mode == RunnerMode.PARALLEL_ANY
         attempt_count = 0
         results: list[WorkerResult] | None = None
         failure_records: list[dict[str, str] | None] = [None] * total_providers
