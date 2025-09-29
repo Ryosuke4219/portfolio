@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List
 
 from ci_metrics import load_run_history
 
@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def scale_positions(count: int) -> List[float]:
+def scale_positions(count: int) -> list[float]:
     if count <= 1:
         return [MARGIN_LEFT]
     available = WIDTH - MARGIN_LEFT - MARGIN_RIGHT
@@ -59,7 +59,7 @@ def build_polyline(points: Iterable[tuple[float, float]]) -> str:
     return " ".join(f"{x:.2f},{y:.2f}" for x, y in points)
 
 
-def build_svg(entries: List[dict]) -> str:
+def build_svg(entries: list[dict]) -> str:
     chart_height = HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
 
     positions = scale_positions(len(entries))
@@ -74,9 +74,9 @@ def build_svg(entries: List[dict]) -> str:
     axis_left = MARGIN_LEFT
     axis_right = WIDTH - MARGIN_RIGHT
 
-    circles_pass: List[str] = []
-    circles_flaky: List[str] = []
-    x_labels: List[str] = []
+    circles_pass: list[str] = []
+    circles_flaky: list[str] = []
+    x_labels: list[str] = []
 
     for idx, entry in enumerate(entries):
         x = positions[idx]
@@ -104,7 +104,7 @@ def build_svg(entries: List[dict]) -> str:
                 f'<text x="{x:.2f}" y="{axis_bottom + 42:.2f}" fill="{TEXT_COLOR}" font-size="11" text-anchor="middle">{ts[:10]}</text>'
             )
 
-    grid_lines: List[str] = []
+    grid_lines: list[str] = []
     grid_steps = [0.0, 0.25, 0.5, 0.75, 1.0]
     for step in grid_steps:
         y = axis_top + chart_height * (1 - step)

@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = ROOT / "docs"
@@ -32,9 +32,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def extract_overview(lines: Iterable[str]) -> tuple[str, List[str]]:
+def extract_overview(lines: Iterable[str]) -> tuple[str, list[str]]:
     date_label = ""
-    overview: List[str] = []
+    overview: list[str] = []
     capture = False
     for raw in lines:
         line = raw.rstrip("\n")
@@ -56,7 +56,7 @@ def extract_overview(lines: Iterable[str]) -> tuple[str, List[str]]:
     return date_label, overview
 
 
-def build_card(date_label: str, overview: List[str]) -> str:
+def build_card(date_label: str, overview: list[str]) -> str:
     if not date_label:
         date_label = dt.date.today().isoformat()
     if not overview:
