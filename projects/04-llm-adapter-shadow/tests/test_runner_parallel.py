@@ -168,6 +168,21 @@ def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
         compute_consensus(responses, config=ConsensusConfig(quorum=3))
 
 
+def test_compute_consensus_accepts_numeric_scores() -> None:
+    responses = [
+        ProviderResponse(text="int", latency_ms=0, raw={"score": 1}),
+        ProviderResponse(text="float", latency_ms=0, raw={"score": 1.5}),
+    ]
+
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(strategy="weighted", quorum=1),
+    )
+
+    assert result.response.text == "float"
+    assert result.scores == {"int": 1.0, "float": 1.5}
+
+
 def test_runner_parallel_all_returns_full_result() -> None:
     providers = [
         _StaticProvider("p1", "response-1", latency_ms=5),
