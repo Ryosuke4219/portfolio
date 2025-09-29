@@ -184,7 +184,7 @@ def test_async_runner_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
         await runner.run_async(request)
         await runner.run_async(request)
 
-    asyncio.run(_execute())
+    asyncio.run(asyncio.wait_for(_execute(), timeout=0.1))
 
     assert call_times[1] - call_times[0] >= 2.0
 
@@ -210,7 +210,10 @@ def test_async_runner_matches_sync(tmp_path: Path) -> None:
 
     sync_response = sync_runner.run(sync_request, shadow_metrics_path=sync_metrics)
     async_response = asyncio.run(
-        async_runner.run_async(async_request, shadow_metrics_path=async_metrics)
+        asyncio.wait_for(
+            async_runner.run_async(async_request, shadow_metrics_path=async_metrics),
+            timeout=0.5,
+        )
     )
 
     assert async_response.text == sync_response.text
@@ -229,10 +232,13 @@ def test_async_shadow_exec_uses_injected_logger(tmp_path: Path) -> None:
 
     response = _run_without_warnings(
         lambda: asyncio.run(
-            runner.run_async(
-                request,
-                shadow=shadow,
-                shadow_metrics_path=metrics_path,
+            asyncio.wait_for(
+                runner.run_async(
+                    request,
+                    shadow=shadow,
+                    shadow_metrics_path=metrics_path,
+                ),
+                timeout=0.5,
             )
         )
     )
@@ -256,10 +262,13 @@ def test_async_shadow_exec_without_metrics_path_skips_logging() -> None:
     request = ProviderRequest(prompt="hello", model="primary-model")
 
     asyncio.run(
-        runner.run_async(
-            request,
-            shadow=shadow,
-            shadow_metrics_path=None,
+        asyncio.wait_for(
+            runner.run_async(
+                request,
+                shadow=shadow,
+                shadow_metrics_path=None,
+            ),
+            timeout=0.5,
         )
     )
 
@@ -277,10 +286,13 @@ def test_async_shadow_exec_records_metrics(tmp_path: Path) -> None:
 
     response = _run_without_warnings(
         lambda: asyncio.run(
-            runner.run_async(
-                request,
-                shadow=shadow,
-                shadow_metrics_path=metrics_path,
+            asyncio.wait_for(
+                runner.run_async(
+                    request,
+                    shadow=shadow,
+                    shadow_metrics_path=metrics_path,
+                ),
+                timeout=0.5,
             )
         )
     )
@@ -320,10 +332,13 @@ def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:
     metrics_path = tmp_path / "metrics-error.jsonl"
 
     asyncio.run(
-        runner.run_async(
-            ProviderRequest(prompt="[TIMEOUT] hello", model="primary-model"),
-            shadow=shadow,
-            shadow_metrics_path=metrics_path,
+        asyncio.wait_for(
+            runner.run_async(
+                ProviderRequest(prompt="[TIMEOUT] hello", model="primary-model"),
+                shadow=shadow,
+                shadow_metrics_path=metrics_path,
+            ),
+            timeout=0.5,
         )
     )
 
@@ -358,10 +373,13 @@ def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     metrics_path = tmp_path / "async-consensus.jsonl"
 
     response = asyncio.run(
-        runner.run_async(
-            request,
-            shadow=shadow,
-            shadow_metrics_path=metrics_path,
+        asyncio.wait_for(
+            runner.run_async(
+                request,
+                shadow=shadow,
+                shadow_metrics_path=metrics_path,
+            ),
+            timeout=0.5,
         )
     )
 
@@ -454,7 +472,7 @@ def test_async_consensus_quorum_failure() -> None:
     request = ProviderRequest(prompt="topic", model="model-consensus")
 
     with pytest.raises(ParallelExecutionError):
-        asyncio.run(runner.run_async(request))
+        asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
 
 
 def test_async_consensus_failure_details() -> None:
@@ -484,7 +502,7 @@ def test_async_consensus_failure_details() -> None:
     request = ProviderRequest(prompt="consensus", model="consensus-failure")
 
     with pytest.raises(ParallelExecutionError) as exc_info:
-        asyncio.run(runner.run_async(request))
+        asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
 
     error = exc_info.value
     failures = error.failures if hasattr(error, "failures") else None
@@ -596,7 +614,12 @@ def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
         config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL),
     )
 
-    result = asyncio.run(runner_all.run_async(request_all, shadow_metrics_path="unused.jsonl"))
+    result = asyncio.run(
+        asyncio.wait_for(
+            runner_all.run_async(request_all, shadow_metrics_path="unused.jsonl"),
+            timeout=0.2,
+        )
+    )
     assert isinstance(result, ParallelAllResult)
     assert [entry[1].name() for entry in result.invocations] == ["fast", "slow", "ready"]
     assert result.primary_response.text == "fast:gather"
