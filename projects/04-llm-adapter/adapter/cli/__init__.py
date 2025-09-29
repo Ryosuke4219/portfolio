@@ -8,10 +8,8 @@ from adapter.core import providers as provider_module
 
 from .app import app, main
 from .doctor import run_doctor
-from .prompt_runner import PromptResult as _PromptResult
-from .prompt_runner import RateLimiter as _RateLimiter
-from .prompts import ProviderFactory as _ProviderFactory
-from .prompts import run_prompts
+from .prompt_runner import PromptResult as _PromptResult, RateLimiter as _RateLimiter
+from .prompts import ProviderFactory as _ProviderFactory, run_prompts
 from .utils import (
     EXIT_ENV_ERROR,
     EXIT_INPUT_ERROR,
