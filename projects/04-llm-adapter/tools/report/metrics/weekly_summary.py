@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Mapping, Sequence
 
 
 def update_weekly_summary(
@@ -13,8 +13,8 @@ def update_weekly_summary(
     failure_summary: Sequence[Mapping[str, object]],
 ) -> None:
     weekly_path.parent.mkdir(parents=True, exist_ok=True)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    lines: List[str] = [f"## {today} 時点の失敗サマリ", ""]
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    lines: list[str] = [f"## {today} 時点の失敗サマリ", ""]
     if failure_total > 0 and failure_summary:
         lines.append(f"- 失敗総数: {failure_total}")
         lines.append("")
@@ -30,7 +30,7 @@ def update_weekly_summary(
         existing_text = weekly_path.read_text(encoding="utf-8").strip()
     else:
         existing_text = ""
-    existing_entries: List[str] = []
+    existing_entries: list[str] = []
     if existing_text:
         if existing_text.startswith(header):
             body = existing_text[len(header) :].strip()
