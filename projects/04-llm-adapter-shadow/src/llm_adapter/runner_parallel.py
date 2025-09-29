@@ -2,8 +2,15 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
-from collections.abc import Callable as TypingCallable
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Callable as TypingCallable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from concurrent.futures import (
     as_completed,
     FIRST_COMPLETED,
