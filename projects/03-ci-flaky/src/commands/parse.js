@@ -178,7 +178,7 @@ export async function runParse(args) {
     source: attempt.source,
   }));
 
-  ensureDir(resolvedConfig.paths.store);
+  ensureDir(path.dirname(resolvedConfig.paths.store));
   appendAttempts(resolvedConfig.paths.store, enrichedAttempts);
 
   const failCount = enrichedAttempts.filter((a) => a.status === 'fail' || a.status === 'error').length;
