@@ -132,10 +132,12 @@ def _invoke_gemini(
 def _extract_usage(response: Any, prompt: str, output_text: str) -> tuple[int, int]:
     prompt_tokens = 0
     output_tokens = 0
-    usage = getattr(response, "usage_metadata", None)
+    usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
     if usage is not None:
-        prompt_tokens = int(getattr(usage, "input_tokens", 0) or 0)
-        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+        if hasattr(usage, "input_tokens"):
+            prompt_tokens = int(usage.input_tokens or 0)
+        if hasattr(usage, "output_tokens"):
+            output_tokens = int(usage.output_tokens or 0)
     else:
         payload = None
         if hasattr(response, "to_dict"):
@@ -157,22 +159,29 @@ def _extract_usage(response: Any, prompt: str, output_text: str) -> tuple[int, i
 
 
 def _extract_output_text(response: Any) -> str:
-    text = getattr(response, "text", None)
-    if isinstance(text, str) and text.strip():
-        return text
-    text = getattr(response, "output_text", None)
-    if isinstance(text, str) and text.strip():
-        return text
-    candidates = getattr(response, "candidates", None)
+    if hasattr(response, "text"):
+        text = response.text
+        if isinstance(text, str) and text.strip():
+            return text
+    if hasattr(response, "output_text"):
+        text = response.output_text
+        if isinstance(text, str) and text.strip():
+            return text
+    candidates: Any
+    if hasattr(response, "candidates"):
+        candidates = response.candidates
+    else:
+        candidates = None
     if isinstance(candidates, Sequence):
         for candidate in candidates:
             if isinstance(candidate, Mapping):
                 candidate_text = candidate.get("text")
                 if isinstance(candidate_text, str) and candidate_text.strip():
                     return candidate_text
-            text_attr = getattr(candidate, "text", None)
-            if isinstance(text_attr, str) and text_attr.strip():
-                return text_attr
+            if hasattr(candidate, "text"):
+                text_attr = candidate.text
+                if isinstance(text_attr, str) and text_attr.strip():
+                    return text_attr
     if hasattr(response, "to_dict"):
         try:
             payload = response.to_dict()
