@@ -6,3 +6,4 @@ pytest-socket>=0.6.0
 google-genai>=0.3
 requests>=2.31.0
 PyYAML>=6.0
+types-PyYAML>=6.0.12.20240311
