@@ -8,6 +8,7 @@ from pathlib import Path
 
 from adapter import cli as cli_module
 from adapter.cli import prompt_runner
+from adapter.cli import prompts as prompts_module
 from adapter.core import providers as provider_module
 from adapter.core.models import (
     PricingConfig,
@@ -277,16 +278,18 @@ def test_classify_error_rate_limit_status_code() -> None:
     class RateLimitedError(Exception):
         status_code = 429
 
-    message, kind = _classify_error(RateLimitedError("Too many requests"), config, "ja")
+    message, kind = prompts_module._classify_error(
+        RateLimitedError("Too many requests"), config, "ja"
+    )
     assert kind == "rate"
-    assert message == _msg("ja", "rate_limited")
+    assert message == prompts_module._msg("ja", "rate_limited")
 
 
 def test_classify_error_system_exit_provider_error() -> None:
     config = types.SimpleNamespace(provider="fake", auth_env="NONE")
-    message, kind = _classify_error(SystemExit("fatal"), config, "ja")
+    message, kind = prompts_module._classify_error(SystemExit("fatal"), config, "ja")
     assert kind == "provider"
-    assert message == _msg("ja", "provider_error", error="fatal")
+    assert message == prompts_module._msg("ja", "provider_error", error="fatal")
 
 
 def test_cli_doctor(monkeypatch, tmp_path: Path, capsys) -> None:
