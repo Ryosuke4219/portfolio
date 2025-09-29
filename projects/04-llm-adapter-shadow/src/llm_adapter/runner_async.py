@@ -334,6 +334,7 @@ class AsyncRunner:
                     return response
         else:
             attempt_count = total_providers
+            is_parallel_any = mode == RunnerMode.PARALLEL_ANY
 
             capture_shadow, retry_attempts = mode == RunnerMode.CONSENSUS, 0
             attempt_labels = [index for index in range(1, total_providers + 1)]
@@ -359,9 +360,9 @@ class AsyncRunner:
                     return None
                 if delay is None:
                     return None
-                delay = max(0.0, float(delay))
                 if limit is not None and next_attempt_total > limit:
                     return None
+                delay = max(0.0, float(delay))
                 retry_attempt = retry_attempts + 1
                 retry_attempts, attempt_count = retry_attempt, next_attempt_total
                 attempt_labels[worker_index] = next_attempt_total
