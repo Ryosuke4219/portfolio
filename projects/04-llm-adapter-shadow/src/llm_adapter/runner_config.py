@@ -37,7 +37,7 @@ class BackoffPolicy:
 class RunnerConfig:
     backoff: BackoffPolicy = field(default_factory=BackoffPolicy)
     max_attempts: int | None = None
-    mode: RunnerMode = RunnerMode.SEQUENTIAL
+    mode: RunnerMode | str | Enum = RunnerMode.SEQUENTIAL
     max_concurrency: int | None = None
     rpm: int | None = None
     consensus: ConsensusConfig | None = None
