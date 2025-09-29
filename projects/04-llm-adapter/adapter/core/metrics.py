@@ -142,17 +142,15 @@ def compute_cost_usd(
 def estimate_cost(config: ProviderConfig, input_tokens: int, output_tokens: int) -> float:
     """プロバイダ設定に基づいて概算コストを算出する。"""
 
-    pricing = getattr(config, "pricing", None)
-    if pricing is None:
-        return 0.0
-    input_per_million = float(getattr(pricing, "input_per_million", 0.0) or 0.0)
-    output_per_million = float(getattr(pricing, "output_per_million", 0.0) or 0.0)
+    pricing = config.pricing
+    input_per_million = float(pricing.input_per_million or 0.0)
+    output_per_million = float(pricing.output_per_million or 0.0)
     if input_per_million or output_per_million:
         cost = (input_tokens / 1_000_000.0) * input_per_million
         cost += (output_tokens / 1_000_000.0) * output_per_million
         return round(cost, 6)
-    prompt_price = float(getattr(pricing, "prompt_usd", 0.0) or 0.0)
-    completion_price = float(getattr(pricing, "completion_usd", 0.0) or 0.0)
+    prompt_price = float(pricing.prompt_usd or 0.0)
+    completion_price = float(pricing.completion_usd or 0.0)
     return compute_cost_usd(input_tokens, output_tokens, prompt_price, completion_price)
 
 
