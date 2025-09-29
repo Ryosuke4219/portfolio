@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import textwrap
 import socket
 from collections.abc import Iterable
 from pathlib import Path
@@ -32,9 +33,16 @@ ProviderFactory = provider_module.ProviderFactory
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser("llm-adapter")
-    parser.add_argument("--provider", required=True, help="プロバイダ設定 YAML のパス")
+    parser.add_argument(
+        "--provider",
+        required=True,
+        help="プロバイダ設定 YAML のパス",
+    )
     parser.add_argument("--prompt", help="単発プロンプト文字列")
-    parser.add_argument("--prompt-file", help="テキストファイルからプロンプトを読み込む")
+    parser.add_argument(
+        "--prompt-file",
+        help="テキストファイルからプロンプトを読み込む",
+    )
     parser.add_argument("--prompts", help="JSONL 形式のプロンプト一覧")
     parser.add_argument(
         "--format",
@@ -42,13 +50,38 @@ def _build_parser() -> argparse.ArgumentParser:
         default="text",
         help="出力フォーマット (text/json/jsonl)",
     )
-    parser.add_argument("--out", type=Path, help="メトリクスを書き出すディレクトリ")
-    parser.add_argument("--json-logs", action="store_true", help="ログを JSON 形式で出力")
-    parser.add_argument("--parallel", action="store_true", help="プロンプトを並列実行する")
-    parser.add_argument("--rpm", type=int, default=0, help="1 分あたりの実行上限 (RPM)")
+    parser.add_argument(
+        "--out",
+        type=Path,
+        help="メトリクスを書き出すディレクトリ",
+    )
+    parser.add_argument(
+        "--json-logs",
+        action="store_true",
+        help="ログを JSON 形式で出力",
+    )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="プロンプトを並列実行する",
+    )
+    parser.add_argument(
+        "--rpm",
+        type=int,
+        default=0,
+        help="1 分あたりの実行上限 (RPM)",
+    )
     parser.add_argument("--env", help="指定した .env ファイルを読み込む")
-    parser.add_argument("--log-prompts", action="store_true", help="JSON 出力にプロンプト本文を含める")
-    parser.add_argument("--lang", choices=("ja", "en"), help="エラーメッセージの言語")
+    parser.add_argument(
+        "--log-prompts",
+        action="store_true",
+        help="JSON 出力にプロンプト本文を含める",
+    )
+    parser.add_argument(
+        "--lang",
+        choices=("ja", "en"),
+        help="エラーメッセージの言語",
+    )
     return parser
 
 
@@ -57,8 +90,12 @@ def _load_env_file(path: Path, lang: str) -> None:
         from dotenv import load_dotenv
     except ImportError as exc:  # pragma: no cover - optional dependency
         raise SystemExit(
-            "python-dotenv がインストールされていないため --env オプションは利用できません。"
-            " `pip install python-dotenv` を実行してください。"
+            textwrap.dedent(
+                """
+                python-dotenv がインストールされていないため --env オプションは利用できません。
+                `pip install python-dotenv` を実行してください。
+                """
+            ).strip()
         ) from exc
     if not path.exists():
         raise SystemExit(_msg(lang, "env_missing", path=path))
@@ -85,10 +122,20 @@ def _classify_error(
         )
     if has_auth_env and ("environment variable" in lower or "api key" in lower):
         return _msg(lang, "api_key_missing", env=auth_env), "env"
-    status_code = exc.status_code if hasattr(exc, "status_code") else None
-    if status_code == 429 or "429" in lower or "rate" in lower or "quota" in lower:
+    status_code = getattr(exc, "status_code", None)
+    if (
+        status_code == 429
+        or "429" in lower
+        or "rate" in lower
+        or "quota" in lower
+    ):
+
         return _msg(lang, "rate_limited"), "rate"
-    if isinstance(exc, OSError | socket.gaierror | TimeoutError) or "ssl" in lower or "dns" in lower:
+    if (
+        isinstance(exc, OSError | socket.gaierror | TimeoutError)
+        or "ssl" in lower
+        or "dns" in lower
+    ):
         return _msg(lang, "network_error"), "network"
     if exc.__class__.__name__.lower().endswith("ratelimiterror"):
         return _msg(lang, "rate_limited"), "rate"
@@ -168,14 +215,23 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     concurrency = _determine_concurrency(args.parallel, len(prompts))
     try:
         results = asyncio.run(
-            execute_prompts(prompts, provider, config, concurrency, args.rpm, lang, _classify_error)
+            execute_prompts(
+                prompts,
+                provider,
+                config,
+                concurrency,
+                args.rpm,
+                lang,
+                _classify_error,
+            )
         )
     except KeyboardInterrupt:  # pragma: no cover - ユーザー中断
         LOGGER.warning(_msg(lang, "interrupt"))
         return 130
 
     if args.out:
-        write_metrics(Path(args.out).expanduser().resolve(), results, args.log_prompts, lang)
+        metrics_dir = Path(args.out).expanduser().resolve()
+        write_metrics(metrics_dir, results, args.log_prompts, lang)
     emit_results(results, args.format, args.log_prompts)
     has_error = any(res.error for res in results)
     if has_error:
