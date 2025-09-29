@@ -341,22 +341,24 @@ class AsyncRunner:
                 worker_index: int, attempt_index: int, error: BaseException
             ) -> tuple[int, float] | None:
                 nonlocal retry_attempts, attempt_count
-                if mode == RunnerMode.PARALLEL_ANY and isinstance(error, RateLimitError):
-                    return None
+                current_mode = RunnerMode(self._config.mode)
+                is_parallel_any = current_mode == RunnerMode.PARALLEL_ANY
                 provider, _ = providers[worker_index]
                 next_attempt_total = total_providers + retry_attempts + 1
                 delay: float | None = None
                 if isinstance(error, RateLimitError):
-                    delay = max(0.0, float(self._config.backoff.rate_limit_sleep_s))
+                    delay = self._config.backoff.rate_limit_sleep_s
                 elif isinstance(error, TimeoutError):
                     if not self._config.backoff.timeout_next_provider:
                         delay = 0.0
                 elif isinstance(error, RetryableError):
                     if not self._config.backoff.retryable_next_provider:
                         delay = 0.0
+                elif is_parallel_any:
+                    return None
                 if delay is None:
                     return None
-                delay = max(0.0, float(delay))
+                delay_float = max(0.0, float(delay))
                 if limit is not None and next_attempt_total > limit:
                     return None
                 retry_attempt = retry_attempts + 1
@@ -374,7 +376,7 @@ class AsyncRunner:
                             "error_type": type(error).__name__,
                         },
                     )
-                return next_attempt_total, delay
+                return next_attempt_total, delay_float
             def _build_worker(
                 worker_index: int,
                 provider: ProviderSPI | AsyncProviderSPI,
