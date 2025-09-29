@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Callable, cast
 
 import pytest
 from src.llm_adapter.errors import (
@@ -61,8 +61,8 @@ def test_gemini_provider_invokes_client_with_config():
     config_dict = recorded.get("_config_dict")
     if isinstance(config_dict, Mapping):
         config_view.update(config_dict)
-    to_dict = getattr(recorded_config, "to_dict", None)
-    if callable(to_dict):
+    if hasattr(recorded_config, "to_dict"):
+        to_dict = cast(Callable[[], Any], recorded_config.to_dict)
         maybe = to_dict()
         if isinstance(maybe, Mapping):
             config_view.update(maybe)
