@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import pytest
-
 from src.llm_adapter.errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderSPI
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
@@ -11,20 +10,28 @@ from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
 from ._runner_test_helpers import (
     FakeLogger,
     _ErrorProvider,
+    _run_and_collect,
     _SkipProvider,
     _SuccessProvider,
-    _run_and_collect,
 )
 
 
 @pytest.fixture(autouse=True)
-def _force_event_logger(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _resolve(logger: FakeLogger | None, metrics_path: object) -> tuple[FakeLogger | None, str | None]:
+def _force_event_logger(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _resolve(
+        logger: FakeLogger | None,
+        metrics_path: object,
+    ) -> tuple[FakeLogger | None, str | None]:
         if logger is None:
             return None, None
         return logger, "unused"
 
-    monkeypatch.setattr("src.llm_adapter.runner_sync.resolve_event_logger", _resolve)
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.resolve_event_logger",
+        _resolve,
+    )
 
 
 @pytest.mark.parametrize(
@@ -131,7 +138,10 @@ def test_rate_limit_triggers_backoff_and_logs(
     def _fake_sleep(duration: float) -> None:
         sleep_calls.append(duration)
 
-    monkeypatch.setattr("src.llm_adapter.runner_sync.time.sleep", _fake_sleep)
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.time.sleep",
+        _fake_sleep,
+    )
 
     _, logger = _run_and_collect(
         [rate_limited, succeeding],
