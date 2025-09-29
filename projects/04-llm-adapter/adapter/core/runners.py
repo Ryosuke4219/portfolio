@@ -307,9 +307,17 @@ class CompareRunner:
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
             return [], None
-        max_workers = self._normalize_concurrency(
-            len(providers), getattr(config, "max_concurrency", None)
-        )
+        try:
+            max_concurrency = config.max_concurrency  # type: ignore[attr-defined]
+        except AttributeError:
+            max_concurrency = None
+
+        if max_concurrency is None:
+            max_workers = self._normalize_concurrency(len(providers), None)
+        else:
+            max_workers = self._normalize_concurrency(
+                len(providers), max_concurrency
+            )
         stop_reason: str | None = None
         results: list[SingleRunResult | None] = [None] * len(providers)
 
