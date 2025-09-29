@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from adapter.cli import doctor
+
 import pytest
 from adapter import run_compare as run_compare_module
 from adapter.core import runner_api
@@ -108,3 +110,19 @@ def test_run_compare_sanitizes_runner_config(
     assert captured["max_concurrency"] is None
     assert captured["rpm"] is None
     assert captured["repeat"] == 1
+
+
+def test_doctor_windows_encoding(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor.sys, "platform", "win32")
+
+    class DummyStream:
+        def __init__(self, encoding: str | None) -> None:
+            self.encoding = encoding
+
+    monkeypatch.setattr(doctor.sys, "stdout", DummyStream("UTF-8"))
+    monkeypatch.setattr(doctor.sys, "stdin", DummyStream("utf-8"))
+
+    name, status, detail = doctor._doctor_check_windows_encoding("ja")
+    assert name == "doctor_name_windows"
+    assert status == "ok"
+    assert detail == "stdout=utf-8, stdin=utf-8"

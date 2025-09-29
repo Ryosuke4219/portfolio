@@ -29,7 +29,10 @@ def _doctor_check_python(lang: str) -> tuple[str, str, str]:
 
 
 def _doctor_check_os(lang: str) -> tuple[str, str, str]:
-    venv_active = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+    base_prefix = sys.prefix
+    if hasattr(sys, "base_prefix"):
+        base_prefix = sys.base_prefix  # type: ignore[attr-defined]
+    venv_active = sys.prefix != base_prefix
     detail = _msg(
         lang,
         "doctor_info_os",
@@ -82,8 +85,14 @@ def _doctor_check_pythonioencoding(lang: str) -> tuple[str, str, str]:
 def _doctor_check_windows_encoding(lang: str) -> tuple[str, str, str]:
     if not sys.platform.startswith("win"):
         return "doctor_name_windows", "ok", "N/A"
-    stdout_enc = (getattr(sys.stdout, "encoding", "") or "").lower()
-    stdin_enc = (getattr(sys.stdin, "encoding", "") or "").lower()
+    stdout_enc = ""
+    if hasattr(sys.stdout, "encoding"):
+        stdout_value = sys.stdout.encoding
+        stdout_enc = (stdout_value or "").lower()
+    stdin_enc = ""
+    if hasattr(sys.stdin, "encoding"):
+        stdin_value = sys.stdin.encoding
+        stdin_enc = (stdin_value or "").lower()
     if "utf" in stdout_enc and "utf" in stdin_enc:
         return "doctor_name_windows", "ok", f"stdout={stdout_enc}, stdin={stdin_enc}"
     return "doctor_name_windows", "fail", _msg(lang, "doctor_fix_windows")
@@ -141,7 +150,7 @@ def run_doctor(
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
-        return _coerce_exit_code(getattr(exc, "code", None))
+        return _coerce_exit_code(exc.code)
 
     lang = _resolve_lang(getattr(args, "lang", None))
     socket_mod = socket_module or socket
