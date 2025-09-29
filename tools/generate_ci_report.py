@@ -8,7 +8,7 @@ import datetime as dt
 import json
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ci_metrics import compute_recent_deltas, compute_run_history
 from weekly_summary import (  # type: ignore
@@ -49,8 +49,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def compute_last_updated(runs: List[dict]) -> Optional[str]:
-    timestamps: List[dt.datetime] = []
+def compute_last_updated(runs: list[dict]) -> str | None:
+    timestamps: list[dt.datetime] = []
     for run in runs:
         ts = parse_iso8601(run.get("ts"))
         if ts is not None:
@@ -61,7 +61,7 @@ def compute_last_updated(runs: List[dict]) -> Optional[str]:
     return latest.isoformat().replace("+00:00", "Z")
 
 
-def summarize_failure_kinds(runs: List[dict], limit: int = 3) -> List[dict]:
+def summarize_failure_kinds(runs: list[dict], limit: int = 3) -> list[dict]:
     counter: Counter[str] = Counter()
     for run in runs:
         status = (run.get("status") or "").lower()
@@ -76,7 +76,7 @@ def summarize_failure_kinds(runs: List[dict], limit: int = 3) -> List[dict]:
     ]
 
 
-def normalize_flaky_rows(rows: List[dict], limit: int = 3) -> List[dict]:
+def normalize_flaky_rows(rows: list[dict], limit: int = 3) -> list[dict]:
     if not rows:
         return []
     sorted_rows = sorted(
@@ -84,7 +84,7 @@ def normalize_flaky_rows(rows: List[dict], limit: int = 3) -> List[dict]:
         key=lambda row: to_float(row.get("score")) or 0.0,
         reverse=True,
     )
-    normalized: List[dict] = []
+    normalized: list[dict] = []
     for idx, row in enumerate(sorted_rows[:limit], start=1):
         attempts = row.get("attempts") or row.get("Attempts")
         normalized.append(
@@ -107,11 +107,11 @@ def build_json_payload(
     passes: int,
     fails: int,
     errors: int,
-    failure_kinds: List[dict],
-    flaky_rows: List[dict],
-    last_updated: Optional[str],
-    recent_runs: List[dict],
-) -> Dict[str, Any]:
+    failure_kinds: list[dict],
+    flaky_rows: list[dict],
+    last_updated: str | None,
+    recent_runs: list[dict],
+) -> dict[str, Any]:
     total = passes + fails + errors
     pass_rate = (passes / total) if total else None
     return {
@@ -131,7 +131,7 @@ def build_json_payload(
     }
 
 
-def format_flaky_markdown(rows: List[dict]) -> List[str]:
+def format_flaky_markdown(rows: list[dict]) -> list[str]:
     header = "| Rank | Canonical ID | Attempts | p_fail | Score |"
     divider = "|-----:|--------------|---------:|------:|------:|"
     lines = [header, divider]
@@ -157,20 +157,20 @@ def render_markdown(
     *,
     today: dt.date,
     window_days: int,
-    totals: Dict[str, int],
-    pass_rate: Optional[float],
-    failure_kinds: List[dict],
-    flaky_rows: List[dict],
-    last_updated: Optional[str],
+    totals: dict[str, int],
+    pass_rate: float | None,
+    failure_kinds: list[dict],
+    flaky_rows: list[dict],
+    last_updated: str | None,
     runs_path: Path,
     flaky_path: Path,
-) -> List[str]:
+) -> list[str]:
     kinds_summary = (
         " / ".join(f"{item['kind']} {item['count']}" for item in failure_kinds)
         if failure_kinds
         else "-"
     )
-    lines: List[str] = [
+    lines: list[str] = [
         "---",
         "layout: default",
         f"title: QA Reliability Snapshot — {today.isoformat()}",
@@ -229,7 +229,7 @@ def update_index(index_path: Path, *, today: dt.date) -> None:
 
 def main() -> None:
     args = parse_args()
-    now = dt.datetime.now(dt.timezone.utc)
+    now = dt.datetime.now(dt.UTC)
     window = dt.timedelta(days=max(args.days, 1))
     start = now - window
 

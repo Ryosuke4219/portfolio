@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Deque, Dict, Iterable, List, Optional
 
 from weekly_summary import load_runs, parse_iso8601  # type: ignore
 
@@ -18,23 +18,23 @@ ERROR_STATUSES = {"error", "errored"}
 @dataclass
 class RunRecord:
     run_id: str
-    timestamp: Optional[dt.datetime]
-    records: List[dict]
+    timestamp: dt.datetime | None
+    records: list[dict]
 
 
 @dataclass
 class RunMetrics:
     run_id: str
-    timestamp: Optional[dt.datetime]
+    timestamp: dt.datetime | None
     total: int
     passes: int
     fails: int
     errors: int
-    pass_rate: Optional[float]
+    pass_rate: float | None
     flaky_count: int
 
 
-def normalize_status(value: Optional[str]) -> str:
+def normalize_status(value: str | None) -> str:
     status = (value or "").strip().lower()
     if status in PASS_STATUSES:
         return "pass"
@@ -45,8 +45,8 @@ def normalize_status(value: Optional[str]) -> str:
     return "other"
 
 
-def _group_runs(runs: Iterable[dict]) -> List[RunRecord]:
-    grouped: Dict[str, RunRecord] = {}
+def _group_runs(runs: Iterable[dict]) -> list[RunRecord]:
+    grouped: dict[str, RunRecord] = {}
     for record in runs:
         run_id = record.get("run_id")
         if not run_id:
@@ -64,7 +64,7 @@ def _group_runs(runs: Iterable[dict]) -> List[RunRecord]:
     records = list(grouped.values())
     records.sort(
         key=lambda item: (
-            item.timestamp or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
+            item.timestamp or dt.datetime.min.replace(tzinfo=dt.UTC),
             item.run_id,
         )
     )
@@ -73,23 +73,23 @@ def _group_runs(runs: Iterable[dict]) -> List[RunRecord]:
 
 def compute_run_history(
     runs: Iterable[dict], *, window_size: int = 5
-) -> List[RunMetrics]:
+) -> list[RunMetrics]:
     grouped_runs = _group_runs(runs)
     if not grouped_runs:
         return []
 
-    history: Dict[str, Deque[str]] = {}
-    flaky_flags: Dict[str, bool] = {}
+    history: dict[str, deque[str]] = {}
+    flaky_flags: dict[str, bool] = {}
     current_flaky_total = 0
 
-    metrics: List[RunMetrics] = []
+    metrics: list[RunMetrics] = []
     for run in grouped_runs:
         total = passes = fails = errors = 0
         for record in sorted(
             run.records,
             key=lambda item: parse_iso8601(item.get("ts"))
             or run.timestamp
-            or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
+            or dt.datetime.min.replace(tzinfo=dt.UTC),
         ):
             total += 1
             status = normalize_status(record.get("status"))
@@ -137,22 +137,22 @@ def compute_run_history(
     return metrics
 
 
-def compute_recent_deltas(history: List[RunMetrics], limit: int = 3) -> List[dict]:
+def compute_recent_deltas(history: list[RunMetrics], limit: int = 3) -> list[dict]:
     if not history:
         return []
 
-    recent: List[dict] = []
+    recent: list[dict] = []
     start_index = max(0, len(history) - max(limit, 0))
     for idx in range(start_index, len(history)):
         entry = history[idx]
         prev = history[idx - 1] if idx > 0 else None
-        pass_delta: Optional[float] = None
-        flaky_delta: Optional[int] = None
+        pass_delta: float | None = None
+        flaky_delta: int | None = None
         if prev and entry.pass_rate is not None and prev.pass_rate is not None:
             pass_delta = entry.pass_rate - prev.pass_rate
         if prev is not None:
             flaky_delta = entry.flaky_count - prev.flaky_count
-        timestamp_iso: Optional[str] = None
+        timestamp_iso: str | None = None
         if entry.timestamp is not None:
             timestamp_iso = entry.timestamp.isoformat().replace("+00:00", "Z")
         recent.append(
@@ -168,7 +168,7 @@ def compute_recent_deltas(history: List[RunMetrics], limit: int = 3) -> List[dic
     return recent
 
 
-def load_run_history(path: Path, *, window_size: int = 5) -> List[RunMetrics]:
+def load_run_history(path: Path, *, window_size: int = 5) -> list[RunMetrics]:
     runs = load_runs(path)
     return compute_run_history(runs, window_size=window_size)
 
