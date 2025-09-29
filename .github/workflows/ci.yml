@@ -22,7 +22,9 @@ on:
       - 'package-lock.json'
       - 'pyproject.toml'
       - '.github/workflows/**'
-      - '!docs/**'
+      - 'docs/examples/**'
+      - '!docs/**/*.md'
+      - '!docs/**/*.yml'
   pull_request:
     branches: [main]
     paths:
@@ -40,7 +42,9 @@ on:
       - 'package-lock.json'
       - 'pyproject.toml'
       - '.github/workflows/**'
-      - '!docs/**'
+      - 'docs/examples/**'
+      - '!docs/**/*.md'
+      - '!docs/**/*.yml'
   workflow_dispatch:
 
 permissions:
