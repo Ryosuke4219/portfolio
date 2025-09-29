@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+# Third-party
 import pytest
 
 from adapter import run_compare as run_compare_module
