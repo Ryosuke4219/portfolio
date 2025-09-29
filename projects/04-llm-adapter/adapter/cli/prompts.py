@@ -4,8 +4,8 @@ import argparse
 import asyncio
 import os
 import socket
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
 
 from adapter.core import providers as provider_module
 from adapter.core.config import ProviderConfig, load_provider_config
@@ -70,8 +70,8 @@ def _classify_error(
     exc: Exception,
     config: ProviderConfig,
     lang: str,
-    factory: Optional[object] = None,
-) -> Tuple[str, str]:
+    factory: object | None = None,
+) -> tuple[str, str]:
     raw_message = str(exc)
     lower = raw_message.lower()
     auth_env = (config.auth_env or "").strip()
@@ -88,7 +88,7 @@ def _classify_error(
     status_code = getattr(exc, "status_code", None)
     if status_code == 429 or "429" in lower or "rate" in lower or "quota" in lower:
         return _msg(lang, "rate_limited"), "rate"
-    if isinstance(exc, (OSError, socket.gaierror, TimeoutError)) or "ssl" in lower or "dns" in lower:
+    if isinstance(exc, OSError | socket.gaierror | TimeoutError) or "ssl" in lower or "dns" in lower:
         return _msg(lang, "network_error"), "network"
     if exc.__class__.__name__.lower().endswith("ratelimiterror"):
         return _msg(lang, "rate_limited"), "rate"
@@ -118,7 +118,7 @@ def _exit_code_for_results(results: Iterable[PromptResult]) -> int:
     return EXIT_OK
 
 
-def run_prompts(argv: Optional[List[str]], provider_factory: Optional[object] = None) -> int:
+def run_prompts(argv: list[str] | None, provider_factory: object | None = None) -> int:
     parser = _build_parser()
     try:
         args = parser.parse_args(argv)
