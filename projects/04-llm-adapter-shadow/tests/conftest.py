@@ -1,7 +1,7 @@
-import sys
-import warnings
 from collections.abc import Generator
 from pathlib import Path
+import sys
+import warnings
 
 import pytest
 
