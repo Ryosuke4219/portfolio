@@ -9,9 +9,10 @@ from src.llm_adapter import provider_spi as provider_spi_module
 from src.llm_adapter.provider_spi import ProviderRequest
 
 hypothesis = pytest.importorskip("hypothesis")
+from hypothesis.strategies import SearchStrategy
+
 st = hypothesis.strategies
 given = hypothesis.given
-SearchStrategy = st.SearchStrategy
 
 
 def _message_entries() -> SearchStrategy[Mapping[str, Any]]:
