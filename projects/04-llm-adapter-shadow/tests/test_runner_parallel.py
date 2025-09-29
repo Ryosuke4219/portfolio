@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import pytest
 from src.llm_adapter.errors import RateLimitError, TimeoutError
