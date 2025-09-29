@@ -422,7 +422,8 @@ class CompareRunner:
                     if result.metrics.status == "ok"
                     and result.raw_output.strip() == winner_output
                 )
-            quorum = getattr(config, "quorum", None) or len(candidates)
+            quorum_value = config.quorum
+            quorum = quorum_value if quorum_value is not None else len(candidates)
             if votes < quorum:
                 self._mark_consensus_failure(lookup.values(), quorum, votes)
                 return None
