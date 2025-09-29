@@ -34,7 +34,7 @@ def test_ollama_provider_legacy_host_fallback(monkeypatch):
     assert provider._host == "http://legacy-host"
 
 
-def test_ollama_provider_auto_pull_and_chat():
+def test_ollama_provider_auto_pull_and_chat(monkeypatch):
     class Session(FakeSession):
         def __init__(self):
             super().__init__()
@@ -65,6 +65,8 @@ def test_ollama_provider_auto_pull_and_chat():
                     },
                 )
             raise AssertionError(f"unexpected url: {url}")
+
+    monkeypatch.setenv("OLLAMA_AUTO_PULL", "0")
 
     session = Session()
     provider = OllamaProvider("gemma3n:e2b", session=session, host="http://localhost")

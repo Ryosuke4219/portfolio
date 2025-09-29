@@ -60,20 +60,21 @@ class OllamaProvider(BaseProvider):
             except (TypeError, ValueError):
                 pass
 
-        auto_pull_env = os.environ.get("OLLAMA_AUTO_PULL")
-        if auto_pull_env is not None and auto_pull_env.strip() == "0":
-            auto_pull = False
-
         self._timeout = timeout
         self._pull_timeout = pull_timeout
-        self._auto_pull = auto_pull
         self._offline = (
             os.environ.get("LLM_ADAPTER_OFFLINE") == "1"
             or os.environ.get("CI", "").lower() == "true"
         )
         session_provided = session is not None
         client_provided = client is not None
-        self._allow_network = session_provided or client_provided
+        allow_network = session_provided or client_provided
+        auto_pull_env = os.environ.get("OLLAMA_AUTO_PULL")
+        if auto_pull_env is not None and auto_pull_env.strip() == "0" and not allow_network:
+            auto_pull = False
+
+        self._auto_pull = auto_pull
+        self._allow_network = allow_network
         self._ready_models: set[str] = set()
         if client is None:
             if session is None:
