@@ -85,7 +85,7 @@ def _classify_error(
         )
     if has_auth_env and ("environment variable" in lower or "api key" in lower):
         return _msg(lang, "api_key_missing", env=auth_env), "env"
-    status_code = getattr(exc, "status_code", None)
+    status_code = exc.status_code if hasattr(exc, "status_code") else None
     if status_code == 429 or "429" in lower or "rate" in lower or "quota" in lower:
         return _msg(lang, "rate_limited"), "rate"
     if isinstance(exc, OSError | socket.gaierror | TimeoutError) or "ssl" in lower or "dns" in lower:
