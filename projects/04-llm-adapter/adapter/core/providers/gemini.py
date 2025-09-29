@@ -1,11 +1,10 @@
 """Google Gemini プロバイダ実装。"""
-
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping, Sequence
 import os
 import textwrap
 import time
-from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any
 
 from ..config import ProviderConfig

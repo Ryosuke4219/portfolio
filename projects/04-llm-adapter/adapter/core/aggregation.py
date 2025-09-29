@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, cast, Protocol, runtime_checkable
 
 # 依存は実行時読み込み。型は実体を使う（mypy用に直import）
 try:  # pragma: no cover - 実環境では src.* が存在する

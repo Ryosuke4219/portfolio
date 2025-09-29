@@ -1,9 +1,8 @@
 """Shared helpers for metrics report processing."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime, UTC
 
 
 def parse_iso_ts(value: object) -> datetime:

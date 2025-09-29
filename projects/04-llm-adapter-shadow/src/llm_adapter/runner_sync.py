@@ -1,10 +1,9 @@
 """Synchronous runner implementation."""
-
 from __future__ import annotations
 
-import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import time
 from typing import cast
 
 from .errors import (
@@ -19,24 +18,24 @@ from .observability import EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
+    compute_consensus,
     ParallelAllResult,
     ParallelExecutionError,
-    compute_consensus,
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
 from .runner_shared import (
-    MetricsPath,
-    RateLimiter,
     error_family,
     estimate_cost,
     log_provider_call,
     log_provider_skipped,
     log_run_metric,
+    MetricsPath,
+    RateLimiter,
     resolve_event_logger,
     resolve_rate_limiter,
 )
-from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow
+from .shadow import DEFAULT_METRICS_PATH, run_with_shadow, ShadowMetrics
 from .utils import content_hash, elapsed_ms
 
 

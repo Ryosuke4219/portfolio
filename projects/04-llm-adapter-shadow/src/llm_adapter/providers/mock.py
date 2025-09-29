@@ -1,10 +1,9 @@
 """Mock provider that can deterministically trigger failure modes."""
-
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 import random
 import time
-from collections.abc import Iterable, Mapping, Sequence
 
 from ..errors import AdapterError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage

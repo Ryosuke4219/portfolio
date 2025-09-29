@@ -1,6 +1,6 @@
+from pathlib import Path
 import sys
 import warnings
-from pathlib import Path
 
 import pytest
 

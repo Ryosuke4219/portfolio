@@ -1,23 +1,22 @@
 """Parallel and consensus orchestration helpers for runner implementations."""
-
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable as TypingCallable
+from concurrent.futures import (
+    as_completed,
+    FIRST_COMPLETED,
+    Future,
+    ThreadPoolExecutor,
+    wait,
+)
+from dataclasses import dataclass, field
 import importlib
 import inspect
 import json
 import math
-from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
-from collections.abc import Callable as TypingCallable
-from concurrent.futures import (
-    FIRST_COMPLETED,
-    Future,
-    ThreadPoolExecutor,
-    as_completed,
-    wait,
-)
-from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, cast, Generic, TypeVar
 
 from .provider_spi import ProviderResponse
 from .runner_config import ConsensusConfig

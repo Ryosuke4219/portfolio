@@ -1,5 +1,4 @@
 """設定ファイルの読み込みユーティリティ。"""
-
 from __future__ import annotations
 
 from collections.abc import Iterable, MutableMapping

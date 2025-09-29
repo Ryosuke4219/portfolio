@@ -8,11 +8,10 @@ from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMod
 from src.llm_adapter.runner_parallel import ParallelExecutionError
 
 from tests.shadow._runner_test_helpers import (
-    FakeLogger,
     _ErrorProvider,
     _SuccessProvider,
+    FakeLogger,
 )
-
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
 

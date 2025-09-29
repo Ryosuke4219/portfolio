@@ -1,11 +1,10 @@
 """プロバイダとのインタフェース。"""
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import logging
 import time
-from dataclasses import dataclass
 from typing import Any
 
 from ..config import ProviderConfig

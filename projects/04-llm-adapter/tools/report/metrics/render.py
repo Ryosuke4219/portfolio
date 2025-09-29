@@ -1,5 +1,4 @@
 """Facade exports for metrics rendering helpers."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

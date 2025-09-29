@@ -1,12 +1,11 @@
 """データセット読み込みとプロンプト整形。"""
-
 from __future__ import annotations
 
-import json
-import re
 from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass
+import json
 from pathlib import Path
+import re
 
 _PROMPT_PATTERN = re.compile(r"{{\s*(?P<key>[a-zA-Z0-9_\.]+)\s*}}")
 

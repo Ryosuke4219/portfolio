@@ -1,22 +1,21 @@
 """OpenAI プロバイダ実装。"""
-
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping
 import os
 import time
-from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 from ..config import ProviderConfig
 from . import BaseProvider, ProviderResponse
 from .openai_utils import (
-    OpenAIClientFactory,
     build_chat_messages,
     build_system_user_contents,
     coerce_raw_output,
     determine_modes,
     extract_text_from_response,
     extract_usage_tokens,
+    OpenAIClientFactory,
 )
 
 __all__ = ["OpenAIProvider"]

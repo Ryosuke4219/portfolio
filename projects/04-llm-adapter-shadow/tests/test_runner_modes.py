@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from enum import Enum
+import time
 
 import pytest
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse

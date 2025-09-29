@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 """OpenAI プロバイダ用ユーティリティ。"""
-
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

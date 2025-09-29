@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Generate helper snippets for docs gallery pages."""
-
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 from collections.abc import Iterable
+import datetime as dt
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]

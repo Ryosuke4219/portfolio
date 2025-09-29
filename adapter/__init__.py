@@ -1,10 +1,9 @@
 """トップレベル `adapter` パッケージのシム。"""
-
 from __future__ import annotations
 
-import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import sys
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _TARGET_DIR = _REPO_ROOT / "projects" / "04-llm-adapter" / "adapter"

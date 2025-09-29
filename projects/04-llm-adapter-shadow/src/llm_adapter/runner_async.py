@@ -1,10 +1,9 @@
 """Asynchronous runner implementation."""
-
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+import time
 from typing import Any, cast
 
 from .errors import (
@@ -18,31 +17,31 @@ from .errors import (
 from .observability import EventLogger
 from .provider_spi import (
     AsyncProviderSPI,
+    ensure_async_provider,
     ProviderRequest,
     ProviderResponse,
     ProviderSPI,
-    ensure_async_provider,
 )
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import (
+    compute_consensus,
     ParallelAllResult,
     ParallelExecutionError,
-    compute_consensus,
     run_parallel_all_async,
     run_parallel_any_async,
 )
 from .runner_shared import (
-    MetricsPath,
-    RateLimiter,
     error_family,
     estimate_cost,
     log_provider_call,
     log_provider_skipped,
     log_run_metric,
+    MetricsPath,
+    RateLimiter,
     resolve_event_logger,
     resolve_rate_limiter,
 )
-from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics, run_with_shadow_async
+from .shadow import DEFAULT_METRICS_PATH, run_with_shadow_async, ShadowMetrics
 from .utils import content_hash, elapsed_ms
 
 WorkerResult = tuple[

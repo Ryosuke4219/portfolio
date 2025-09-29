@@ -1,11 +1,10 @@
 """Gemini provider integration for the minimal adapter."""
-
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import os
 import re
 import time
-from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from ..errors import (

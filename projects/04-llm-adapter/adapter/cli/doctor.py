@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import http.client
 import os
+from pathlib import Path
 import platform
 import socket
 import sys
-from contextlib import closing
-from pathlib import Path
 from types import ModuleType
 
 from .utils import (
-    EXIT_ENV_ERROR,
-    EXIT_OK,
     _coerce_exit_code,
     _msg,
     _resolve_lang,
+    EXIT_ENV_ERROR,
+    EXIT_OK,
 )
 
 

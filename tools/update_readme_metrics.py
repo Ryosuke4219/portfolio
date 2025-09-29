@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Update README metrics table from generated CI report."""
-
 from __future__ import annotations
 
 import argparse
-import json
 from datetime import datetime
+import json
 from pathlib import Path
 from typing import Any
 

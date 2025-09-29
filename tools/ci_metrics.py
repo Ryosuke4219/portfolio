@@ -1,11 +1,10 @@
 """Utilities for deriving CI metrics from run history."""
-
 from __future__ import annotations
 
-import datetime as dt
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
+import datetime as dt
 from pathlib import Path
 
 from weekly_summary import load_runs, parse_iso8601  # type: ignore
