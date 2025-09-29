@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+
+from src.llm_adapter.provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    TokenUsage,
+)
 
 
 def test_provider_request_builds_messages_from_prompt(provider_request_model):
