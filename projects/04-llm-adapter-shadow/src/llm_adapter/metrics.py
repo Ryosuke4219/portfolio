@@ -75,17 +75,17 @@ class PrometheusMetricsExporter:
             ).inc()
 
             latency_ms = record.get("latency_ms")
-            if isinstance(latency_ms, (int | float)) and latency_ms >= 0:
+            if isinstance(latency_ms, (int, float)) and latency_ms >= 0:  # noqa: UP038
                 self._provider_call_latency_ms.labels(
                     provider=provider, status=status
                 ).observe(float(latency_ms))
 
             tokens_in = record.get("tokens_in")
-            if isinstance(tokens_in, (int | float)) and tokens_in >= 0:
+            if isinstance(tokens_in, (int, float)) and tokens_in >= 0:  # noqa: UP038
                 self._provider_tokens_in.labels(provider=provider).inc(float(tokens_in))
 
             tokens_out = record.get("tokens_out")
-            if isinstance(tokens_out, (int | float)) and tokens_out >= 0:
+            if isinstance(tokens_out, (int, float)) and tokens_out >= 0:  # noqa: UP038
                 self._provider_tokens_out.labels(provider=provider).inc(
                     float(tokens_out)
                 )
@@ -96,7 +96,7 @@ class PrometheusMetricsExporter:
             self._run_total.labels(provider=provider, status=status).inc()
 
             latency_ms = record.get("latency_ms")
-            if isinstance(latency_ms, (int | float)) and latency_ms >= 0:
+            if isinstance(latency_ms, (int, float)) and latency_ms >= 0:  # noqa: UP038
                 self._run_latency_ms.labels(status=status).observe(float(latency_ms))
 
 
