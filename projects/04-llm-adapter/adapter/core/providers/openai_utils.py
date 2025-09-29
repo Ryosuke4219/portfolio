@@ -35,7 +35,11 @@ def build_chat_messages(system_prompt: str | None, user_prompt: str) -> list[Map
 
 
 def extract_text_from_response(response: Any) -> str:
-    text = getattr(response, "output_text", None)
+    text: Any
+    if hasattr(response, "output_text"):
+        text = response.output_text
+    else:
+        text = getattr(response, "output_text", None)
     if isinstance(text, str) and text.strip():
         return text
     text = getattr(response, "text", None)
