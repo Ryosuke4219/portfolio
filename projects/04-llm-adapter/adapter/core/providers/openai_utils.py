@@ -44,32 +44,35 @@ def extract_text_from_response(response: Any) -> str:
     choices = getattr(response, "choices", None)
     if isinstance(choices, Sequence) and choices:
         first = choices[0]
-        if isinstance(first, Mapping):
-            message = first.get("message")
-            if isinstance(message, Mapping):
-                content = message.get("content")
-                if isinstance(content, str) and content.strip():
-                    return content
-                if isinstance(content, Sequence):
-                    parts: list[str] = []
-                    for item in content:
-                        if isinstance(item, Mapping):
-                            text_part = item.get("text")
-                            if isinstance(text_part, str):
-                                parts.append(text_part)
-                    if parts:
-                        return "".join(parts)
-            text_value = first.get("text")
-            if isinstance(text_value, str) and text_value.strip():
-                return text_value
-        message_attr = getattr(first, "message", None)
-        if isinstance(message_attr, Mapping):
-            content_attr = message_attr.get("content")
-            if isinstance(content_attr, str) and content_attr.strip():
-                return content_attr
-        text_attr = getattr(first, "text", None)
-        if isinstance(text_attr, str) and text_attr.strip():
-            return text_attr
+        message_candidate: Any | None = None
+        if hasattr(first, "message"):
+            message_candidate = first.message
+        elif isinstance(first, Mapping):
+            message_candidate = first.get("message")
+
+        if isinstance(message_candidate, Mapping):
+            content = message_candidate.get("content")
+            if isinstance(content, str) and content.strip():
+                return content
+            if isinstance(content, Sequence):
+                parts: list[str] = []
+                for item in content:
+                    if isinstance(item, Mapping):
+                        text_part = item.get("text")
+                        if isinstance(text_part, str):
+                            parts.append(text_part)
+                if parts:
+                    return "".join(parts)
+
+        text_candidate: Any | None
+        if hasattr(first, "text"):
+            text_candidate = first.text
+        elif isinstance(first, Mapping):
+            text_candidate = first.get("text")
+        else:
+            text_candidate = None
+        if isinstance(text_candidate, str) and text_candidate.strip():
+            return text_candidate
     output = getattr(response, "output", None)
     if isinstance(output, Sequence):
         parts: list[str] = []
