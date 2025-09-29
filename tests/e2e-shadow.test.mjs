@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { test } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { parseSpecFile } from '../projects/01-spec2cases-md2json/scripts/spec2cases.mjs';
@@ -27,7 +28,7 @@ async function waitForFile(targetPath, { timeoutMs = 1000, intervalMs = 25 } = {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (fs.existsSync(targetPath)) return;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    await delay(intervalMs);
   }
   assert.fail(`expected file to exist within ${timeoutMs}ms: ${targetPath}`);
 }
