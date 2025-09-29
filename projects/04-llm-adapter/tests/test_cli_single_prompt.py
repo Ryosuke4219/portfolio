@@ -6,8 +6,10 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-import adapter.cli as cli_module
-from adapter.cli import prompt_runner, prompts as prompts_module
+from adapter.cli import (
+    prompt_runner,
+    prompts as prompts_module,
+)
 from adapter.core import providers as provider_module
 from adapter.core.models import (
     PricingConfig,
@@ -16,6 +18,8 @@ from adapter.core.models import (
     RateLimitConfig,
     RetryConfig,
 )
+
+cli_module = sys.modules["adapter.cli"]
 
 
 def test_cli_help_smoke() -> None:
