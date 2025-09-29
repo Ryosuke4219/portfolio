@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+
 from src.llm_adapter.errors import (
     AuthError,
     ProviderSkip,
@@ -15,7 +16,6 @@ from src.llm_adapter.errors import (
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers import gemini as gemini_module
 from src.llm_adapter.providers.gemini import GeminiProvider
-
 from tests.helpers.fakes import RecordGeminiClient
 
 
