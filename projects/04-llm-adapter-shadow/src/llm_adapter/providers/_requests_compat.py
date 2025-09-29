@@ -48,8 +48,10 @@ requests_exceptions: RequestsExceptionsProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover - typing time placeholders
     import requests as _requests_mod  # type: ignore[import-untyped]  # noqa: F401
-    from requests import exceptions as _RequestsExceptions  # noqa: F401
-    from requests import Response as _RequestsResponse  # noqa: F401
+    from requests import (
+        exceptions as _RequestsExceptions,  # noqa: F401
+        Response as _RequestsResponse,  # noqa: F401
+    )
 
 
 def _initialize_requests() -> tuple[
