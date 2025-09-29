@@ -1,4 +1,5 @@
-from typing import Any, IO, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, IO
 
 class Loader: ...
 
