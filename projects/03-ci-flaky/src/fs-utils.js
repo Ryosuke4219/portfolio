@@ -6,7 +6,7 @@ export function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-export async function * readJsonl(filePath) {
+export async function* readJsonl(filePath) {
   if (!fs.existsSync(filePath)) return;
   const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
