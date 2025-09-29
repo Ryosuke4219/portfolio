@@ -223,3 +223,78 @@ def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> No
         assert detail["provider"] in message
         assert detail["attempt"] in message
         assert detail["summary"] in message
+
+
+def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    providers = [
+        MockProvider("alpha", base_latency_ms=1, error_markers=set()),
+        MockProvider("bravo", base_latency_ms=1, error_markers=set()),
+        MockProvider("charlie", base_latency_ms=1, error_markers=set()),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=3,
+            consensus=ConsensusConfig(strategy="majority", quorum=2),
+        ),
+    )
+    request = ProviderRequest(
+        prompt="consensus partial", model="consensus-partial"
+    )
+
+    response_alpha = ProviderResponse(
+        text="A", latency_ms=10, token_usage=TokenUsage(prompt=1, completion=1)
+    )
+    response_charlie = ProviderResponse(
+        text="A", latency_ms=12, token_usage=TokenUsage(prompt=1, completion=1)
+    )
+    invocations = [
+        ProviderInvocationResult(
+            provider=providers[0],
+            attempt=1,
+            total_providers=len(providers),
+            response=response_alpha,
+            error=None,
+            latency_ms=10,
+            tokens_in=1,
+            tokens_out=1,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+        ),
+        ProviderInvocationResult(
+            provider=providers[1],
+            attempt=2,
+            total_providers=len(providers),
+            response=None,
+            error=TimeoutError("simulated timeout"),
+            latency_ms=15,
+            tokens_in=None,
+            tokens_out=None,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+        ),
+        ProviderInvocationResult(
+            provider=providers[2],
+            attempt=3,
+            total_providers=len(providers),
+            response=response_charlie,
+            error=None,
+            latency_ms=12,
+            tokens_in=1,
+            tokens_out=1,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+        ),
+    ]
+
+    def _fake_run_parallel_all_sync(workers, *, max_concurrency=None):
+        return invocations
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        _fake_run_parallel_all_sync,
+    )
+
+    response = runner.run(request)
+    assert response.text == "A"

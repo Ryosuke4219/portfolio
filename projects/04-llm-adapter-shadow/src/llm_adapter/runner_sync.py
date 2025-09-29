@@ -463,8 +463,6 @@ class Runner:
                         message, failures=failure_details
                     )
                     raise error
-                if len(successful) != len(invocations):
-                    raise ParallelExecutionError("all workers failed")
                 responses_for_consensus = [response for _, response in successful]
                 consensus = compute_consensus(
                     responses_for_consensus,
