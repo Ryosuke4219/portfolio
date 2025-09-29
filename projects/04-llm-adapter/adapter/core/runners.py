@@ -235,7 +235,8 @@ class CompareRunner:
     def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
         self._token_bucket = _TokenBucket(getattr(config, "rpm", None))
-        self._schema_validator = _SchemaValidator(getattr(config, "schema", None))
+        schema_path = config.schema
+        self._schema_validator = _SchemaValidator(schema_path)
         self._judge_provider_config = getattr(config, "judge_provider", None)
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []
