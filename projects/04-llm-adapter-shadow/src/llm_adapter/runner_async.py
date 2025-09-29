@@ -335,14 +335,13 @@ class AsyncRunner:
 
             capture_shadow, retry_attempts = mode == RunnerMode.CONSENSUS, 0
             attempt_labels = [index for index in range(1, total_providers + 1)]
+            pending_retry_events: dict[int, dict[str, Any]] = {}
             limit = self._config.max_attempts
 
             async def _handle_parallel_retry(
                 worker_index: int, attempt_index: int, error: BaseException
             ) -> tuple[int, float] | None:
                 nonlocal retry_attempts, attempt_count
-                if mode == RunnerMode.PARALLEL_ANY and isinstance(error, RateLimitError):
-                    return None
                 provider, _ = providers[worker_index]
                 next_attempt_total = total_providers + retry_attempts + 1
                 delay: float | None = None
@@ -363,17 +362,14 @@ class AsyncRunner:
                 retry_attempts, attempt_count = retry_attempt, next_attempt_total
                 attempt_labels[worker_index] = next_attempt_total
                 if event_logger is not None:
-                    event_logger.emit(
-                        "retry",
-                        {
-                            "request_fingerprint": request_fingerprint,
-                            "provider": provider.name(),
-                            "attempt": attempt_index,
-                            "retry_attempt": retry_attempt,
-                            "next_attempt": next_attempt_total,
-                            "error_type": type(error).__name__,
-                        },
-                    )
+                    pending_retry_events[worker_index] = {
+                        "request_fingerprint": request_fingerprint,
+                        "provider": provider.name(),
+                        "attempt": attempt_index,
+                        "retry_attempt": retry_attempt,
+                        "next_attempt": next_attempt_total,
+                        "error_type": type(error).__name__,
+                    }
                 return next_attempt_total, delay
             def _build_worker(
                 worker_index: int,
@@ -382,6 +378,15 @@ class AsyncRunner:
             ) -> WorkerFactory:
                 async def _worker() -> WorkerResult:
                     attempt_index = attempt_labels[worker_index]
+                    if event_logger is not None:
+                        pending_payload = pending_retry_events.pop(worker_index, None)
+                        if (
+                            pending_payload is not None
+                            and pending_payload.get("next_attempt") == attempt_index
+                        ):
+                            event_logger.emit("retry", pending_payload)
+                        elif pending_payload is not None:
+                            pending_retry_events[worker_index] = pending_payload
                     attempted[worker_index] = True
                     try:
                         response, shadow_metrics = await self._invoke_provider_async(
