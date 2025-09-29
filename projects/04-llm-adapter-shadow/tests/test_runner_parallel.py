@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 import json
 from pathlib import Path
 import time
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 import pytest
 

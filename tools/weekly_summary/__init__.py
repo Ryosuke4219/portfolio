@@ -168,7 +168,7 @@ def to_float(value: object) -> float | None:
         return None
     if isinstance(value, bool):
         return float(value)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     if isinstance(value, str):
         s = value.strip()
@@ -179,6 +179,7 @@ def to_float(value: object) -> float | None:
         except ValueError:
             return None
     return None
+
 
 
 def format_percentage(value: float | None) -> str:

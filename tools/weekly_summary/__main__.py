@@ -10,6 +10,7 @@ from pathlib import Path
 from . import (
     aggregate_status,
     build_front_matter,
+    coerce_str,
     compute_failure_top,
     count_new_defects,
     extract_defect_dates,
@@ -20,7 +21,6 @@ from . import (
     coerce_str,
     load_flaky,
     load_runs,
-    coerce_str,
     select_flaky_rows,
     to_float,
     week_over_week_notes,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from types import SimpleNamespace, TracebackType
-from typing import Any, Literal, cast
+from typing import Any, cast, Literal
 
 from src.llm_adapter.providers import ollama as ollama_module
 from src.llm_adapter.providers.gemini_client import (
