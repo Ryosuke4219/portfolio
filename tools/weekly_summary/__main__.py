@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List
 
 from . import (
     aggregate_status,
@@ -51,7 +51,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 def _main_impl() -> None:
     args = _parse_args_impl()
     out_path: Path = args.out
-    today = dt.datetime.now(dt.timezone.utc).date()
+    today = dt.datetime.now(dt.UTC).date()
 
     if not args.runs.exists() or not args.flaky.exists():
         fallback_write(out_path, today, args.days)
@@ -61,7 +61,7 @@ def _main_impl() -> None:
     flaky_rows = load_flaky(args.flaky)
     defect_dates = extract_defect_dates(args.defects)
 
-    now = dt.datetime.now(dt.timezone.utc)
+    now = dt.datetime.now(dt.UTC)
     window = dt.timedelta(days=max(args.days, 1))
     current_start = now - window
     previous_start = now - window * 2
@@ -92,7 +92,7 @@ def _main_impl() -> None:
     current_flaky = select_flaky_rows(flaky_rows, current_start, now)
     previous_flaky = select_flaky_rows(flaky_rows, previous_start, current_start)
 
-    def sort_flaky(rows: List[dict]) -> List[dict]:
+    def sort_flaky(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         return sorted(rows, key=lambda row: to_float(row.get("score")) or 0.0, reverse=True)
 
     current_flaky_sorted = sort_flaky(current_flaky)[:5]
@@ -105,7 +105,7 @@ def _main_impl() -> None:
     if pass_rate is not None and prev_pass_rate is not None:
         wow_delta = (pass_rate - prev_pass_rate) * 100
 
-    notes: List[str] = []
+    notes: list[str] = []
     if wow_delta is not None:
         notes.append(
             f"PassRate WoW: {wow_delta:+.2f}pp (prev {prev_pass_rate * 100:.2f}%)."
@@ -122,7 +122,7 @@ def _main_impl() -> None:
     if not notes:
         notes.append("特記事項なし。")
 
-    markdown_lines: List[str] = [
+    markdown_lines: list[str] = [
         f"# Weekly QA Summary — {today.isoformat()}",
         "",
         f"## Overview (last {args.days} days)",

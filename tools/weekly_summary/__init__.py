@@ -8,8 +8,8 @@ import datetime as dt
 import json
 import re
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List, Optional
 
 __all__ = [
     "parse_iso8601",
@@ -33,7 +33,7 @@ __all__ = [
 ISO_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})")
 
 
-def parse_iso8601(value: Optional[str]) -> Optional[dt.datetime]:
+def parse_iso8601(value: str | None) -> dt.datetime | None:
     if not value:
         return None
     try:
@@ -47,10 +47,10 @@ def parse_iso8601(value: Optional[str]) -> Optional[dt.datetime]:
     return None
 
 
-def load_runs(path: Path) -> List[dict]:
+def load_runs(path: Path) -> list[dict[str, object]]:
     if not path.exists():
         return []
-    runs: List[dict] = []
+    runs: list[dict[str, object]] = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -64,10 +64,10 @@ def load_runs(path: Path) -> List[dict]:
     return runs
 
 
-def load_flaky(path: Path) -> List[dict]:
+def load_flaky(path: Path) -> list[dict[str, object]]:
     if not path.exists():
         return []
-    rows: List[dict] = []
+    rows: list[dict[str, object]] = []
     with path.open("r", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
@@ -75,8 +75,10 @@ def load_flaky(path: Path) -> List[dict]:
     return rows
 
 
-def filter_by_window(items: Iterable[dict], start: dt.datetime, end: dt.datetime) -> List[dict]:
-    results: List[dict] = []
+def filter_by_window(
+    items: Iterable[dict[str, object]], start: dt.datetime, end: dt.datetime
+) -> list[dict[str, object]]:
+    results: list[dict[str, object]] = []
     for item in items:
         ts = parse_iso8601(item.get("ts"))
         if ts is None:
@@ -86,7 +88,7 @@ def filter_by_window(items: Iterable[dict], start: dt.datetime, end: dt.datetime
     return results
 
 
-def aggregate_status(runs: Iterable[dict]) -> tuple[int, int, int]:
+def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
     passes = fails = errors = 0
     for run in runs:
         status = (run.get("status") or "").lower()
@@ -102,17 +104,17 @@ def aggregate_status(runs: Iterable[dict]) -> tuple[int, int, int]:
 def compute_failure_top(counter: Counter[str], top_n: int = 3) -> str:
     if not counter:
         return "-"
-    parts: List[str] = []
+    parts: list[str] = []
     for name, count in counter.most_common(top_n):
         display = name if name else "unknown"
         parts.append(f"{display} {count}")
     return " / ".join(parts)
 
 
-def extract_defect_dates(path: Path) -> List[dt.date]:
+def extract_defect_dates(path: Path) -> list[dt.date]:
     if not path.exists():
         return []
-    dates: List[dt.date] = []
+    dates: list[dt.date] = []
     pattern = re.compile(r"-\s*起票日:\s*(\d{4}-\d{2}-\d{2})")
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
@@ -129,10 +131,12 @@ def count_new_defects(defect_dates: Iterable[dt.date], start: dt.date) -> int:
     return sum(1 for value in defect_dates if value >= start)
 
 
-def select_flaky_rows(rows: List[dict], start: dt.datetime, end: dt.datetime) -> List[dict]:
+def select_flaky_rows(
+    rows: list[dict[str, object]], start: dt.datetime, end: dt.datetime
+) -> list[dict[str, object]]:
     if not rows:
         return []
-    selected: List[dict] = []
+    selected: list[dict[str, object]] = []
     for row in rows:
         as_of_raw = row.get("as_of") or row.get("generated_at")
         as_of_dt = parse_iso8601(as_of_raw) if as_of_raw else None
@@ -144,7 +148,7 @@ def select_flaky_rows(rows: List[dict], start: dt.datetime, end: dt.datetime) ->
     return selected
 
 
-def to_float(value: Optional[str]) -> Optional[float]:
+def to_float(value: str | None) -> float | None:
     if value is None or value == "":
         return None
     try:
@@ -153,16 +157,16 @@ def to_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
-def format_percentage(value: Optional[float]) -> str:
+def format_percentage(value: float | None) -> str:
     if value is None:
         return "N/A"
     return f"{value * 100:.2f}%"
 
 
-def format_table(rows: List[dict]) -> List[str]:
+def format_table(rows: list[dict[str, object]]) -> list[str]:
     header = "| Rank | Canonical ID | Attempts | p_fail | Score |"
     divider = "|-----:|--------------|---------:|------:|------:|"
-    body: List[str] = [header, divider]
+    body: list[str] = [header, divider]
     for idx, row in enumerate(rows, start=1):
         attempts = row.get("attempts") or row.get("Attempts") or "0"
         p_fail = to_float(row.get("p_fail"))
@@ -181,7 +185,9 @@ def format_table(rows: List[dict]) -> List[str]:
     return body
 
 
-def week_over_week_notes(current_rows: List[dict], previous_rows: List[dict]) -> tuple[List[str], List[str]]:
+def week_over_week_notes(
+    current_rows: list[dict[str, object]], previous_rows: list[dict[str, object]]
+) -> tuple[list[str], list[str]]:
     current_ids = [row.get("canonical_id") for row in current_rows if row.get("canonical_id")]
     previous_ids = [row.get("canonical_id") for row in previous_rows if row.get("canonical_id")]
     entered = [cid for cid in current_ids if cid not in previous_ids]
@@ -189,7 +195,7 @@ def week_over_week_notes(current_rows: List[dict], previous_rows: List[dict]) ->
     return entered, exited
 
 
-def build_front_matter(today: dt.date, days: int) -> List[str]:
+def build_front_matter(today: dt.date, days: int) -> list[str]:
     return [
         "---",
         "layout: default",
@@ -200,7 +206,7 @@ def build_front_matter(today: dt.date, days: int) -> List[str]:
     ]
 
 
-def ensure_front_matter(lines: List[str], today: dt.date, days: int) -> List[str]:
+def ensure_front_matter(lines: list[str], today: dt.date, days: int) -> list[str]:
     stripped = list(lines)
     if stripped and stripped[0] == "---":
         try:
