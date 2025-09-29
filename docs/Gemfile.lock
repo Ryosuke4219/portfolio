@@ -1,0 +1,15 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+
+PLATFORMS
+  x86_64-linux
+
+DEPENDENCIES
+  github-pages
+  jekyll-seo-tag
+  jekyll-sitemap
+  jekyll-theme-cayman
+
+BUNDLED WITH
+   2.6.7
