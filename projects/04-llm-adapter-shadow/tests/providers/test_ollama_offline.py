@@ -5,7 +5,7 @@ from src.llm_adapter.errors import ProviderSkip
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.ollama import OllamaProvider
 
-from tests.helpers.fakes import FakeResponse, FakeSession
+from tests.helpers import fakes
 
 
 def test_ollama_offline_skips_without_custom_session(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -20,13 +20,13 @@ def test_ollama_offline_skips_without_custom_session(monkeypatch: pytest.MonkeyP
 def test_ollama_offline_allows_fake_session(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "1")
 
-    class Session(FakeSession):
+    class Session(fakes.FakeSession):
         def post(self, url, json=None, stream=False, timeout=None):  # type: ignore[override]
             self.calls.append((url, json, stream))
             if url.endswith("/api/show"):
-                return FakeResponse(status_code=200, payload={})
+                return fakes.FakeResponse(status_code=200, payload={})
             if url.endswith("/api/chat"):
-                return FakeResponse(
+                return fakes.FakeResponse(
                     status_code=200,
                     payload={
                         "message": {"content": "ok"},
