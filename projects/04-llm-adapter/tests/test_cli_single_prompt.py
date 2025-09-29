@@ -2,7 +2,11 @@ import json
 import os
 import subprocess
 import sys
+import types
 from pathlib import Path
+
+from adapter import cli as cli_module
+from adapter.core import providers as provider_module
 
 
 def test_cli_help_smoke() -> None:
@@ -16,9 +20,6 @@ def test_cli_help_smoke() -> None:
 
 
 def test_cli_fake_provider(monkeypatch, tmp_path: Path, capfd) -> None:
-    from adapter import cli as cli_module
-    from adapter.core import providers as provider_module
-
     class FakeProvider:
         def __init__(self, config):
             self.config = config
@@ -53,9 +54,6 @@ def test_cli_fake_provider(monkeypatch, tmp_path: Path, capfd) -> None:
 
 
 def test_cli_json_log_prompts(monkeypatch, tmp_path: Path, capfd) -> None:
-    from adapter import cli as cli_module
-    from adapter.core import providers as provider_module
-
     class FakeProvider:
         def __init__(self, config):
             self.config = config
@@ -96,9 +94,6 @@ def test_cli_json_log_prompts(monkeypatch, tmp_path: Path, capfd) -> None:
 
 
 def test_cli_json_without_prompts(monkeypatch, tmp_path: Path, capfd) -> None:
-    from adapter import cli as cli_module
-    from adapter.core import providers as provider_module
-
     class FakeProvider:
         def __init__(self, config):
             self.config = config
@@ -138,8 +133,6 @@ def test_cli_json_without_prompts(monkeypatch, tmp_path: Path, capfd) -> None:
 
 
 def test_cli_missing_api_key_en(monkeypatch, tmp_path: Path, capfd) -> None:
-    from adapter import cli as cli_module
-
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
         "provider: fake\nmodel: dummy\nauth_env: TEST_KEY\n",
@@ -162,8 +155,6 @@ def test_cli_missing_api_key_en(monkeypatch, tmp_path: Path, capfd) -> None:
 
 
 def test_cli_unknown_provider(tmp_path: Path, capfd) -> None:
-    from adapter import cli as cli_module
-
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
         "provider: unknown\nmodel: dummy\nauth_env: NONE\n",
@@ -184,9 +175,6 @@ def test_cli_unknown_provider(tmp_path: Path, capfd) -> None:
 
 
 def test_cli_rate_limit_exit_code(monkeypatch, tmp_path: Path, capfd) -> None:
-    from adapter import cli as cli_module
-    from adapter.core import providers as provider_module
-
     class FailingProvider:
         def __init__(self, config):
             self.config = config
@@ -220,9 +208,6 @@ def test_cli_rate_limit_exit_code(monkeypatch, tmp_path: Path, capfd) -> None:
 
 
 def test_cli_doctor(monkeypatch, tmp_path: Path, capsys) -> None:
-    from adapter import cli as cli_module
-    import types
-
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".env").write_text("OPENAI_API_KEY=dummy", encoding="utf-8")
     monkeypatch.setenv("OPENAI_API_KEY", "dummy")
