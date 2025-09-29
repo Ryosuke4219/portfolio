@@ -20,8 +20,8 @@ __all__ = [
     "extract_defect_dates",
     "count_new_defects",
     "select_flaky_rows",
-    "to_float",
     "coerce_str",
+    "to_float",
     "format_percentage",
     "format_table",
     "week_over_week_notes",
@@ -142,9 +142,7 @@ def select_flaky_rows(
         return []
     selected: list[dict[str, object]] = []
     for row in rows:
-        as_of_raw = coerce_str(row.get("as_of"))
-        if as_of_raw is None:
-            as_of_raw = coerce_str(row.get("generated_at"))
+        as_of_raw = coerce_str(row.get("as_of")) or coerce_str(row.get("generated_at"))
         as_of_dt = parse_iso8601(as_of_raw) if as_of_raw else None
         if as_of_dt is None:
             selected.append(row)
@@ -154,29 +152,34 @@ def select_flaky_rows(
     return selected
 
 
+def coerce_str(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    return None
+
+
 def to_float(value: object) -> float | None:
+    if value is None:
+        return None
     if isinstance(value, bool):
         return float(value)
     if isinstance(value, int | float):
         return float(value)
     if isinstance(value, str):
-        if value == "":
+        s = value.strip()
+        if s == "":
             return None
         try:
-            return float(value)
+            return float(s)
         except ValueError:
             return None
     return None
 
-
-def coerce_str(value: object) -> str | None:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, bool):
-        return str(value)
-    if isinstance(value, int | float):
-        return str(value)
-    return None
 
 
 def format_percentage(value: float | None) -> str:
@@ -227,6 +230,8 @@ def week_over_week_notes(
     entered = [cid for cid in current_ids if cid not in previous_ids]
     exited = [cid for cid in previous_ids if cid not in current_ids]
     return entered, exited
+
+
 def build_front_matter(today: dt.date, days: int) -> list[str]:
     return [
         "---",
@@ -298,4 +303,3 @@ def fallback_write(out_path: Path, today: dt.date, days: int) -> None:
         updated.append("")
 
     out_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
-

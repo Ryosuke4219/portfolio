@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import datetime as dt
 from pathlib import Path
 
-from weekly_summary import load_runs, parse_iso8601  # type: ignore
+from weekly_summary import coerce_str, load_runs, parse_iso8601
 
 PASS_STATUSES = {"pass", "passed"}
 FAIL_STATUSES = {"fail", "failed"}
@@ -47,10 +47,10 @@ def normalize_status(value: str | None) -> str:
 def _group_runs(runs: Iterable[dict]) -> list[RunRecord]:
     grouped: dict[str, RunRecord] = {}
     for record in runs:
-        run_id = record.get("run_id")
+        run_id = coerce_str(record.get("run_id"))
         if not run_id:
             continue
-        ts = parse_iso8601(record.get("ts"))
+        ts = parse_iso8601(coerce_str(record.get("ts")))
         if run_id not in grouped:
             grouped[run_id] = RunRecord(run_id=run_id, timestamp=ts, records=[record])
         else:
@@ -86,12 +86,12 @@ def compute_run_history(
         total = passes = fails = errors = 0
         for record in sorted(
             run.records,
-            key=lambda item: parse_iso8601(item.get("ts"))
+            key=lambda item: parse_iso8601(coerce_str(item.get("ts")))
             or run.timestamp
             or dt.datetime.min.replace(tzinfo=dt.UTC),
         ):
             total += 1
-            status = normalize_status(record.get("status"))
+            status = normalize_status(coerce_str(record.get("status")))
             if status == "pass":
                 passes += 1
             elif status == "fail":
@@ -99,7 +99,7 @@ def compute_run_history(
             elif status == "error":
                 errors += 1
 
-            canonical_id = record.get("canonical_id")
+            canonical_id = coerce_str(record.get("canonical_id"))
             if not canonical_id:
                 continue
             bucket = history.get(canonical_id)
