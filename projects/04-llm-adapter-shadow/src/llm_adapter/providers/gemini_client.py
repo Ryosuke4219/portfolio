@@ -92,12 +92,10 @@ def _prepare_generation_config(
         config_obj = merged
 
     config_payload: LegacyConfigPayload | None = None
-    if config_obj is not None:
-        to_dict = getattr(config_obj, "to_dict", None)
-        if callable(to_dict):
-            payload = to_dict()
-            if isinstance(payload, Mapping) and payload:
-                config_payload = payload
+    if config_obj is not None and hasattr(config_obj, "to_dict"):
+        payload = config_obj.to_dict()
+        if isinstance(payload, Mapping) and payload:
+            config_payload = payload
     if config_payload is None and merged:
         config_payload = merged
 
@@ -112,7 +110,10 @@ def invoke_gemini(
     safety_settings: Sequence[Mapping[str, Any]] | None,
 ) -> Any:
     config_obj, config_payload = _prepare_generation_config(config, safety_settings)
-    models_api = getattr(client, "models", None)
+    try:
+        models_api = client.models
+    except AttributeError:
+        models_api = None
     if models_api and hasattr(models_api, "generate_content"):
         try:
             model_kwargs: dict[str, Any] = {"model": model, "contents": contents}
@@ -128,7 +129,10 @@ def invoke_gemini(
                 return models_api.generate_content(model=model, contents=contents)
             raise
 
-    responses_api = getattr(client, "responses", None)
+    try:
+        responses_api = client.responses
+    except AttributeError:
+        responses_api = None
     if responses_api and hasattr(responses_api, "generate"):
         try:
             response_kwargs: dict[str, Any] = {"model": model, "input": contents}
