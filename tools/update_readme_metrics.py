@@ -7,7 +7,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_payload(path: Path) -> Optional[Dict[str, Any]]:
+def load_payload(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
@@ -27,27 +27,27 @@ def load_payload(path: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def format_pass_rate(value: Optional[float]) -> str:
+def format_pass_rate(value: float | None) -> str:
     if value is None:
         return "N/A"
     return f"{value * 100:.2f}%"
 
 
-def format_top_flaky(rows: List[Dict[str, Any]]) -> str:
+def format_top_flaky(rows: list[dict[str, Any]]) -> str:
     if not rows:
         return "データなし"
-    formatted: List[str] = []
+    formatted: list[str] = []
     for row in rows[:3]:
         cid = row.get("canonical_id") or "-"
         score = row.get("score")
-        if isinstance(score, (int, float)):
+        if isinstance(score, int | float):
             formatted.append(f"{len(formatted) + 1}. {cid} (score {score:.2f})")
         else:
             formatted.append(f"{len(formatted) + 1}. {cid}")
     return "<br/>".join(formatted)
 
 
-def format_pass_rate_delta(value: Optional[float]) -> str:
+def format_pass_rate_delta(value: float | None) -> str:
     if value is None:
         return " (基準なし)"
     if abs(value) < 1e-9:
@@ -56,7 +56,7 @@ def format_pass_rate_delta(value: Optional[float]) -> str:
     return f" ({sign}{abs(value) * 100:.2f}pp)"
 
 
-def format_int_delta(value: Optional[int]) -> str:
+def format_int_delta(value: int | None) -> str:
     if value is None:
         return " (基準なし)"
     if value == 0:
@@ -65,7 +65,7 @@ def format_int_delta(value: Optional[int]) -> str:
     return f" ({sign}{abs(value)})"
 
 
-def format_recent_runs(items: List[Dict[str, Any]]) -> List[str]:
+def format_recent_runs(items: list[dict[str, Any]]) -> list[str]:
     if not items:
         return []
     lines = ["直近3回の差分:"]
@@ -82,7 +82,7 @@ def format_recent_runs(items: List[Dict[str, Any]]) -> List[str]:
     return lines
 
 
-def build_table(payload: Optional[Dict[str, Any]], report_url: str) -> List[str]:
+def build_table(payload: dict[str, Any] | None, report_url: str) -> list[str]:
     if payload is None:
         table = [
             "| 指標 | 値 |",
@@ -123,7 +123,7 @@ def build_table(payload: Optional[Dict[str, Any]], report_url: str) -> List[str]
     return table
 
 
-def replace_section(text: str, new_lines: List[str]) -> str:
+def replace_section(text: str, new_lines: list[str]) -> str:
     start_marker = "<!-- qa-metrics:start -->"
     end_marker = "<!-- qa-metrics:end -->"
     if start_marker not in text or end_marker not in text:
