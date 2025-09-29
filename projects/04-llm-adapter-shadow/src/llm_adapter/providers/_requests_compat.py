@@ -32,6 +32,7 @@ class RequestsExceptionsProtocol(Protocol):
     Timeout: type[Exception]
     RequestException: type[Exception]
     HTTPError: type[Exception]
+    ConnectionError: type[Exception]
 
 
 class _RequestsModuleProtocol(Protocol):
@@ -67,6 +68,8 @@ def _initialize_requests() -> tuple[
             class RequestException(Exception): ...
 
             class Timeout(RequestException): ...
+
+            class ConnectionError(RequestException): ...
 
             class HTTPError(RequestException):
                 def __init__(self, message: str | None = None, response: Any | None = None):
