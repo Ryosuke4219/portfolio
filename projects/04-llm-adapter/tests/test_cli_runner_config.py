@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from adapter.cli import doctor
-
 import pytest
+
 from adapter import run_compare as run_compare_module
+from adapter.cli import doctor
 from adapter.core import runner_api
 
 
