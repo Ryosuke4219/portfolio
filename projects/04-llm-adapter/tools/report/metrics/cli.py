@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
 
 from .data import (
     build_comparison_table,
@@ -22,9 +22,9 @@ from .weekly_summary import update_weekly_summary
 
 def generate_report(
     metrics_path: Path,
-    golden_dir: Optional[Path],
+    golden_dir: Path | None,
     out_path: Path,
-    weekly_summary_path: Optional[Path] = None,
+    weekly_summary_path: Path | None = None,
 ) -> None:
     metrics = load_metrics(metrics_path)
     overview = compute_overview(metrics)
@@ -50,7 +50,7 @@ def generate_report(
         update_weekly_summary(weekly_summary_path, failure_total, failure_summary)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="JSONL メトリクスから HTML を生成")
     parser.add_argument("--metrics", required=True, help="runs-metrics.jsonl のパス")
     parser.add_argument("--golden", default=None, help="ゴールデンディレクトリ")
