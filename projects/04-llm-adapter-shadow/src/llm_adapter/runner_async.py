@@ -248,7 +248,6 @@ class AsyncRunner:
         total_providers = len(providers)
 
         mode = RunnerMode(self._config.mode)
-        is_parallel_any = mode == RunnerMode.PARALLEL_ANY
         attempt_count = 0
         results: list[WorkerResult] | None = None
         failure_records: list[dict[str, str] | None] = [None] * total_providers
@@ -337,7 +336,6 @@ class AsyncRunner:
             attempt_count = total_providers
 
             capture_shadow, retry_attempts = mode == RunnerMode.CONSENSUS, 0
-            is_parallel_any = mode == RunnerMode.PARALLEL_ANY
             attempt_labels = [index for index in range(1, total_providers + 1)]
             pending_retry_events: dict[int, dict[str, Any]] = {}
             limit = self._config.max_attempts
@@ -375,6 +373,7 @@ class AsyncRunner:
                         "retry_attempt": retry_attempt,
                         "next_attempt": next_attempt_total,
                         "error_type": type(error).__name__,
+                        "delay_seconds": delay,
                     }
                 return next_attempt_total, delay
             def _build_worker(
