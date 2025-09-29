@@ -417,10 +417,10 @@ def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
     assert slow.finished is True
 
 
-def test_async_parallel_any_rate_limit_retries() -> None:
+def test_async_parallel_any_rate_limit_does_not_retry() -> None:
     providers = [
         _AsyncProbeProvider("rl_a", delay=0.0, failures=[RateLimitError("a")]),
-        _AsyncProbeProvider("rl_b", delay=0.0, failures=[RateLimitError("b")]),
+        _AsyncProbeProvider("rl_b", delay=0.0),
     ]
     logger = _CapturingLogger()
     runner = AsyncRunner(
@@ -435,12 +435,10 @@ def test_async_parallel_any_rate_limit_retries() -> None:
 
     response = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
-    assert response.text in {"rl_a:rl", "rl_b:rl"}
-    assert [provider.invocations for provider in providers] == [2, 2]
+    assert response.text == "rl_b:rl"
+    assert [provider.invocations for provider in providers] == [1, 1]
     retries = logger.of_type("retry")
-    assert len(retries) == 2
-    assert all(record["error_type"] == "RateLimitError" for record in retries)
-    assert {record["next_attempt"] for record in retries} == {3, 4}
+    assert all(record["error_type"] != "RateLimitError" for record in retries)
 
 
 def test_async_consensus_quorum_failure() -> None:
