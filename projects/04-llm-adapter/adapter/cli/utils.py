@@ -17,15 +17,29 @@ EXIT_RATE_LIMIT = 6
 LANG_MESSAGES: dict[str, dict[str, str]] = {
     "ja": {
         "env_loaded": ".env を読み込みました: {path}",
-        "prompt_sources_missing": "--prompt / --prompt-file / --prompts のいずれかを指定してください",
-        "unsupported_provider": "プロバイダ {provider} は未対応です。利用可能: {supported}。",
-        "api_key_missing": "API キーが未設定です。環境変数 {env} を設定してから再実行してください。",
-        "rate_limited": "OpenAI/Gemini のレートまたは使用量制限に到達しました。プラン・請求状況・プロジェクトキーのクォータを確認してください。",
-        "network_error": "ネットワークに接続できません。プロキシ・ファイアウォール・VPN の設定を確認してください。",
+        "prompt_sources_missing": (
+            "--prompt / --prompt-file / --prompts のいずれかを指定してください"
+        ),
+        "unsupported_provider": (
+            "プロバイダ {provider} は未対応です。利用可能: {supported}。"
+        ),
+        "api_key_missing": (
+            "API キーが未設定です。環境変数 {env} を設定してから再実行してください。"
+        ),
+        "rate_limited": (
+            "OpenAI/Gemini のレートまたは使用量制限に到達しました。"
+            "プラン・請求状況・プロジェクトキーのクォータを確認してください。"
+        ),
+        "network_error": (
+            "ネットワークに接続できません。"
+            "プロキシ・ファイアウォール・VPN の設定を確認してください。"
+        ),
         "provider_error": "プロバイダで予期しないエラーが発生しました: {error}",
         "jsonl_missing": "JSONL が見つかりません: {path}",
         "jsonl_decode_error": "JSONL の読み込みに失敗しました: {path}:{line}",
-        "jsonl_invalid_object": "{path}:{line} は 'prompt' キーを含む JSON オブジェクトではありません",
+        "jsonl_invalid_object": (
+            "{path}:{line} は 'prompt' キーを含む JSON オブジェクトではありません"
+        ),
         "jsonl_unsupported": "{path}:{line} がサポート外の JSON 形式です",
         "metrics_written": "メトリクスを追記しました: {path}",
         "interrupt": "ユーザー操作により中断しました",
@@ -47,25 +61,49 @@ LANG_MESSAGES: dict[str, dict[str, str]] = {
         "doctor_name_rpm": "RPM 上限設定",
         "doctor_info_os": "OS={os}, venv={venv}",
         "doctor_fix_python": "Python {required} 以上をインストールしてください",
-        "doctor_fix_api": "OPENAI_API_KEY などの API キーを環境変数で設定してください",
-        "doctor_fix_dns": "api.openai.com への DNS/HTTPS を確認してください（プロキシ/ファイアウォール）",
-        "doctor_fix_encoding": "PowerShell などで PYTHONIOENCODING=utf-8 を設定してください",
-        "doctor_fix_windows": "[Console]::OutputEncoding などを UTF-8 に設定してください",
-        "doctor_fix_env_file": "python-dotenv をインストールするか .env を作成してください",
-        "doctor_fix_rpm": "LLM_ADAPTER_RPM で安全な上限を設定することを検討してください",
+        "doctor_fix_api": (
+            "OPENAI_API_KEY などの API キーを環境変数で設定してください"
+        ),
+        "doctor_fix_dns": (
+            "api.openai.com への DNS/HTTPS を確認してください（プロキシ/ファイアウォール）"
+        ),
+        "doctor_fix_encoding": (
+            "PowerShell などで PYTHONIOENCODING=utf-8 を設定してください"
+        ),
+        "doctor_fix_windows": (
+            "[Console]::OutputEncoding などを UTF-8 に設定してください"
+        ),
+        "doctor_fix_env_file": (
+            "python-dotenv をインストールするか .env を作成してください"
+        ),
+        "doctor_fix_rpm": (
+            "LLM_ADAPTER_RPM で安全な上限を設定することを検討してください"
+        ),
         "doctor_info_rpm": "現在の上限: {rpm}",
     },
     "en": {
         "env_loaded": "Loaded .env file: {path}",
-        "prompt_sources_missing": "Please provide --prompt, --prompt-file, or --prompts",
-        "unsupported_provider": "Provider {provider} is not supported. Available: {supported}.",
-        "api_key_missing": "API key is missing. Set environment variable {env} and retry.",
-        "rate_limited": "Rate or quota limit reached. Check your plan, billing status, and project quota.",
-        "network_error": "Network connectivity failed. Verify proxy, firewall, or VPN settings.",
+        "prompt_sources_missing": (
+            "Please provide --prompt, --prompt-file, or --prompts"
+        ),
+        "unsupported_provider": (
+            "Provider {provider} is not supported. Available: {supported}."
+        ),
+        "api_key_missing": (
+            "API key is missing. Set environment variable {env} and retry."
+        ),
+        "rate_limited": (
+            "Rate or quota limit reached. Check your plan, billing status, and project quota."
+        ),
+        "network_error": (
+            "Network connectivity failed. Verify proxy, firewall, or VPN settings."
+        ),
         "provider_error": "Unexpected provider error occurred: {error}",
         "jsonl_missing": "JSONL file not found: {path}",
         "jsonl_decode_error": "Failed to read JSONL: {path}:{line}",
-        "jsonl_invalid_object": "{path}:{line} must be a JSON object containing a 'prompt' key",
+        "jsonl_invalid_object": (
+            "{path}:{line} must be a JSON object containing a 'prompt' key"
+        ),
         "jsonl_unsupported": "Unsupported JSON entry at {path}:{line}",
         "metrics_written": "Appended metrics: {path}",
         "interrupt": "Interrupted by user",
@@ -87,12 +125,24 @@ LANG_MESSAGES: dict[str, dict[str, str]] = {
         "doctor_name_rpm": "RPM limit",
         "doctor_info_os": "OS={os}, venv={venv}",
         "doctor_fix_python": "Install Python {required}+.",
-        "doctor_fix_api": "Set API keys such as OPENAI_API_KEY in your environment.",
-        "doctor_fix_dns": "Ensure DNS/HTTPS access to api.openai.com (proxy/firewall).",
-        "doctor_fix_encoding": "Set PYTHONIOENCODING=utf-8 before running the CLI.",
-        "doctor_fix_windows": "Configure [Console]::OutputEncoding to UTF-8.",
-        "doctor_fix_env_file": "Install python-dotenv or create a .env file.",
-        "doctor_fix_rpm": "Consider configuring a safe limit via LLM_ADAPTER_RPM.",
+        "doctor_fix_api": (
+            "Set API keys such as OPENAI_API_KEY in your environment."
+        ),
+        "doctor_fix_dns": (
+            "Ensure DNS/HTTPS access to api.openai.com (proxy/firewall)."
+        ),
+        "doctor_fix_encoding": (
+            "Set PYTHONIOENCODING=utf-8 before running the CLI."
+        ),
+        "doctor_fix_windows": (
+            "Configure [Console]::OutputEncoding to UTF-8."
+        ),
+        "doctor_fix_env_file": (
+            "Install python-dotenv or create a .env file."
+        ),
+        "doctor_fix_rpm": (
+            "Consider configuring a safe limit via LLM_ADAPTER_RPM."
+        ),
         "doctor_info_rpm": "Current limit: {rpm}",
     },
 }
