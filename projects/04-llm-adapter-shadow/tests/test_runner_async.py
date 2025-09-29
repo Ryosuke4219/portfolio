@@ -534,7 +534,12 @@ def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
         ),
     )
 
-    response = asyncio.run(runner_any.run_async(request_any, shadow_metrics_path="unused.jsonl"))
+    response = asyncio.run(
+        asyncio.wait_for(
+            runner_any.run_async(request_any, shadow_metrics_path="unused.jsonl"),
+            timeout=1,
+        )
+    )
     assert response.text == "ok:retry"
     assert (
         flaky.invocations,
@@ -564,7 +569,12 @@ def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
     )
 
     with pytest.raises(ParallelExecutionError):
-        asyncio.run(runner_fail.run_async(request_any, shadow_metrics_path="unused.jsonl"))
+        asyncio.run(
+            asyncio.wait_for(
+                runner_fail.run_async(request_any, shadow_metrics_path="unused.jsonl"),
+                timeout=1,
+            )
+        )
 
     assert (
         flaky_fail.invocations,
