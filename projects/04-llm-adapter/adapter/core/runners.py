@@ -240,10 +240,10 @@ class CompareRunner:
     def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
         self._token_bucket = _TokenBucket(getattr(config, "rpm", None))
-        schema_path = config.schema
-        self._schema_validator = _SchemaValidator(schema_path)
+        self._schema_validator = _SchemaValidator(getattr(config, "schema", None))
+        if config.judge_provider is not None:
+            self._judge_provider_config = config.judge_provider
 
-        self._judge_provider_config = getattr(config, "judge_provider", None)
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []
         for provider_config in self.provider_configs:
@@ -444,7 +444,10 @@ class CompareRunner:
         if not aggregate:
             aggregate = "majority"
         if aggregate.lower() in {"judge", "llm-judge"}:
-            judge_config = config.judge_provider or self._judge_provider_config
+            judge_config = config.judge_provider
+            if judge_config is None:
+                judge_config = self._judge_provider_config
+
             if judge_config is None:
                 raise ValueError("aggregate=judge requires judge provider configuration")
             factory = _JudgeProviderFactoryAdapter(judge_config)
