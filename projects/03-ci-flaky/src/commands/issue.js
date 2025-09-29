@@ -5,7 +5,7 @@ import { ensureDir } from '../fs-utils.js';
 import { runAnalyze, serialiseFlakyEntry } from './analyze.js';
 import { parseBoolean, parseList } from './utils.js';
 
-function formatIssueMarkdown(entry, resolvedConfig, issueConfig, summary) {
+function formatIssueMarkdown(entry, resolvedConfig, issueConfig) {
   const signatureEntries = Object.entries(entry.failure_signatures || {});
   const primarySignature = signatureEntries.sort((a, b) => b[1].count - a[1].count)[0]?.[0] ?? 'unknown';
   const recentRuns = Array.from(new Set((entry.statuses || []).map((s) => s.run_id).filter(Boolean))).slice(-5).join(', ');
@@ -73,7 +73,7 @@ export async function runIssue(args) {
     }
     if (seen.has(key)) continue;
     seen.add(key);
-    const markdown = formatIssueMarkdown(serialized, resolvedConfig, issueConfig, summary);
+    const markdown = formatIssueMarkdown(serialized, resolvedConfig, issueConfig);
     if (issueConfig.dry_run) {
       const filename = `${serialized.canonical_id.replace(/[^a-z0-9-_]+/gi, '_')}.md`;
       const filePath = path.join(issuesDir, filename);
