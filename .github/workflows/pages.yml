@@ -53,6 +53,7 @@ jobs:
           exit 1
         env:
           JEKYLL_ENV: production
+          BUNDLE_GEMFILE: docs/Gemfile
 
   deploy:
     needs: build
