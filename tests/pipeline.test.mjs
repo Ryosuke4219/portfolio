@@ -195,28 +195,32 @@ function extractRunCommands(yamlText) {
   return commands;
 }
 
-function containsPytestExecution(command) {
-  const executionPatterns = [
-    /\bpytest\.main\b/, // python -c "... pytest.main(..." pattern
-    /\bpython(?:\s+-\w+)*\s+-m\s+pytest\b/, // python -m pytest ...
-  ];
-
-  const directPytestPattern = /(^|[;&|])\s*pytest(\s|$)/;
-
+function extractExecutableLines(command) {
   return command
     .split(/\r?\n/)
-    .some((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) return false;
-      if (executionPatterns.some((pattern) => pattern.test(trimmed))) return true;
-      return directPytestPattern.test(trimmed);
-    });
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+}
+
+function isPytestExecutionLine(line) {
+  const executionPatterns = [
+    /\bpytest\.main\b/, // python -c "... pytest.main(..." pattern
+    /(^|\s)python[\d.]*\b[^\n]*\b-m\s+pytest\b/, // python -m pytest ...
+  ];
+
+  return executionPatterns.some((pattern) => pattern.test(line));
+}
+
+function collectPytestExecutionCommands(commands) {
+  return commands.filter((command) =>
+    extractExecutableLines(command).some(isPytestExecutionLine),
+  );
 }
 
 test('python pytest runs exactly once in CI workflow', () => {
   const ciWorkflowPath = path.join(rootDir, '.github', 'workflows', 'ci.yml');
   const workflow = fs.readFileSync(ciWorkflowPath, 'utf8');
   const runCommands = extractRunCommands(workflow);
-  const executions = runCommands.filter(containsPytestExecution);
+  const executions = collectPytestExecutionCommands(runCommands);
   assert.equal(executions.length, 1);
 });
