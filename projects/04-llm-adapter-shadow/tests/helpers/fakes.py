@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Callable, cast
 
 from src.llm_adapter.providers import ollama as ollama_module
 
@@ -80,10 +80,9 @@ class RecordGeminiClient:
 
             def generate_content(self, **kwargs: Any):
                 config_obj = kwargs.get("config")
-                if config_obj is not None:
-                    to_dict = getattr(config_obj, "to_dict", None)
-                    if callable(to_dict):
-                        kwargs["_config_dict"] = to_dict()
+                if config_obj is not None and hasattr(config_obj, "to_dict"):
+                    to_dict = cast(Callable[[], dict[str, Any]], config_obj.to_dict)
+                    kwargs["_config_dict"] = to_dict()
                 self._outer.calls.append(kwargs)
                 return SimpleNamespace(**self._outer._response_fields)
 
