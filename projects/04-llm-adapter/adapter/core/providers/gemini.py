@@ -132,10 +132,12 @@ def _invoke_gemini(
 def _extract_usage(response: Any, prompt: str, output_text: str) -> tuple[int, int]:
     prompt_tokens = 0
     output_tokens = 0
-    usage = getattr(response, "usage_metadata", None)
+    usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
     if usage is not None:
-        prompt_tokens = int(getattr(usage, "input_tokens", 0) or 0)
-        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+        if hasattr(usage, "input_tokens"):
+            prompt_tokens = int(usage.input_tokens or 0)
+        if hasattr(usage, "output_tokens"):
+            output_tokens = int(usage.output_tokens or 0)
     else:
         payload = None
         if hasattr(response, "to_dict"):
