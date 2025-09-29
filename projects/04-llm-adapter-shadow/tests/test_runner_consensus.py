@@ -209,7 +209,7 @@ def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> No
         runner.run(request)
 
     error = exc_info.value
-    failures = getattr(error, "failures", None)
+    failures = error.failures if hasattr(error, "failures") else None
     expected = [
         {
             "provider": invocation.provider.name(),

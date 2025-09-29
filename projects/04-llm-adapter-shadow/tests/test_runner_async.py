@@ -486,7 +486,7 @@ def test_async_consensus_failure_details() -> None:
         asyncio.run(runner.run_async(request))
 
     error = exc_info.value
-    failures = getattr(error, "failures", None)
+    failures = error.failures if hasattr(error, "failures") else None
     expected = [
         {
             "provider": "timeout",
