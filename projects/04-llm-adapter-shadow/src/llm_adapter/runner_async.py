@@ -245,6 +245,7 @@ class AsyncRunner:
         total_providers = len(providers)
 
         mode = RunnerMode(self._config.mode)
+        is_parallel_any = mode == RunnerMode.PARALLEL_ANY
         attempt_count = 0
         results: list[WorkerResult] | None = None
         failure_records: list[dict[str, str] | None] = [None] * total_providers
@@ -356,7 +357,7 @@ class AsyncRunner:
                     return None
                 if delay is None:
                     return None
-                delay_float = max(0.0, float(delay))
+                delay = max(0.0, float(delay))
                 if limit is not None and next_attempt_total > limit:
                     return None
                 retry_attempt = retry_attempts + 1
@@ -422,7 +423,7 @@ class AsyncRunner:
             ]
 
             try:
-                if mode == RunnerMode.PARALLEL_ANY:
+                if is_parallel_any:
                     (
                         attempt_index,
                         provider,
