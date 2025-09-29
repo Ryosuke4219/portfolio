@@ -14,13 +14,19 @@ from src.llm_adapter.providers.ollama_client import OllamaClient
 from tests.helpers.fakes import FakeResponse, FakeSession
 
 
-def test_ollama_client_success_paths():
+def test_ollama_client_success_paths() -> None:
     class Session(FakeSession):
         def __init__(self) -> None:
             super().__init__()
             self.timeouts: list[float | None] = []
 
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, object] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             self.calls.append((url, json, stream))
             self.timeouts.append(timeout)
             if url.endswith("/api/show"):
@@ -60,9 +66,18 @@ def test_ollama_client_success_paths():
         (requests_exceptions.Timeout, TimeoutError),
     ],
 )
-def test_ollama_client_normalizes_session_errors(factory, expected):
+def test_ollama_client_normalizes_session_errors(
+    factory: type[BaseException],
+    expected: type[Exception],
+) -> None:
     class Session(FakeSession):
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, object] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             raise factory()
 
     client = OllamaClient(host="http://h", session=Session(), timeout=10.0, pull_timeout=10.0)
@@ -79,14 +94,25 @@ def test_ollama_client_normalizes_session_errors(factory, expected):
     ],
 )
 def test_ollama_client_closes_responses_on_http_error(
-    method_name, path, status, payload, kwargs, expected
-):
+    method_name: str,
+    path: str,
+    status: int,
+    payload: dict[str, object],
+    kwargs: dict[str, object],
+    expected: type[Exception],
+) -> None:
     class Session(FakeSession):
         def __init__(self) -> None:
             super().__init__()
             self.last_response: FakeResponse | None = None
 
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, object] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             if url.endswith(path):
                 response = FakeResponse(status_code=status, payload={})
                 self.last_response = response
@@ -103,7 +129,7 @@ def test_ollama_client_closes_responses_on_http_error(
     assert session.last_response.closed is True
 
 
-def test_ollama_client_closes_responses_on_stream_error():
+def test_ollama_client_closes_responses_on_stream_error() -> None:
     if hasattr(requests_exceptions, "ChunkedEncodingError"):
         stream_error_cls = requests_exceptions.ChunkedEncodingError
     elif hasattr(requests_exceptions, "ProtocolError"):
@@ -116,7 +142,13 @@ def test_ollama_client_closes_responses_on_stream_error():
             super().__init__()
             self.last_response: FakeResponse | None = None
 
-        def post(self, url, json=None, stream=False, timeout=None):
+        def post(
+            self,
+            url: str,
+            json: dict[str, object] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
             response = FakeResponse(
                 status_code=200,
                 payload={},
