@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from functools import lru_cache
 from importlib import import_module
 from types import ModuleType
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 try:  # pragma: no cover - optional dependency
     import typer
