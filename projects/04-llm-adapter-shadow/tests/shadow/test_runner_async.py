@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.runner import AsyncRunner
