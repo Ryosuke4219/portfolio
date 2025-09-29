@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
+import process from 'node:process';
 
 const [,, dirArg = 'public', portArg = '5173'] = process.argv;
 const rootDir = path.resolve(process.cwd(), dirArg);
