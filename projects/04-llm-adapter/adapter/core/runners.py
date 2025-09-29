@@ -136,7 +136,12 @@ class _JudgeInvoker:
         self._config = config
 
     def invoke(self, request: object) -> JudgeProviderResponse:  # type: ignore[override]
-        prompt = getattr(request, "prompt_text", "") or getattr(request, "prompt", "")
+        if hasattr(request, "prompt_text"):
+            prompt = request.prompt_text or ""
+        elif hasattr(request, "prompt"):
+            prompt = request.prompt or ""
+        else:
+            prompt = ""
         response = self._provider.generate(prompt)
         return JudgeProviderResponse(
             text=response.output_text,
