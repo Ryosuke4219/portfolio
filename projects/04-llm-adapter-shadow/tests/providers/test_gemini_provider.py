@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 import pytest
 
@@ -25,11 +25,11 @@ def _maybe_attr(obj: Any, name: str) -> Any:
     return getattr(obj, name) if hasattr(obj, name) else None
 
 
-def test_gemini_provider_invokes_client_with_config():
+def test_gemini_provider_invokes_client_with_config() -> None:
     client = RecordGeminiClient()
     provider = GeminiProvider(
         "gemini-2.5-flash",
-        client=client,  # type: ignore[arg-type]
+        client=client,
         generation_config={"temperature": 0.2},
     )
 
@@ -39,7 +39,7 @@ def test_gemini_provider_invokes_client_with_config():
         metadata={"system": "you are helpful"},
         temperature=0.4,
         top_p=0.85,
-        stop=["END"],
+        stop=("END",),
         model="gemini-2.5-flash",
     )
     response = provider.invoke(request)
@@ -101,16 +101,17 @@ def test_gemini_provider_invokes_client_with_config():
     assert isinstance(recorded["contents"], list)
 
 
-def test_gemini_provider_uses_request_model_override_and_finish_reason():
+def test_gemini_provider_uses_request_model_override_and_finish_reason() -> None:
     class _Client:
-        def __init__(self):
-            self.calls = []
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+            self.responses: None = None
 
             class _Models:
-                def __init__(self, outer):
+                def __init__(self, outer: _Client) -> None:
                     self._outer = outer
 
-                def generate_content(self, **kwargs):
+                def generate_content(self, **kwargs: Any) -> SimpleNamespace:
                     self._outer.calls.append(kwargs)
                     return SimpleNamespace(
                         text="ok",
@@ -121,7 +122,7 @@ def test_gemini_provider_uses_request_model_override_and_finish_reason():
             self.models = _Models(self)
 
     client = _Client()
-    provider = GeminiProvider("gemini-1.5-pro", client=client)  # type: ignore[arg-type]
+    provider = GeminiProvider("gemini-1.5-pro", client=client)
 
     request = ProviderRequest(prompt="hello", model="gemini-1.5-pro-exp")
     response = provider.invoke(request)
@@ -134,7 +135,9 @@ def test_gemini_provider_uses_request_model_override_and_finish_reason():
     assert response.tokens_out == 3
 
 
-def test_gemini_provider_skips_without_api_key(monkeypatch, provider_request_model):
+def test_gemini_provider_skips_without_api_key(
+    monkeypatch: pytest.MonkeyPatch, provider_request_model: str
+) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "")
     stub_module = SimpleNamespace(Client=lambda **_: SimpleNamespace(models=None, responses=None))
@@ -148,59 +151,72 @@ def test_gemini_provider_skips_without_api_key(monkeypatch, provider_request_mod
     assert excinfo.value.reason is SkipReason.MISSING_GEMINI_API_KEY
 
 
-def test_gemini_provider_translates_rate_limit(provider_request_model):
+def test_gemini_provider_translates_rate_limit(provider_request_model: str) -> None:
+    class _ResourceExhaustedError(Exception):
+        def __init__(self) -> None:
+            super().__init__("rate limited")
+            self.status: str = "RESOURCE_EXHAUSTED"
+
     class _FailingModels:
-        def generate_content(self, **kwargs):
-            err = Exception("rate limited")
-            err.status = "RESOURCE_EXHAUSTED"
-            raise err
+        def generate_content(self, **kwargs: Any) -> NoReturn:
+            raise _ResourceExhaustedError()
 
     class _Client:
-        def __init__(self):
-            self.models = _FailingModels()
+        def __init__(self) -> None:
+            self.models: _FailingModels = _FailingModels()
+            self.responses: None = None
 
-    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
     with pytest.raises(RateLimitError):
         provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
 
 
-def test_gemini_provider_translates_rate_limit_status_object(provider_request_model):
+def test_gemini_provider_translates_rate_limit_status_object(
+    provider_request_model: str,
+) -> None:
     class _StatusCode:
-        def __init__(self, name: str):
+        def __init__(self, name: str) -> None:
             self.name = name
 
         def __str__(self) -> str:  # pragma: no cover - defensive normalization
             return f"StatusCode.{self.name}"
 
+    class _RateLimitedError(Exception):
+        def __init__(self) -> None:
+            super().__init__("rate limited")
+            self.status: _StatusCode = _StatusCode("RESOURCE_EXHAUSTED")
+
     class _FailingModels:
-        def generate_content(self, **kwargs):
-            err = Exception("rate limited")
-            err.status = _StatusCode("RESOURCE_EXHAUSTED")
-            raise err
+        def generate_content(self, **kwargs: Any) -> NoReturn:
+            raise _RateLimitedError()
 
     class _Client:
-        def __init__(self):
-            self.models = _FailingModels()
+        def __init__(self) -> None:
+            self.models: _FailingModels = _FailingModels()
+            self.responses: None = None
 
-    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
     with pytest.raises(RateLimitError):
         provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
 
 
-def test_gemini_provider_preserves_rate_limit_error_instances(provider_request_model):
+def test_gemini_provider_preserves_rate_limit_error_instances(
+    provider_request_model: str,
+) -> None:
     raised_error = RateLimitError("rate limited")
 
     class _FailingModels:
-        def generate_content(self, **kwargs):
+        def generate_content(self, **kwargs: Any) -> NoReturn:
             raise raised_error
 
     class _Client:
-        def __init__(self):
-            self.models = _FailingModels()
+        def __init__(self) -> None:
+            self.models: _FailingModels = _FailingModels()
+            self.responses: None = None
 
-    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
     with pytest.raises(RateLimitError) as excinfo:
         provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
@@ -208,42 +224,51 @@ def test_gemini_provider_preserves_rate_limit_error_instances(provider_request_m
     assert excinfo.value is raised_error
 
 
-def test_gemini_provider_translates_timeout_status_object(provider_request_model):
+def test_gemini_provider_translates_timeout_status_object(
+    provider_request_model: str,
+) -> None:
     class _StatusCode:
-        def __init__(self, name: str):
+        def __init__(self, name: str) -> None:
             self.name = name
 
         def __str__(self) -> str:  # pragma: no cover - defensive normalization
             return f"StatusCode.{self.name}"
 
+    class _DeadlineExceededError(Exception):
+        def __init__(self) -> None:
+            super().__init__("timeout")
+            self.code: _StatusCode = _StatusCode("DEADLINE_EXCEEDED")
+
     class _FailingModels:
-        def generate_content(self, **kwargs):
-            err = Exception("timeout")
-            err.code = _StatusCode("DEADLINE_EXCEEDED")
-            raise err
+        def generate_content(self, **kwargs: Any) -> NoReturn:
+            raise _DeadlineExceededError()
 
     class _Client:
-        def __init__(self):
-            self.models = _FailingModels()
+        def __init__(self) -> None:
+            self.models: _FailingModels = _FailingModels()
+            self.responses: None = None
 
-    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
     with pytest.raises(TimeoutError):
         provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
 
 
-def test_gemini_provider_preserves_timeout_error_instances(provider_request_model):
+def test_gemini_provider_preserves_timeout_error_instances(
+    provider_request_model: str,
+) -> None:
     raised_error = TimeoutError("took too long")
 
     class _FailingModels:
-        def generate_content(self, **kwargs):
+        def generate_content(self, **kwargs: Any) -> NoReturn:
             raise raised_error
 
     class _Client:
-        def __init__(self):
-            self.models = _FailingModels()
+        def __init__(self) -> None:
+            self.models: _FailingModels = _FailingModels()
+            self.responses: None = None
 
-    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
     with pytest.raises(TimeoutError) as excinfo:
         provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
@@ -262,22 +287,23 @@ def test_gemini_provider_preserves_timeout_error_instances(provider_request_mode
     ],
 )
 def test_gemini_provider_translates_http_errors(
-    status_code: int, expected: type[Exception], provider_request_model
-):
+    status_code: int, expected: type[Exception], provider_request_model: str
+) -> None:
     class _HttpError(Exception):
-        def __init__(self, code: int):
+        def __init__(self, code: int) -> None:
             super().__init__(f"http {code}")
             self.response = SimpleNamespace(status_code=code)
 
     class _FailingModels:
-        def generate_content(self, **kwargs):
+        def generate_content(self, **kwargs: Any) -> NoReturn:
             raise _HttpError(status_code)
 
     class _Client:
-        def __init__(self):
-            self.models = _FailingModels()
+        def __init__(self) -> None:
+            self.models: _FailingModels = _FailingModels()
+            self.responses: None = None
 
-    provider = GeminiProvider("gemini-2.5-flash", client=_Client())  # type: ignore[arg-type]
+    provider = GeminiProvider("gemini-2.5-flash", client=_Client())
 
     with pytest.raises(expected):
         provider.invoke(ProviderRequest(prompt="hello", model=provider_request_model))
