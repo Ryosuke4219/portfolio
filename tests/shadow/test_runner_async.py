@@ -1,11 +1,11 @@
 """pytest shim to expose shadow async runner tests at the repository root."""
 from __future__ import annotations
 
+import pathlib
 import sys
-from pathlib import Path
 
 _PROJECT_ROOT = (
-    Path(__file__).resolve().parents[2]
+    pathlib.Path(__file__).resolve().parents[2]
     / "projects"
     / "04-llm-adapter-shadow"
 )
