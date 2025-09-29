@@ -11,7 +11,6 @@ from tests.helpers.fakes import FakeResponse, FakeSession
 def test_ollama_provider_prefers_base_url_over_legacy(monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://env-base")
     monkeypatch.setenv("OLLAMA_HOST", "http://legacy-host")
-
     provider = OllamaProvider(
         "test-model",
         session=FakeSession(),
@@ -24,7 +23,6 @@ def test_ollama_provider_prefers_base_url_over_legacy(monkeypatch):
 def test_ollama_provider_legacy_host_fallback(monkeypatch):
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     monkeypatch.setenv("OLLAMA_HOST", "http://legacy-host")
-
     provider = OllamaProvider(
         "test-model",
         session=FakeSession(),

@@ -10,6 +10,7 @@ from src.llm_adapter.providers.ollama import OllamaProvider
 from tests.helpers import fakes
 
 
+
 def test_ollama_offline_skips_without_custom_session(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "1")
 
