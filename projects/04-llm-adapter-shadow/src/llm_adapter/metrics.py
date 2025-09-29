@@ -7,11 +7,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from threading import Lock
 from types import MappingProxyType
-from typing import Any, Protocol, Union
+from typing import Any, Protocol
 
 from .observability import CompositeLogger, JsonlLogger
 
-PathLike = Union[str, "Path"]
+PathLike = str | Path
 
 
 class MetricsExporter(Protocol):
