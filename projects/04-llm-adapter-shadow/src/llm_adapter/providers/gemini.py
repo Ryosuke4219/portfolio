@@ -68,14 +68,24 @@ class GeminiProvider(BaseProvider):
         def _has_timeout_marker(value: Any) -> bool:
             return isinstance(value, str) and "timeout" in value.lower()
 
+        def _read_attr(obj: Any, name: str) -> Any:
+            if obj is None:
+                return None
+            try:
+                return getattr(obj, name)
+            except AttributeError:
+                return None
+
+        def _read_str_attr(obj: Any, name: str) -> str:
+            value = _read_attr(obj, name)
+            return value if isinstance(value, str) else ""
+
         exc_type = type(exc)
         class_names = [
-            getattr(exc_type, "__qualname__", ""),
-            getattr(exc_type, "__name__", ""),
+            _read_str_attr(exc_type, attr) for attr in ("__qualname__", "__name__")
         ]
         module_names = [
-            getattr(exc_type, "__module__", ""),
-            getattr(exc, "__module__", ""),
+            _read_str_attr(target, "__module__") for target in (exc_type, exc)
         ]
         if any(_has_timeout_marker(name) for name in class_names + module_names):
             return TimeoutError(str(exc))
@@ -104,7 +114,7 @@ class GeminiProvider(BaseProvider):
 
         status_value: Any = None
         for attr_name in ("status", "code"):
-            candidate = getattr(exc, attr_name, None)
+            candidate = _read_attr(exc, attr_name)
             if candidate is None:
                 continue
             if callable(candidate):
@@ -118,8 +128,8 @@ class GeminiProvider(BaseProvider):
                 break
         status_text = _normalize_status(status_value)
 
-        response = getattr(exc, "response", None)
-        status_code = getattr(response, "status_code", None)
+        response = _read_attr(exc, "response")
+        status_code = _read_attr(response, "status_code")
         try:
             http_status = int(status_code) if status_code is not None else None
         except (TypeError, ValueError):  # pragma: no cover - defensive fallback
