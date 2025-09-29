@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from src.llm_adapter.errors import ProviderSkip
@@ -21,7 +23,13 @@ def test_ollama_offline_allows_fake_session(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "1")
 
     class Session(fakes.FakeSession):
-        def post(self, url, json=None, stream=False, timeout=None):  # type: ignore[override]
+        def post(
+            self,
+            url: str,
+            json: dict[str, Any] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> fakes.FakeResponse:
             self.calls.append((url, json, stream))
             if url.endswith("/api/show"):
                 return fakes.FakeResponse(status_code=200, payload={})

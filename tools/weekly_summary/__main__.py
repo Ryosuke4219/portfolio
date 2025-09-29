@@ -20,6 +20,7 @@ from . import (
     coerce_str,
     load_flaky,
     load_runs,
+    coerce_str,
     select_flaky_rows,
     to_float,
     week_over_week_notes,
@@ -109,13 +110,17 @@ def _main_impl() -> None:
 
     entered, exited = week_over_week_notes(current_flaky_sorted, previous_flaky_sorted)
     wow_delta = None
+    prev_rate_for_delta: float | None = None
     if pass_rate is not None and prev_pass_rate is not None:
-        wow_delta = (pass_rate - prev_pass_rate) * 100
+        current_rate = pass_rate
+        previous_rate = prev_pass_rate
+        wow_delta = (current_rate - previous_rate) * 100
+        prev_rate_for_delta = previous_rate
 
     notes: list[str] = []
     if wow_delta is not None and prev_pass_rate is not None:
         notes.append(
-            f"PassRate WoW: {wow_delta:+.2f}pp (prev {prev_pass_rate * 100:.2f}%)."
+            f"PassRate WoW: {wow_delta:+.2f}pp (prev {prev_rate_for_delta * 100:.2f}%)."
         )
     elif pass_rate is not None:
         notes.append(f"PassRate: {pass_rate * 100:.2f}% (過去週データ不足)")

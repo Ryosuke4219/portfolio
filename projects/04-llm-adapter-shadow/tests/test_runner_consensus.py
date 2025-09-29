@@ -55,8 +55,12 @@ def test_majority_with_latency_tie_breaker() -> None:
     assert result.response.text == "B"
     assert result.votes == 2
     assert result.tie_break_applied is True
-    assert result.tie_break_reason.startswith("latency")
-    assert result.tie_breaker_selected == "latency"
+    tie_break_reason = result.tie_break_reason
+    assert tie_break_reason is not None
+    assert tie_break_reason.startswith("latency")
+    tie_breaker_selected = result.tie_breaker_selected
+    assert tie_breaker_selected is not None
+    assert tie_breaker_selected == "latency"
     assert result.rounds == 2
 
 
@@ -76,8 +80,12 @@ def test_weighted_strategy_records_scores() -> None:
     assert result.scores["A"] == pytest.approx(0.6)
     assert result.scores["B"] == pytest.approx(0.6)
     assert result.winner_score == pytest.approx(0.6)
-    assert result.tie_break_reason == "cost(min)"
-    assert result.tie_breaker_selected == "cost"
+    tie_break_reason = result.tie_break_reason
+    assert tie_break_reason is not None
+    assert tie_break_reason == "cost(min)"
+    tie_breaker_selected = result.tie_breaker_selected
+    assert tie_breaker_selected is not None
+    assert tie_breaker_selected == "cost"
 
 
 def test_max_score_strategy_prefers_best_latency() -> None:
@@ -93,8 +101,12 @@ def test_max_score_strategy_prefers_best_latency() -> None:
     )
     assert result.response.text == "B"
     assert result.tie_break_applied is True
-    assert result.tie_breaker_selected == "latency"
-    assert result.tie_break_reason.startswith("latency")
+    tie_breaker_selected = result.tie_breaker_selected
+    assert tie_breaker_selected is not None
+    assert tie_breaker_selected == "latency"
+    tie_break_reason = result.tie_break_reason
+    assert tie_break_reason is not None
+    assert tie_break_reason.startswith("latency")
     assert result.scores is not None
     assert result.scores["A"] == pytest.approx(0.6)
     assert result.scores["B"] == pytest.approx(0.6)
@@ -138,7 +150,9 @@ def test_judge_provider_handles_runoff_round() -> None:
     )
     assert result.response.text == "B"
     assert result.tie_break_applied is True
-    assert result.tie_break_reason == "latency(min=10)"
+    tie_break_reason = result.tie_break_reason
+    assert tie_break_reason is not None
+    assert tie_break_reason == "latency(min=10)"
     assert result.judge_name == "tests.test_runner_consensus:fake_judge"
     assert result.judge_score == pytest.approx(0.75)
     assert result.rounds == 3

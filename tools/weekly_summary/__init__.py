@@ -80,7 +80,8 @@ def filter_by_window(
 ) -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
     for item in items:
-        ts = parse_iso8601(coerce_str(item.get("ts")))
+        ts_value = coerce_str(item.get("ts"))
+        ts = parse_iso8601(ts_value)
         if ts is None:
             continue
         if start <= ts < end:
@@ -162,13 +163,22 @@ def coerce_str(value: object | None) -> str | None:
     return None
 
 
-def to_float(value: str | None) -> float | None:
-    if value is None or value == "":
+def to_float(value: object) -> float | None:
+    if value is None:
         return None
-    try:
+    if isinstance(value, bool):
         return float(value)
-    except ValueError:
-        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        s = value.strip()
+        if s == "":
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    return None
 
 
 def format_percentage(value: float | None) -> str:
@@ -182,18 +192,18 @@ def format_table(rows: list[dict[str, object]]) -> list[str]:
     divider = "|-----:|--------------|---------:|------:|------:|"
     body: list[str] = [header, divider]
     for idx, row in enumerate(rows, start=1):
-        attempts_value = row.get("attempts") or row.get("Attempts")
-        attempts_str = coerce_str(attempts_value)
-        attempts_float = to_float(attempts_str) if attempts_str is not None else None
-        p_fail = to_float(coerce_str(row.get("p_fail")))
-        score = to_float(coerce_str(row.get("score")))
+        attempts_value = to_float(row.get("attempts"))
+        if attempts_value is None:
+            attempts_value = to_float(row.get("Attempts"))
+        p_fail_value = to_float(row.get("p_fail"))
+        score_value = to_float(row.get("score"))
         body.append(
             "| {rank} | {cid} | {attempts} | {p_fail:.2f} | {score:.2f} |".format(
                 rank=idx,
                 cid=coerce_str(row.get("canonical_id")) or "-",
-                attempts=int(attempts_float) if attempts_float is not None else 0,
-                p_fail=p_fail or 0.0,
-                score=score or 0.0,
+                attempts=int(attempts_value) if attempts_value is not None else 0,
+                p_fail=p_fail_value or 0.0,
+                score=score_value or 0.0,
             )
         )
     if len(body) == 2:
@@ -205,17 +215,19 @@ def week_over_week_notes(
     current_rows: list[dict[str, object]], previous_rows: list[dict[str, object]]
 ) -> tuple[list[str], list[str]]:
     current_ids = [
-        coerce_str(row.get("canonical_id"))
+        canonical_id
         for row in current_rows
-        if coerce_str(row.get("canonical_id"))
+        for canonical_id in [coerce_str(row.get("canonical_id"))]
+        if canonical_id
     ]
     previous_ids = [
-        coerce_str(row.get("canonical_id"))
+        canonical_id
         for row in previous_rows
-        if coerce_str(row.get("canonical_id"))
+        for canonical_id in [coerce_str(row.get("canonical_id"))]
+        if canonical_id
     ]
-    entered = [cid for cid in current_ids if cid and cid not in previous_ids]
-    exited = [cid for cid in previous_ids if cid and cid not in current_ids]
+    entered = [cid for cid in current_ids if cid not in previous_ids]
+    exited = [cid for cid in previous_ids if cid not in current_ids]
     return entered, exited
 
 
@@ -290,4 +302,3 @@ def fallback_write(out_path: Path, today: dt.date, days: int) -> None:
         updated.append("")
 
     out_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
-

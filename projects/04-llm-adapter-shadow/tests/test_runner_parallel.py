@@ -6,7 +6,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import json
 from pathlib import Path
 import time
-from typing import Any
+from typing import Any, Callable, cast
 
 import pytest
 
@@ -14,6 +14,7 @@ from src.llm_adapter.errors import RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
     ProviderResponse,
+    ProviderSPI,
     TokenUsage,
 )
 from src.llm_adapter.providers.mock import MockProvider
@@ -145,6 +146,15 @@ def _read_metrics(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+def _worker_for(
+    provider: MockProvider, request: ProviderRequest
+) -> Callable[[], ProviderResponse]:
+    def _invoke() -> ProviderResponse:
+        return provider.invoke(request)
+
+    return _invoke
+
+
 def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
     failing = MockProvider("fail", base_latency_ms=1, error_markers={"[TIMEOUT]"})
@@ -163,7 +173,9 @@ def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
         MockProvider("p1", base_latency_ms=1, error_markers=set()),
         MockProvider("p2", base_latency_ms=2, error_markers=set()),
     ]
-    collected = run_parallel_all_sync(tuple(lambda p=p: p.invoke(request) for p in providers))
+    collected = run_parallel_all_sync(
+        tuple(_worker_for(provider, request) for provider in providers)
+    )
     assert [res.text for res in collected] == ["echo(p1): hello", "echo(p2): hello"]
     responses = [ProviderResponse("A", 0), ProviderResponse("A", 0), ProviderResponse("B", 0)]
     result = compute_consensus(responses, config=ConsensusConfig(quorum=2))
@@ -246,12 +258,15 @@ def test_parallel_any_with_shadow_logs(tmp_path: Path, monkeypatch: pytest.Monke
         return failing.invoke(fail_request)
 
     def success_worker() -> ProviderResponse:
-        return run_with_shadow(
+        result = run_with_shadow(
             primary,
             shadow,
             success_request,
             metrics_path=metrics_path,
         )
+        if isinstance(result, tuple):
+            return result[0]
+        return cast(ProviderResponse, result)
 
     response = run_parallel_any_sync((fail_worker, success_worker))
     assert response.text.startswith("echo(primary):")
@@ -287,7 +302,7 @@ def test_runner_parallel_any_returns_success_after_fast_failure(
             time.sleep(self._delay)
             return super().invoke(request)
 
-    providers = [
+    providers: list[ProviderSPI] = [
         _FailingProvider("fail-fast"),
         _SlowProvider("slow-success", "slow-ok", latency_ms=5, delay=0.05),
     ]
@@ -432,7 +447,7 @@ def test_run_parallel_all_async_on_retry_future() -> None:
         ) -> asyncio.Future[float | None]:
             retry_log.append((index, attempt, type(exc).__name__))
             future: asyncio.Future[float | None] = loop.create_future()
-            loop.call_soon(future.set_result(0.0))
+            loop.call_soon(future.set_result, 0.0)
             return future
 
         result = await run_parallel_all_async(

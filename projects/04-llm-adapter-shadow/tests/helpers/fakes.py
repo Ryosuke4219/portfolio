@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from types import SimpleNamespace, TracebackType
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from src.llm_adapter.providers import ollama as ollama_module
+from src.llm_adapter.providers.gemini_client import (
+    GeminiModelsAPI,
+    GeminiResponsesAPI,
+)
 
 
 class FakeResponse:
@@ -46,7 +50,7 @@ class FakeResponse:
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         tb: TracebackType | None,
-    ) -> bool:  # pragma: no cover - context protocol
+    ) -> Literal[False]:  # pragma: no cover - context protocol
         self.close()
         return False
 
@@ -91,12 +95,21 @@ class RecordGeminiClient:
             def __init__(self, outer: RecordGeminiClient) -> None:
                 self._outer = outer
 
-            def generate_content(self, **kwargs: Any):
-                config_obj = kwargs.get("config")
-                if config_obj is not None and hasattr(config_obj, "to_dict"):
-                    to_dict = cast(Callable[[], dict[str, Any]], config_obj.to_dict)
-                    kwargs["_config_dict"] = to_dict()
-                self._outer.calls.append(kwargs)
+            def generate_content(
+                self,
+                *,
+                model: str,
+                contents: Sequence[Mapping[str, Any]] | None,
+                config: Any | None = None,
+            ) -> SimpleNamespace:
+                recorded: dict[str, Any] = {"model": model, "contents": contents}
+                if config is not None:
+                    recorded["config"] = config
+                    if hasattr(config, "to_dict"):
+                        to_dict = cast(Callable[[], dict[str, Any]], config.to_dict)
+                        recorded["_config_dict"] = to_dict()
+                self._outer.calls.append(recorded)
                 return SimpleNamespace(**self._outer._response_fields)
 
-        self.models = _Models(self)
+        self.models: GeminiModelsAPI | None = _Models(self)
+        self.responses: GeminiResponsesAPI | None = None

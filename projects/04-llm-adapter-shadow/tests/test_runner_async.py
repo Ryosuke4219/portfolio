@@ -415,7 +415,12 @@ def test_async_parallel_any_returns_first_completion() -> None:
     )
     request = ProviderRequest(prompt="hi", model="model-parallel-any")
 
-    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+    async def _execute() -> ProviderResponse:
+        result = await runner.run_async(request)
+        assert isinstance(result, ProviderResponse)
+        return result
+
+    response = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
     assert response.text.startswith("fast:")
 
@@ -429,7 +434,12 @@ def test_async_parallel_any_cancellation_waits_for_cleanup() -> None:
     )
     request = ProviderRequest(prompt="hi", model="model-parallel-cancel")
 
-    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.3))
+    async def _execute() -> ProviderResponse:
+        result = await runner.run_async(request)
+        assert isinstance(result, ProviderResponse)
+        return result
+
+    response = asyncio.run(asyncio.wait_for(_execute(), timeout=0.3))
 
     assert response.text.startswith("fast:")
     assert slow.cancelled is True
@@ -450,7 +460,9 @@ def test_async_parallel_any_rate_limit_does_not_retry() -> None:
     request = ProviderRequest(prompt="rl", model="model-parallel-any-rl")
 
     async def _execute() -> ProviderResponse:
-        return await runner.run_async(request)
+        result = await runner.run_async(request)
+        assert isinstance(result, ProviderResponse)
+        return result
 
     response = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
@@ -554,12 +566,12 @@ def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
         ),
     )
 
-    response = asyncio.run(
-        asyncio.wait_for(
-            runner_any.run_async(request_any, shadow_metrics_path="unused.jsonl"),
-            timeout=1,
-        )
-    )
+    async def _execute_any() -> ProviderResponse:
+        result = await runner_any.run_async(request_any, shadow_metrics_path="unused.jsonl")
+        assert isinstance(result, ProviderResponse)
+        return result
+
+    response = asyncio.run(asyncio.wait_for(_execute_any(), timeout=1))
     assert response.text == "ok:retry"
     assert (
         flaky.invocations,
@@ -588,13 +600,13 @@ def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None
         ),
     )
 
+    async def _execute_fail() -> ProviderResponse:
+        result = await runner_fail.run_async(request_any, shadow_metrics_path="unused.jsonl")
+        assert isinstance(result, ProviderResponse)
+        return result
+
     with pytest.raises(ParallelExecutionError):
-        asyncio.run(
-            asyncio.wait_for(
-                runner_fail.run_async(request_any, shadow_metrics_path="unused.jsonl"),
-                timeout=1,
-            )
-        )
+        asyncio.run(asyncio.wait_for(_execute_fail(), timeout=1))
 
     assert (
         flaky_fail.invocations,
@@ -642,7 +654,9 @@ def test_async_parallel_all_rate_limit_retries() -> None:
     request = ProviderRequest(prompt="rl-all", model="model-parallel-all-rl")
 
     async def _execute() -> ParallelAllResult[Any, ProviderResponse]:
-        return await runner.run_async(request)
+        result = await runner.run_async(request)
+        assert isinstance(result, ParallelAllResult)
+        return result
 
     result = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
