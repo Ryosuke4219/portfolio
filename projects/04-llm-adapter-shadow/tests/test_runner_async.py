@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 
 from _pytest.recwarn import WarningsRecorder
 import pytest
+
 from src.llm_adapter.errors import RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
