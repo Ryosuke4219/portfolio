@@ -13,7 +13,6 @@ extend-exclude = [
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "UP"]
 ignore = ["E501"]
-extend-select = ["B950"]
 
 [tool.ruff.lint.isort]
 force-single-line = false
