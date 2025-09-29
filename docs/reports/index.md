@@ -8,15 +8,9 @@ description: Snapshot reports generated from CI telemetry
 
 最新のCI信頼性レポートとソースJSONへのリンクです。週次ワークフローで自動更新されます。
 
-- [Latest Snapshot (2025-09-23)](./latest)
+- [Latest Snapshot (2025-09-29)](./latest)
   - [Source JSON](./latest.json)
   - 更新元: tools/generate_ci_report.py
 
-個別レポートへのダイレクトリンク:
-
-- [JUnit要約](./junit/)
-- [Flakyランキング](./flaky/)
-- [Coverage HTML](./coverage/)
-
-過去分の保管が必要になった場合は、このフォルダに日付別のMarkdown/JSONやHTMLを追加してください。
+過去分の保管が必要になった場合は、このフォルダに日付別のMarkdown/JSONを追加してください。
 

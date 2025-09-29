@@ -1,18 +1,18 @@
 ---
 layout: default
-title: QA Reliability Snapshot — 2025-09-23
+title: QA Reliability Snapshot — 2025-09-29
 description: CI pass rate and flaky ranking (auto-generated)
 ---
 
-# QA Reliability Snapshot — 2025-09-23
+# QA Reliability Snapshot — 2025-09-29
 
 - Window: Last 7 days
-- Data Last Updated: 2025-09-23T07:46:06.005000Z
+- Data Last Updated: 2025-09-29T10:38:40.894000Z
 
 ## KPI
 | 指標 | 値 |
 |------|----|
-| Pass Rate | 100.00% (126/126) |
+| Pass Rate | 100.00% (134/134) |
 | Failures | 0 |
 | Errors | 0 |
 | Top Failure Kinds | - |
@@ -24,8 +24,8 @@ description: CI pass rate and flaky ranking (auto-generated)
 | - | データなし | 0 | 0.00 | 0.00 |
 
 <details><summary>Generation</summary>
-Source: runs=projects/03-ci-flaky/data/runs.jsonl / flaky=projects/03-ci-flaky/data/flaky_rank.csv
-Window: 7 days / Executions: 126
+Source: runs=projects/03-ci-flaky/data/runs.jsonl / flaky=projects/03-ci-flaky/out/flaky_rank.csv
+Window: 7 days / Executions: 134
 Automation: tools/generate_ci_report.py (GitHub Actions)
 </details>
 
