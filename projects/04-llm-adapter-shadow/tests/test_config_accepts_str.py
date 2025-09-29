@@ -2,7 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from adapter.core.config import ConfigError, load_provider_config
+from adapter.core.config import (
+    ConfigError,
+    load_provider_config,
+)
 
 
 def test_cfg_accepts_str_and_path(tmp_path: Path) -> None:
