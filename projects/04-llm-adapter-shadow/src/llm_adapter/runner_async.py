@@ -248,6 +248,7 @@ class AsyncRunner:
         total_providers = len(providers)
 
         mode = RunnerMode(self._config.mode)
+        is_parallel_any = mode == RunnerMode.PARALLEL_ANY
         attempt_count = 0
         results: list[WorkerResult] | None = None
         failure_records: list[dict[str, str] | None] = [None] * total_providers
@@ -359,6 +360,8 @@ class AsyncRunner:
                     return None
                 if delay is None:
                     return None
+                # ``delay`` must be reused so that we do not keep an unused helper
+                # variable when normalizing to a non-negative float.
                 delay = max(0.0, float(delay))
                 if limit is not None and next_attempt_total > limit:
                     return None

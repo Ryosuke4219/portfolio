@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
+from src.llm_adapter.errors import (
+    RateLimitError,
+    RetriableError,
+    TimeoutError,
+)
 from src.llm_adapter.providers._requests_compat import requests_exceptions
 from src.llm_adapter.providers.ollama_client import OllamaClient
 

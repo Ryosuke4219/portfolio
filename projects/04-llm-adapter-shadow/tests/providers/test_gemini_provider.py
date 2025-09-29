@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import (
-    Callable,
-    Mapping,
-)
+from collections.abc import Callable, Mapping
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -19,6 +16,8 @@ from src.llm_adapter.errors import (
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers import gemini as gemini_module
 from src.llm_adapter.providers.gemini import GeminiProvider
+
+# Test helpers
 from tests.helpers.fakes import RecordGeminiClient
 
 
