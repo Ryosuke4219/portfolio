@@ -118,12 +118,24 @@ def extract_usage_tokens(response: Any, prompt: str, output_text: str) -> tuple[
     completion_tokens = 0
     usage = getattr(response, "usage", None)
     if usage is not None:
-        prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        if hasattr(usage, "prompt_tokens"):
+            prompt_tokens = int(usage.prompt_tokens or 0)
+        elif isinstance(usage, Mapping):
+            prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
         if prompt_tokens <= 0:
-            prompt_tokens = int(getattr(usage, "input_tokens", 0) or 0)
-        completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+            if hasattr(usage, "input_tokens"):
+                prompt_tokens = int(usage.input_tokens or 0)
+            elif isinstance(usage, Mapping):
+                prompt_tokens = int(usage.get("input_tokens", 0) or 0)
+        if hasattr(usage, "completion_tokens"):
+            completion_tokens = int(usage.completion_tokens or 0)
+        elif isinstance(usage, Mapping):
+            completion_tokens = int(usage.get("completion_tokens", 0) or 0)
         if completion_tokens <= 0:
-            completion_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+            if hasattr(usage, "output_tokens"):
+                completion_tokens = int(usage.output_tokens or 0)
+            elif isinstance(usage, Mapping):
+                completion_tokens = int(usage.get("output_tokens", 0) or 0)
     if prompt_tokens <= 0 or completion_tokens <= 0:
         if isinstance(usage, Mapping):
             prompt_value = usage.get("prompt_tokens")
