@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from .utils import LOGGER, _msg, _sanitize_message
 
@@ -11,8 +12,8 @@ if TYPE_CHECKING:
     from .prompt_runner import PromptResult
 
 
-def read_jsonl_prompts(path: Path, lang: str) -> List[str]:
-    prompts: List[str] = []
+def read_jsonl_prompts(path: Path, lang: str) -> list[str]:
+    prompts: list[str] = []
     try:
         with path.open("r", encoding="utf-8") as fp:
             for line_no, raw_line in enumerate(fp, start=1):
@@ -42,8 +43,8 @@ def read_jsonl_prompts(path: Path, lang: str) -> List[str]:
     return prompts
 
 
-def collect_prompts(args: argparse.Namespace, parser: argparse.ArgumentParser, lang: str) -> List[str]:
-    prompts: List[str] = []
+def collect_prompts(args: argparse.Namespace, parser: argparse.ArgumentParser, lang: str) -> list[str]:
+    prompts: list[str] = []
     if args.prompt is not None:
         prompts.append(args.prompt)
     if args.prompt_file:
@@ -61,7 +62,7 @@ def collect_prompts(args: argparse.Namespace, parser: argparse.ArgumentParser, l
     return prompts
 
 
-def emit_results(results: Iterable["PromptResult"], output_format: str, include_prompts: bool) -> None:
+def emit_results(results: Iterable[PromptResult], output_format: str, include_prompts: bool) -> None:
     metrics = []
     for res in results:
         payload = res.metric.model_dump()
@@ -85,7 +86,7 @@ def emit_results(results: Iterable["PromptResult"], output_format: str, include_
 
 def write_metrics(
     out_dir: Path,
-    results: Iterable["PromptResult"],
+    results: Iterable[PromptResult],
     include_prompts: bool,
     lang: str,
 ) -> None:

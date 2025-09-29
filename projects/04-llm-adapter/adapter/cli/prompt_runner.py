@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple
 
 from adapter.core import providers as provider_module
 from adapter.core.config import ProviderConfig
@@ -13,7 +13,7 @@ from adapter.core.metrics import RunMetric, estimate_cost
 from .utils import LOGGER, _sanitize_message
 
 ProviderResponse = provider_module.ProviderResponse
-Classifier = Callable[[Exception, ProviderConfig, str], Tuple[str, str]]
+Classifier = Callable[[Exception, ProviderConfig, str], tuple[str, str]]
 
 
 class RateLimiter:
@@ -44,11 +44,11 @@ class RateLimiter:
 class PromptResult:
     index: int
     prompt: str
-    response: Optional[ProviderResponse]
+    response: ProviderResponse | None
     metric: RunMetric
     output_text: str
-    error: Optional[str]
-    error_kind: Optional[str] = None
+    error: str | None
+    error_kind: str | None = None
 
 
 async def _process_prompt(
@@ -107,14 +107,14 @@ async def _process_prompt(
 
 
 async def execute_prompts(
-    prompts: List[str],
+    prompts: list[str],
     provider: object,
     config: ProviderConfig,
     concurrency: int,
     rpm: int,
     lang: str,
     classify_error: Classifier,
-) -> List[PromptResult]:
+) -> list[PromptResult]:
     limiter = RateLimiter(rpm)
     semaphore = asyncio.Semaphore(max(1, concurrency))
     tasks = [
