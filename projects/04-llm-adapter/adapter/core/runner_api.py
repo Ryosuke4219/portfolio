@@ -124,7 +124,7 @@ def run_compare(
         )
     else:
         config = runner_config
-        if judge_provider is not None and getattr(config, "judge_provider", None) is None:
+        if config.judge_provider is None and judge_provider is not None:
             config = replace(config, judge=judge_path, judge_provider=judge_provider)
 
     provider_configs = load_provider_configs(list(provider_paths))
