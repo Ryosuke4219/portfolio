@@ -5,6 +5,7 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 from adapter.core import providers as provider_module
 from adapter.core.config import ProviderConfig
@@ -66,9 +67,7 @@ async def _process_prompt(
         loop = asyncio.get_running_loop()
         start = time.perf_counter()
         try:
-            response: ProviderResponse = await loop.run_in_executor(
-                None, provider.generate, prompt
-            )
+            response = await loop.run_in_executor(None, provider.generate, prompt)
         except Exception as exc:  # pragma: no cover - 実 API 呼び出し向けの防御
             latency_ms = int((time.perf_counter() - start) * 1000)
             friendly, error_kind = classify_error(exc, config, lang)
@@ -90,18 +89,43 @@ async def _process_prompt(
                 error=friendly,
                 error_kind=error_kind,
             )
-        cost = estimate_cost(
-            config,
-            getattr(response, "input_tokens", 0),
-            getattr(response, "output_tokens", 0),
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        provider_response = cast(ProviderResponse, response)
+
+        if hasattr(response, "input_tokens"):
+            input_tokens = int(provider_response.input_tokens)
+        else:
+            input_tokens = 0
+
+        if hasattr(response, "output_tokens"):
+            output_tokens = int(provider_response.output_tokens)
+        else:
+            output_tokens = 0
+
+        if hasattr(response, "output_text"):
+            output_text = provider_response.output_text
+        else:
+            output_text = ""
+
+        if hasattr(response, "latency_ms"):
+            latency_ms = int(provider_response.latency_ms)
+        else:
+            latency_ms = elapsed_ms
+
+        cost = estimate_cost(config, input_tokens, output_tokens)
+        metric_base = ProviderResponse(
+            output_text=output_text,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            latency_ms=latency_ms,
         )
-        metric = RunMetric.from_resp(config, response, prompt, cost_usd=cost)
+        metric = RunMetric.from_resp(config, metric_base, prompt, cost_usd=cost)
         return PromptResult(
             index=index,
             prompt=prompt,
-            response=response,
+            response=provider_response,
             metric=metric,
-            output_text=getattr(response, "output_text", ""),
+            output_text=output_text,
             error=None,
         )
 

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import subprocess
@@ -6,7 +7,15 @@ import types
 from pathlib import Path
 
 from adapter import cli as cli_module
+from adapter.cli import prompt_runner
 from adapter.core import providers as provider_module
+from adapter.core.models import (
+    PricingConfig,
+    ProviderConfig,
+    QualityGatesConfig,
+    RateLimitConfig,
+    RetryConfig,
+)
 
 
 def test_cli_help_smoke() -> None:
@@ -51,6 +60,61 @@ def test_cli_fake_provider(monkeypatch, tmp_path: Path, capfd) -> None:
     captured = capfd.readouterr()
     assert exit_code == 0
     assert "echo:hello" in captured.out
+
+
+def test_prompt_runner_provider_response_tokens() -> None:
+    class FakeProvider:
+        def generate(self, prompt: str) -> provider_module.ProviderResponse:
+            return provider_module.ProviderResponse(
+                output_text=f"echo:{prompt}",
+                input_tokens=3,
+                output_tokens=2,
+                latency_ms=5,
+            )
+
+    provider = FakeProvider()
+    config = ProviderConfig(
+        path=Path("provider.yml"),
+        schema_version=None,
+        provider="fake",
+        endpoint=None,
+        model="dummy",
+        auth_env=None,
+        seed=0,
+        temperature=0.0,
+        top_p=1.0,
+        max_tokens=16,
+        timeout_s=30,
+        retries=RetryConfig(),
+        persist_output=False,
+        pricing=PricingConfig(),
+        rate_limit=RateLimitConfig(),
+        quality_gates=QualityGatesConfig(),
+        raw={},
+    )
+
+    def classify_error(exc: Exception, cfg: ProviderConfig, lang: str) -> tuple[str, str]:
+        return ("", "")
+
+    results = asyncio.run(
+        prompt_runner.execute_prompts(
+            ["hello"],
+            provider,
+            config,
+            concurrency=1,
+            rpm=0,
+            lang="ja",
+            classify_error=classify_error,
+        )
+    )
+
+    assert len(results) == 1
+    result = results[0]
+    assert result.output_text == "echo:hello"
+    assert result.metric.input_tokens == 3
+    assert result.metric.output_tokens == 2
+    assert result.response is not None
+    assert result.response.output_text == "echo:hello"
 
 
 def test_cli_json_log_prompts(monkeypatch, tmp_path: Path, capfd) -> None:
