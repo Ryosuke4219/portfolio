@@ -337,7 +337,6 @@ class AsyncRunner:
             attempt_count = total_providers
 
             capture_shadow, retry_attempts = mode == RunnerMode.CONSENSUS, 0
-            is_parallel_any = mode == RunnerMode.PARALLEL_ANY
             attempt_labels = [index for index in range(1, total_providers + 1)]
             pending_retry_events: dict[int, dict[str, Any]] = {}
             limit = self._config.max_attempts
