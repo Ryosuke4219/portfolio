@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any, Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping
+from typing import Any
 
 from ..config import ProviderConfig
 from . import BaseProvider, ProviderResponse
@@ -46,10 +47,13 @@ def _coerce_mapping(value: Any) -> MutableMapping[str, Any]:
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
-    rate_limit_cls = getattr(_openai, "RateLimitError", None)
-    if rate_limit_cls is not None and isinstance(exc, rate_limit_cls):
-        return True
-    return exc.__class__.__name__ == "RateLimitError"
+    if _openai is None:
+        return exc.__class__.__name__ == "RateLimitError"
+    try:
+        rate_limit_cls = _openai.RateLimitError
+    except AttributeError:
+        return exc.__class__.__name__ == "RateLimitError"
+    return isinstance(exc, rate_limit_cls)
 
 
 def _split_endpoint(value: str | None) -> tuple[str | None, str | None]:
@@ -84,14 +88,19 @@ class OpenAIProvider(BaseProvider):
             raise ImportError("openai パッケージがインストールされていません")
         api_key = _resolve_api_key(config.auth_env)
         self._model = config.model
-        self._system_prompt = config.raw.get("system_prompt") if isinstance(config.raw.get("system_prompt"), str) else None
+        self._system_prompt = None
+        raw_system_prompt = config.raw.get("system_prompt")
+        if isinstance(raw_system_prompt, str):
+            self._system_prompt = raw_system_prompt
         endpoint_mode, endpoint_url = _split_endpoint(config.endpoint)
         self._endpoint_url = endpoint_url
         self._preferred_modes: tuple[str, ...] = determine_modes(config, endpoint_mode)
         base_kwargs = _prepare_common_kwargs(config)
         self._request_kwargs = dict(base_kwargs)
         response_format = config.raw.get("response_format")
-        self._response_format = dict(response_format) if isinstance(response_format, Mapping) else None
+        self._response_format = (
+            dict(response_format) if isinstance(response_format, Mapping) else None
+        )
         default_headers = _coerce_mapping(config.raw.get("default_headers"))
         factory = OpenAIClientFactory(_openai)
         self._client = factory.create(api_key, config, self._endpoint_url, default_headers)
@@ -138,8 +147,10 @@ class OpenAIProvider(BaseProvider):
         return None
 
     def _call_responses(self, prompt: str) -> tuple[Any, int] | None:
-        responses_api = getattr(self._client, "responses", None)
-        create = getattr(responses_api, "create", None)
+        try:
+            create = self._client.responses.create
+        except AttributeError:
+            return None
         if not callable(create):
             return None
         kwargs = dict(self._request_kwargs)
@@ -154,13 +165,16 @@ class OpenAIProvider(BaseProvider):
         return result, latency_ms
 
     def _call_chat_completions(self, prompt: str) -> tuple[Any, int] | None:
-        chat_api = getattr(getattr(self._client, "chat", None), "completions", None)
-        create = getattr(chat_api, "create", None)
+        try:
+            create = self._client.chat.completions.create
+        except AttributeError:
+            create = None
         if not callable(create):
             # v0 互換
-            create = getattr(self._client, "ChatCompletion", None)
-            if create and hasattr(create, "create"):
-                create = getattr(create, "create")
+            try:
+                create = self._client.ChatCompletion.create
+            except AttributeError:
+                create = None
         if not callable(create):
             return None
         kwargs = dict(self._request_kwargs)
@@ -176,12 +190,15 @@ class OpenAIProvider(BaseProvider):
 
     def _call_completions(self, prompt: str) -> tuple[Any, int] | None:
         # v0 系の text-davinci シリーズ向けエンドポイント
-        create = getattr(self._client, "Completion", None)
-        if create and hasattr(create, "create"):
-            create = getattr(create, "create")
+        try:
+            create = self._client.completions.create
+        except AttributeError:
+            create = None
         if not callable(create):
-            completions_api = getattr(self._client, "completions", None)
-            create = getattr(completions_api, "create", None)
+            try:
+                create = self._client.Completion.create
+            except AttributeError:
+                create = None
         if not callable(create):
             return None
         kwargs = dict(self._request_kwargs)
@@ -189,7 +206,9 @@ class OpenAIProvider(BaseProvider):
             kwargs.setdefault("max_tokens", int(self.config.max_tokens))
         prompt_text = prompt
         if self._system_prompt:
-            prompt_text = f"{self._system_prompt}\n\n{prompt}" if prompt else self._system_prompt
+            prompt_text = (
+                f"{self._system_prompt}\n\n{prompt}" if prompt else self._system_prompt
+            )
         ts0 = time.time()
         result = create(model=self._model, prompt=prompt_text, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)

@@ -83,7 +83,12 @@ def test_run_provider_call_flags_guard_violation(
             super().__init__(provider_config)
 
         def generate(self, prompt: str) -> ProviderResponse:
-            return ProviderResponse(output_text="   ", input_tokens=1, output_tokens=0, latency_ms=10)
+            return ProviderResponse(
+                output_text="   ",
+                input_tokens=1,
+                output_tokens=0,
+                latency_ms=10,
+            )
 
     response, status, failure_kind, _, _ = runner._run_provider_call(
         provider_config, EmptyProvider(), "hello"
@@ -121,7 +126,12 @@ def test_build_metrics_respects_existing_failure(
         prompt_template="hello",
         expected={"type": "literal", "value": "ok"},
     )
-    response = ProviderResponse(output_text="ng", input_tokens=2, output_tokens=1, latency_ms=50)
+    response = ProviderResponse(
+        output_text="ng",
+        input_tokens=2,
+        output_tokens=1,
+        latency_ms=50,
+    )
     budget = BudgetSnapshot(run_budget_usd=1.0, hit_stop=True)
     metrics, raw_output = runner._build_metrics(
         provider_config,

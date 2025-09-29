@@ -3,16 +3,17 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import pytest
 from src.llm_adapter.errors import RateLimitError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
+from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
     ParallelExecutionError,

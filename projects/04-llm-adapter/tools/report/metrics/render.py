@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
 
 from .html_report import render_html as _render_html
 from .regression_summary import build_regression_summary as _build_regression_summary
@@ -11,7 +11,7 @@ from .weekly_summary import update_weekly_summary as _update_weekly_summary
 
 
 def build_regression_summary(
-    metrics: Sequence[Mapping[str, object]], golden_dir: Optional[Path]
+    metrics: Sequence[Mapping[str, object]], golden_dir: Path | None
 ) -> str:
     """Proxy to :func:`regression_summary.build_regression_summary`."""
     return _build_regression_summary(metrics, golden_dir)

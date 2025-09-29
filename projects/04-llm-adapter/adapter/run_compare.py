@@ -106,7 +106,11 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
 
-    provider_paths = [Path(p.strip()).expanduser().resolve() for p in args.providers.split(",") if p.strip()]
+    provider_paths = [
+        Path(p.strip()).expanduser().resolve()
+        for p in args.providers.split(",")
+        if p.strip()
+    ]
     if not provider_paths:
         raise SystemExit("--providers に有効なパスが指定されていません")
     prompt_path = Path(args.prompts).expanduser().resolve()

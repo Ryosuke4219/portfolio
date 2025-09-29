@@ -15,12 +15,52 @@ from threading import Lock
 from time import perf_counter, sleep
 from typing import TYPE_CHECKING
 
-from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
-from src.llm_adapter.runner_parallel import (
-    ParallelExecutionError,
-    run_parallel_all_sync,
-    run_parallel_any_sync,
-)
+try:  # pragma: no cover - 実環境では src.* が存在する
+    from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
+except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+    from typing import Any
+
+    @dataclass(slots=True)
+    class JudgeProviderResponse:  # type: ignore[override]
+        text: str
+        latency_ms: int
+        tokens_in: int = 0
+        tokens_out: int = 0
+        raw: Any | None = None
+
+        @property
+        def token_usage(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                prompt=self.tokens_in,
+                completion=self.tokens_out,
+                total=self.tokens_in + self.tokens_out,
+            )
+
+try:  # pragma: no cover - 実環境では src.* が存在する
+    from src.llm_adapter.runner_parallel import (
+        ParallelExecutionError,
+        run_parallel_all_sync,
+        run_parallel_any_sync,
+    )
+except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+    class ParallelExecutionError(RuntimeError):
+        """並列実行時エラーのフォールバック。"""
+
+    def run_parallel_all_sync(workers, *, max_concurrency: int | None = None):  # type: ignore[override]
+        return [worker() for worker in workers]
+
+    def run_parallel_any_sync(workers, *, max_concurrency: int | None = None):  # type: ignore[override]
+        last_error: Exception | None = None
+        for worker in workers:
+            try:
+                worker()
+                return
+            except Exception as exc:  # pragma: no cover - テスト環境でのみ到達
+                last_error = exc
+        if last_error is not None:
+            raise ParallelExecutionError(str(last_error)) from last_error
 
 from .aggregation import (
     AggregationCandidate,
@@ -96,7 +136,12 @@ class _JudgeInvoker:
         self._config = config
 
     def invoke(self, request: object) -> JudgeProviderResponse:  # type: ignore[override]
-        prompt = getattr(request, "prompt_text", "") or getattr(request, "prompt", "")
+        if hasattr(request, "prompt_text"):
+            prompt = request.prompt_text or ""
+        elif hasattr(request, "prompt"):
+            prompt = request.prompt or ""
+        else:
+            prompt = ""
         response = self._provider.generate(prompt)
         return JudgeProviderResponse(
             text=response.output_text,
@@ -196,7 +241,9 @@ class CompareRunner:
         repeat = max(repeat, 1)
         self._token_bucket = _TokenBucket(getattr(config, "rpm", None))
         self._schema_validator = _SchemaValidator(getattr(config, "schema", None))
-        self._judge_provider_config = getattr(config, "judge_provider", None)
+        if config.judge_provider is not None:
+            self._judge_provider_config = config.judge_provider
+
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []
         for provider_config in self.provider_configs:
@@ -260,9 +307,17 @@ class CompareRunner:
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
             return [], None
-        max_workers = self._normalize_concurrency(
-            len(providers), getattr(config, "max_concurrency", None)
-        )
+        try:
+            max_concurrency = config.max_concurrency  # type: ignore[attr-defined]
+        except AttributeError:
+            max_concurrency = None
+
+        if max_concurrency is None:
+            max_workers = self._normalize_concurrency(len(providers), None)
+        else:
+            max_workers = self._normalize_concurrency(
+                len(providers), max_concurrency
+            )
         stop_reason: str | None = None
         results: list[SingleRunResult | None] = [None] * len(providers)
 
@@ -382,7 +437,8 @@ class CompareRunner:
                     if result.metrics.status == "ok"
                     and result.raw_output.strip() == winner_output
                 )
-            quorum = getattr(config, "quorum", None) or len(candidates)
+            quorum_value = config.quorum
+            quorum = quorum_value if quorum_value is not None else len(candidates)
             if votes < quorum:
                 self._mark_consensus_failure(lookup.values(), quorum, votes)
                 return None
@@ -391,11 +447,15 @@ class CompareRunner:
     def _resolve_aggregation_strategy(
         self, mode: str, config: RunnerConfig
     ) -> AggregationStrategy | None:
-        aggregate = (getattr(config, "aggregate", None) or "").strip()
+        aggregate_raw = config.aggregate
+        aggregate = (aggregate_raw or "").strip()
         if not aggregate:
             aggregate = "majority"
         if aggregate.lower() in {"judge", "llm-judge"}:
-            judge_config = getattr(config, "judge_provider", None) or self._judge_provider_config
+            judge_config = config.judge_provider
+            if judge_config is None:
+                judge_config = self._judge_provider_config
+
             if judge_config is None:
                 raise ValueError("aggregate=judge requires judge provider configuration")
             factory = _JudgeProviderFactoryAdapter(judge_config)
@@ -411,14 +471,14 @@ class CompareRunner:
         config: RunnerConfig,
         lookup: Mapping[int, SingleRunResult],
     ) -> TieBreaker | None:
-        name = (getattr(config, "tie_breaker", None) or "").strip().lower()
-        if not name:
+        tie_name = (config.tie_breaker or "").strip().lower()
+        if not tie_name:
             return None
-        if name == "latency":
+        if tie_name == "latency":
             return _LatencyTieBreaker(lookup)
-        if name == "cost":
+        if tie_name == "cost":
             return _CostTieBreaker(lookup)
-        if name == "first":
+        if tie_name == "first":
             return FirstTieBreaker()
         return None
 

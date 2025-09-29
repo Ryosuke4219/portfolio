@@ -129,6 +129,7 @@ def _classify_error(
         or "rate" in lower
         or "quota" in lower
     ):
+
         return _msg(lang, "rate_limited"), "rate"
     if (
         isinstance(exc, OSError | socket.gaierror | TimeoutError)

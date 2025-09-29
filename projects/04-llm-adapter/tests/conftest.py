@@ -8,4 +8,4 @@ if str(PROJECT_ROOT) not in sys.path:
 
 def pytest_configure(config):  # pragma: no cover - pytest hook
     if config.pluginmanager.hasplugin("asyncio"):
-        setattr(config.option, "asyncio_default_fixture_loop_scope", "function")
+        config.option.asyncio_default_fixture_loop_scope = "function"

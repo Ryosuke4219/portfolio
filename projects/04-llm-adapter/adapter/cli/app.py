@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from functools import lru_cache
 from importlib import import_module
 from types import ModuleType
+from typing import Callable, TypeVar
 
 try:  # pragma: no cover - optional dependency
     import typer
@@ -20,17 +21,37 @@ def _cli_namespace() -> ModuleType:
     return import_module(__name__.rsplit(".", 1)[0])
 
 
+T = TypeVar("T")
+
+
+def _with_cli_namespace(accessor: Callable[[ModuleType], T]) -> T:
+    namespace = _cli_namespace()
+    return accessor(namespace)
+
+
 def _provider_factory() -> object:
-    return getattr(_cli_namespace(), "ProviderFactory")
+    def resolve(namespace: ModuleType) -> object:
+        return namespace.ProviderFactory
+
+    return _with_cli_namespace(resolve)
 
 
 def _socket_module() -> ModuleType:
-    return getattr(_cli_namespace(), "socket")
+    def resolve(namespace: ModuleType) -> ModuleType:
+        return namespace.socket
+
+    return _with_cli_namespace(resolve)
 
 
 def _http_module() -> ModuleType:
-    http_pkg = getattr(_cli_namespace(), "http")
-    return getattr(http_pkg, "client")
+    def resolve(namespace: ModuleType) -> ModuleType:
+        http_pkg = namespace.http
+        try:
+            return http_pkg.client
+        except AttributeError as exc:
+            raise AttributeError("namespace.http has no client module") from exc
+
+    return _with_cli_namespace(resolve)
 
 
 def _run_prompts_from_iterable(args: Iterable[str]) -> int:

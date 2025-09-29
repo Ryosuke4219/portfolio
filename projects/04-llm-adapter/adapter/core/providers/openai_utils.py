@@ -35,13 +35,17 @@ def build_chat_messages(system_prompt: str | None, user_prompt: str) -> list[Map
 
 
 def extract_text_from_response(response: Any) -> str:
-    text = getattr(response, "output_text", None)
+    text: Any
+    if hasattr(response, "output_text"):
+        text = response.output_text
+    else:
+        text = getattr(response, "output_text", None)
     if isinstance(text, str) and text.strip():
         return text
     text = getattr(response, "text", None)
     if isinstance(text, str) and text.strip():
         return text
-    choices = getattr(response, "choices", None)
+    choices = response.choices if hasattr(response, "choices") else None
     if isinstance(choices, Sequence) and choices:
         first = choices[0]
         if isinstance(first, Mapping):
@@ -70,7 +74,7 @@ def extract_text_from_response(response: Any) -> str:
         text_attr = getattr(first, "text", None)
         if isinstance(text_attr, str) and text_attr.strip():
             return text_attr
-    output = getattr(response, "output", None)
+    output = response.output if hasattr(response, "output") else None
     if isinstance(output, Sequence):
         parts: list[str] = []
         for item in output:
@@ -116,20 +120,37 @@ def extract_text_from_response(response: Any) -> str:
 def extract_usage_tokens(response: Any, prompt: str, output_text: str) -> tuple[int, int]:
     prompt_tokens = 0
     completion_tokens = 0
-    usage = getattr(response, "usage", None)
+    usage = response.usage if hasattr(response, "usage") else None
     if usage is not None:
-        prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        if hasattr(usage, "prompt_tokens"):
+            prompt_tokens = int(usage.prompt_tokens or 0)
+        elif isinstance(usage, Mapping):
+            prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
         if prompt_tokens <= 0:
-            prompt_tokens = int(getattr(usage, "input_tokens", 0) or 0)
-        completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+            if hasattr(usage, "input_tokens"):
+                prompt_tokens = int(usage.input_tokens or 0)
+            elif isinstance(usage, Mapping):
+                prompt_tokens = int(usage.get("input_tokens", 0) or 0)
+        if hasattr(usage, "completion_tokens"):
+            completion_tokens = int(usage.completion_tokens or 0)
+        elif isinstance(usage, Mapping):
+            completion_tokens = int(usage.get("completion_tokens", 0) or 0)
         if completion_tokens <= 0:
-            completion_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+            if hasattr(usage, "output_tokens"):
+                completion_tokens = int(usage.output_tokens or 0)
+            elif isinstance(usage, Mapping):
+                completion_tokens = int(usage.get("output_tokens", 0) or 0)
     if prompt_tokens <= 0 or completion_tokens <= 0:
         if isinstance(usage, Mapping):
-            prompt_tokens = int(usage.get("prompt_tokens", usage.get("input_tokens", 0)) or prompt_tokens)
-            completion_tokens = int(
-                usage.get("completion_tokens", usage.get("output_tokens", 0)) or completion_tokens
-            )
+            prompt_value = usage.get("prompt_tokens")
+            if prompt_value is None:
+                prompt_value = usage.get("input_tokens", 0)
+            prompt_tokens = int(prompt_value or prompt_tokens)
+
+            completion_value = usage.get("completion_tokens")
+            if completion_value is None:
+                completion_value = usage.get("output_tokens", 0)
+            completion_tokens = int(completion_value or completion_tokens)
     if prompt_tokens <= 0 or completion_tokens <= 0:
         if hasattr(response, "model_dump"):
             try:
@@ -139,14 +160,15 @@ def extract_usage_tokens(response: Any, prompt: str, output_text: str) -> tuple[
             if isinstance(payload, Mapping):
                 usage_dict = payload.get("usage")
                 if isinstance(usage_dict, Mapping):
-                    prompt_tokens = int(
-                        usage_dict.get("prompt_tokens", usage_dict.get("input_tokens", prompt_tokens))
-                        or prompt_tokens
-                    )
-                    completion_tokens = int(
-                        usage_dict.get("completion_tokens", usage_dict.get("output_tokens", completion_tokens))
-                        or completion_tokens
-                    )
+                    prompt_value = usage_dict.get("prompt_tokens")
+                    if prompt_value is None:
+                        prompt_value = usage_dict.get("input_tokens", prompt_tokens)
+                    prompt_tokens = int(prompt_value or prompt_tokens)
+
+                    completion_value = usage_dict.get("completion_tokens")
+                    if completion_value is None:
+                        completion_value = usage_dict.get("output_tokens", completion_tokens)
+                    completion_tokens = int(completion_value or completion_tokens)
     if prompt_tokens <= 0:
         prompt_tokens = max(1, len(prompt.split()))
     if completion_tokens <= 0:
@@ -211,9 +233,8 @@ class OpenAIClientFactory:
         default_headers: Mapping[str, Any],
     ) -> Any:
         openai_module = self._openai
-        organization = (
-            config.raw.get("organization") if isinstance(config.raw.get("organization"), str) else None
-        )
+        organization_raw = config.raw.get("organization")
+        organization = organization_raw if isinstance(organization_raw, str) else None
         if hasattr(openai_module, "OpenAI"):
             kwargs: dict[str, Any] = {"api_key": api_key}
             if endpoint_url:
@@ -225,12 +246,15 @@ class OpenAIClientFactory:
             return openai_module.OpenAI(**kwargs)
         openai_module.api_key = api_key  # type: ignore[attr-defined]
         if endpoint_url:
-            setattr(openai_module, "base_url", endpoint_url)
+            openai_module.base_url = endpoint_url  # type: ignore[attr-defined]
         if organization:
-            setattr(openai_module, "organization", organization)
+            openai_module.organization = organization  # type: ignore[attr-defined]
         if default_headers:
-            headers = getattr(openai_module, "_default_headers", {})
-            headers = dict(headers)
+            if hasattr(openai_module, "_default_headers"):
+                headers_source = openai_module._default_headers  # type: ignore[attr-defined]
+            else:
+                headers_source = {}
+            headers = dict(headers_source)
             headers.update(default_headers)
-            setattr(openai_module, "_default_headers", headers)
+            openai_module._default_headers = headers  # type: ignore[attr-defined]
         return openai_module
