@@ -70,7 +70,7 @@ def extract_text_from_response(response: Any) -> str:
         text_attr = getattr(first, "text", None)
         if isinstance(text_attr, str) and text_attr.strip():
             return text_attr
-    output = getattr(response, "output", None)
+    output = response.output if hasattr(response, "output") else None
     if isinstance(output, Sequence):
         parts: list[str] = []
         for item in output:
