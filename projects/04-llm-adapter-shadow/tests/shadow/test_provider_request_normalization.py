@@ -5,10 +5,10 @@ from typing import Any
 
 import pytest
 
-pytest.importorskip("hypothesis")
-from hypothesis import given
-from hypothesis import strategies as st
-from hypothesis.strategies import SearchStrategy
+hypothesis = pytest.importorskip("hypothesis")
+st = hypothesis.strategies
+given = hypothesis.given
+SearchStrategy = st.SearchStrategy
 
 from src.llm_adapter import provider_spi as provider_spi_module
 from src.llm_adapter.provider_spi import ProviderRequest

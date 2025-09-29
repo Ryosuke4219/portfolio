@@ -1,5 +1,8 @@
+[tool.black]
+line-length = 120
+
 [tool.ruff]
-line-length = 240
+line-length = 180
 target-version = "py311"
 extend-exclude = [
   "node_modules",
@@ -9,7 +12,8 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "UP"]
-ignore = []
+ignore = ["E501"]
+extend-select = ["B950"]
 
 [tool.ruff.lint.isort]
 force-single-line = false
