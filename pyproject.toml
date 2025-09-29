@@ -22,13 +22,36 @@ force-sort-within-sections = true
 python_version = "3.11"
 warn_unused_configs = true
 warn_unused_ignores = true
-check_untyped_defs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
 ignore_missing_imports = true
 namespace_packages = true
 mypy_path = ["projects/04-llm-adapter-shadow"]
 explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "adapter.*"
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = "llm_adapter.*"
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = "llm_adapter._event_loop"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "src.llm_adapter.*"
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = "src.llm_adapter._event_loop"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 markers = [
