@@ -333,6 +333,7 @@ class AsyncRunner:
             attempt_count = total_providers
 
             capture_shadow, retry_attempts = mode == RunnerMode.CONSENSUS, 0
+            is_parallel_any = mode == RunnerMode.PARALLEL_ANY
             attempt_labels = [index for index in range(1, total_providers + 1)]
             pending_retry_events: dict[int, dict[str, Any]] = {}
             limit = self._config.max_attempts
@@ -356,7 +357,7 @@ class AsyncRunner:
                     return None
                 if delay is None:
                     return None
-                delay_float = max(0.0, float(delay))
+                delay = max(0.0, float(delay))
                 if limit is not None and next_attempt_total > limit:
                     return None
                 retry_attempt = retry_attempts + 1
