@@ -73,10 +73,16 @@ jobs:
           npm run ci:analyze
           npm run ci:issue
           PYTHON=python3 node --test tests/e2e-shadow.test.mjs
-      - name: Run Python tests
+      - name: Run Python tests (verbose, timeout, no network)
+        env:
+          LLM_ADAPTER_OFFLINE: "1"
+          OLLAMA_AUTO_PULL: "0"
+          OLLAMA_TIMEOUT_S: "5"
+          OLLAMA_PULL_TIMEOUT_S: "20"
+          OLLAMA_BASE_URL: "http://127.0.0.1:9"
         run: |
           set -euxo pipefail
-          pytest -q projects/04-llm-adapter-shadow/tests
+          python -c "import pytest, sys; sys.exit(pytest.main(['-vv', '-s', '--maxfail=1', '--durations=20', '--disable-socket', 'projects/04-llm-adapter-shadow/tests']))"
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4

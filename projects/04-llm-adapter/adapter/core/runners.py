@@ -136,7 +136,12 @@ class _JudgeInvoker:
         self._config = config
 
     def invoke(self, request: object) -> JudgeProviderResponse:  # type: ignore[override]
-        prompt = getattr(request, "prompt_text", "") or getattr(request, "prompt", "")
+        if hasattr(request, "prompt_text"):
+            prompt = request.prompt_text or ""
+        elif hasattr(request, "prompt"):
+            prompt = request.prompt or ""
+        else:
+            prompt = ""
         response = self._provider.generate(prompt)
         return JudgeProviderResponse(
             text=response.output_text,
@@ -237,6 +242,7 @@ class CompareRunner:
         self._token_bucket = _TokenBucket(getattr(config, "rpm", None))
         schema_path = config.schema
         self._schema_validator = _SchemaValidator(schema_path)
+
         self._judge_provider_config = getattr(config, "judge_provider", None)
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []
@@ -423,7 +429,8 @@ class CompareRunner:
                     if result.metrics.status == "ok"
                     and result.raw_output.strip() == winner_output
                 )
-            quorum = getattr(config, "quorum", None) or len(candidates)
+            quorum_value = config.quorum
+            quorum = quorum_value if quorum_value is not None else len(candidates)
             if votes < quorum:
                 self._mark_consensus_failure(lookup.values(), quorum, votes)
                 return None
@@ -432,11 +439,12 @@ class CompareRunner:
     def _resolve_aggregation_strategy(
         self, mode: str, config: RunnerConfig
     ) -> AggregationStrategy | None:
-        aggregate = (getattr(config, "aggregate", None) or "").strip()
+        aggregate_raw = config.aggregate
+        aggregate = (aggregate_raw or "").strip()
         if not aggregate:
             aggregate = "majority"
         if aggregate.lower() in {"judge", "llm-judge"}:
-            judge_config = getattr(config, "judge_provider", None) or self._judge_provider_config
+            judge_config = config.judge_provider or self._judge_provider_config
             if judge_config is None:
                 raise ValueError("aggregate=judge requires judge provider configuration")
             factory = _JudgeProviderFactoryAdapter(judge_config)
