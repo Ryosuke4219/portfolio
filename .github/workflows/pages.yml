@@ -30,7 +30,7 @@ jobs:
 
       - name: Build with Jekyll
         id: jekyll
-        uses: actions/jekyll-build@v1
+        uses: actions/jekyll-build-pages@v1
         with:
           source: docs
           destination: _site
