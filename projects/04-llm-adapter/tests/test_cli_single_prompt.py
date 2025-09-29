@@ -6,7 +6,7 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-from adapter import cli as cli_module
+import adapter.cli as cli_module
 from adapter.cli import (
     prompt_runner,
     prompts as prompts_module,
