@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
@@ -58,11 +56,11 @@ class ProviderConfigModel(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    schema_version: Optional[int] = None
+    schema_version: int | None = None
     provider: str
-    endpoint: Optional[str] = None
+    endpoint: str | None = None
     model: str
-    auth_env: Optional[str] = None
+    auth_env: str | None = None
     seed: int = 0
     temperature: float = 0.0
     top_p: float = 1.0
