@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping
+from typing import Any
 
 
 def _load_json(path: Path) -> Any:
@@ -19,11 +20,11 @@ def _load_json(path: Path) -> Any:
         raise SystemExit(f"invalid JSON in {path}: {exc}") from exc
 
 
-def _load_jsonl(path: Path) -> List[Mapping[str, Any]]:
+def _load_jsonl(path: Path) -> list[Mapping[str, Any]]:
     if not path.exists():
         raise SystemExit(f"attempts file not found: {path}")
 
-    attempts: List[Mapping[str, Any]] = []
+    attempts: list[Mapping[str, Any]] = []
     with path.open("r", encoding="utf-8") as handle:
         for line_no, raw in enumerate(handle, start=1):
             trimmed = raw.strip()
@@ -38,8 +39,8 @@ def _load_jsonl(path: Path) -> List[Mapping[str, Any]]:
     return attempts
 
 
-def _extract_case_ids(cases: Iterable[Mapping[str, Any]]) -> List[str]:
-    ids: List[str] = []
+def _extract_case_ids(cases: Iterable[Mapping[str, Any]]) -> list[str]:
+    ids: list[str] = []
     for entry in cases:
         if isinstance(entry, Mapping):
             value = str(entry.get("id", "")).strip()
@@ -56,7 +57,9 @@ def _attempt_case_id(attempt: Mapping[str, Any]) -> str | None:
     return prefix.strip() or None
 
 
-def _build_metrics(cases: Mapping[str, Any], attempts: List[Mapping[str, Any]]) -> MutableMapping[str, Any]:
+def _build_metrics(
+    cases: Mapping[str, Any], attempts: list[Mapping[str, Any]]
+) -> MutableMapping[str, Any]:
     suite = str(cases.get("suite", "")).strip() if isinstance(cases, Mapping) else ""
     case_entries = cases.get("cases") if isinstance(cases, Mapping) else None
     if not isinstance(case_entries, Iterable):
@@ -64,8 +67,8 @@ def _build_metrics(cases: Mapping[str, Any], attempts: List[Mapping[str, Any]]) 
 
     case_ids = _extract_case_ids(case_entries) if case_entries else []
     statuses: Counter[str] = Counter()
-    seen: Dict[str, Mapping[str, Any]] = {}
-    failed_ids: List[str] = []
+    seen: dict[str, Mapping[str, Any]] = {}
+    failed_ids: list[str] = []
 
     for attempt in attempts:
         status = str(attempt.get("status", "unknown")).lower()
