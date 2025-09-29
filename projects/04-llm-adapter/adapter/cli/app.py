@@ -15,14 +15,11 @@ except ModuleNotFoundError:  # pragma: no cover - runtime fallback
 from .doctor import run_doctor
 from .prompts import run_prompts
 
-
 @lru_cache(maxsize=1)
 def _cli_namespace() -> ModuleType:
     return import_module(__name__.rsplit(".", 1)[0])
 
-
 T = TypeVar("T")
-
 
 def _with_cli_namespace(accessor: Callable[[ModuleType], T]) -> T:
     namespace = _cli_namespace()
@@ -117,7 +114,6 @@ else:  # pragma: no cover - exercised when Typer is unavailable
         if args and args[0] == "doctor":
             return doctor(args[1:])
         return run(args)
-
 
 __all__ = ["app", "doctor", "main", "run"]
 
