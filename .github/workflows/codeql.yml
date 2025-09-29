@@ -1,26 +1,27 @@
 name: CodeQL
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
   schedule:
     - cron: '30 1 * * 1'
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     steps:
       - name: Check out repository
@@ -37,18 +38,18 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ['javascript', 'python']
+          languages: "python,javascript"
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
-      - name: Perform CodeQL analysis
+      - name: Analyze
         id: analyze
         uses: github/codeql-action/analyze@v3
         with:
           output: codeql-results
 
-      - name: Upload CodeQL SARIF artifact
+      - name: Upload SARIF artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
