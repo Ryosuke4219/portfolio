@@ -41,7 +41,7 @@ def extract_text_from_response(response: Any) -> str:
     text = getattr(response, "text", None)
     if isinstance(text, str) and text.strip():
         return text
-    choices = getattr(response, "choices", None)
+    choices = response.choices if hasattr(response, "choices") else None
     if isinstance(choices, Sequence) and choices:
         first = choices[0]
         if isinstance(first, Mapping):
