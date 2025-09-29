@@ -197,10 +197,10 @@ class _AsyncProviderAdapter(AsyncProviderSPI):
         if self._async_invoke is not None:
             return await self._async_invoke(request)
         provider = self._provider
-        attr_name = "invoke"
-        if not hasattr(provider, attr_name):
+        if not hasattr(provider, "invoke"):
             raise TypeError("Provider does not expose a synchronous invoke() method")
-        invoke_attr = getattr(provider, attr_name)
+        provider_spi = cast(ProviderSPI, provider)
+        invoke_attr = provider_spi.invoke
         if not callable(invoke_attr):
             raise TypeError("Provider invoke attribute is not callable")
         invoke = cast(Callable[[ProviderRequest], ProviderResponse], invoke_attr)
