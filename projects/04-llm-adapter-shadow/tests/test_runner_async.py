@@ -507,6 +507,10 @@ def test_async_consensus_failure_details() -> None:
         assert detail["summary"] in message
 
 
+def test_async_consensus_error_details() -> None:
+    test_async_consensus_failure_details()
+
+
 def test_async_parallel_retry_behaviour(monkeypatch: pytest.MonkeyPatch) -> None:
     request_any = ProviderRequest(prompt="retry", model="parallel-any")
     clock_any = _FakeClock()
