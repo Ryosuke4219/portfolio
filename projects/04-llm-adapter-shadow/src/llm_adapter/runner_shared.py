@@ -9,7 +9,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .errors import FatalError, RateLimitError, RetryableError, SkipError
+from .errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger, JsonlLogger
 from .utils import content_hash
 
@@ -183,7 +183,7 @@ def log_provider_skipped(
             "provider": provider_name,
             "attempt": attempt,
             "total_providers": total_providers,
-            "reason": getattr(error, "reason", None),
+            "reason": error.reason if isinstance(error, ProviderSkip) else None,
             "error_message": str(error),
         },
     )
