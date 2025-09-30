@@ -16,11 +16,11 @@ from .provider_spi import (
     ProviderSPI,
 )
 from .shadow_metrics import (
-    MetricsPath,
-    ShadowMetrics,
     _build_shadow_record,
     _emit_shadow_metrics,
     _to_path_str,
+    MetricsPath,
+    ShadowMetrics,
 )
 
 DEFAULT_METRICS_PATH = "artifacts/runs-metrics.jsonl"
