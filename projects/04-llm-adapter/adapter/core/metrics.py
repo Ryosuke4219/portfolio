@@ -99,6 +99,11 @@ class RunMetrics:
     token_usage: dict[str, int] = field(default_factory=dict)
     retries: int = 0
     outcome: Literal["success", "skip", "error"] = "success"
+    shadow_provider_id: str | None = None
+    shadow_latency_ms: int | None = None
+    shadow_status: str | None = None
+    shadow_error_message: str | None = None
+    shadow_outcome: Literal["success", "skip", "error"] | None = None
     eval: EvalMetrics = field(default_factory=EvalMetrics)
     budget: BudgetSnapshot = field(default_factory=lambda: BudgetSnapshot(0.0, False))
     ci_meta: Mapping[str, Any] = field(default_factory=dict)
