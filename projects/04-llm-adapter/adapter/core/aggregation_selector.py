@@ -81,7 +81,7 @@ class _CompositeTieBreaker(TieBreaker):
 class AggregationDecision:
     decision: AggregationResult
     lookup: Mapping[int, SingleRunResult]
-    votes: int | None
+    votes: float | int | None
 
 
 class AggregationSelector:
@@ -142,21 +142,53 @@ class AggregationSelector:
             metadata = dict(decision.metadata) if decision.metadata else {}
             metadata["scores"] = score_metadata
             decision.metadata = metadata
-        votes: int | None = None
+        votes: float | int | None = None
+        aggregate_kind = (config.aggregate or "").strip().lower().replace("-", "_")
+        is_weighted = aggregate_kind in {"weighted_vote", "weighted"}
         if mode == "consensus":
             if decision.metadata:
-                raw_votes = decision.metadata.get("bucket_size")
-                if isinstance(raw_votes, int):
-                    votes = raw_votes
-            if votes is None:
-                chosen_text = decision.chosen.text or decision.chosen.response.text or ""
-                winner_output = chosen_text.strip()
-                votes = sum(
-                    1
-                    for result in lookup.values()
-                    if result.metrics.status == "ok"
-                    and result.raw_output.strip() == winner_output
-                )
+                key = "bucket_weight" if is_weighted else "bucket_size"
+                raw_votes = decision.metadata.get(key)
+                if isinstance(raw_votes, (int, float)):
+                    votes = float(raw_votes)
+            metadata = dict(decision.metadata or {})
+            if is_weighted:
+                weighted_votes = metadata.get("weighted_votes")
+                if not isinstance(weighted_votes, Mapping):
+                    weighted_map: dict[str, float] = {}
+                    weights = config.provider_weights or {}
+                    for result in lookup.values():
+                        if result.metrics.status != "ok":
+                            continue
+                        text = result.raw_output.strip()
+                        if not text:
+                            continue
+                        weight = float(weights.get(result.metrics.provider, 1.0))
+                        weighted_map[text] = weighted_map.get(text, 0.0) + weight
+                    metadata["weighted_votes"] = weighted_map
+                else:
+                    metadata["weighted_votes"] = {
+                        str(text): float(weight)
+                        for text, weight in weighted_votes.items()
+                    }
+                if votes is None:
+                    chosen_text = decision.chosen.text or decision.chosen.response.text or ""
+                    winner_output = chosen_text.strip()
+                    weighted_map = cast(Mapping[str, float], metadata.get("weighted_votes", {}))
+                    votes = weighted_map.get(winner_output)
+                decision.metadata = metadata
+            else:
+                if votes is None:
+                    chosen_text = decision.chosen.text or decision.chosen.response.text or ""
+                    winner_output = chosen_text.strip()
+                    votes = sum(
+                        1
+                        for result in lookup.values()
+                        if result.metrics.status == "ok"
+                        and result.raw_output.strip() == winner_output
+                    )
+            if votes is not None and not is_weighted:
+                votes = int(votes)
         return AggregationDecision(decision=decision, lookup=lookup, votes=votes)
 
     def _score_candidates_with_judge(
@@ -236,7 +268,12 @@ class AggregationSelector:
                 provider_factory=factory,
             )
         schema_data = self._load_schema(getattr(config, "schema", None))
-        return AggregationStrategy.from_string(aggregate, schema=schema_data)
+        provider_weights = getattr(config, "provider_weights", None)
+        extra: dict[str, Any] = {"schema": schema_data}
+        normalized = aggregate.lower().replace("-", "_") if aggregate else ""
+        if normalized in {"weighted_vote", "weighted"}:
+            extra["provider_weights"] = provider_weights
+        return AggregationStrategy.from_string(aggregate, **extra)
 
     @staticmethod
     def _resolve_tie_breaker(
