@@ -1,41 +1,67 @@
 """プロバイダとのインタフェース。"""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import logging
 import time
+import warnings
 from typing import Any
 
 from ..config import ProviderConfig
+from ..provider_spi import ProviderRequest, ProviderResponse as _ProviderResponse, TokenUsage
 
 LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class ProviderResponse:
-    """LLM 呼び出しの結果。"""
+class ProviderResponse(_ProviderResponse):
+    """LLM 呼び出しの結果（後方互換ラッパー）。"""
 
-    output_text: str
-    input_tokens: int = 0
-    output_tokens: int = 0
-    latency_ms: int = 0
-    raw_output: Any = None
+    def __init__(
+        self,
+        *,
+        text: str | None = None,
+        latency_ms: int = 0,
+        token_usage: TokenUsage | None = None,
+        model: str | None = None,
+        finish_reason: str | None = None,
+        raw: Any | None = None,
+        output_text: str | None = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        raw_output: Any | None = None,
+    ) -> None:
+        selected_text = text if text is not None else (output_text or "")
+        if token_usage is None and (input_tokens is not None or output_tokens is not None):
+            token_usage = TokenUsage(
+                prompt=int(input_tokens or 0),
+                completion=int(output_tokens or 0),
+            )
+        raw_value = raw if raw is not None else raw_output
+        super().__init__(
+            text=selected_text,
+            latency_ms=latency_ms,
+            token_usage=token_usage,
+            model=model,
+            finish_reason=finish_reason,
+            raw=raw_value,
+        )
 
     # --- compatibility aliases (shadow 互換) ---
     @property
-    def text(self) -> str:
-        return self.output_text
+    def output_text(self) -> str:
+        return self.text
 
     @property
-    def token_usage(self):
-        from types import SimpleNamespace
+    def input_tokens(self) -> int:
+        return self.token_usage.prompt
 
-        return SimpleNamespace(
-            prompt=self.input_tokens,
-            completion=self.output_tokens,
-            total=(self.input_tokens + self.output_tokens),
-        )
+    @property
+    def output_tokens(self) -> int:
+        return self.token_usage.completion
+
+    @property
+    def raw_output(self) -> Any | None:
+        return self.raw
 
 
 class BaseProvider:
@@ -44,18 +70,29 @@ class BaseProvider:
     def __init__(self, config: ProviderConfig) -> None:
         self.config = config
 
-    def generate(self, prompt: str) -> ProviderResponse:  # pragma: no cover - インタフェース
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - インタフェース
         raise NotImplementedError
+
+    def generate(self, prompt: str) -> ProviderResponse:
+        warnings.warn(
+            "BaseProvider.generate() は非推奨です。ProviderRequest を受け取る invoke() を利用してください。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        model = (self.config.model or self.config.provider).strip()
+        request = ProviderRequest(model=model, prompt=prompt)
+        return self.invoke(request)
 
 
 class SimulatedProvider(BaseProvider):
     """実際の API 呼び出しを伴わない簡易シミュレータ。"""
 
-    def generate(self, prompt: str) -> ProviderResponse:
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        prompt = request.prompt
         # 擬似レイテンシ（文字数に比例）
         latency_ms = min(len(prompt) * 5, 1500)
         time.sleep(latency_ms / 1000.0 / 100.0)
-        seed_material = f"{self.config.seed}:{self.config.model}:{prompt}".encode()
+        seed_material = f"{self.config.seed}:{request.model}:{prompt}".encode()
         digest = hashlib.sha256(seed_material).hexdigest()
         normalized = prompt.lower()
         if "return success" in normalized:
@@ -66,12 +103,13 @@ class SimulatedProvider(BaseProvider):
             output = "SIMULATED:" + digest[:24]
         prompt_tokens = max(1, len(prompt.split()))
         output_tokens = max(1, len(output.split()))
+        token_usage = TokenUsage(prompt=prompt_tokens, completion=output_tokens)
         return ProviderResponse(
-            output_text=output,
-            input_tokens=prompt_tokens,
-            output_tokens=output_tokens,
+            text=output,
             latency_ms=latency_ms,
-            raw_output={"simulated": True, "digest": digest},
+            token_usage=token_usage,
+            model=request.model,
+            raw={"simulated": True, "digest": digest},
         )
 
 
