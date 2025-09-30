@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections.abc import Mapping, Sequence
 import json
-import sys
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+import sys
+from typing import Any
 
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .providers.factory import create_provider_from_spec, parse_provider_spec, ProviderFactory
