@@ -43,7 +43,7 @@ from .budgets import BudgetManager
 from .compare_runner_finalizer import TaskFinalizer
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics import BudgetSnapshot, EvalMetrics, RunMetrics, compute_diff_rate, hash_text, now_ts
+from .metrics import BudgetSnapshot, compute_diff_rate, EvalMetrics, hash_text, now_ts, RunMetrics
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 from .runner_execution import (
     _SchemaValidator,
