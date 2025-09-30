@@ -49,7 +49,9 @@ def test_majority_with_latency_tie_breaker() -> None:
     ]
     result = compute_consensus(
         responses,
-        config=ConsensusConfig(strategy="majority", tie_breaker="latency", quorum=2),
+        config=ConsensusConfig(
+            strategy="majority_vote", tie_breaker="min_latency", quorum=2
+        ),
     )
     assert isinstance(result, ConsensusResult)
     assert result.response.text == "B"
@@ -73,7 +75,9 @@ def test_weighted_strategy_records_scores() -> None:
     ]
     result = compute_consensus(
         responses,
-        config=ConsensusConfig(strategy="weighted", tie_breaker="cost", quorum=2),
+        config=ConsensusConfig(
+            strategy="weighted_vote", tie_breaker="min_cost", quorum=2
+        ),
     )
     assert result.response.text == "B"
     assert result.scores is not None
@@ -111,6 +115,25 @@ def test_max_score_strategy_prefers_best_latency() -> None:
     assert result.scores["A"] == pytest.approx(0.6)
     assert result.scores["B"] == pytest.approx(0.6)
     assert result.winner_score == pytest.approx(0.6)
+
+
+def test_default_tie_breaker_fallback_order() -> None:
+    responses = [
+        _response("A", 10, tokens_in=5, tokens_out=5),
+        _response("B", 10, tokens_in=5, tokens_out=5),
+    ]
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(strategy="majority", quorum=1),
+    )
+    assert result.response.text == "A"
+    assert result.tie_break_applied is True
+    tie_break_reason = result.tie_break_reason
+    assert tie_break_reason is not None
+    assert tie_break_reason.startswith("stable_order")
+    tie_breaker_selected = result.tie_breaker_selected
+    assert tie_breaker_selected == "stable_order"
+    assert result.rounds == 4
 
 
 def test_schema_validation_marks_abstentions() -> None:
@@ -156,6 +179,19 @@ def test_judge_provider_handles_runoff_round() -> None:
     assert result.judge_name == "tests.test_runner_consensus:fake_judge"
     assert result.judge_score == pytest.approx(0.75)
     assert result.rounds == 3
+
+
+def test_invalid_tie_breaker_rejected() -> None:
+    responses = [
+        _response("A", 10),
+        _response("B", 10),
+    ]
+    with pytest.raises(ValueError) as exc_info:
+        compute_consensus(
+            responses,
+            config=ConsensusConfig(strategy="majority", tie_breaker="unknown"),
+        )
+    assert "unknown tie_breaker" in str(exc_info.value)
 
 
 def test_max_rounds_exhausted_before_judge_round() -> None:

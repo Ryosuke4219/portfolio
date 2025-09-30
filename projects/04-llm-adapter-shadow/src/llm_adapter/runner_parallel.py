@@ -85,7 +85,12 @@ def _load_judge(path: str) -> Callable[[Sequence[ProviderResponse]], Any]:
 def _select_candidates(
     strategy: str, candidates: Mapping[str, _Candidate]
 ) -> tuple[list[_Candidate], float, dict[str, float] | None]:
-    normalized = strategy.strip().lower()
+    normalized_input = strategy.strip().lower()
+    aliases = {
+        "majority_vote": "majority",
+        "weighted_vote": "weighted",
+    }
+    normalized = aliases.get(normalized_input, normalized_input)
     if normalized == "majority":
         pivot_votes = max(candidate.votes for candidate in candidates.values())
         pool = [
@@ -131,17 +136,40 @@ def _tie_break_by_cost(candidates: Sequence[_Candidate]) -> tuple[list[_Candidat
     return narrowed, "cost(min)"
 
 
+def _tie_break_by_stable_order(
+    candidates: Sequence[_Candidate],
+) -> tuple[list[_Candidate], str]:
+    indexed = [
+        (candidate, min(index for index, _ in candidate.entries)) for candidate in candidates
+    ]
+    best_index = min(position for _, position in indexed)
+    narrowed = [candidate for candidate, position in indexed if position == best_index]
+    return narrowed, f"stable_order(first_index={best_index})"
+
+
+def _normalize_tie_breaker_name(name: str) -> str:
+    normalized_input = name.strip().lower()
+    aliases = {
+        "min_latency": "latency",
+        "min_cost": "cost",
+    }
+    normalized = aliases.get(normalized_input, normalized_input)
+    valid = {"latency", "cost", "stable_order"}
+    if normalized not in valid:
+        raise ValueError(f"unknown tie_breaker: {name!r}")
+    return normalized
+
+
 def _apply_tie_breaker(
     name: str, candidates: Sequence[_Candidate]
 ) -> tuple[list[_Candidate], str, str]:
-    normalized = name.strip().lower()
+    normalized = _normalize_tie_breaker_name(name)
     handlers: dict[str, Callable[[Sequence[_Candidate]], tuple[list[_Candidate], str]]] = {
         "latency": _tie_break_by_latency,
         "cost": _tie_break_by_cost,
+        "stable_order": _tie_break_by_stable_order,
     }
-    handler = handlers.get(normalized)
-    if handler is None:
-        raise ValueError(f"unknown tie_breaker: {name!r}")
+    handler = handlers[normalized]
     narrowed, reason = handler(candidates)
     return narrowed, reason, normalized
 
@@ -215,9 +243,10 @@ def compute_consensus(
     if config is None:
         config = ConsensusConfig()
     strategy = (config.strategy or "majority").strip()
-    tie_breaker = (config.tie_breaker or "").strip().lower() or None
-    if tie_breaker is not None and tie_breaker not in {"latency", "cost"}:
-        raise ValueError(f"unsupported tie_breaker: {config.tie_breaker!r}")
+    tie_breaker_value = (config.tie_breaker or "").strip()
+    normalized_tie_breaker = (
+        _normalize_tie_breaker_name(tie_breaker_value) if tie_breaker_value else None
+    )
 
     valid_entries, schema_failures, schema_checked = validate_consensus_schema(
         collected, config.schema
@@ -256,11 +285,19 @@ def compute_consensus(
             raise ParallelExecutionError("consensus max_rounds exhausted")
         rounds += 1
 
-    if tie_break_applied and tie_breaker is not None:
-        _next_round()
-        remaining, tie_break_reason, tie_breaker_selected = _apply_tie_breaker(
-            tie_breaker, remaining
+    if tie_break_applied:
+        sequence = (
+            [normalized_tie_breaker]
+            if normalized_tie_breaker is not None
+            else ["latency", "cost", "stable_order"]
         )
+        for breaker in sequence:
+            if len(remaining) <= 1:
+                break
+            _next_round()
+            remaining, tie_break_reason, tie_breaker_selected = _apply_tie_breaker(
+                breaker, remaining
+            )
 
     if len(remaining) > 1 and config.judge:
         _next_round()
