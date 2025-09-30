@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .provider_spi import ProviderSPI
 
 
 class RunnerMode(str, Enum):
@@ -42,6 +46,7 @@ class RunnerConfig:
     max_concurrency: int | None = None
     rpm: int | None = None
     consensus: ConsensusConfig | None = None
+    shadow_provider: ProviderSPI | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.mode, RunnerMode):
