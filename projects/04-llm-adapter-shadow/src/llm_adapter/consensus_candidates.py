@@ -103,7 +103,7 @@ def _select_candidates(
 ) -> tuple[list[_Candidate], float, dict[str, float] | None]:
     normalized = strategy.strip().lower()
     values = list(candidates.values())
-    if normalized == "majority":
+    if normalized in {"majority", "majority_vote"}:
         pivot_votes = max(candidate.votes for candidate in values)
         pool = [candidate for candidate in values if candidate.votes == pivot_votes]
         return pool, float(pivot_votes), None

@@ -553,7 +553,7 @@ def test_consensus_vote_event_and_shadow_delta(
     consensus_event = next(
         item for item in payloads if item.get("event") == "consensus_vote"
     )
-    assert consensus_event["strategy"] == "majority"
+    assert consensus_event["strategy"] == "majority_vote"
     assert consensus_event["voters_total"] == 3
     assert consensus_event["votes_for"] == 2
     assert consensus_event["votes_against"] == 1
