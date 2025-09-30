@@ -238,7 +238,20 @@ class Runner:
         request_fingerprint = content_hash(
             "runner", request.prompt_text, request.options, request.max_tokens
         )
-        shadow_used = shadow is not None
+        shadow_provider = shadow
+        if shadow_provider is None:
+            shadow_provider = getattr(self._config, "shadow_provider", None)
+        shadow_used = shadow_provider is not None
+        provider_names = [provider.name() for provider in self.providers]
+        metadata.update(
+            {
+                "run_id": request_fingerprint,
+                "mode": getattr(self._config.mode, "value", str(self._config.mode)),
+                "providers": provider_names,
+                "shadow_used": shadow_used,
+                "shadow_provider_id": shadow_provider.name() if shadow_provider else None,
+            }
+        )
         strategy = get_sync_strategy(cast(RunnerMode, self._config.mode))
         context = SyncRunContext(
             runner=self,
@@ -247,7 +260,7 @@ class Runner:
             metadata=metadata,
             run_started=run_started,
             request_fingerprint=request_fingerprint,
-            shadow=shadow,
+            shadow=shadow_provider,
             shadow_used=shadow_used,
             metrics_path=metrics_path_str,
             run_parallel_all=run_parallel_all_sync,

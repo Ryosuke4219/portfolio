@@ -55,6 +55,25 @@ def _tokens_total(res: ProviderResponse) -> int:
     return usage.total
 
 
+def _resolve_shadow_outcome(payload: Mapping[str, Any]) -> str | None:
+    outcome = payload.get("outcome")
+    if isinstance(outcome, str):
+        return outcome
+
+    ok = payload.get("ok")
+    if ok is True:
+        return "success"
+
+    error = payload.get("error")
+    if error == "ShadowTimeout":
+        return "timeout"
+
+    if ok is False or error is not None:
+        return "error"
+
+    return None
+
+
 def _build_shadow_record(
     *,
     primary_provider_name: str,
@@ -65,11 +84,17 @@ def _build_shadow_record(
 ) -> dict[str, Any]:
     """Compose the metrics payload for a shadow run."""
 
-    payload: Mapping[str, Any] = shadow_payload or {"provider": shadow_name, "ok": False}
+    payload: Mapping[str, Any] = shadow_payload or {
+        "provider": shadow_name,
+        "ok": False,
+        "outcome": "error",
+    }
     primary_text_len = len(primary_response.text)
     request_fingerprint = content_hash(
         "runner", request.prompt_text, request.options, request.max_tokens
     )
+    shadow_provider = payload.get("provider", shadow_name)
+    shadow_outcome = _resolve_shadow_outcome(payload)
     record: dict[str, Any] = {
         "request_hash": content_hash(
             primary_provider_name, request.prompt_text, request.options, request.max_tokens
@@ -79,8 +104,10 @@ def _build_shadow_record(
         "primary_latency_ms": primary_response.latency_ms,
         "primary_text_len": primary_text_len,
         "primary_token_usage_total": _tokens_total(primary_response),
-        "shadow_provider": payload.get("provider", shadow_name),
+        "shadow_provider": shadow_provider,
+        "shadow_provider_id": shadow_provider,
         "shadow_ok": payload.get("ok"),
+        "shadow_outcome": shadow_outcome,
         "shadow_latency_ms": payload.get("latency_ms"),
         "shadow_duration_ms": payload.get("duration_ms"),
         "shadow_error": payload.get("error"),
@@ -165,6 +192,7 @@ def run_with_shadow(
                     "error": type(exc).__name__,
                     "message": str(exc),
                     "provider": shadow_name,
+                    "outcome": "error",
                 }
             else:
                 payload = {
@@ -173,6 +201,7 @@ def run_with_shadow(
                     "latency_ms": response.latency_ms,
                     "text_len": len(response.text),
                     "token_usage_total": _tokens_total(response),
+                    "outcome": "success",
                 }
             finally:
                 payload["duration_ms"] = int((time.time() - ts0) * 1000)
@@ -198,12 +227,17 @@ def run_with_shadow(
                 "provider": shadow_name,
                 "ok": False,
                 "error": "ShadowTimeout",
+                "outcome": "timeout",
                 "duration_ms": duration_ms,
             }
         elif payload_holder:
             shadow_payload = dict(payload_holder[-1])
         else:
-            shadow_payload = {"provider": shadow_name, "ok": False}
+            shadow_payload = {
+                "provider": shadow_name,
+                "ok": False,
+                "outcome": "error",
+            }
 
         if metrics_path_str:
             record = _build_shadow_record(
@@ -264,6 +298,7 @@ async def run_with_shadow_async(
                     "error": type(exc).__name__,
                     "message": str(exc),
                     "provider": shadow_name,
+                    "outcome": "error",
                 }
             else:
                 payload = {
@@ -272,6 +307,7 @@ async def run_with_shadow_async(
                     "latency_ms": response.latency_ms,
                     "text_len": len(response.text),
                     "token_usage_total": _tokens_total(response),
+                    "outcome": "success",
                 }
             payload["duration_ms"] = int((time.time() - ts0) * 1000)
             return payload
@@ -301,13 +337,22 @@ async def run_with_shadow_async(
                 "provider": shadow_name,
                 "ok": False,
                 "error": "ShadowTimeout",
+                "outcome": "timeout",
                 "duration_ms": duration_ms,
             }
         except asyncio.CancelledError:  # pragma: no cover - defensive
-            shadow_payload = {"provider": shadow_name, "ok": False}
+            shadow_payload = {
+                "provider": shadow_name,
+                "ok": False,
+                "outcome": "error",
+            }
 
         if shadow_payload is None:
-            shadow_payload = {"provider": shadow_name, "ok": False}
+            shadow_payload = {
+                "provider": shadow_name,
+                "ok": False,
+                "outcome": "error",
+            }
 
         if metrics_path_str:
             record = _build_shadow_record(
