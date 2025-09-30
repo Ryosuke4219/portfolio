@@ -1,4 +1,4 @@
-"""CompareRunner の実行責務を担うユーティリティ。"""
+"""CompareRunner の実行責務と実行戦略を提供するユーティリティ。"""
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -51,6 +51,10 @@ from .config import ProviderConfig
 from .datasets import GoldenTask
 from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
 from .providers import BaseProvider, ProviderResponse
+from .runner_execution_attempts import (
+    ParallelAttemptExecutor,
+    SequentialAttemptExecutor,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
@@ -149,6 +153,14 @@ class RunnerExecution:
         self._evaluate_budget = evaluate_budget
         self._build_metrics = build_metrics
         self._normalize_concurrency = normalize_concurrency
+        self._sequential_executor = SequentialAttemptExecutor(self._run_single)
+        self._parallel_executor = ParallelAttemptExecutor(
+            self._run_single,
+            normalize_concurrency,
+            run_parallel_all_sync=run_parallel_all_sync,
+            run_parallel_any_sync=run_parallel_any_sync,
+            parallel_execution_error=ParallelExecutionError,
+        )
 
     def run_sequential_attempt(
         self,
@@ -157,14 +169,12 @@ class RunnerExecution:
         attempt_index: int,
         mode: str,
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
-        batch: list[tuple[int, SingleRunResult]] = []
-        stop_reason: str | None = None
-        for index, (provider_config, provider) in enumerate(providers):
-            result = self._run_single(provider_config, provider, task, attempt_index, mode)
-            batch.append((index, result))
-            if result.stop_reason and not stop_reason:
-                stop_reason = result.stop_reason
-        return batch, stop_reason
+        return self._sequential_executor.run(
+            providers,
+            task,
+            attempt_index,
+            mode,
+        )
 
     def run_parallel_attempt(
         self,
@@ -173,56 +183,12 @@ class RunnerExecution:
         attempt_index: int,
         config: RunnerConfig,
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
-        if not providers:
-            return [], None
-        max_concurrency = getattr(config, "max_concurrency", None)
-
-        if max_concurrency is None:
-            max_workers = self._normalize_concurrency(len(providers), None)
-        else:
-            max_workers = self._normalize_concurrency(len(providers), max_concurrency)
-
-        stop_reason: str | None = None
-        results: list[SingleRunResult | None] = [None] * len(providers)
-
-        def build_worker(
-            index: int, provider_config: ProviderConfig, provider: BaseProvider
-        ) -> Callable[[], int]:
-            def worker() -> int:
-                nonlocal stop_reason
-                result = self._run_single(
-                    provider_config,
-                    provider,
-                    task,
-                    attempt_index,
-                    config.mode,
-                )
-                results[index] = result
-                if result.stop_reason and not stop_reason:
-                    stop_reason = result.stop_reason
-                if config.mode == "parallel-any" and result.metrics.status != "ok":
-                    raise RuntimeError("parallel-any failure")
-                return index
-
-            return worker
-
-        workers = [
-            build_worker(index, provider_config, provider)
-            for index, (provider_config, provider) in enumerate(providers)
-        ]
-        if config.mode == "parallel-any":
-            try:
-                run_parallel_any_sync(workers, max_concurrency=max_workers)
-            except (ParallelExecutionError, RuntimeError):
-                pass
-        else:
-            run_parallel_all_sync(workers, max_concurrency=max_workers)
-        batch = [
-            (index, result)
-            for index, result in enumerate(results)
-            if result is not None
-        ]
-        return batch, stop_reason
+        return self._parallel_executor.run(
+            providers,
+            task,
+            attempt_index,
+            config,
+        )
 
     def _run_single(
         self,
@@ -356,6 +322,8 @@ class RunnerExecution:
 
 __all__ = [
     "RunnerExecution",
+    "SequentialAttemptExecutor",
+    "ParallelAttemptExecutor",
     "SingleRunResult",
     "_SchemaValidator",
     "_TokenBucket",
