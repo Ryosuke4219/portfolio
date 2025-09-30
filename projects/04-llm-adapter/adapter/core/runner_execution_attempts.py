@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
@@ -16,8 +16,13 @@ from .runner_execution_parallel import (
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_execution import SingleRunResult
+else:  # pragma: no cover - 実行時フォールバック
+    SingleRunResult = Any  # type: ignore[assignment]
 
-_RunSingle = Callable[[ProviderConfig, BaseProvider, GoldenTask, int, str], "SingleRunResult"]
+_RunSingle = Callable[
+    [ProviderConfig, BaseProvider, GoldenTask, int, str],
+    SingleRunResult,
+]
 
 
 class SequentialAttemptExecutor:
@@ -32,8 +37,8 @@ class SequentialAttemptExecutor:
         task: GoldenTask,
         attempt_index: int,
         mode: str,
-    ) -> tuple[list[tuple[int, "SingleRunResult"]], str | None]:
-        batch: list[tuple[int, "SingleRunResult"]] = []
+    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
+        batch: list[tuple[int, SingleRunResult]] = []
         stop_reason: str | None = None
         failures: list[ProviderFailureSummary] = []
         success_found = False
