@@ -15,6 +15,7 @@ if TYPE_CHECKING:  # pragma: no cover - 型補完用
         run_parallel_all_sync,
         run_parallel_any_sync,
     )
+
 else:  # pragma: no cover - 実行時フォールバック
     try:
         from src.llm_adapter.parallel_exec import (
