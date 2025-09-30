@@ -230,8 +230,13 @@ class Runner:
     ]:
         """Execute ``request`` with fallback semantics."""
 
+        metrics_path = (
+            self._config.metrics_path
+            if shadow_metrics_path == DEFAULT_METRICS_PATH
+            else shadow_metrics_path
+        )
         event_logger, metrics_path_str = resolve_event_logger(
-            self._logger, shadow_metrics_path
+            self._logger, metrics_path
         )
         metadata = dict(request.metadata or {})
         run_started = time.time()
