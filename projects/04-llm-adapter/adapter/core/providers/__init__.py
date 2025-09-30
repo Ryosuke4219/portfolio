@@ -4,8 +4,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-import warnings
 from typing import Any
+import warnings
 
 from ..config import ProviderConfig
 from ..provider_spi import ProviderRequest, ProviderResponse as _ProviderResponse, TokenUsage
