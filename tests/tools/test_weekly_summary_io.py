@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import datetime as dt
 import importlib
-import sys
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -15,7 +15,6 @@ if root_str not in sys.path:
 weekly_summary = importlib.import_module("tools.weekly_summary")
 legacy_load_runs = weekly_summary.load_runs
 legacy_load_flaky = weekly_summary.load_flaky
-
 
 @pytest.mark.parametrize(
     "loader, filename, payload, expected",
