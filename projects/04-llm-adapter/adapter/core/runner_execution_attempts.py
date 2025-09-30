@@ -4,13 +4,14 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Protocol, TYPE_CHECKING
 
+from .runner_execution import SingleRunResult
+
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
-    from .runner_execution import SingleRunResult
 
 
 class _ParallelRunner(Protocol):
