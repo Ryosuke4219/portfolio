@@ -20,7 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover - 型補完用
 _single_run_result_cls: type[Any] | None = None
 
 
-def _get_single_run_result_cls() -> type["SingleRunResult"]:
+def _get_single_run_result_cls() -> type[SingleRunResult]:
     global _single_run_result_cls
     if _single_run_result_cls is None:
         from .runner_execution import SingleRunResult as _SingleRunResult
