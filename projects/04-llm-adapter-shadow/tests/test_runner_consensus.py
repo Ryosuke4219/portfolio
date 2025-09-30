@@ -1,6 +1,5 @@
 import pytest
 
-import src.llm_adapter.runner_parallel as runner_parallel
 from src.llm_adapter.errors import RetriableError, TimeoutError
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import (
@@ -10,6 +9,7 @@ from src.llm_adapter.provider_spi import (
 )
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
+import src.llm_adapter.runner_parallel as runner_parallel
 from src.llm_adapter.runner_parallel import (
     compute_consensus,
     ConsensusResult,
