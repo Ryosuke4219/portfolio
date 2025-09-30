@@ -41,7 +41,7 @@ class _ParallelRunner(Protocol):
 
 _RunSingle = Callable[
     [ProviderConfig, BaseProvider, GoldenTask, int, str],
-    SingleRunResult,
+    "SingleRunResult",
 ]
 
 

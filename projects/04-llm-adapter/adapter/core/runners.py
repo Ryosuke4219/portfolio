@@ -3,12 +3,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
-import json
 import logging
 import os
 from pathlib import Path
 import re
-from statistics import median, pstdev
 from typing import TYPE_CHECKING
 import uuid
 
@@ -42,16 +40,10 @@ else:  # pragma: no cover - 実行時フォールバック
 
 from .aggregation_controller import AggregationController
 from .budgets import BudgetManager
+from .compare_runner_finalizer import TaskFinalizer
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics import (
-    BudgetSnapshot,
-    compute_diff_rate,
-    EvalMetrics,
-    hash_text,
-    now_ts,
-    RunMetrics,
-)
+from .metrics import BudgetSnapshot, EvalMetrics, RunMetrics, compute_diff_rate, hash_text, now_ts
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 from .runner_execution import (
     _SchemaValidator,
@@ -143,6 +135,7 @@ class CompareRunner:
         self._aggregation = AggregationController(
             judge_factory_builder=lambda cfg: _JudgeProviderFactoryAdapter(cfg)
         )
+        self._task_finalizer = TaskFinalizer(self.metrics_path)
 
     def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
@@ -151,6 +144,7 @@ class CompareRunner:
         if config.metrics_path is not None and config.metrics_path != self.metrics_path:
             self.metrics_path = config.metrics_path
             self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
+            self._task_finalizer.update_metrics_path(self.metrics_path)
         self._shadow_provider = config.shadow_provider
         self._provider_weights = (
             dict(config.provider_weights) if config.provider_weights is not None else None
@@ -213,50 +207,12 @@ class CompareRunner:
                     histories[index].append(result)
                 if stop_reason:
                     break
-            self._finalize_task(task, providers, histories, results)
+            self._task_finalizer.finalize_task(task, providers, histories, results)
             if stop_reason:
                 LOGGER.warning("予算制約により実行を停止します: %s", stop_reason)
                 break
         return results
 
-
-    def _run_provider_call(
-        self,
-        provider_config: ProviderConfig,
-        provider: BaseProvider,
-        prompt: str,
-    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
-        """Backward-compatible proxy to :class:`RunnerExecution` helper."""
-
-        response, status, failure_kind, error_message, latency_ms = (
-            RunnerExecution._invoke_provider(provider, prompt)
-        )
-        status, failure_kind = RunnerExecution._check_timeout(
-            provider_config, latency_ms, status, failure_kind
-        )
-        status, failure_kind = RunnerExecution._enforce_output_guard(
-            response.output_text, status, failure_kind
-        )
-        return response, status, failure_kind, error_message, latency_ms
-
-
-    def _finalize_task(
-        self,
-        task: GoldenTask,
-        providers: Sequence[tuple[ProviderConfig, BaseProvider]],
-        histories: Sequence[Sequence[SingleRunResult]],
-        results: list[RunMetrics],
-    ) -> None:
-        for index, (provider_config, _) in enumerate(providers):
-            attempts = list(histories[index])
-            if not attempts:
-                continue
-            metrics_list = [attempt.metrics for attempt in attempts]
-            outputs = [attempt.raw_output for attempt in attempts]
-            self._apply_determinism_gate(provider_config, task, metrics_list, outputs)
-            for attempt in attempts:
-                results.append(attempt.metrics)
-                self._append_metric(attempt.metrics)
 
     def _run_provider_call(
         self,
@@ -400,11 +356,6 @@ class CompareRunner:
                 LOGGER.warning("予算超過を許容 (--allow-overrun): %s", joined)
         return budget_snapshot, stop_reason, status, failure_kind, error_message
 
-    def _append_metric(self, metrics: RunMetrics) -> None:
-        with self.metrics_path.open("a", encoding="utf-8") as fp:
-            json.dump(metrics.to_json_dict(), fp, ensure_ascii=False)
-            fp.write("\n")
-
     def _evaluate(
         self, task: GoldenTask, output_text: str | None
     ) -> tuple[EvalMetrics, str | None]:
@@ -447,54 +398,3 @@ class CompareRunner:
         if commit:
             meta["commit"] = commit
         return meta
-
-    def _apply_determinism_gate(
-        self,
-        provider_config: ProviderConfig,
-        task: GoldenTask,
-        metrics_list: Sequence[RunMetrics],
-        outputs: Sequence[str],
-    ) -> None:
-        gates = provider_config.quality_gates
-        if gates.determinism_diff_rate_max <= 0 and gates.determinism_len_stdev_max <= 0:
-            return
-        comparable: list[tuple[RunMetrics, str]] = [
-            (metrics, output)
-            for metrics, output in zip(metrics_list, outputs, strict=False)
-            if metrics.status == "ok" and output
-        ]
-        if len(comparable) < 2:
-            return
-        diff_rates: list[float] = []
-        for idx, (_, output_a) in enumerate(comparable):
-            for _, output_b in comparable[idx + 1 :]:
-                diff_rates.append(compute_diff_rate(output_a, output_b))
-        median_diff = median(diff_rates) if diff_rates else 0.0
-        lengths: list[int] = [
-            metrics.eval.len_tokens
-            if metrics.eval.len_tokens is not None
-            else metrics.output_tokens
-            for metrics, _ in comparable
-        ]
-        len_stdev = pstdev(lengths) if len(lengths) > 1 else 0.0
-        diff_threshold_exceeded = (
-            gates.determinism_diff_rate_max > 0
-            and median_diff > gates.determinism_diff_rate_max
-        )
-        len_threshold_exceeded = (
-            gates.determinism_len_stdev_max > 0
-            and len_stdev > gates.determinism_len_stdev_max
-        )
-        if not (diff_threshold_exceeded or len_threshold_exceeded):
-            return
-        LOGGER.warning(
-            "決定性ゲート失敗: provider=%s model=%s prompt=%s median_diff=%.4f len_stdev=%.4f",
-            provider_config.provider,
-            provider_config.model,
-            task.task_id,
-            median_diff,
-            len_stdev,
-        )
-        for metrics, _ in comparable:
-            metrics.status = "error"
-            metrics.failure_kind = "non_deterministic"
