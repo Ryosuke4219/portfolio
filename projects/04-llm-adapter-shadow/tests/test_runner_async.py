@@ -10,6 +10,7 @@ from _pytest.recwarn import WarningsRecorder
 import pytest
 
 from src.llm_adapter.errors import RateLimitError, TimeoutError
+import src.llm_adapter.runner_async_modes as runner_async_modes
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
@@ -668,3 +669,69 @@ def test_async_parallel_all_rate_limit_retries() -> None:
     assert len(retries) == 2
     assert all(record["error_type"] == "RateLimitError" for record in retries)
     assert {record["next_attempt"] for record in retries} == {3, 4}
+
+
+@pytest.mark.parametrize(
+    ("mode", "strategy_name"),
+    [
+        (RunnerMode.SEQUENTIAL, "SequentialRunStrategy"),
+        (RunnerMode.PARALLEL_ANY, "ParallelAnyRunStrategy"),
+        (RunnerMode.PARALLEL_ALL, "ParallelAllRunStrategy"),
+        (RunnerMode.CONSENSUS, "ConsensusRunStrategy"),
+    ],
+)
+def test_async_runner_strategy_selection(
+    monkeypatch: pytest.MonkeyPatch, mode: RunnerMode, strategy_name: str
+) -> None:
+    strategy_cls = getattr(runner_async_modes, strategy_name)
+    original_run = strategy_cls.run
+    called: list[str] = []
+
+    async def _wrapped(self: object, context: object) -> Any:
+        called.append(strategy_name)
+        return await original_run(self, context)
+
+    monkeypatch.setattr(strategy_cls, "run", _wrapped)
+
+    providers = [
+        _AsyncProbeProvider("p1", delay=0.0, text="ok"),
+        _AsyncProbeProvider("p2", delay=0.0, text="ok"),
+    ]
+    config_kwargs: dict[str, Any] = {"mode": mode}
+    if mode == RunnerMode.CONSENSUS:
+        config_kwargs["consensus"] = ConsensusConfig()
+    runner = AsyncRunner(providers, config=RunnerConfig(**config_kwargs))
+    request = ProviderRequest(model="gpt-test", prompt="hello")
+
+    asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.1))
+
+    assert called == [strategy_name]
+
+
+def test_async_runner_emits_failure_event() -> None:
+    logger = _CapturingLogger()
+    provider = _AsyncProbeProvider(
+        "flaky",
+        delay=0.0,
+        text="nope",
+        failures=[TimeoutError("boom")],
+    )
+    runner = AsyncRunner(
+        [provider],
+        logger=logger,
+        config=RunnerConfig(mode=RunnerMode.SEQUENTIAL),
+    )
+    request = ProviderRequest(model="gpt-test", prompt="fail")
+
+    async def _execute() -> None:
+        await runner.run_async(request)
+
+    with pytest.raises(TimeoutError):
+        asyncio.run(asyncio.wait_for(_execute(), timeout=0.1))
+
+    events = logger.of_type("provider_chain_failed")
+    assert len(events) == 1
+    event = events[0]
+    assert event["provider_attempts"] == 1
+    assert event["providers"] == ["flaky"]
+    assert event["last_error_type"] == "TimeoutError"
