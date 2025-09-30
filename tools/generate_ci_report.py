@@ -10,11 +10,13 @@ from pathlib import Path
 import sys
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from ci_metrics import compute_recent_deltas, compute_run_history
+from tools.ci_report.processing import (
+    compute_last_updated,
+    normalize_flaky_rows,
+    summarize_failure_kinds,
+)
+from tools.ci_report.rendering import build_json_payload, render_markdown
 from weekly_summary import (
     aggregate_status,
     coerce_str,
@@ -27,12 +29,9 @@ from weekly_summary import (
     to_float,
 )
 
-from tools.ci_report.processing import (
-    compute_last_updated,
-    normalize_flaky_rows,
-    summarize_failure_kinds,
-)
-from tools.ci_report.rendering import build_json_payload, render_markdown
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def parse_args() -> argparse.Namespace:
