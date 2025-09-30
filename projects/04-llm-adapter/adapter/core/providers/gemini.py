@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 from ..config import ProviderConfig
+from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from . import BaseProvider, ProviderResponse
 
 __all__ = ["GeminiProvider"]
@@ -20,7 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover - SDK 未導入時
 
 def _resolve_api_key(env_name: str | None) -> str:
     if not env_name:
-        raise RuntimeError(
+        raise AuthError(
             textwrap.dedent(
                 """
                 Gemini プロバイダを利用するには auth_env に API キーの環境変数を指定してください
@@ -29,8 +30,55 @@ def _resolve_api_key(env_name: str | None) -> str:
         )
     value = os.getenv(env_name)
     if not value:
-        raise RuntimeError(f"Gemini API キーが環境変数 '{env_name}' に見つかりません")
+        raise AuthError(f"Gemini API キーが環境変数 '{env_name}' に見つかりません")
     return value
+
+
+def _extract_status_code(exc: Exception) -> int | None:
+    for attr in ("status_code", "code"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int):
+            return value
+        if hasattr(value, "value"):
+            try:
+                numeric = int(value.value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                numeric = None
+            else:
+                return numeric
+        if hasattr(value, "name") and isinstance(value.name, str):
+            mapped = {
+                "UNAUTHENTICATED": 401,
+                "PERMISSION_DENIED": 403,
+                "RESOURCE_EXHAUSTED": 429,
+                "DEADLINE_EXCEEDED": 408,
+                "UNAVAILABLE": 503,
+            }.get(value.name)
+            if mapped is not None:
+                return mapped
+    return None
+
+
+def _normalize_gemini_exception(exc: Exception) -> Exception:
+    status_code = _extract_status_code(exc)
+    name = exc.__class__.__name__
+    if name in {"Unauthenticated", "PermissionDenied"} or (
+        isinstance(status_code, int) and status_code in {401, 403}
+    ):
+        return AuthError("Gemini API 認証に失敗しました")
+    if name in {"ResourceExhausted", "QuotaFailure", "BillingNotEnabled"} or (
+        isinstance(status_code, int) and status_code == 429
+    ):
+        return RateLimitError("Gemini API のクォータ制限に達しました")
+    if name in {"DeadlineExceeded", "Timeout"} or (
+        isinstance(status_code, int) and status_code in {408, 504}
+    ):
+        return TimeoutError("Gemini API 呼び出しがタイムアウトしました")
+    if name in {"Unavailable", "Internal", "InternalServerError", "ServiceUnavailable"} or (
+        isinstance(status_code, int) and 500 <= status_code < 600
+    ):
+        return RetriableError("Gemini API が一時的に利用できません")
+    return RetriableError("Gemini API 呼び出しに失敗しました")
 
 
 def _prepare_generation_config(config_obj: ProviderConfig) -> MutableMapping[str, Any]:
@@ -230,13 +278,18 @@ class GeminiProvider(BaseProvider):
     def generate(self, prompt: str) -> ProviderResponse:
         contents = [{"role": "user", "parts": [{"text": prompt}]}]
         ts0 = time.time()
-        response = _invoke_gemini(
-            self._client,
-            self._model,
-            contents,
-            self._generation_config,
-            self._safety_settings,
-        )
+        try:
+            response = _invoke_gemini(
+                self._client,
+                self._model,
+                contents,
+                self._generation_config,
+                self._safety_settings,
+            )
+        except Exception as exc:  # pragma: no cover - 実行時例外は発生環境依存
+            normalized = _normalize_gemini_exception(exc)
+            normalized.__cause__ = exc
+            raise normalized
         latency_ms = int((time.time() - ts0) * 1000)
         output_text = _extract_output_text(response)
         prompt_tokens, output_tokens = _extract_usage(response, prompt, output_text)
