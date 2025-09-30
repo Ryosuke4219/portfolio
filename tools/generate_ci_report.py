@@ -5,24 +5,22 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from ci_metrics import compute_recent_deltas, compute_run_history
 from weekly_summary import (
     aggregate_status,
+    coerce_str,
     filter_by_window,
+    format_percentage,
     load_flaky,
     load_runs,
+    parse_iso8601,
     select_flaky_rows,
+    to_float,
 )
-from weekly_summary import coerce_str, format_percentage, parse_iso8601, to_float
 
 from tools.ci_report.processing import (
     compute_last_updated,
