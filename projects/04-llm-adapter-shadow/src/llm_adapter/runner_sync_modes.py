@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import time
-from typing import Protocol, TYPE_CHECKING, cast
+from typing import cast, Protocol, TYPE_CHECKING
 
 from .errors import (
     FatalError,
