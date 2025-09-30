@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, UTC
 import hashlib
 from statistics import median
-from typing import Any, TYPE_CHECKING, Literal
+from typing import Any, Literal, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
