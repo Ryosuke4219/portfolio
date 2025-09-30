@@ -1,9 +1,9 @@
 """Data aggregation helpers for CI report generation."""
 from __future__ import annotations
 
-import datetime as dt
 from collections import Counter
-from typing import Iterable
+from collections.abc import Iterable
+import datetime as dt
 
 from tools.weekly_summary import coerce_str, parse_iso8601, to_float
 
