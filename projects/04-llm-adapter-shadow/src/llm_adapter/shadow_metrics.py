@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from typing import Any
 
 from .observability import EventLogger, JsonlLogger
