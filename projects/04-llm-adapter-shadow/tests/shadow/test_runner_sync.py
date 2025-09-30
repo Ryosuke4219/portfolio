@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import pytest
 
 from src.llm_adapter.errors import (
+    AllFailedError,
     AuthError,
     ConfigError,
     RateLimitError,
@@ -85,7 +86,7 @@ def _force_event_logger(
             None,
             2,
             0,
-            TimeoutError,
+            AllFailedError,
             id="all-fail",
         ),
         pytest.param(
@@ -210,7 +211,7 @@ def test_provider_skip_logs_error_family() -> None:
 def test_fatal_error_logs_error_family() -> None:
     _, logger = _run_and_collect(
         [_ErrorProvider("fatal", AuthError("invalid"))],
-        expect_exception=AuthError,
+        expect_exception=AllFailedError,
     )
 
     assert isinstance(logger, FakeLogger)
@@ -227,7 +228,7 @@ def test_provider_chain_failed_records_last_error_family() -> None:
             _ErrorProvider("first", TimeoutError("slow")),
             _ErrorProvider("second", RetriableError("oops")),
         ],
-        expect_exception=RetriableError,
+        expect_exception=AllFailedError,
     )
 
     assert isinstance(logger, FakeLogger)
