@@ -1,12 +1,11 @@
 """Consensus orchestration helpers for runner implementations."""
 from __future__ import annotations
 
-import importlib
-import inspect
-import json
-import math
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+import importlib
+import json
+import math
 from typing import Any, cast
 
 from .parallel_exec import ParallelExecutionError
