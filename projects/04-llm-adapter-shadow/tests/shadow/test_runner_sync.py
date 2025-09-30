@@ -7,6 +7,7 @@ import pytest
 from src.llm_adapter.errors import (
     AllFailedError,
     AuthError,
+    ConfigError,
     RateLimitError,
     RetriableError,
     TimeoutError,
@@ -259,3 +260,39 @@ def test_run_metric_contains_tokens_and_cost() -> None:
     assert run_event["tokens_out"] == 9
     assert run_event["cost_usd"] == pytest.approx(0.456)
     assert succeeding.cost_calls == [(21, 9)]
+
+
+def test_auth_error_falls_back_and_logs() -> None:
+    response, logger = _run_and_collect(
+        [
+            _ErrorProvider("auth", AuthError("invalid")),
+            _SuccessProvider("fallback"),
+        ]
+    )
+
+    assert response is not None
+    fallback_events = logger.of_type("provider_fallback")
+    assert len(fallback_events) == 1
+    event = fallback_events[0]
+    assert event["provider"] == "auth"
+    assert event["attempt"] == 1
+    assert event["error_type"] == "AuthError"
+    assert event["error_message"] == "invalid"
+
+
+def test_config_error_falls_back_and_logs() -> None:
+    response, logger = _run_and_collect(
+        [
+            _ErrorProvider("config", ConfigError("bad setup")),
+            _SuccessProvider("fallback"),
+        ]
+    )
+
+    assert response is not None
+    fallback_events = logger.of_type("provider_fallback")
+    assert len(fallback_events) == 1
+    event = fallback_events[0]
+    assert event["provider"] == "config"
+    assert event["attempt"] == 1
+    assert event["error_type"] == "ConfigError"
+    assert event["error_message"] == "bad setup"

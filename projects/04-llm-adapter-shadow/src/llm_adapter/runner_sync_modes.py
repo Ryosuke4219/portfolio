@@ -8,6 +8,8 @@ from typing import cast, Protocol, TYPE_CHECKING
 
 from .errors import (
     AllFailedError,
+    AuthError,
+    ConfigError,
     FatalError,
     ProviderSkip,
     RateLimitError,
@@ -171,6 +173,19 @@ class SequentialStrategy:
             if error is None:
                 continue
             if isinstance(error, FatalError):
+                if isinstance(error, (AuthError, ConfigError)):
+                    if event_logger is not None:
+                        event_logger.emit(
+                            "provider_fallback",
+                            {
+                                "request_fingerprint": context.request_fingerprint,
+                                "provider": provider.name(),
+                                "attempt": attempt_index,
+                                "error_type": type(error).__name__,
+                                "error_message": str(error),
+                            },
+                        )
+                    continue
                 raise error
             if isinstance(error, RateLimitError):
                 sleep_duration = config.backoff.rate_limit_sleep_s

@@ -38,7 +38,9 @@ class ConsensusResult:
 
 @dataclass(slots=True)
 class _Candidate:
+    normalized: str
     text: str
+    raw_text: str
     entries: list[tuple[int, ProviderResponse]] = field(default_factory=list)
     votes: int = 0
     score: float = 0.0
@@ -71,6 +73,24 @@ def _extract_score(response: ProviderResponse) -> float:
     return 0.0
 
 
+def _normalize_candidate_text(text: str) -> tuple[str, str]:
+    stripped = text.strip()
+    if not stripped:
+        return "", stripped
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        normalized = " ".join(stripped.split()).lower()
+        return normalized, stripped
+    normalized = json.dumps(
+        parsed,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return normalized, stripped
+
+
 def _load_judge(path: str) -> Callable[[Sequence[ProviderResponse]], Any]:
     module_name, _, attr = path.partition(":")
     if not module_name or not attr:
@@ -86,31 +106,28 @@ def _select_candidates(
     strategy: str, candidates: Mapping[str, _Candidate]
 ) -> tuple[list[_Candidate], float, dict[str, float] | None]:
     normalized = strategy.strip().lower()
+    values = list(candidates.values())
     if normalized == "majority":
-        pivot_votes = max(candidate.votes for candidate in candidates.values())
-        pool = [
-            candidate
-            for candidate in candidates.values()
-            if candidate.votes == pivot_votes
-        ]
+        pivot_votes = max(candidate.votes for candidate in values)
+        pool = [candidate for candidate in values if candidate.votes == pivot_votes]
         return pool, float(pivot_votes), None
     if normalized == "weighted":
-        scores = {text: candidate.score for text, candidate in candidates.items()}
+        scores = {candidate.text: candidate.score for candidate in values}
         pivot_score = max(scores.values())
         pool = [
             candidate
-            for candidate in candidates.values()
+            for candidate in values
             if math.isclose(
                 candidate.score, pivot_score, rel_tol=1e-9, abs_tol=1e-9
             )
         ]
         return pool, float(pivot_score), scores
     if normalized == "max_score":
-        scores = {text: candidate.best_score for text, candidate in candidates.items()}
+        scores = {candidate.text: candidate.best_score for candidate in values}
         pivot_score = max(scores.values())
         pool = [
             candidate
-            for candidate in candidates.values()
+            for candidate in values
             if math.isclose(
                 candidate.best_score, pivot_score, rel_tol=1e-9, abs_tol=1e-9
             )
@@ -228,14 +245,18 @@ def compute_consensus(
 
     candidates: dict[str, _Candidate] = {}
     for index, response in valid_entries:
-        key = response.text.strip()
-        candidate = candidates.get(key)
+        normalized, display_text = _normalize_candidate_text(response.text)
+        candidate = candidates.get(normalized)
         if candidate is None:
-            candidate = _Candidate(text=key)
-            candidates[key] = candidate
+            candidate = _Candidate(
+                normalized=normalized,
+                text=display_text,
+                raw_text=response.text,
+            )
+            candidates[normalized] = candidate
         candidate.record(index, response)
 
-    tally = {text: candidate.votes for text, candidate in candidates.items()}
+    tally = {candidate.text: candidate.votes for candidate in candidates.values()}
     if not tally:
         raise ParallelExecutionError("consensus tally is empty")
 
