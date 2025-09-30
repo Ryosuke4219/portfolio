@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ..parallel_exec import ParallelExecutionError, run_parallel_all_async
-from ..runner_parallel import compute_consensus
+from ..runner_parallel import ConsensusInput, compute_consensus
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import content_hash, elapsed_ms
 from .base import ParallelStrategyBase
@@ -54,8 +54,14 @@ class ConsensusRunStrategy(ParallelStrategyBase):
             )
 
         try:
+            consensus_inputs = [
+                ConsensusInput(provider=provider, response=response, order=index)
+                for index, (_attempt, provider, response, _metrics) in enumerate(
+                    successful_entries
+                )
+            ]
             consensus = compute_consensus(
-                [response for _, _, response, _ in successful_entries],
+                consensus_inputs,
                 config=context.config.consensus,
             )
         except ParallelExecutionError as err:
@@ -88,6 +94,12 @@ class ConsensusRunStrategy(ParallelStrategyBase):
             )
         attempt_index, provider, response, shadow_metrics = winner_entry
         votes_against = consensus.total_voters - consensus.votes - consensus.abstained
+        strategy_value = getattr(consensus.strategy, "value", consensus.strategy)
+        tie_breaker_value = (
+            getattr(consensus.tie_breaker, "value", consensus.tie_breaker)
+            if consensus.tie_breaker is not None
+            else None
+        )
         if context.event_logger is not None:
             candidate_summaries = [
                 {
@@ -102,8 +114,8 @@ class ConsensusRunStrategy(ParallelStrategyBase):
                 "consensus_vote",
                 {
                     "request_fingerprint": context.request_fingerprint,
-                    "strategy": consensus.strategy,
-                    "tie_breaker": consensus.tie_breaker,
+                    "strategy": strategy_value,
+                    "tie_breaker": tie_breaker_value,
                     "min_votes": consensus.min_votes,
                     "score_threshold": consensus.score_threshold,
                     "voters_total": consensus.total_voters,

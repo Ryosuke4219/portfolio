@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import pytest
 
 from src.llm_adapter.errors import RetriableError, TimeoutError
@@ -11,6 +13,7 @@ from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
     compute_consensus,
+    ConsensusInput,
     ConsensusResult,
 )
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
@@ -35,6 +38,37 @@ def _response(
     )
 
 
+class _DummyProvider:
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - unused
+        raise NotImplementedError
+
+
+def _entries(
+    responses: Sequence[ProviderResponse],
+    *,
+    names: Sequence[str] | None = None,
+) -> list[ConsensusInput]:
+    if names is None:
+        names = [f"p{index}" for index in range(len(responses))]
+    return [
+        ConsensusInput(
+            provider=_DummyProvider(name),
+            response=response,
+            order=index,
+        )
+        for index, (name, response) in enumerate(zip(names, responses, strict=True))
+    ]
+
+
 def fake_judge(responses: list[ProviderResponse]) -> tuple[str, float]:
     winner = responses[-1].text.strip()
     return winner, 0.75
@@ -47,9 +81,14 @@ def test_majority_with_latency_tie_breaker() -> None:
         _response("A", 35),
         _response("B", 7),
     ]
+    entries = _entries(responses)
     result = compute_consensus(
-        responses,
-        config=ConsensusConfig(strategy="majority", tie_breaker="latency", quorum=2),
+        entries,
+        config=ConsensusConfig(
+            strategy="majority_vote",
+            tie_breaker="min_latency",
+            quorum=2,
+        ),
     )
     assert isinstance(result, ConsensusResult)
     assert result.response.text == "B"
@@ -57,10 +96,10 @@ def test_majority_with_latency_tie_breaker() -> None:
     assert result.tie_break_applied is True
     tie_break_reason = result.tie_break_reason
     assert tie_break_reason is not None
-    assert tie_break_reason.startswith("latency")
+    assert tie_break_reason.startswith("min_latency")
     tie_breaker_selected = result.tie_breaker_selected
     assert tie_breaker_selected is not None
-    assert tie_breaker_selected == "latency"
+    assert tie_breaker_selected == "min_latency"
     assert result.rounds == 2
 
 
@@ -71,9 +110,21 @@ def test_weighted_strategy_records_scores() -> None:
         _response("B", 9, tokens_in=1, tokens_out=1, score=0.3),
         _response("B", 8, tokens_in=1, tokens_out=1, score=0.3),
     ]
+    names = ["a1", "a2", "b1", "b2"]
+    entries = _entries(responses, names=names)
     result = compute_consensus(
-        responses,
-        config=ConsensusConfig(strategy="weighted", tie_breaker="cost", quorum=2),
+        entries,
+        config=ConsensusConfig(
+            strategy="weighted_vote",
+            tie_breaker="min_cost",
+            quorum=2,
+            provider_weights={
+                "a1": 0.4,
+                "a2": 0.2,
+                "b1": 0.3,
+                "b2": 0.3,
+            },
+        ),
     )
     assert result.response.text == "B"
     assert result.scores is not None
@@ -82,10 +133,10 @@ def test_weighted_strategy_records_scores() -> None:
     assert result.winner_score == pytest.approx(0.6)
     tie_break_reason = result.tie_break_reason
     assert tie_break_reason is not None
-    assert tie_break_reason == "cost(min)"
+    assert tie_break_reason.startswith("min_cost")
     tie_breaker_selected = result.tie_breaker_selected
     assert tie_breaker_selected is not None
-    assert tie_breaker_selected == "cost"
+    assert tie_breaker_selected == "min_cost"
 
 
 def test_max_score_strategy_prefers_best_latency() -> None:
@@ -95,18 +146,23 @@ def test_max_score_strategy_prefers_best_latency() -> None:
         _response("A", 22, score=0.4),
         _response("B", 7, score=0.6),
     ]
+    entries = _entries(responses)
     result = compute_consensus(
-        responses,
-        config=ConsensusConfig(strategy="max_score", tie_breaker="latency", quorum=2),
+        entries,
+        config=ConsensusConfig(
+            strategy="max_score",
+            tie_breaker="min_latency",
+            quorum=2,
+        ),
     )
     assert result.response.text == "B"
     assert result.tie_break_applied is True
     tie_breaker_selected = result.tie_breaker_selected
     assert tie_breaker_selected is not None
-    assert tie_breaker_selected == "latency"
+    assert tie_breaker_selected == "min_latency"
     tie_break_reason = result.tie_break_reason
     assert tie_break_reason is not None
-    assert tie_break_reason.startswith("latency")
+    assert tie_break_reason.startswith("min_latency")
     assert result.scores is not None
     assert result.scores["A"] == pytest.approx(0.6)
     assert result.scores["B"] == pytest.approx(0.6)
@@ -120,9 +176,10 @@ def test_schema_validation_marks_abstentions() -> None:
         _response('{"value": "ok"}', 13),
         _response("not-json", 5),
     ]
+    entries = _entries(responses)
     result = compute_consensus(
-        responses,
-        config=ConsensusConfig(strategy="majority", schema=schema),
+        entries,
+        config=ConsensusConfig(strategy="majority_vote", schema=schema),
     )
     assert result.response.text == '{"value": "ok"}'
     assert result.abstained == 1
@@ -138,11 +195,12 @@ def test_judge_provider_handles_runoff_round() -> None:
         _response("A", 20),
         _response("B", 20),
     ]
+    entries = _entries(responses)
     result = compute_consensus(
-        responses,
+        entries,
         config=ConsensusConfig(
-            strategy="majority",
-            tie_breaker="latency",
+            strategy="majority_vote",
+            tie_breaker="min_latency",
             judge="tests.test_runner_consensus:fake_judge",
             quorum=2,
             max_rounds=4,
@@ -152,7 +210,7 @@ def test_judge_provider_handles_runoff_round() -> None:
     assert result.tie_break_applied is True
     tie_break_reason = result.tie_break_reason
     assert tie_break_reason is not None
-    assert tie_break_reason == "latency(min=10)"
+    assert tie_break_reason == "min_latency(min=10)"
     assert result.judge_name == "tests.test_runner_consensus:fake_judge"
     assert result.judge_score == pytest.approx(0.75)
     assert result.rounds == 3
@@ -167,10 +225,10 @@ def test_max_rounds_exhausted_before_judge_round() -> None:
     ]
     with pytest.raises(ParallelExecutionError):
         compute_consensus(
-            responses,
+            _entries(responses),
             config=ConsensusConfig(
-                strategy="majority",
-                tie_breaker="latency",
+                strategy="majority_vote",
+                tie_breaker="min_latency",
                 judge="tests.test_runner_consensus:fake_judge",
                 max_rounds=2,
             ),
@@ -251,7 +309,7 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
         config=RunnerConfig(
             mode=RunnerMode.CONSENSUS,
             max_concurrency=3,
-            consensus=ConsensusConfig(strategy="majority", quorum=2),
+            consensus=ConsensusConfig(strategy="majority_vote", quorum=2),
         ),
     )
     request = ProviderRequest(
