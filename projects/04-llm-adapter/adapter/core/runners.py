@@ -143,12 +143,22 @@ class CompareRunner:
         if config.judge_provider is not None:
             self._judge_provider_config = config.judge_provider
 
+        shadow_config = getattr(config, "shadow_provider", None)
+        shadow_factory: Callable[[], BaseProvider] | None = None
+        if shadow_config is not None:
+            def _create_shadow_provider() -> BaseProvider:
+                return ProviderFactory.create(shadow_config)
+
+            shadow_factory = _create_shadow_provider
+
         execution = RunnerExecution(
             token_bucket=self._token_bucket,
             schema_validator=self._schema_validator,
             evaluate_budget=self._evaluate_budget,
             build_metrics=self._build_metrics,
             normalize_concurrency=self._normalize_concurrency,
+            shadow_provider_factory=shadow_factory,
+            shadow_config=shadow_config,
         )
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []

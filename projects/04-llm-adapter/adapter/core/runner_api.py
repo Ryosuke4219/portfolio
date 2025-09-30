@@ -44,6 +44,7 @@ class RunnerConfig:
     schema: Path | None = None
     judge: Path | None = None
     judge_provider: ProviderConfig | None = None
+    shadow_provider: ProviderConfig | None = None
     max_concurrency: int | None = None
     rpm: int | None = None
 

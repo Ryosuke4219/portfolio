@@ -117,6 +117,69 @@ def test_parallel_any_stops_after_first_success(
     assert calls == ["fast"]
 
 
+def test_shadow_run_records_metrics(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class PrimaryProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(
+                output_text="primary",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=7,
+            )
+
+    class ShadowProvider(BaseProvider):
+        should_fail = False
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            if ShadowProvider.should_fail:
+                raise RuntimeError("shadow boom")
+            return ProviderResponse(
+                output_text="shadow",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=5,
+            )
+
+    monkeypatch.setitem(ProviderFactory._registry, "primary", PrimaryProvider)
+    monkeypatch.setitem(ProviderFactory._registry, "shadow", ShadowProvider)
+
+    primary_config = _make_provider_config(
+        tmp_path, name="primary", provider="primary", model="primary"
+    )
+    shadow_config = _make_provider_config(
+        tmp_path, name="shadow", provider="shadow", model="shadow"
+    )
+
+    runner = CompareRunner(
+        [primary_config],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_shadow.jsonl",
+    )
+
+    config = RunnerConfig(mode="sequential", shadow_provider=shadow_config)
+
+    primary_only = runner.run(repeat=1, config=config)
+    assert len(primary_only) == 1
+    metric = primary_only[0]
+    assert metric.model == "primary"
+    assert metric.shadow_provider_id == "shadow"
+    assert metric.shadow_outcome == "ok"
+    assert metric.shadow_latency_ms == 5
+
+    ShadowProvider.should_fail = True
+    shadow_failed = runner.run(repeat=1, config=config)
+    assert len(shadow_failed) == 1
+    fail_metric = shadow_failed[0]
+    assert fail_metric.model == "primary"
+    assert fail_metric.status == "ok"
+    assert fail_metric.shadow_provider_id == "shadow"
+    assert fail_metric.shadow_outcome == "error:RuntimeError"
+    assert isinstance(fail_metric.shadow_latency_ms, int)
+
+
 def test_consensus_majority_and_judge_tiebreak(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

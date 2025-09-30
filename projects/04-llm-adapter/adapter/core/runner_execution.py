@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
 from time import perf_counter, sleep
 from typing import TYPE_CHECKING, TypeVar
 
@@ -51,10 +51,6 @@ from .config import ProviderConfig
 from .datasets import GoldenTask
 from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
 from .providers import BaseProvider, ProviderResponse
-from .runner_execution_attempts import (
-    ParallelAttemptExecutor,
-    SequentialAttemptExecutor,
-)
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
@@ -138,6 +134,12 @@ _BuildMetrics = Callable[
 _NormalizeConcurrency = Callable[[int, int | None], int]
 
 
+from .runner_execution_attempts import (
+    ParallelAttemptExecutor,
+    SequentialAttemptExecutor,
+)
+
+
 class RunnerExecution:
     def __init__(
         self,
@@ -147,12 +149,16 @@ class RunnerExecution:
         evaluate_budget: _EvaluateBudget,
         build_metrics: _BuildMetrics,
         normalize_concurrency: _NormalizeConcurrency,
+        shadow_provider_factory: Callable[[], BaseProvider] | None = None,
+        shadow_config: ProviderConfig | None = None,
     ) -> None:
         self._token_bucket = token_bucket
         self._schema_validator = schema_validator
         self._evaluate_budget = evaluate_budget
         self._build_metrics = build_metrics
         self._normalize_concurrency = normalize_concurrency
+        self._shadow_provider_factory = shadow_provider_factory
+        self._shadow_config = shadow_config
         self._sequential_executor = SequentialAttemptExecutor(self._run_single)
         self._parallel_executor = ParallelAttemptExecutor(
             self._run_single,
@@ -201,11 +207,52 @@ class RunnerExecution:
         if self._token_bucket:
             self._token_bucket.acquire()
         prompt = task.render_prompt()
+        shadow_thread: Thread | None = None
+        shadow_started: float | None = None
+        shadow_latency_ms: int | None = None
+        shadow_outcome: str | None = None
+        shadow_provider_id: str | None = None
+        shadow_factory = self._shadow_provider_factory
+        shadow_config = self._shadow_config
+        shadow_provider: BaseProvider | None = None
+        if shadow_factory is not None and shadow_config is not None:
+            shadow_provider_id = shadow_config.provider
+            try:
+                shadow_provider = shadow_factory()
+            except Exception as exc:  # pragma: no cover - shadow 準備失敗の防御
+                shadow_outcome = f"error:{exc.__class__.__name__}"
+                shadow_provider = None
+        if shadow_provider is not None:
+            shadow_started = perf_counter()
+
+            def _shadow_worker() -> None:
+                nonlocal shadow_latency_ms, shadow_outcome
+                start = perf_counter()
+                try:
+                    response = shadow_provider.generate(prompt)
+                except Exception as exc:  # pragma: no cover - 影例外の捕捉
+                    shadow_latency_ms = int((perf_counter() - start) * 1000)
+                    shadow_outcome = f"error:{exc.__class__.__name__}"
+                    return
+                shadow_latency_ms = response.latency_ms
+                shadow_outcome = "ok"
+
+            shadow_thread = Thread(target=_shadow_worker, daemon=True)
+            shadow_thread.start()
+
         response, status, failure_kind, error_message, latency_ms = self._run_provider_call(
             provider_config,
             provider,
             prompt,
         )
+
+        if shadow_thread is not None:
+            shadow_thread.join(timeout=10)
+            if shadow_thread.is_alive():
+                if shadow_latency_ms is None and shadow_started is not None:
+                    shadow_latency_ms = int((perf_counter() - shadow_started) * 1000)
+                if shadow_outcome is None:
+                    shadow_outcome = "timeout"
         cost_usd = estimate_cost(
             provider_config, response.input_tokens, response.output_tokens
         )
@@ -249,6 +296,9 @@ class RunnerExecution:
             run_metrics.status = status
             run_metrics.failure_kind = failure_kind
             run_metrics.error_message = error_message
+        run_metrics.shadow_provider_id = shadow_provider_id
+        run_metrics.shadow_latency_ms = shadow_latency_ms
+        run_metrics.shadow_outcome = shadow_outcome
         return SingleRunResult(
             metrics=run_metrics,
             raw_output=raw_output,
