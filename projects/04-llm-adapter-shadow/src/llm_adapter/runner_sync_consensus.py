@@ -2,14 +2,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
 from .provider_spi import ProviderSPI, ProviderResponse
 from .runner_parallel import ConsensusInput, compute_consensus
 from .shadow import ShadowMetrics
 from .utils import content_hash
-from .runner_sync_modes import _limited_providers, _raise_no_attempts
 
 if TYPE_CHECKING:
     from .runner_sync import ProviderInvocationResult
@@ -18,20 +17,20 @@ if TYPE_CHECKING:
 
 class ConsensusStrategy:
     def execute(
-        self, context: "SyncRunContext"
+        self, context: SyncRunContext
     ) -> ProviderResponse | ParallelAllResult[
-        "ProviderInvocationResult", ProviderResponse
+        ProviderInvocationResult, ProviderResponse
     ]:
         runner = context.runner
         total_providers = len(runner.providers)
-        results: list["ProviderInvocationResult" | None] = [None] * total_providers
+        results: list[ProviderInvocationResult | None] = [None] * total_providers
         max_attempts = runner._config.max_attempts
         providers = _limited_providers(runner.providers, max_attempts)
 
         def make_worker(
             index: int, provider: ProviderSPI
-        ) -> Callable[[], "ProviderInvocationResult"]:
-            def worker() -> "ProviderInvocationResult":
+        ) -> Callable[[], ProviderInvocationResult]:
+            def worker() -> ProviderInvocationResult:
                 result = runner._invoke_provider_sync(
                     provider,
                     context.request,
@@ -70,12 +69,24 @@ class ConsensusStrategy:
             fatal = runner._extract_fatal_error(results)
             if fatal is not None:
                 raise fatal from None
-            successful: list[tuple["ProviderInvocationResult", ProviderResponse]] = [
-                (res, res.response)
-                for res in invocations
-                if res.response is not None
-            ]
-            if not successful:
+            candidates: list[
+                tuple[str, ProviderResponse, dict[str, object]]
+            ] = []
+            for invocation in invocations:
+                response = invocation.response
+                if response is None:
+                    continue
+                metadata: dict[str, object] = {
+                    "invocation": invocation,
+                    "attempt": invocation.attempt,
+                    "latency_ms": response.latency_ms,
+                    "tokens_in": invocation.tokens_in,
+                    "tokens_out": invocation.tokens_out,
+                }
+                candidates.append(
+                    (invocation.provider.name(), response, metadata)
+                )
+            if not candidates:
                 failure_details: list[dict[str, str]] = []
                 for invocation in invocations:
                     provider_name = invocation.provider.name()
@@ -114,10 +125,14 @@ class ConsensusStrategy:
                 consensus_inputs,
                 config=runner._config.consensus,
             )
-            winner_invocation = next(
-                invocation
-                for invocation, response in successful
-                if response is consensus.response
+            winner_name, _, winner_metadata = next(
+                entry
+                for entry in candidates
+                if entry[1] is consensus.response
+            )
+            winner_invocation = cast(
+                "ProviderInvocationResult",
+                winner_metadata["invocation"],
             )
             votes_against = (
                 consensus.total_voters - consensus.votes - consensus.abstained
@@ -132,12 +147,12 @@ class ConsensusStrategy:
             if event_logger is not None:
                 candidate_summaries = [
                     {
-                        "provider": invocation.provider.name(),
+                        "provider": provider_name,
                         "latency_ms": response.latency_ms,
                         "votes": consensus.tally.get(response.text.strip(), 0),
                         "text_hash": content_hash("consensus", response.text),
                     }
-                    for invocation, response in successful
+                    for provider_name, response, _ in candidates
                 ]
                 event_logger.emit(
                     "consensus_vote",
@@ -151,7 +166,7 @@ class ConsensusStrategy:
                         "votes_for": consensus.votes,
                         "votes_against": votes_against,
                         "abstained": consensus.abstained,
-                        "winner_provider": winner_invocation.provider.name(),
+                        "winner_provider": winner_name,
                         "winner_score": consensus.winner_score,
                         "winner_latency_ms": consensus.response.latency_ms,
                         "tie_break_applied": consensus.tie_break_applied,
