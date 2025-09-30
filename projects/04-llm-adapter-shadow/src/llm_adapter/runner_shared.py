@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 from pathlib import Path
 import threading
 import time
 from typing import Any, TYPE_CHECKING
+from uuid import uuid4
 
 from .errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger, JsonlLogger
@@ -252,6 +253,29 @@ def log_run_metric(
         return
 
     provider_name = _provider_name(provider)
+    run_id_value = metadata.get("run_id")
+    if run_id_value is None:
+        run_id = uuid4().hex
+        if isinstance(metadata, MutableMapping):
+            metadata["run_id"] = run_id
+    else:
+        run_id = str(run_id_value)
+
+    mode_value = metadata.get("mode")
+    mode = str(mode_value) if mode_value is not None else None
+
+    providers_value = metadata.get("providers")
+    providers: list[str] | None
+    if providers_value is None:
+        providers = None
+    elif isinstance(providers_value, (list, tuple, set)):
+        providers = [str(item) for item in providers_value]
+    else:
+        providers = [str(providers_value)]
+
+    outcome = "success" if status == "ok" else "failure"
+    retries = max(attempts - 1, 0)
+
     event_logger.emit(
         "run_metric",
         {
@@ -259,7 +283,9 @@ def log_run_metric(
             "request_hash": _request_hash(provider_name, request),
             "provider": provider_name,
             "status": status,
+            "outcome": outcome,
             "attempts": attempts,
+            "retries": retries,
             "latency_ms": latency_ms,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
@@ -268,6 +294,9 @@ def log_run_metric(
             "error_message": str(error) if error is not None else None,
             "error_family": error_family(error),
             "shadow_used": shadow_used,
+            "run_id": run_id,
+            "mode": mode,
+            "providers": providers,
             "trace_id": metadata.get("trace_id"),
             "project_id": metadata.get("project_id"),
         },

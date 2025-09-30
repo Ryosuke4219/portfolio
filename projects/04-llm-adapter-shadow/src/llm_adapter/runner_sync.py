@@ -171,6 +171,10 @@ class Runner:
         skip: tuple[ProviderInvocationResult, ...] | None = None,
         attempts_override: Mapping[int, int] | None = None,
     ) -> None:
+        metadata.setdefault("mode", str(self._config.mode))
+        metadata.setdefault(
+            "providers", [provider.name() for provider in self.providers]
+        )
         skipped = skip or ()
         attempts_map = dict(attempts_override or {})
         for result in results:
@@ -234,6 +238,10 @@ class Runner:
             self._logger, shadow_metrics_path
         )
         metadata = dict(request.metadata or {})
+        metadata.setdefault("mode", str(self._config.mode))
+        metadata.setdefault(
+            "providers", [provider.name() for provider in self.providers]
+        )
         run_started = time.time()
         request_fingerprint = content_hash(
             "runner", request.prompt_text, request.options, request.max_tokens

@@ -118,6 +118,12 @@ def test_runner_fallback_paths(
     assert run_event["status"] == expected_run_status
     assert run_event.get("provider") == expected_provider
     assert run_event["attempts"] == expected_attempts
+    assert isinstance(run_event["run_id"], str)
+    assert run_event["mode"] == "sequential"
+    assert run_event["providers"] == [provider.name() for provider in providers]
+    expected_outcome = "success" if expected_run_status == "ok" else "failure"
+    assert run_event["outcome"] == expected_outcome
+    assert run_event["retries"] == max(expected_attempts - 1, 0)
 
     skip_events = logger.of_type("provider_skipped")
     assert len(skip_events) == expected_skip_events
@@ -247,3 +253,5 @@ def test_run_metric_contains_tokens_and_cost() -> None:
     assert run_event["tokens_out"] == 9
     assert run_event["cost_usd"] == pytest.approx(0.456)
     assert succeeding.cost_calls == [(21, 9)]
+    assert run_event["outcome"] == "success"
+    assert run_event["retries"] == 0
