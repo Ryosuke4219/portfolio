@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 import time
-from typing import Any
 
 from ._event_loop import ensure_socket_free_event_loop_policy
 from .observability import EventLogger
