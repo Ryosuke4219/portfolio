@@ -1,9 +1,9 @@
 """Rendering utilities for CI report outputs."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 import datetime as dt
 from pathlib import Path
-from collections.abc import Iterable
 from typing import Any
 
 from tools import weekly_summary
