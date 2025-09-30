@@ -3,18 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from types import SimpleNamespace
 from typing import Any, cast, NoReturn
-import pathlib
-import sys
 
 import pytest
 
-PROJECTS_ROOT = pathlib.Path(__file__).resolve().parents[3]
-CORE_ROOT = PROJECTS_ROOT / "04-llm-adapter"
-if str(CORE_ROOT) not in sys.path:
-    sys.path.insert(0, str(CORE_ROOT))
-
-from adapter.core.providers import gemini_support
 from adapter.core.errors import RateLimitError as CoreRateLimitError
+from adapter.core.providers import gemini_support
 from src.llm_adapter.errors import (
     AuthError,
     ProviderSkip,
