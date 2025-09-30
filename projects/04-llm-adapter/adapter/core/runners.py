@@ -1,8 +1,8 @@
 """比較ランナーの実装。"""
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Sequence
+from dataclasses import replace
 import json
 import logging
 import os
@@ -40,13 +40,7 @@ else:  # pragma: no cover - 実行時フォールバック
                     total=self.tokens_in + self.tokens_out,
                 )
 
-from .aggregation import (
-    AggregationCandidate,
-    AggregationResult,
-    AggregationStrategy,
-    FirstTieBreaker,
-    TieBreaker,
-)
+from .aggregation_controller import AggregationController
 from .budgets import BudgetManager
 from .config import ProviderConfig
 from .datasets import GoldenTask
@@ -59,45 +53,20 @@ from .metrics import (
     RunMetrics,
 )
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
-from .runner_execution import _SchemaValidator, _TokenBucket, RunnerExecution, SingleRunResult
+from .runner_execution import (
+    _SchemaValidator,
+    _TokenBucket,
+    RunnerExecution,
+    SingleRunResult,
+    run_parallel_any_sync,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
 
 LOGGER = logging.getLogger(__name__)
 
-
-@dataclass(slots=True)
-class AggregationDecision:
-    winner_index: int
-    output: str
-    votes: int | None = None
-
-
-class _LatencyTieBreaker(TieBreaker):
-    name = "latency"
-
-    def __init__(self, lookup: Mapping[int, SingleRunResult]) -> None:
-        self._lookup = lookup
-
-    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
-        return min(
-            candidates,
-            key=lambda candidate: self._lookup[candidate.index].metrics.latency_ms,
-        )
-
-
-class _CostTieBreaker(TieBreaker):
-    name = "cost"
-
-    def __init__(self, lookup: Mapping[int, SingleRunResult]) -> None:
-        self._lookup = lookup
-
-    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
-        return min(
-            candidates,
-            key=lambda candidate: self._lookup[candidate.index].metrics.cost_usd,
-        )
+__all__ = ["CompareRunner", "run_parallel_any_sync"]
 
 
 class _JudgeInvoker:
@@ -159,6 +128,9 @@ class CompareRunner:
         self._judge_provider_config: ProviderConfig | None = (
             runner_config.judge_provider if runner_config else None
         )
+        self._aggregation = AggregationController(
+            judge_factory_builder=lambda cfg: _JudgeProviderFactoryAdapter(cfg)
+        )
 
     def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
@@ -205,7 +177,12 @@ class CompareRunner:
                     batch, stop_reason = execution.run_parallel_attempt(
                         providers, task, attempt, config
                     )
-                self._apply_aggregation(config.mode, config, batch)
+                self._aggregation.apply(
+                    mode=config.mode,
+                    config=config,
+                    batch=batch,
+                    default_judge_config=self._judge_provider_config,
+                )
                 for index, result in batch:
                     histories[index].append(result)
                 if stop_reason:
@@ -216,145 +193,6 @@ class CompareRunner:
                 break
         return results
 
-    def _apply_aggregation(
-        self,
-        mode: str,
-        config: RunnerConfig,
-        batch: Sequence[tuple[int, SingleRunResult]],
-    ) -> None:
-        selection = self._select_aggregation(mode, config, batch)
-        if selection is None:
-            return
-        decision, result_lookup, votes = selection
-        winner = result_lookup.get(decision.chosen.index)
-        if winner is None:
-            return
-        aggregate_output = decision.chosen.text or decision.chosen.response.text or ""
-        winner.aggregate_output = aggregate_output
-        meta = dict(winner.metrics.ci_meta)
-        meta["aggregate_mode"] = mode
-        meta["aggregate_strategy"] = decision.strategy
-        if decision.reason:
-            meta["aggregate_reason"] = decision.reason
-        if decision.tie_breaker_used:
-            meta["aggregate_tie_breaker"] = decision.tie_breaker_used
-        if decision.metadata:
-            for key, value in decision.metadata.items():
-                meta[f"aggregate_{key}"] = value
-        meta["aggregate_hash"] = hash_text(aggregate_output)
-        if votes is not None:
-            meta["aggregate_votes"] = votes
-        winner.metrics.ci_meta = meta
-
-    def _select_aggregation(
-        self,
-        mode: str,
-        config: RunnerConfig,
-        batch: Sequence[tuple[int, SingleRunResult]],
-    ) -> tuple[AggregationResult, dict[int, SingleRunResult], int | None] | None:
-        if not batch:
-            return None
-        lookup: dict[int, SingleRunResult] = {index: result for index, result in batch}
-        candidates = [
-            AggregationCandidate(
-                index=index,
-                provider=result.metrics.provider,
-                response=JudgeProviderResponse(
-                    text=result.raw_output,
-                    latency_ms=result.metrics.latency_ms,
-                    tokens_in=result.metrics.input_tokens,
-                    tokens_out=result.metrics.output_tokens,
-                ),
-                text=result.raw_output,
-            )
-            for index, result in batch
-            if result.metrics.status == "ok" and result.raw_output.strip()
-        ]
-        if not candidates:
-            return None
-        strategy = self._resolve_aggregation_strategy(mode, config)
-        if strategy is None:
-            return None
-        tiebreaker = self._resolve_tie_breaker(config, lookup)
-        decision = strategy.aggregate(candidates, tiebreaker=tiebreaker)
-        votes: int | None = None
-        if mode == "consensus":
-            if decision.metadata:
-                raw_votes = decision.metadata.get("bucket_size")
-                if isinstance(raw_votes, int):
-                    votes = raw_votes
-            if votes is None:
-                chosen_text = decision.chosen.text or decision.chosen.response.text or ""
-                winner_output = chosen_text.strip()
-                votes = sum(
-                    1
-                    for result in lookup.values()
-                    if result.metrics.status == "ok"
-                    and result.raw_output.strip() == winner_output
-                )
-            quorum_value = config.quorum
-            quorum = quorum_value if quorum_value is not None else len(candidates)
-            if votes < quorum:
-                self._mark_consensus_failure(lookup.values(), quorum, votes)
-                return None
-        return decision, lookup, votes
-
-    def _resolve_aggregation_strategy(
-        self, mode: str, config: RunnerConfig
-    ) -> AggregationStrategy | None:
-        aggregate_raw = config.aggregate
-        aggregate = (aggregate_raw or "").strip()
-        if not aggregate:
-            aggregate = "majority"
-        if aggregate.lower() in {"judge", "llm-judge"}:
-            judge_config = config.judge_provider
-            if judge_config is None:
-                judge_config = self._judge_provider_config
-
-            if judge_config is None:
-                raise ValueError("aggregate=judge requires judge provider configuration")
-            factory = _JudgeProviderFactoryAdapter(judge_config)
-            return AggregationStrategy.from_string(
-                aggregate,
-                model=judge_config.model,
-                provider_factory=factory,
-            )
-        return AggregationStrategy.from_string(aggregate)
-
-    def _resolve_tie_breaker(
-        self,
-        config: RunnerConfig,
-        lookup: Mapping[int, SingleRunResult],
-    ) -> TieBreaker | None:
-        tie_name = (config.tie_breaker or "").strip().lower()
-        if not tie_name:
-            return None
-        if tie_name == "latency":
-            return _LatencyTieBreaker(lookup)
-        if tie_name == "cost":
-            return _CostTieBreaker(lookup)
-        if tie_name == "first":
-            return FirstTieBreaker()
-        return None
-
-    def _mark_consensus_failure(
-        self,
-        results: Iterable[SingleRunResult],
-        quorum: int,
-        votes: int,
-    ) -> None:
-        message = f"consensus quorum not reached (votes={votes}, quorum={quorum})"
-        for result in results:
-            metrics = result.metrics
-            if metrics.status == "ok":
-                metrics.status = "error"
-            if not metrics.failure_kind:
-                metrics.failure_kind = "consensus_quorum"
-            if metrics.error_message:
-                if message not in metrics.error_message:
-                    metrics.error_message = f"{metrics.error_message} | {message}"
-            else:
-                metrics.error_message = message
 
     def _finalize_task(
         self,
