@@ -26,6 +26,15 @@ class FatalError(AdapterError):
     """Base class for unrecoverable issues that should halt the runner."""
 
 
+class AllFailedError(FatalError):
+    """Raised when all providers in a run fail to return a successful response."""
+
+    def __init__(self, *, last_error: Exception | None = None) -> None:
+        message = "No providers succeeded"
+        super().__init__(message)
+        self.last_error = last_error
+
+
 class TimeoutError(RetryableError):
     """Raised when a provider does not respond within the expected window (instant fallback)."""
 
@@ -85,6 +94,7 @@ __all__ = [
     "AdapterError",
     "RetriableError",
     "RetryableError",
+    "AllFailedError",
     "TimeoutError",
     "RateLimitError",
     "AuthError",

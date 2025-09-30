@@ -6,6 +6,7 @@ import time
 
 import pytest
 
+from src.llm_adapter.errors import AllFailedError, TimeoutError
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
@@ -191,3 +192,19 @@ def test_runner_sequential_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None
     runner.run(request)
 
     assert call_times[1] - call_times[0] >= 2.0
+
+
+def test_runner_sequential_all_failed_raises_specific_error() -> None:
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+
+    def _timeout(_: ProviderRequest) -> ProviderResponse:
+        raise TimeoutError("timeout")
+
+    failing = _MockProvider("timeout", _timeout)
+    runner = Runner([failing])
+
+    with pytest.raises(AllFailedError) as exc_info:
+        runner.run(request)
+
+    cause = exc_info.value.__cause__
+    assert isinstance(cause, TimeoutError)

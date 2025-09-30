@@ -7,6 +7,7 @@ import time
 from typing import cast, Protocol, TYPE_CHECKING
 
 from .errors import (
+    AllFailedError,
     FatalError,
     ProviderSkip,
     RateLimitError,
@@ -111,7 +112,7 @@ def _raise_no_attempts(context: SyncRunContext) -> None:
         metadata=context.metadata,
         shadow_used=context.shadow_used,
     )
-    raise RuntimeError("No providers succeeded")
+    raise AllFailedError()
 
 
 class SequentialStrategy:
@@ -215,7 +216,9 @@ class SequentialStrategy:
             metadata=context.metadata,
             shadow_used=context.shadow_used,
         )
-        raise last_err if last_err is not None else RuntimeError("No providers succeeded")
+        if last_err is not None:
+            raise AllFailedError(last_error=last_err) from last_err
+        raise AllFailedError()
 
 
 class ParallelAnyStrategy:
