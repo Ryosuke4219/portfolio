@@ -270,6 +270,9 @@ def log_run_metric(
             "shadow_used": shadow_used,
             "trace_id": metadata.get("trace_id"),
             "project_id": metadata.get("project_id"),
+            "run_id": metadata.get("run_id"),
+            "mode": metadata.get("mode"),
+            "providers": metadata.get("providers"),
         },
     )
 

@@ -4,8 +4,10 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 import time
+from typing import Any
 
 from ._event_loop import ensure_socket_free_event_loop_policy
+from .errors import FatalError
 from .observability import EventLogger
 from .parallel_exec import ParallelAllResult
 from .provider_spi import (
@@ -40,6 +42,10 @@ from .utils import content_hash, elapsed_ms
 ensure_socket_free_event_loop_policy()
 
 
+class AllFailedError(FatalError):
+    """Raised when all providers fail to produce a response."""
+
+
 class AsyncRunner:
     """Async counterpart of :class:`Runner` providing ``asyncio`` bridges."""
 
@@ -69,12 +75,13 @@ class AsyncRunner:
         event_logger, metrics_path_str = resolve_event_logger(
             self._logger, shadow_metrics_path
         )
-        metadata = request.metadata or {}
+        metadata: dict[str, Any] = dict(request.metadata or {})
         run_started = time.time()
         request_fingerprint = content_hash(
             "runner", request.prompt_text, request.options, request.max_tokens
         )
 
+        shadow = shadow or getattr(self._config, "shadow_provider", None)
         shadow_async = ensure_async_provider(shadow) if shadow is not None else None
 
         max_attempts = self._config.max_attempts
@@ -85,6 +92,9 @@ class AsyncRunner:
             providers = self.providers
         total_providers = len(providers)
         mode = RunnerMode(self._config.mode)
+        metadata.setdefault("run_id", metadata.get("trace_id") or request_fingerprint)
+        metadata["mode"] = mode.value
+        metadata["providers"] = [provider.name() for provider, _ in providers]
 
         async def _invoke(
             attempt_index: int,
@@ -165,6 +175,7 @@ class AsyncRunner:
                     "last_error_family": error_family(last_err),
                 },
             )
+        failure_error = AllFailedError("All providers failed to produce a result")
         log_run_metric(
             event_logger,
             request_fingerprint=request_fingerprint,
@@ -176,11 +187,13 @@ class AsyncRunner:
             tokens_in=None,
             tokens_out=None,
             cost_usd=0.0,
-            error=last_err,
+            error=failure_error,
             metadata=metadata,
             shadow_used=shadow is not None,
         )
-        raise last_err if last_err is not None else RuntimeError("No providers succeeded")
+        if last_err is not None:
+            raise failure_error from last_err
+        raise failure_error
 
 
-__all__ = ["AsyncRunner"]
+__all__ = ["AllFailedError", "AsyncRunner"]
