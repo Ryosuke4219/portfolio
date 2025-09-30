@@ -5,7 +5,8 @@ import datetime as dt
 from collections import Counter
 from typing import Iterable
 
-from tools.weekly_summary import coerce_str, parse_iso8601, to_float
+from tools import weekly_summary
+from tools.weekly_summary import coerce_str, parse_iso8601
 
 
 def compute_last_updated(runs: Iterable[dict[str, object]]) -> str | None:
@@ -49,7 +50,9 @@ def normalize_flaky_rows(
         return []
     sorted_rows = sorted(
         materialized,
-        key=lambda row: to_float(coerce_str(row.get("score"))) or 0.0,
+        key=lambda row: (
+            weekly_summary.to_float(coerce_str(row.get("score"))) or 0.0
+        ),
         reverse=True,
     )
     normalized: list[dict[str, object]] = []
@@ -64,7 +67,7 @@ def normalize_flaky_rows(
             attempts = int(attempts_value)
         else:
             attempts_str = coerce_str(attempts_value)
-            attempts_float = to_float(attempts_str)
+            attempts_float = weekly_summary.to_float(attempts_str)
             if attempts_float is not None:
                 attempts = int(attempts_float)
         normalized.append(
@@ -76,8 +79,8 @@ def normalize_flaky_rows(
                     or "-"
                 ),
                 "attempts": attempts,
-                "p_fail": to_float(coerce_str(row.get("p_fail"))),
-                "score": to_float(coerce_str(row.get("score"))),
+                "p_fail": weekly_summary.to_float(coerce_str(row.get("p_fail"))),
+                "score": weekly_summary.to_float(coerce_str(row.get("score"))),
                 "as_of": (
                     coerce_str(row.get("as_of"))
                     or coerce_str(row.get("generated_at"))
