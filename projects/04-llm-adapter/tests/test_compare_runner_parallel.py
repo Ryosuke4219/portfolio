@@ -373,6 +373,7 @@ def test_consensus_majority_and_judge_tiebreak(
     assert consensus_meta["chosen_provider"] == "consensus"
     assert consensus_meta.get("metadata", {}) == {"bucket_size": 2}
 
+
     class JudgeProvider(BaseProvider):
         calls = 0
 
@@ -408,6 +409,47 @@ def test_consensus_majority_and_judge_tiebreak(
     )
     assert judge_winner.model == "B"
     assert JudgeProvider.calls == 1
+
+
+def test_consensus_default_quorum_meta_uses_two(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class ThreeWayConsensusProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(
+                output_text="YES",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=5,
+            )
+
+    monkeypatch.setitem(
+        ProviderFactory._registry, "three-way-consensus", ThreeWayConsensusProvider
+    )
+
+    runner = CompareRunner(
+        [
+            _make_provider_config(
+                tmp_path, name="p1", provider="three-way-consensus", model="YES"
+            ),
+            _make_provider_config(
+                tmp_path, name="p2", provider="three-way-consensus", model="YES"
+            ),
+            _make_provider_config(
+                tmp_path, name="p3", provider="three-way-consensus", model="YES"
+            ),
+        ],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_consensus_quorum_default.jsonl",
+    )
+
+    results = runner.run(repeat=1, config=RunnerConfig(mode="consensus"))
+    winner = next(metric for metric in results if metric.ci_meta.get("consensus"))
+
+    consensus_meta = winner.ci_meta["consensus"]
+    assert consensus_meta["quorum"] == 2
+    assert winner.ci_meta["aggregate_quorum"] == 2
 
 
 def test_consensus_quorum_failure_marks_metrics(
