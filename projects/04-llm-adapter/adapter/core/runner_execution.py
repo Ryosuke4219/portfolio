@@ -5,7 +5,6 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from threading import Thread
 from time import perf_counter, sleep
 from typing import Literal, Protocol, TYPE_CHECKING, TypeVar
 
@@ -67,8 +66,8 @@ from .errors import (
     TimeoutError,
 )
 from .execution.guards import _SchemaValidator, _TokenBucket
+from .execution.shadow_runner import ShadowRunner, ShadowRunnerResult
 from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
-from .provider_spi import ProviderRequest
 from .providers import BaseProvider, ProviderResponse
 
 LOGGER = logging.getLogger(__name__)
@@ -191,60 +190,8 @@ class RunnerExecution:
         if self._token_bucket:
             self._token_bucket.acquire()
         prompt = task.render_prompt()
-        shadow_thread: Thread | None = None
-        shadow_result: dict[str, object] | None = None
-        shadow_provider_id: str | None = None
-        if self._shadow_provider is not None:
-            shadow_provider = self._shadow_provider
-            try:
-                shadow_provider_id = shadow_provider.name()
-            except Exception:  # pragma: no cover - name() 実装の防御
-                shadow_provider_id = None
-            request = ProviderRequest(
-                model=provider_config.model,
-                prompt=prompt,
-                max_tokens=provider_config.max_tokens,
-                temperature=provider_config.temperature,
-                top_p=provider_config.top_p,
-                timeout_s=float(provider_config.timeout_s) if provider_config.timeout_s > 0 else None,
-            )
-            shadow_data: dict[str, object] = {}
-
-            def _run_shadow() -> None:
-                start = perf_counter()
-                try:
-                    response = shadow_provider.invoke(request)
-                except Exception as exc:  # pragma: no cover - 影響範囲縮小のため
-                    latency_ms = int((perf_counter() - start) * 1000)
-                    LOGGER.exception("Shadow provider %s failed", shadow_provider_id, exc_info=exc)
-                    shadow_data.update(
-                        provider_id=shadow_provider_id,
-                        latency_ms=latency_ms,
-                        status="error",
-                        error_message=str(exc),
-                    )
-                else:
-                    latency_ms = int(getattr(response, "latency_ms", 0))
-                    LOGGER.info(
-                        "Shadow provider %s completed in %sms", shadow_provider_id, latency_ms
-                    )
-                    shadow_data.update(
-                        provider_id=shadow_provider_id,
-                        latency_ms=latency_ms,
-                        status="ok",
-                    )
-                finally:
-                    shadow_data.setdefault(
-                        "latency_ms", int((perf_counter() - start) * 1000)
-                    )
-
-            shadow_thread = Thread(
-                target=_run_shadow,
-                name=f"shadow-{shadow_provider_id or 'unknown'}",
-                daemon=True,
-            )
-            shadow_thread.start()
-            shadow_result = shadow_data
+        shadow_runner = ShadowRunner(self._shadow_provider)
+        shadow_runner.start(provider_config, prompt)
         provider_result = self._run_provider_call(
             provider_config,
             provider,
@@ -267,6 +214,52 @@ class RunnerExecution:
                 error_message,
             )
         )
+        status, failure_kind, error_message, schema_error = self._apply_schema_validation(
+            response,
+            status,
+            failure_kind,
+            error_message,
+        )
+        run_metrics, raw_output = self._build_metrics(
+            provider_config,
+            task,
+            attempt_index,
+            mode,
+            response,
+            status,
+            failure_kind,
+            error_message,
+            latency_ms,
+            budget_snapshot,
+            cost_usd,
+        )
+        shadow_result = shadow_runner.finalize()
+        self._finalize_run_metrics(
+            run_metrics,
+            attempt_index,
+            provider_result,
+            response,
+            status,
+            failure_kind,
+            error_message,
+            schema_error,
+            shadow_result,
+            shadow_runner.provider_id,
+        )
+        return self._build_single_run_result(
+            run_metrics,
+            raw_output,
+            stop_reason,
+            provider_result,
+        )
+
+    def _apply_schema_validation(
+        self,
+        response: ProviderResponse,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+    ) -> tuple[str, str | None, str | None, str | None]:
         schema_error: str | None = None
         validator = self._schema_validator
         if validator is not None:
@@ -281,19 +274,21 @@ class RunnerExecution:
             error_message = (
                 f"{error_message} | {schema_error}" if error_message else schema_error
             )
-        run_metrics, raw_output = self._build_metrics(
-            provider_config,
-            task,
-            attempt_index,
-            mode,
-            response,
-            status,
-            failure_kind,
-            error_message,
-            latency_ms,
-            budget_snapshot,
-            cost_usd,
-        )
+        return status, failure_kind, error_message, schema_error
+
+    def _finalize_run_metrics(
+        self,
+        run_metrics: RunMetrics,
+        attempt_index: int,
+        provider_result: _ProviderCallResult,
+        response: ProviderResponse,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+        schema_error: str | None,
+        shadow_result: ShadowRunnerResult | None,
+        fallback_shadow_id: str | None,
+    ) -> None:
         provider_ids: list[str] = []
         for provider_id in self._active_provider_ids:
             if provider_id not in provider_ids:
@@ -320,27 +315,36 @@ class RunnerExecution:
             run_metrics.failure_kind = failure_kind
             run_metrics.error_message = error_message
         run_metrics.outcome = self._resolve_outcome(run_metrics.status)
-        if shadow_thread is not None:
-            shadow_thread.join()
-            if shadow_result:
-                provider_key = shadow_result.get("provider_id")
-                run_metrics.shadow_provider_id = (
-                    str(provider_key)
-                    if provider_key is not None
-                    else shadow_provider_id
-                )
-                latency_val = shadow_result.get("latency_ms")
-                if latency_val is not None:
-                    run_metrics.shadow_latency_ms = int(latency_val)
-                status_val = shadow_result.get("status")
-                if isinstance(status_val, str):
-                    run_metrics.shadow_status = status_val
-                    run_metrics.shadow_outcome = self._resolve_outcome(status_val)
-                error_val = shadow_result.get("error_message")
-                if isinstance(error_val, str):
-                    run_metrics.shadow_error_message = error_val
-            elif shadow_provider_id is not None:
-                run_metrics.shadow_provider_id = shadow_provider_id
+        self._apply_shadow_metrics(run_metrics, shadow_result, fallback_shadow_id)
+
+    def _apply_shadow_metrics(
+        self,
+        run_metrics: RunMetrics,
+        shadow_result: ShadowRunnerResult | None,
+        fallback_shadow_id: str | None,
+    ) -> None:
+        if shadow_result is None:
+            if fallback_shadow_id is not None:
+                run_metrics.shadow_provider_id = fallback_shadow_id
+            return
+        provider_id = shadow_result.provider_id or fallback_shadow_id
+        if provider_id is not None:
+            run_metrics.shadow_provider_id = provider_id
+        if shadow_result.latency_ms is not None:
+            run_metrics.shadow_latency_ms = int(shadow_result.latency_ms)
+        if shadow_result.status is not None:
+            run_metrics.shadow_status = shadow_result.status
+            run_metrics.shadow_outcome = self._resolve_outcome(shadow_result.status)
+        if shadow_result.error_message is not None:
+            run_metrics.shadow_error_message = shadow_result.error_message
+
+    @staticmethod
+    def _build_single_run_result(
+        run_metrics: RunMetrics,
+        raw_output: str,
+        stop_reason: str | None,
+        provider_result: _ProviderCallResult,
+    ) -> SingleRunResult:
         return SingleRunResult(
             metrics=run_metrics,
             raw_output=raw_output,
