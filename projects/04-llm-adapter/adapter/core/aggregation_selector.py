@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import json
 from pathlib import Path
-from typing import Any, Protocol, TYPE_CHECKING, cast
+from typing import Any, cast, Protocol, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
 from .aggregation import (
@@ -97,7 +97,7 @@ class AggregationSelector:
     def select(
         self,
         mode: str,
-        config: "RunnerConfig",
+        config: RunnerConfig,
         batch: Sequence[tuple[int, SingleRunResult]],
         *,
         default_judge_config: ProviderConfig | None,
@@ -151,7 +151,7 @@ class AggregationSelector:
     def _resolve_aggregation_strategy(
         self,
         mode: str,
-        config: "RunnerConfig",
+        config: RunnerConfig,
         *,
         default_judge_config: ProviderConfig | None,
     ) -> AggregationStrategy | None:
@@ -182,7 +182,7 @@ class AggregationSelector:
 
     @staticmethod
     def _resolve_tie_breaker(
-        config: "RunnerConfig",
+        config: RunnerConfig,
         lookup: Mapping[int, SingleRunResult],
     ) -> TieBreaker | None:
         tie_name = (config.tie_breaker or "").strip().lower()
