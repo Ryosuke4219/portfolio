@@ -176,7 +176,7 @@ async def run_parallel_any_async(
         if on_cancelled is not None:
             cancelled = [
                 index
-                for (index, _), outcome in zip(task_pairs, results)
+                for (index, _), outcome in zip(task_pairs, results, strict=False)
                 if isinstance(outcome, asyncio.CancelledError)
             ]
             if cancelled:
