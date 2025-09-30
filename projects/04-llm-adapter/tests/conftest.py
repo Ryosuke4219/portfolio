@@ -1,9 +1,22 @@
-from pathlib import Path
+from __future__ import annotations
+
+import importlib
 import sys
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+project_path = str(PROJECT_ROOT)
+if project_path not in sys.path:
+    sys.path.insert(0, project_path)
+
+# Ensure the canonical adapter package is loaded before shadow paths can override it.
+importlib.import_module("adapter")
+
+SHADOW_ROOT = PROJECT_ROOT.parent / "04-llm-adapter-shadow"
+if SHADOW_ROOT.exists():
+    shadow_path = str(SHADOW_ROOT)
+    if shadow_path not in sys.path:
+        sys.path.append(shadow_path)
 
 
 def pytest_configure(config):  # pragma: no cover - pytest hook
