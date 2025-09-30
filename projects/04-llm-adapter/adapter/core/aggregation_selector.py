@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import json
 from pathlib import Path
-from typing import Any, Protocol, TYPE_CHECKING, cast
+from typing import Any, cast, Protocol, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
 from .aggregation import (
