@@ -2,17 +2,17 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
 from concurrent.futures import (
+    as_completed,
     FIRST_COMPLETED,
     Future,
     ThreadPoolExecutor,
-    as_completed,
     wait,
 )
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, cast
+import inspect
+from typing import Any, cast, Generic, TypeVar
 
 T = TypeVar("T")
 S = TypeVar("S")
