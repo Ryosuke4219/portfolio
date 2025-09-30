@@ -57,3 +57,6 @@ ignore_errors = true
 markers = [
     "asyncio: tests that drive asyncio event loops",
 ]
+pythonpath = [
+    ".",
+]

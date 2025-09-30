@@ -7,6 +7,13 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from types import ModuleType
 
+_current_dir = Path(__file__).resolve().parent
+_legacy_tools = _current_dir.parent / "projects" / "04-llm-adapter" / "tools"
+
+__path__ = [str(_current_dir)]
+if _legacy_tools.exists():
+    __path__.append(str(_legacy_tools))
+
 __all__ = []
 
 
@@ -42,3 +49,4 @@ if _METRICS_ROOT.exists():
     metrics_to_html = _REPORT_ROOT / "metrics_to_html.py"
     if metrics_to_html.exists():
         _load_package("tools.report.metrics_to_html", metrics_to_html)
+
