@@ -1,5 +1,6 @@
 import pytest
 
+import src.llm_adapter.runner_parallel as runner_parallel
 from src.llm_adapter.errors import RetriableError, TimeoutError
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import (
@@ -38,6 +39,49 @@ def _response(
 def fake_judge(responses: list[ProviderResponse]) -> tuple[str, float]:
     winner = responses[-1].text.strip()
     return winner, 0.75
+
+
+def _observation(
+    provider_id: str,
+    text: str,
+    latency: int,
+    *extra_cost: float,
+    tokens_in: int = 1,
+    tokens_out: int = 1,
+    cost_estimate: float | None = None,
+) -> object:
+    observation_type = getattr(runner_parallel, "ConsensusObservation", None)
+    assert observation_type is not None, "ConsensusObservation must be defined"
+    annotations = getattr(observation_type, "__annotations__", {})
+    response = _response(text, latency, tokens_in=tokens_in, tokens_out=tokens_out)
+    token_usage = TokenUsage(prompt=tokens_in, completion=tokens_out)
+    kwargs: dict[str, object] = {
+        "provider_id": provider_id,
+        "response": response,
+    }
+    latency_field = next(
+        (name for name in ("latency", "latency_ms") if name in annotations), None
+    )
+    assert latency_field is not None, "ConsensusObservation missing latency field"
+    kwargs[latency_field] = latency
+    if tokens_field := next(
+        (name for name in ("tokens", "token_usage") if name in annotations), None
+    ):
+        kwargs[tokens_field] = token_usage
+    if (
+        cost_field := next(
+            (name for name in ("cost_estimate", "cost") if name in annotations), None
+        )
+    ) or cost_estimate is not None or extra_cost:
+        estimate = cost_estimate if cost_estimate is not None else extra_cost[0] if extra_cost else None
+        kwargs[cost_field or "cost_estimate"] = (
+            float(estimate)
+            if estimate is not None
+            else float(tokens_in + tokens_out)
+        )
+    if "error" in annotations:
+        kwargs.setdefault("error", None)
+    return observation_type(**kwargs)
 
 
 def test_majority_with_latency_tie_breaker() -> None:
@@ -175,6 +219,63 @@ def test_max_rounds_exhausted_before_judge_round() -> None:
                 max_rounds=2,
             ),
         )
+
+
+def test_weighted_vote_uses_provider_weights_and_srs_names() -> None:
+    observations = [
+        _observation(provider, text, latency, tokens_in=1, tokens_out=1)
+        for provider, text, latency in (
+            ("alpha", "A", 80),
+            ("bravo", "B", 25),
+            ("charlie", "B", 20),
+        )
+    ]
+    result = compute_consensus(
+        observations,
+        config=ConsensusConfig(
+            strategy="weighted_vote",
+            tie_breaker="min_latency",
+            quorum=1,
+            provider_weights={"alpha": 2.0, "bravo": 0.5, "charlie": 0.5},
+        ),
+    )
+    assert result.response.text == "A"
+
+
+def test_default_tie_break_order() -> None:
+    cases = [(("alpha", "A", 90, 5.0), ("bravo", "B", 35, 1.0), "B", "min_latency", "latency"), (("alpha", "A", 40, 4.0), ("bravo", "B", 40, 1.5), "B", "min_cost", "cost")]
+    for entry_a, entry_b, expected, tie_breaker, fragment in cases:
+        observations = [
+            _observation(*entry, tokens_in=1, tokens_out=1, cost_estimate=entry[3])
+            for entry in (entry_a, entry_b)
+        ]
+        result = compute_consensus(
+            observations,
+            config=ConsensusConfig(strategy="majority_vote", quorum=1),
+        )
+        assert result.response.text == expected
+        assert result.tie_break_applied is True
+        assert result.tie_breaker_selected == tie_breaker
+        assert fragment in result.tie_break_reason
+
+
+def test_stable_order_makes_tie_resolution_deterministic() -> None:
+    observations = [
+        _observation("alpha", "A", 25, tokens_in=1, tokens_out=1, cost_estimate=1.0),
+        _observation("bravo", "B", 25, tokens_in=1, tokens_out=1, cost_estimate=1.0),
+    ]
+    flipped = list(reversed(observations))
+    first = compute_consensus(
+        observations,
+        config=ConsensusConfig(strategy="majority_vote", quorum=1),
+    )
+    second = compute_consensus(
+        flipped,
+        config=ConsensusConfig(strategy="majority_vote", quorum=1),
+    )
+    assert first.response.text == second.response.text
+    assert first.tie_breaker_selected == "stable_order"
+    assert second.tie_breaker_selected == "stable_order"
 
 
 def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> None:
