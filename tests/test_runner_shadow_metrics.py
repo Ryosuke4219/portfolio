@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import contextlib
-import logging
-import sys
 from dataclasses import replace
+import logging
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "projects" / "04-ll
 
 from adapter.core.metrics import RunMetrics
 from adapter.core.runner_execution import RunnerExecution
-
 
 BASE_METRICS = RunMetrics(
     ts="2024-01-01T00:00:00Z",
