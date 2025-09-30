@@ -52,7 +52,7 @@ from .budgets import BudgetManager
 from .compare_runner_finalizer import TaskFinalizer
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .errors import AllFailedError
+from .execution.compare_task_runner import run_tasks
 from .metrics import BudgetSnapshot, compute_diff_rate, EvalMetrics, hash_text, now_ts, RunMetrics
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 from .runner_execution import (
@@ -180,75 +180,19 @@ class CompareRunner:
             metrics_path=config.metrics_path,
             provider_weights=self._provider_weights,
         )
-
-        providers: list[tuple[ProviderConfig, BaseProvider]] = []
-        for provider_config in self.provider_configs:
-            provider = ProviderFactory.create(provider_config)
-            providers.append((provider_config, provider))
-            LOGGER.info(
-                "provider=%s model=%s を実行",
-                provider_config.provider,
-                provider_config.model,
-            )
-
-        results: list[RunMetrics] = []
-        if not providers:
-            return results
-
-        stop_reason: str | None = None
-        for task in self.tasks:
-            histories: list[list[SingleRunResult]] = [[] for _ in providers]
-            for attempt in range(repeat):
-                try:
-                    if config.mode == "sequential":
-                        batch, stop_reason = execution.run_sequential_attempt(
-                            providers, task, attempt, config.mode
-                        )
-                    else:
-                        batch, stop_reason = execution.run_parallel_attempt(
-                            providers, task, attempt, config
-                        )
-                except AllFailedError as exc:
-                    batch = getattr(exc, "batch", [])
-                    self._log_attempt_failures(config.mode, getattr(exc, "failures", ()))
-                    if batch:
-                        self._record_failed_batch(
-                            batch,
-                            config,
-                            histories,
-                        )
-                    LOGGER.error(
-                        "タスク%sの試行%dで全プロバイダ失敗", task.task_id, attempt, exc_info=exc
-                    )
-                    raise
-                except ParallelExecutionError as exc:
-                    batch = getattr(exc, "batch", [])
-                    self._log_attempt_failures(config.mode, getattr(exc, "failures", ()))
-                    if batch:
-                        self._record_failed_batch(
-                            batch,
-                            config,
-                            histories,
-                        )
-                    LOGGER.error(
-                        "タスク%sの並列実行に失敗", task.task_id, exc_info=exc
-                    )
-                    raise
-                self._aggregation.apply(
-                    mode=config.mode,
-                    config=config,
-                    batch=batch,
-                    default_judge_config=self._judge_provider_config,
-                )
-                for index, result in batch:
-                    histories[index].append(result)
-                if stop_reason:
-                    break
-            self._task_finalizer.finalize_task(task, providers, histories, results)
-            if stop_reason:
-                LOGGER.warning("予算制約により実行を停止します: %s", stop_reason)
-                break
-        return results
+        return run_tasks(
+            provider_configs=self.provider_configs,
+            tasks=self.tasks,
+            repeat=repeat,
+            config=config,
+            execution=execution,
+            aggregation_apply=self._aggregation.apply,
+            finalize_task=self._task_finalizer.finalize_task,
+            judge_provider_config=self._judge_provider_config,
+            record_failed_batch=self._record_failed_batch,
+            log_attempt_failures=self._log_attempt_failures,
+            parallel_execution_error=ParallelExecutionError,
+        )
 
     def _record_failed_batch(
         self,
