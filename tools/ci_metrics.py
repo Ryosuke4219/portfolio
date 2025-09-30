@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import datetime as dt
 from pathlib import Path
 
-from weekly_summary import coerce_str, load_runs, parse_iso8601
+import weekly_summary
+from weekly_summary import coerce_str, load_runs
 
 PASS_STATUSES = {"pass", "passed"}
 FAIL_STATUSES = {"fail", "failed"}
@@ -50,7 +51,7 @@ def _group_runs(runs: Iterable[dict]) -> list[RunRecord]:
         run_id = coerce_str(record.get("run_id"))
         if not run_id:
             continue
-        ts = parse_iso8601(coerce_str(record.get("ts")))
+        ts = weekly_summary.parse_iso8601(coerce_str(record.get("ts")))
         if run_id not in grouped:
             grouped[run_id] = RunRecord(run_id=run_id, timestamp=ts, records=[record])
         else:
@@ -86,7 +87,7 @@ def compute_run_history(
         total = passes = fails = errors = 0
         for record in sorted(
             run.records,
-            key=lambda item: parse_iso8601(coerce_str(item.get("ts")))
+            key=lambda item: weekly_summary.parse_iso8601(coerce_str(item.get("ts")))
             or run.timestamp
             or dt.datetime.min.replace(tzinfo=dt.UTC),
         ):

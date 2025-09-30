@@ -10,6 +10,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import weekly_summary
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -22,7 +24,7 @@ from weekly_summary import (
     load_runs,
     select_flaky_rows,
 )
-from weekly_summary import coerce_str, format_percentage, parse_iso8601, to_float
+from weekly_summary import coerce_str, format_percentage, to_float
 
 from tools.ci_report.processing import (
     compute_last_updated,
@@ -61,7 +63,7 @@ def parse_args() -> argparse.Namespace:
 def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
     timestamps: list[dt.datetime] = []
     for run in runs:
-        ts = parse_iso8601(coerce_str(run.get("ts")))
+        ts = weekly_summary.parse_iso8601(coerce_str(run.get("ts")))
         if ts is not None:
             timestamps.append(ts)
     if not timestamps:
