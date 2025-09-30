@@ -1,7 +1,7 @@
 """応答集約ストラテジ。"""
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast, Protocol, runtime_checkable, TYPE_CHECKING
@@ -93,10 +93,20 @@ class AggregationStrategy(Protocol):
     @staticmethod
     def from_string(kind: str, **kwargs: Any) -> AggregationStrategy:
         kind_norm = (kind or "").strip().lower()
-        if kind_norm in {"majority", "vote", "maj"}:
+        if kind_norm in {"majority", "vote", "maj", "majority_vote"}:
             return cast(AggregationStrategy, MajorityVoteStrategy())
-        if kind_norm in {"max", "score", "top"}:
+        if kind_norm in {"max", "score", "top", "max_score"}:
             return cast(AggregationStrategy, MaxScoreStrategy())
+        if kind_norm in {"weighted", "weighted_vote"}:
+            weights = kwargs.get("provider_weights")
+            if weights is not None and not isinstance(weights, Mapping):
+                raise TypeError("provider_weights must be a mapping of provider -> weight")
+            return cast(
+                AggregationStrategy,
+                WeightedVoteStrategy(
+                    provider_weights=cast(Mapping[str, float] | None, weights),
+                ),
+            )
         if kind_norm in {"judge", "llm-judge"}:
             try:
                 model = kwargs["model"]
@@ -200,6 +210,78 @@ class MaxScoreStrategy:
         )
 
 
+class WeightedVoteStrategy:
+    """プロバイダ重みを考慮した多数決。"""
+
+    name = "weighted_vote"
+
+    def __init__(self, *, provider_weights: Mapping[str, float] | None = None) -> None:
+        self._provider_weights = (
+            {provider: float(weight) for provider, weight in provider_weights.items()}
+            if provider_weights is not None
+            else {}
+        )
+
+    def _weight_for(self, provider: str) -> float:
+        return self._provider_weights.get(provider, 1.0)
+
+    def aggregate(
+        self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
+    ) -> AggregationResult:
+        if not candidates:
+            raise ValueError("weighted_vote: candidates must be non-empty")
+
+        breaker = tiebreaker or FirstTieBreaker()
+
+        def norm(text: str | None) -> str:
+            return (text or "").strip()
+
+        buckets: dict[str, list[AggregationCandidate]] = {}
+        weights: dict[str, float] = {}
+        for candidate in candidates:
+            key = norm(candidate.text if candidate.text is not None else candidate.response.text)
+            buckets.setdefault(key, []).append(candidate)
+            weights[key] = weights.get(key, 0.0) + self._weight_for(candidate.provider)
+
+        max_weight = float("-inf")
+        winners: list[tuple[str, list[AggregationCandidate]]] = []
+        for key, bucket in buckets.items():
+            total_weight = weights.get(key, 0.0)
+            if total_weight > max_weight:
+                max_weight = total_weight
+                winners = [(key, bucket)]
+            elif total_weight == max_weight:
+                winners.append((key, bucket))
+
+        if not winners:
+            raise ValueError("weighted_vote: internal error computing winners")
+
+        tie_used: str | None = None
+        if len(winners) == 1:
+            _, bucket = winners[0]
+            if len(bucket) == 1:
+                chosen = bucket[0]
+            else:
+                tie_used = breaker.name
+                chosen = breaker.break_tie(bucket)
+        else:
+            tie_used = breaker.name
+            finalists = [
+                bucket[0] if len(bucket) == 1 else breaker.break_tie(bucket)
+                for _, bucket in winners
+            ]
+            chosen = breaker.break_tie(finalists)
+
+        return AggregationResult(
+            chosen=chosen,
+            candidates=list(candidates),
+            strategy=self.name,
+            reason=f"weight={max_weight}",
+            tie_breaker_used=tie_used,
+            metadata={"bucket_weight": max_weight},
+        )
+
+
 # 便利ヘルパー：API/CLI から簡単に呼べるように
 def AggregationResolver(kind: str, **kwargs: Any) -> AggregationStrategy:
     return AggregationStrategy.from_string(kind, **kwargs)
@@ -217,6 +299,7 @@ __all__ = [
     "JudgeStrategy",
     "MajorityVoteStrategy",
     "MaxScoreStrategy",
+    "WeightedVoteStrategy",
 ]
 
 

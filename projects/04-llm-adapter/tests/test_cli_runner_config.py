@@ -117,7 +117,7 @@ def test_run_compare_sanitizes_runner_config(
     assert isinstance(captured["backoff"], runner_api.BackoffPolicy)
     assert captured["backoff"].rate_limit_sleep_s is None
     assert captured["shadow_provider"] is None
-    assert captured["provider_weights"] is None
+    assert captured["provider_weights"] == {"openai": 1.0}
     assert captured["metrics_path"].name == "metrics.jsonl"
     assert captured["repeat"] == 1
 

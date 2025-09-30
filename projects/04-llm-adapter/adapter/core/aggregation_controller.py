@@ -236,7 +236,10 @@ class AggregationController:
                 model=judge_config.model,
                 provider_factory=factory,
             )
-        return AggregationStrategy.from_string(aggregate)
+        return AggregationStrategy.from_string(
+            aggregate,
+            provider_weights=config.provider_weights,
+        )
 
     @staticmethod
     def _resolve_tie_breaker(
