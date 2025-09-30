@@ -17,13 +17,13 @@ from src.llm_adapter.provider_spi import (
 )
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult, Runner
+from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.runner_config import (
     BackoffPolicy,
     ConsensusConfig,
     RunnerConfig,
     RunnerMode,
 )
-from src.llm_adapter.runner_parallel import ParallelExecutionError
 
 
 class _FakeClock:

@@ -16,14 +16,14 @@ from .errors import (
 )
 from .observability import EventLogger
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from .runner_config import RunnerConfig, RunnerMode
-from .runner_parallel import (
-    compute_consensus,
+from .parallel_exec import (
     ParallelAllResult,
     ParallelExecutionError,
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
+from .runner_config import RunnerConfig, RunnerMode
+from .runner_parallel import compute_consensus
 from .runner_shared import (
     error_family,
     estimate_cost,

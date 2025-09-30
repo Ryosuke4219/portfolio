@@ -1,6 +1,7 @@
 import pytest
 
 from src.llm_adapter.errors import RetriableError, TimeoutError
+from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
     ProviderResponse,
@@ -11,7 +12,6 @@ from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerM
 from src.llm_adapter.runner_parallel import (
     compute_consensus,
     ConsensusResult,
-    ParallelExecutionError,
 )
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 

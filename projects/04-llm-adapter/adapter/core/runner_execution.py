@@ -10,12 +10,12 @@ from time import perf_counter, sleep
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.runner_parallel import ParallelExecutionError
-    from src.llm_adapter.runner_parallel import run_parallel_all_sync
-    from src.llm_adapter.runner_parallel import run_parallel_any_sync
+    from src.llm_adapter.parallel_exec import ParallelExecutionError
+    from src.llm_adapter.parallel_exec import run_parallel_all_sync
+    from src.llm_adapter.parallel_exec import run_parallel_any_sync
 else:  # pragma: no cover - 実行時フォールバック
     try:
-        from src.llm_adapter.runner_parallel import (
+        from src.llm_adapter.parallel_exec import (
             ParallelExecutionError,
             run_parallel_all_sync,
             run_parallel_any_sync,

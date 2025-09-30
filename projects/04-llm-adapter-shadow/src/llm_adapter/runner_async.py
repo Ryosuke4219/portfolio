@@ -23,14 +23,14 @@ from .provider_spi import (
     ProviderResponse,
     ProviderSPI,
 )
-from .runner_config import RunnerConfig, RunnerMode
-from .runner_parallel import (
-    compute_consensus,
+from .parallel_exec import (
     ParallelAllResult,
     ParallelExecutionError,
     run_parallel_all_async,
     run_parallel_any_async,
 )
+from .runner_config import RunnerConfig, RunnerMode
+from .runner_parallel import compute_consensus
 from .runner_shared import (
     error_family,
     estimate_cost,
