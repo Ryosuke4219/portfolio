@@ -6,16 +6,16 @@ from dataclasses import dataclass
 import importlib
 from typing import Any, cast
 
-from .parallel_exec import ParallelExecutionError
-from .provider_spi import ProviderResponse
-from .runner_config import ConsensusConfig
 from .consensus_candidates import (
-    CandidateSet,
     _apply_tie_breaker,
     _Candidate,
     _normalize_candidate_text,
+    CandidateSet,
     validate_consensus_schema,
 )
+from .parallel_exec import ParallelExecutionError
+from .provider_spi import ProviderResponse
+from .runner_config import ConsensusConfig
 
 
 @dataclass(slots=True)
