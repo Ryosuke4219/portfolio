@@ -113,8 +113,62 @@ def test_parallel_any_stops_after_first_success(
     )
     config = RunnerConfig(mode="parallel-any", max_concurrency=2)
     results = runner.run(repeat=1, config=config)
-    assert [metric.model for metric in results] == ["fast"]
+    assert {metric.model: metric.status for metric in results} == {
+        "fast": "ok",
+        "slow": "skip",
+    }
     assert calls == ["fast"]
+
+
+def test_parallel_any_cancels_pending_workers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import time
+
+    class FastProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(
+                output_text="fast",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=1,
+            )
+
+    class SlowProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            time.sleep(0.05)
+            return ProviderResponse(
+                output_text="slow",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=50,
+            )
+
+    monkeypatch.setitem(ProviderFactory._registry, "fast", FastProvider)
+    monkeypatch.setitem(ProviderFactory._registry, "slow", SlowProvider)
+
+    fast_config = _make_provider_config(
+        tmp_path, name="fast", provider="fast", model="fast"
+    )
+    slow_config = _make_provider_config(
+        tmp_path, name="slow", provider="slow", model="slow"
+    )
+
+    runner = CompareRunner(
+        [fast_config, slow_config],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_cancel.jsonl",
+    )
+    results = runner.run(repeat=1, config=RunnerConfig(mode="parallel-any", max_concurrency=2))
+
+    assert len(results) == 2
+    status_by_model = {metric.model: metric.status for metric in results}
+    assert status_by_model == {"fast": "ok", "slow": "skip"}
+
+    slow_metric = next(metric for metric in results if metric.model == "slow")
+    assert slow_metric.failure_kind == "cancelled"
+    assert slow_metric.error_message == "parallel-any cancelled after winner"
 
 
 def test_consensus_majority_and_judge_tiebreak(
