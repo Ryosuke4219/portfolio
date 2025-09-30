@@ -8,7 +8,7 @@ from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.runner import Runner, RunnerConfig
 from src.llm_adapter.runner_config import RunnerMode
 
-from .shadow._runner_test_helpers import FakeLogger, _SuccessProvider
+from .shadow._runner_test_helpers import _SuccessProvider, FakeLogger
 
 
 def _run_and_fetch_event(
