@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import json
+import math
 from pathlib import Path
 from typing import Any, cast, Protocol, TYPE_CHECKING
 
@@ -93,6 +94,8 @@ class AggregationSelector:
         self._judge_factory_builder = judge_factory_builder
         self._cached_schema_path: Path | None = None
         self._cached_schema: Mapping[str, Any] | None = None
+        self._latest_provider_weights: dict[str, float] | None = None
+        self._latest_candidate_providers: set[str] = set()
 
     def select(
         self,
@@ -122,15 +125,25 @@ class AggregationSelector:
         ]
         if not candidates:
             return None
+        self._latest_candidate_providers = {candidate.provider for candidate in candidates}
+        self._latest_provider_weights = None
         strategy = self._resolve_aggregation_strategy(
             mode,
             config,
             default_judge_config=default_judge_config,
         )
         if strategy is None:
+            self._latest_candidate_providers = set()
             return None
         tiebreaker = self._resolve_tie_breaker(config, lookup)
         decision = strategy.aggregate(candidates, tiebreaker=tiebreaker)
+        provider_weights = self._latest_provider_weights
+        if provider_weights is not None:
+            metadata = dict(decision.metadata) if decision.metadata else {}
+            metadata["provider_weights"] = dict(provider_weights)
+            decision.metadata = metadata
+        self._latest_provider_weights = None
+        self._latest_candidate_providers = set()
         votes: int | None = None
         if mode == "consensus":
             if decision.metadata:
@@ -155,12 +168,14 @@ class AggregationSelector:
         *,
         default_judge_config: ProviderConfig | None,
     ) -> AggregationStrategy | None:
+        self._latest_provider_weights = None
         del mode
         aggregate_raw = config.aggregate
         aggregate = (aggregate_raw or "").strip()
         if not aggregate:
             aggregate = "majority"
-        if aggregate.lower() in {"judge", "llm-judge"}:
+        normalized = aggregate.lower().replace("-", "_")
+        if normalized in {"judge", "llm_judge"}:
             judge_config = config.judge_provider or default_judge_config
             if judge_config is None:
                 raise ValueError("aggregate=judge requires judge provider configuration")
@@ -172,13 +187,21 @@ class AggregationSelector:
                     aggregation_module, attr_name
                 )
             factory = self._judge_factory_builder(judge_config)
+            self._latest_provider_weights = None
             return AggregationStrategy.from_string(
                 aggregate,
                 model=judge_config.model,
                 provider_factory=factory,
             )
+        weights: dict[str, float] | None = None
+        if normalized in {"weighted", "weighted_vote", "weightedvote"}:
+            weights = self._prepare_provider_weights(config, aggregate)
+            self._latest_provider_weights = weights
         schema_data = self._load_schema(getattr(config, "schema", None))
-        return AggregationStrategy.from_string(aggregate, schema=schema_data)
+        kwargs: dict[str, Any] = {"schema": schema_data}
+        if weights is not None:
+            kwargs["weights"] = weights
+        return AggregationStrategy.from_string(aggregate, **kwargs)
 
     @staticmethod
     def _resolve_tie_breaker(
@@ -217,6 +240,48 @@ class AggregationSelector:
         if order[0][0] == "stable_order" and len(order) == 1:
             return FirstTieBreaker()
         return _CompositeTieBreaker(order)
+
+    def _prepare_provider_weights(
+        self,
+        config: RunnerConfig,
+        aggregate_name: str,
+    ) -> dict[str, float]:
+        raw_weights = config.provider_weights
+        if raw_weights is None:
+            raise ValueError(
+                f"aggregate={aggregate_name} requires provider_weights"
+            )
+        if not raw_weights:
+            raise ValueError("provider_weights must not be empty for weighted aggregation")
+        normalized: dict[str, float] = {}
+        for provider, raw_value in raw_weights.items():
+            if not isinstance(provider, str) or not provider.strip():
+                raise ValueError("provider_weights keys must be non-empty strings")
+            try:
+                weight = float(raw_value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"provider_weights[{provider!r}] must be a number"
+                ) from exc
+            if not math.isfinite(weight):
+                raise ValueError(
+                    f"provider_weights[{provider!r}] must be a finite number"
+                )
+            if weight < 0:
+                raise ValueError(
+                    f"provider_weights[{provider!r}] must be >= 0"
+                )
+            normalized[provider] = weight
+        if self._latest_candidate_providers:
+            unknown = [
+                name for name in normalized if name not in self._latest_candidate_providers
+            ]
+            if unknown:
+                joined = ", ".join(sorted(unknown))
+                raise ValueError(
+                    f"provider_weights contains unknown providers: {joined}"
+                )
+        return normalized
 
     def _load_schema(self, schema_path: Path | None) -> Mapping[str, Any] | None:
         if schema_path is None:
