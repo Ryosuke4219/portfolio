@@ -13,8 +13,14 @@ if str(PROJECT_ROOT) not in sys.path:
 if SHADOW_ROOT.exists() and str(SHADOW_ROOT) not in sys.path:
     sys.path.insert(0, str(SHADOW_ROOT))
 
+from adapter.core.aggregation import (  # noqa: E402
+    AggregationCandidate,
+    MajorityVoteStrategy,
+)
+from adapter.core.aggregation_controller import AggregationController  # noqa: E402
 from adapter.core.budgets import BudgetManager  # noqa: E402
 from adapter.core.datasets import GoldenTask  # noqa: E402
+from adapter.core.metrics import RunMetrics  # noqa: E402
 from adapter.core.models import (  # noqa: E402
     BudgetBook,
     BudgetRule,
@@ -30,6 +36,7 @@ from adapter.core.providers import (  # noqa: E402
     ProviderResponse,
 )
 from adapter.core.runner_api import RunnerConfig  # noqa: E402
+from adapter.core.runner_execution import SingleRunResult  # noqa: E402
 from adapter.core.runners import CompareRunner  # noqa: E402
 
 
@@ -75,6 +82,158 @@ def _make_task() -> GoldenTask:
         prompt_template="prompt",
         expected={"type": "literal", "value": "YES"},
     )
+
+
+def _make_run_metrics(
+    *, provider: str, model: str, latency_ms: int, cost_usd: float
+) -> RunMetrics:
+    return RunMetrics(
+        ts="2024-01-01T00:00:00Z",
+        run_id="run",
+        provider=provider,
+        model=model,
+        mode="consensus",
+        prompt_id="prompt-id",
+        prompt_name="prompt",
+        seed=0,
+        temperature=0.0,
+        top_p=1.0,
+        max_tokens=16,
+        input_tokens=1,
+        output_tokens=1,
+        latency_ms=latency_ms,
+        cost_usd=cost_usd,
+        status="ok",
+        failure_kind=None,
+        error_message=None,
+        output_text="",
+        output_hash=None,
+    )
+
+
+def test_majority_vote_normalizes_text_variants() -> None:
+    strategy = MajorityVoteStrategy()
+    candidates = [
+        AggregationCandidate(
+            index=0,
+            provider="p1",
+            response=ProviderResponse(output_text=" Answer  With\tSpaces  "),
+            text=" Answer  With\tSpaces  ",
+        ),
+        AggregationCandidate(
+            index=1,
+            provider="p2",
+            response=ProviderResponse(output_text="answer with    spaces"),
+            text="answer with    spaces",
+        ),
+        AggregationCandidate(
+            index=2,
+            provider="p3",
+            response=ProviderResponse(output_text="different"),
+            text="different",
+        ),
+    ]
+
+    result = strategy.aggregate(candidates)
+
+    assert result.chosen.index == 0
+    assert result.metadata == {"bucket_size": 2}
+    assert result.tie_breaker_used == "first"
+
+
+def test_majority_vote_uses_json_equality_when_schema_present() -> None:
+    strategy = MajorityVoteStrategy(schema={"type": "object"})
+    candidates = [
+        AggregationCandidate(
+            index=0,
+            provider="p1",
+            response=ProviderResponse(output_text='{"value": 1, "items": [1, 2]}'),
+            text='{"value": 1, "items": [1, 2]}',
+        ),
+        AggregationCandidate(
+            index=1,
+            provider="p2",
+            response=ProviderResponse(output_text='{"items": [1,2], "value":1}'),
+            text='{"items": [1,2], "value":1}',
+        ),
+        AggregationCandidate(
+            index=2,
+            provider="p3",
+            response=ProviderResponse(output_text='{"value": 2}'),
+            text='{"value": 2}',
+        ),
+    ]
+
+    result = strategy.aggregate(candidates)
+
+    assert result.metadata == {"bucket_size": 2}
+    assert result.chosen.index in {0, 1}
+
+
+def test_auto_tie_breaker_applies_latency_cost_and_order() -> None:
+    config = RunnerConfig(mode="consensus")
+    base_candidates = [
+        AggregationCandidate(
+            index=0,
+            provider="p1",
+            response=ProviderResponse(output_text="same"),
+            text="same",
+        ),
+        AggregationCandidate(
+            index=1,
+            provider="p2",
+            response=ProviderResponse(output_text="same"),
+            text="same",
+        ),
+    ]
+
+    latency_lookup = {
+        0: SingleRunResult(
+            metrics=_make_run_metrics(provider="p1", model="m1", latency_ms=5, cost_usd=0.5),
+            raw_output="same",
+        ),
+        1: SingleRunResult(
+            metrics=_make_run_metrics(provider="p2", model="m2", latency_ms=10, cost_usd=0.1),
+            raw_output="same",
+        ),
+    }
+    latency_breaker = AggregationController._resolve_tie_breaker(config, latency_lookup)
+    assert latency_breaker is not None
+    chosen_latency = latency_breaker.break_tie(base_candidates)
+    assert chosen_latency.index == 0
+    assert latency_breaker.name == "latency"
+
+    cost_lookup = {
+        0: SingleRunResult(
+            metrics=_make_run_metrics(provider="p1", model="m1", latency_ms=5, cost_usd=0.4),
+            raw_output="same",
+        ),
+        1: SingleRunResult(
+            metrics=_make_run_metrics(provider="p2", model="m2", latency_ms=5, cost_usd=0.1),
+            raw_output="same",
+        ),
+    }
+    cost_breaker = AggregationController._resolve_tie_breaker(config, cost_lookup)
+    assert cost_breaker is not None
+    chosen_cost = cost_breaker.break_tie(base_candidates)
+    assert chosen_cost.index == 1
+    assert cost_breaker.name == "cost"
+
+    order_lookup = {
+        0: SingleRunResult(
+            metrics=_make_run_metrics(provider="p1", model="m1", latency_ms=5, cost_usd=0.1),
+            raw_output="same",
+        ),
+        1: SingleRunResult(
+            metrics=_make_run_metrics(provider="p2", model="m2", latency_ms=5, cost_usd=0.1),
+            raw_output="same",
+        ),
+    }
+    order_breaker = AggregationController._resolve_tie_breaker(config, order_lookup)
+    assert order_breaker is not None
+    chosen_order = order_breaker.break_tie(base_candidates)
+    assert chosen_order.index == 0
+    assert order_breaker.name == "first"
 
 
 def test_parallel_any_stops_after_first_success(
@@ -280,6 +439,48 @@ def test_consensus_quorum_failure_marks_metrics(
         assert metric.status == "error"
         assert metric.failure_kind == "consensus_quorum"
         assert metric.error_message and "quorum" in metric.error_message
+        assert "aggregate_strategy" not in metric.ci_meta
+        assert metric.ci_meta["aggregate_mode"] == "consensus"
+        assert metric.ci_meta["aggregate_quorum"] == 3
+        assert metric.ci_meta["aggregate_votes"] == 2
+
+
+def test_consensus_default_quorum_requires_two_votes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class SplitConsensusProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            latency = 1 if self.config.model == "A" else 5
+            return ProviderResponse(
+                output_text=self.config.model,
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=latency,
+            )
+
+    monkeypatch.setitem(ProviderFactory._registry, "split-consensus", SplitConsensusProvider)
+
+    runner = CompareRunner(
+        [
+            _make_provider_config(
+                tmp_path, name="p1", provider="split-consensus", model="A"
+            ),
+            _make_provider_config(
+                tmp_path, name="p2", provider="split-consensus", model="B"
+            ),
+        ],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_quorum_default.jsonl",
+    )
+    results = runner.run(repeat=1, config=RunnerConfig(mode="consensus"))
+    assert len(results) == 2
+    for metric in results:
+        assert metric.status == "error"
+        assert metric.failure_kind == "consensus_quorum"
+        assert metric.ci_meta["aggregate_mode"] == "consensus"
+        assert metric.ci_meta["aggregate_quorum"] == 2
+        assert metric.ci_meta["aggregate_votes"] == 1
         assert "aggregate_strategy" not in metric.ci_meta
 
 
