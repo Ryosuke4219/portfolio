@@ -1,8 +1,8 @@
 """Shared context and result types for async runner strategies."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from ..observability import EventLogger
