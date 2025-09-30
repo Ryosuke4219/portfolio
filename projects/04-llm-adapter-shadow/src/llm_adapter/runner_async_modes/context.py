@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Mapping, Protocol, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from typing import Any, Protocol
 
 from ..observability import EventLogger
 from ..parallel_exec import ParallelAllResult
