@@ -170,15 +170,31 @@ def run_compare(
             try:
                 config = replace(config, **updates)
             except (TypeError, AttributeError):
-                for key, value in updates.items():
-                    setattr(config, key, value)
+                if "judge" in updates:
+                    config.judge = cast(Path | None, updates["judge"])
+                if "judge_provider" in updates:
+                    config.judge_provider = cast(
+                        ProviderConfig | None, updates["judge_provider"]
+                    )
+                if "backoff" in updates:
+                    config.backoff = cast(BackoffPolicy, updates["backoff"])
+                if "shadow_provider" in updates:
+                    config.shadow_provider = cast(
+                        ProviderSPI | None, updates["shadow_provider"]
+                    )
+                if "provider_weights" in updates:
+                    config.provider_weights = cast(
+                        dict[str, float] | None, updates["provider_weights"]
+                    )
+                if "metrics_path" in updates:
+                    config.metrics_path = cast(Path | None, updates["metrics_path"])
 
     current_metrics_path = getattr(config, "metrics_path", None)
     if current_metrics_path is None:
         try:
             config = replace(config, metrics_path=metrics_path)
         except (TypeError, AttributeError):
-            setattr(config, "metrics_path", metrics_path)
+            config.metrics_path = metrics_path
         resolved_metrics_path = metrics_path
     else:
         resolved_metrics_path = current_metrics_path
