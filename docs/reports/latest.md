@@ -1,10 +1,10 @@
 ---
 layout: default
-title: QA Reliability Snapshot — 2025-09-29
+title: QA Reliability Snapshot — 2025-09-30
 description: CI pass rate and flaky ranking (auto-generated)
 ---
 
-# QA Reliability Snapshot — 2025-09-29
+# QA Reliability Snapshot — 2025-09-30
 
 - Window: Last 7 days
 - Data Last Updated: 2025-09-29T10:38:40.894000Z

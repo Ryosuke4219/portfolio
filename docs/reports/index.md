@@ -8,7 +8,7 @@ description: Snapshot reports generated from CI telemetry
 
 最新のCI信頼性レポートとソースJSONへのリンクです。週次ワークフローで自動更新されます。
 
-- [Latest Snapshot (2025-09-29)](./latest)
+- [Latest Snapshot (2025-09-30)](./latest)
   - [Source JSON](./latest.json)
   - 更新元: tools/generate_ci_report.py
 
