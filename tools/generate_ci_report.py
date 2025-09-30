@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from ci_metrics import compute_recent_deltas, compute_run_history
+import weekly_summary
 from weekly_summary import (
     aggregate_status,
     filter_by_window,
@@ -22,7 +23,7 @@ from weekly_summary import (
     load_runs,
     select_flaky_rows,
 )
-from weekly_summary import coerce_str, format_percentage, parse_iso8601, to_float
+from weekly_summary import format_percentage, parse_iso8601, to_float
 
 from tools.ci_report.processing import (
     compute_last_updated,
@@ -61,7 +62,7 @@ def parse_args() -> argparse.Namespace:
 def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
     timestamps: list[dt.datetime] = []
     for run in runs:
-        ts = parse_iso8601(coerce_str(run.get("ts")))
+        ts = parse_iso8601(weekly_summary.coerce_str(run.get("ts")))
         if ts is not None:
             timestamps.append(ts)
     if not timestamps:
@@ -75,13 +76,13 @@ def summarize_failure_kinds(
 ) -> list[dict[str, object]]:
     counter: Counter[str] = Counter()
     for run in runs:
-        status_raw = coerce_str(run.get("status"))
+        status_raw = weekly_summary.coerce_str(run.get("status"))
         if status_raw is None:
             continue
         status = status_raw.lower()
         if status not in {"fail", "failed", "error"}:
             continue
-        kind = coerce_str(run.get("failure_kind")) or "unknown"
+        kind = weekly_summary.coerce_str(run.get("failure_kind")) or "unknown"
         counter[kind] += 1
     most_common = counter.most_common(limit)
     return [
@@ -97,7 +98,7 @@ def normalize_flaky_rows(
         return []
     sorted_rows = sorted(
         rows,
-        key=lambda row: to_float(coerce_str(row.get("score"))) or 0.0,
+        key=lambda row: to_float(weekly_summary.coerce_str(row.get("score"))) or 0.0,
         reverse=True,
     )
     normalized: list[dict[str, object]] = []
@@ -111,7 +112,7 @@ def normalize_flaky_rows(
         elif isinstance(attempts_value, float):
             attempts = int(attempts_value)
         else:
-            attempts_str = coerce_str(attempts_value)
+            attempts_str = weekly_summary.coerce_str(attempts_value)
             attempts_float = to_float(attempts_str)
             if attempts_float is not None:
                 attempts = int(attempts_float)
@@ -119,16 +120,16 @@ def normalize_flaky_rows(
             {
                 "rank": idx,
                 "canonical_id": (
-                    coerce_str(row.get("canonical_id"))
-                    or coerce_str(row.get("Canonical ID"))
+                    weekly_summary.coerce_str(row.get("canonical_id"))
+                    or weekly_summary.coerce_str(row.get("Canonical ID"))
                     or "-"
                 ),
                 "attempts": attempts,
-                "p_fail": to_float(coerce_str(row.get("p_fail"))),
-                "score": to_float(coerce_str(row.get("score"))),
+                "p_fail": to_float(weekly_summary.coerce_str(row.get("p_fail"))),
+                "score": to_float(weekly_summary.coerce_str(row.get("score"))),
                 "as_of": (
-                    coerce_str(row.get("as_of"))
-                    or coerce_str(row.get("generated_at"))
+                    weekly_summary.coerce_str(row.get("as_of"))
+                    or weekly_summary.coerce_str(row.get("generated_at"))
                 ),
             }
         )
