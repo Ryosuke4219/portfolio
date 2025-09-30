@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from ..config import ProviderConfig
+from ..errors import AuthError, ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
 from .openai_utils import (
@@ -29,12 +30,12 @@ except ModuleNotFoundError:  # pragma: no cover - 依存が無い環境ではプ
 
 def _resolve_api_key(env_name: str | None) -> str:
     if not env_name:
-        raise RuntimeError(
+        raise AuthError(
             "OpenAI プロバイダを利用するには auth_env に API キーの環境変数を指定してください"
         )
     value = os.getenv(env_name)
     if not value:
-        raise RuntimeError(
+        raise AuthError(
             f"Environment variable {env_name!r} is not set. OpenAI API キーを設定してください。"
         )
     return value
@@ -54,6 +55,48 @@ def _is_rate_limit_error(exc: Exception) -> bool:
     except AttributeError:
         return exc.__class__.__name__ == "RateLimitError"
     return isinstance(exc, rate_limit_cls)
+
+
+def _is_timeout_error(exc: Exception) -> bool:
+    name = exc.__class__.__name__
+    if name in {"APITimeoutError", "Timeout"}:
+        return True
+    status_code = getattr(exc, "status_code", None)
+    return isinstance(status_code, int) and status_code in {408, 504}
+
+
+def _is_auth_error(exc: Exception) -> bool:
+    name = exc.__class__.__name__
+    if name in {"AuthenticationError", "PermissionDeniedError"}:
+        return True
+    status_code = getattr(exc, "status_code", None)
+    return isinstance(status_code, int) and status_code in {401, 403}
+
+
+def _is_transient_error(exc: Exception) -> bool:
+    name = exc.__class__.__name__
+    transient_names = {
+        "APIConnectionError",
+        "InternalServerError",
+        "ServiceUnavailableError",
+        "TryAgain",
+    }
+    if name in transient_names:
+        return True
+    status_code = getattr(exc, "status_code", None)
+    return isinstance(status_code, int) and 500 <= status_code < 600
+
+
+def _normalize_openai_exception(exc: Exception) -> Exception:
+    if _is_auth_error(exc):
+        return AuthError("OpenAI API 認証に失敗しました")
+    if _is_rate_limit_error(exc) or getattr(exc, "status_code", None) == 429:
+        return RateLimitError("OpenAI のレート制限に達しました")
+    if _is_timeout_error(exc):
+        return TimeoutError("OpenAI API 呼び出しがタイムアウトしました")
+    if _is_transient_error(exc):
+        return RetriableError("OpenAI API が一時的に利用できません")
+    return RetriableError("OpenAI API 呼び出しに失敗しました")
 
 
 def _split_endpoint(value: str | None) -> tuple[str | None, str | None]:
@@ -115,15 +158,15 @@ class OpenAIProvider(BaseProvider):
                     continue
                 break
             except Exception as exc:  # pragma: no cover - 実行時エラーを保持して次のモードへ
-                if _is_rate_limit_error(exc):
-                    raise RuntimeError(
-                        "OpenAI quota exceeded. ダッシュボードで請求/使用量を確認。"
-                    ) from exc
-                last_error = exc
+                normalized = _normalize_openai_exception(exc)
+                normalized.__cause__ = exc
+                if isinstance(normalized, (RateLimitError, AuthError, TimeoutError, ProviderSkip)):
+                    raise normalized
+                last_error = normalized
         else:
             if last_error:
                 raise last_error
-            raise RuntimeError("OpenAI API 呼び出しに使用可能なモードが見つかりませんでした")
+            raise ProviderSkip("OpenAI API 呼び出しに使用可能なモードが見つかりませんでした")
         # response 取得後に計測しても間に合わないので invoke 内で測定する
         # 上記ループでは response は (結果, latency_ms) のタプルを想定
         result_obj, latency_ms = response
