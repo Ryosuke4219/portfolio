@@ -212,6 +212,21 @@ class CompareRunner:
                 results.append(attempt.metrics)
                 self._append_metric(attempt.metrics)
 
+    def _run_provider_call(
+        self,
+        provider_config: ProviderConfig,
+        provider: BaseProvider,
+        prompt: str,
+    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
+        execution = RunnerExecution(
+            token_bucket=self._token_bucket,
+            schema_validator=self._schema_validator,
+            evaluate_budget=self._evaluate_budget,
+            build_metrics=self._build_metrics,
+            normalize_concurrency=self._normalize_concurrency,
+        )
+        return execution._run_provider_call(provider_config, provider, prompt)
+
     @staticmethod
     def _normalize_concurrency(total: int, limit: int | None) -> int:
         if total <= 0:
