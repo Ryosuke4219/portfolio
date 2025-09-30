@@ -78,7 +78,7 @@ def parse_args() -> argparse.Namespace:
 def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
     timestamps: list[dt.datetime] = []
     for run in runs:
-        ts = weekly_summary.parse_iso8601(coerce_str(run.get("ts")))
+        ts = parse_iso8601(coerce_str(run.get("ts")))
         if ts is not None:
             timestamps.append(ts)
     if not timestamps:
@@ -90,7 +90,7 @@ def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
 def summarize_failure_kinds(
     runs: list[dict[str, object]], limit: int = 3
 ) -> list[dict[str, object]]:
-    counter: collections.Counter[str] = collections.Counter()
+    counter: Counter[str] = Counter()
     for run in runs:
         status_raw = coerce_str(run.get("status"))
         if status_raw is None:
@@ -225,7 +225,7 @@ def render_markdown(
         else "-"
     )
     pass_rate_args = {
-        "pass_rate": weekly_summary.format_percentage(pass_rate),
+        "pass_rate": format_percentage(pass_rate),
         "passes": totals["passes"],
         "executions": totals["executions"],
     }
