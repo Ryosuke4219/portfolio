@@ -151,6 +151,7 @@ class OpenAIProvider(BaseProvider):
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         prompt = request.prompt
         last_error: Exception | None = None
+        last_cause: Exception | None = None
         for mode in self._preferred_modes:
             try:
                 response = self._invoke_mode(mode, request)
@@ -159,13 +160,13 @@ class OpenAIProvider(BaseProvider):
                 break
             except Exception as exc:  # pragma: no cover - 実行時エラーを保持して次のモードへ
                 normalized = _normalize_openai_exception(exc)
-                normalized.__cause__ = exc
                 if isinstance(normalized, (RateLimitError, AuthError, TimeoutError, ProviderSkip)):
-                    raise normalized
+                    raise normalized from exc
                 last_error = normalized
+                last_cause = exc
         else:
             if last_error:
-                raise last_error
+                raise last_error from last_cause
             raise ProviderSkip("OpenAI API 呼び出しに使用可能なモードが見つかりませんでした")
         # response 取得後に計測しても間に合わないので invoke 内で測定する
         # 上記ループでは response は (結果, latency_ms) のタプルを想定
