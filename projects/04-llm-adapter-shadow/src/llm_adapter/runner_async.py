@@ -25,6 +25,7 @@ from .provider_spi import (
 )
 from .runner_async_modes import (
     AsyncRunContext,
+    AsyncRunStrategy,
     collect_failure_details,
     ConsensusRunStrategy,
     ParallelAllRunStrategy,
@@ -277,6 +278,7 @@ class AsyncRunner:
             sleep_fn=asyncio.sleep,
         )
 
+        strategy: AsyncRunStrategy
         if mode == RunnerMode.SEQUENTIAL:
             strategy = SequentialRunStrategy()
         elif mode == RunnerMode.PARALLEL_ANY:

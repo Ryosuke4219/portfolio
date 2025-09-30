@@ -17,7 +17,7 @@ from .parallel_exec import (
     run_parallel_any_sync,
 )
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from .runner_config import RunnerConfig
+from .runner_config import RunnerConfig, RunnerMode
 from .runner_shared import (
     estimate_cost,
     log_provider_call,
@@ -239,7 +239,7 @@ class Runner:
             "runner", request.prompt_text, request.options, request.max_tokens
         )
         shadow_used = shadow is not None
-        strategy = get_sync_strategy(self._config.mode)
+        strategy = get_sync_strategy(cast(RunnerMode, self._config.mode))
         context = SyncRunContext(
             runner=self,
             request=request,
