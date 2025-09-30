@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import weekly_summary
 from ci_metrics import compute_recent_deltas, compute_run_history
 from weekly_summary import (
     aggregate_status,
@@ -22,7 +23,7 @@ from weekly_summary import (
     load_runs,
     select_flaky_rows,
 )
-from weekly_summary import coerce_str, format_percentage, parse_iso8601, to_float
+from weekly_summary import coerce_str, parse_iso8601, to_float
 
 from tools.ci_report.processing import (
     compute_last_updated,
@@ -208,7 +209,7 @@ def render_markdown(
         else "-"
     )
     pass_rate_args = {
-        "pass_rate": format_percentage(pass_rate),
+        "pass_rate": weekly_summary.format_percentage(pass_rate),
         "passes": totals["passes"],
         "executions": totals["executions"],
     }
