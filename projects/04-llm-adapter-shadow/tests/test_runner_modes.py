@@ -110,6 +110,27 @@ def test_runner_parallel_all_collects_all_results() -> None:
     assert provider_b.calls == 1
 
 
+def test_runner_parallel_any_respects_max_attempts() -> None:
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+
+    def _boom(_: ProviderRequest) -> ProviderResponse:
+        raise RuntimeError("boom")
+
+    failing = _MockProvider("fail", _boom)
+    succeeding = _MockProvider("ok", lambda _: _response("ok"))
+
+    runner = Runner(
+        [failing, succeeding],
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_attempts=1),
+    )
+
+    with pytest.raises(ParallelExecutionError):
+        runner.run(request)
+
+    assert failing.calls == 1
+    assert succeeding.calls == 0
+
+
 def test_runner_consensus_majority_selection() -> None:
     request = ProviderRequest(model="gpt-test", prompt="hi")
 
