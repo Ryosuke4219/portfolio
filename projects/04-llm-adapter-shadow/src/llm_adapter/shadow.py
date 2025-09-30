@@ -2,15 +2,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
 import contextlib
-from dataclasses import dataclass
-from pathlib import Path
 import threading
 import time
 from typing import Any
 
-from .observability import EventLogger, JsonlLogger
+from .observability import EventLogger
 from .provider_spi import (
     AsyncProviderSPI,
     ensure_async_provider,
@@ -18,137 +15,122 @@ from .provider_spi import (
     ProviderResponse,
     ProviderSPI,
 )
-from .utils import content_hash
+from .shadow_metrics import (
+    MetricsPath,
+    ShadowMetrics,
+    _build_shadow_record,
+    _emit_shadow_metrics,
+    _to_path_str,
+)
 
-MetricsPath = str | Path | None
 DEFAULT_METRICS_PATH = "artifacts/runs-metrics.jsonl"
 
 
-@dataclass(slots=True)
-class ShadowMetrics:
-    payload: dict[str, Any]
-    logger: EventLogger | None
-
-    def extend(self, extra: Mapping[str, Any] | None = None) -> None:
-        if not extra:
-            return
-        self.payload.update(dict(extra))
-
-    def emit(self, extra: Mapping[str, Any] | None = None) -> None:
-        if extra:
-            self.extend(extra)
-        if self.logger is None:
-            return
-        payload = dict(self.payload)
-        payload.setdefault("ts", int(time.time() * 1000))
-        self.logger.emit("shadow_diff", payload)
-
-
-def _to_path_str(path: MetricsPath) -> str | None:
-    if path is None:
-        return None
-    return str(Path(path))
-
-
-def _tokens_total(res: ProviderResponse) -> int:
-    usage = res.token_usage
-    return usage.total
-
-
-def _resolve_shadow_outcome(payload: Mapping[str, Any]) -> str | None:
-    outcome = payload.get("outcome")
-    if isinstance(outcome, str):
-        return outcome
-
-    ok = payload.get("ok")
-    if ok is True:
-        return "success"
-
-    error = payload.get("error")
-    if error == "ShadowTimeout":
-        return "timeout"
-
-    if ok is False or error is not None:
-        return "error"
-
-    return None
-
-
-def _build_shadow_record(
+def _make_shadow_payload(
     *,
+    provider_name: str | None,
+    response: ProviderResponse | None = None,
+    error: Exception | None = None,
+    duration_ms: int | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"provider": provider_name}
+    if response is not None:
+        payload.update(
+            {
+                "ok": True,
+                "latency_ms": response.latency_ms,
+                "text_len": len(response.text),
+                "token_usage_total": response.token_usage.total,
+                "outcome": "success",
+            }
+        )
+    else:
+        payload.update({"ok": False, "outcome": "error"})
+        if error is not None:
+            payload["error"] = type(error).__name__
+            payload["message"] = str(error)
+    if duration_ms is not None:
+        payload["duration_ms"] = duration_ms
+    return payload
+
+
+def _make_timeout_payload(provider_name: str | None, duration_ms: int | None) -> dict[str, Any]:
+    payload = {
+        "provider": provider_name,
+        "ok": False,
+        "error": "ShadowTimeout",
+        "outcome": "timeout",
+    }
+    if duration_ms is not None:
+        payload["duration_ms"] = duration_ms
+    return payload
+
+
+def _run_shadow_sync(shadow: ProviderSPI, req: ProviderRequest, *, provider_name: str | None) -> dict[str, Any]:
+    ts0 = time.time()
+    try:
+        response = shadow.invoke(req)
+    except Exception as exc:  # pragma: no cover - error branch tested via metrics
+        return _make_shadow_payload(
+            provider_name=provider_name,
+            error=exc,
+            duration_ms=int((time.time() - ts0) * 1000),
+        )
+    return _make_shadow_payload(
+        provider_name=provider_name,
+        response=response,
+        duration_ms=int((time.time() - ts0) * 1000),
+    )
+
+
+async def _run_shadow_async(
+    shadow_async: AsyncProviderSPI,
+    req: ProviderRequest,
+    *,
+    provider_name: str | None,
+) -> dict[str, Any]:
+    ts0 = time.time()
+    try:
+        response = await shadow_async.invoke_async(req)
+    except Exception as exc:  # pragma: no cover - logged below
+        return _make_shadow_payload(
+            provider_name=provider_name,
+            error=exc,
+            duration_ms=int((time.time() - ts0) * 1000),
+        )
+    return _make_shadow_payload(
+        provider_name=provider_name,
+        response=response,
+        duration_ms=int((time.time() - ts0) * 1000),
+    )
+
+
+def _finalize_shadow_metrics(
+    *,
+    metrics_path: str | None,
+    capture_metrics: bool,
+    logger: EventLogger | None,
     primary_provider_name: str,
     primary_response: ProviderResponse,
     request: ProviderRequest,
-    shadow_payload: Mapping[str, Any] | None,
+    shadow_payload: dict[str, Any] | None,
     shadow_name: str | None,
-) -> dict[str, Any]:
-    """Compose the metrics payload for a shadow run."""
-
-    payload: Mapping[str, Any] = shadow_payload or {
-        "provider": shadow_name,
-        "ok": False,
-        "outcome": "error",
-    }
-    primary_text_len = len(primary_response.text)
-    request_fingerprint = content_hash(
-        "runner", request.prompt_text, request.options, request.max_tokens
-    )
-    shadow_provider = payload.get("provider", shadow_name)
-    shadow_outcome = _resolve_shadow_outcome(payload)
-    record: dict[str, Any] = {
-        "request_hash": content_hash(
-            primary_provider_name, request.prompt_text, request.options, request.max_tokens
-        ),
-        "request_fingerprint": request_fingerprint,
-        "primary_provider": primary_provider_name,
-        "primary_latency_ms": primary_response.latency_ms,
-        "primary_text_len": primary_text_len,
-        "primary_token_usage_total": _tokens_total(primary_response),
-        "shadow_provider": shadow_provider,
-        "shadow_provider_id": shadow_provider,
-        "shadow_ok": payload.get("ok"),
-        "shadow_outcome": shadow_outcome,
-        "shadow_latency_ms": payload.get("latency_ms"),
-        "shadow_duration_ms": payload.get("duration_ms"),
-        "shadow_error": payload.get("error"),
-    }
-
-    if payload.get("latency_ms") is not None:
-        record["latency_gap_ms"] = payload["latency_ms"] - primary_response.latency_ms
-
-    if payload.get("text_len") is not None:
-        record["shadow_text_len"] = payload["text_len"]
-
-    if payload.get("token_usage_total") is not None:
-        record["shadow_token_usage_total"] = payload["token_usage_total"]
-
-    if payload.get("message"):
-        record["shadow_error_message"] = payload["message"]
-
-    return record
-
-
-def _emit_shadow_metrics(
-    record: Mapping[str, Any],
-    *,
-    logger: EventLogger | None,
-    metrics_path: str | None,
-    capture_metrics: bool,
 ) -> ShadowMetrics | None:
-    """Emit metrics or return them for deferred emission."""
-
-    event_logger = logger
-    if event_logger is None and metrics_path is not None:
-        event_logger = JsonlLogger(metrics_path)
-
-    if capture_metrics:
-        return ShadowMetrics(dict(record), event_logger)
-
-    if event_logger is not None:
-        metrics = ShadowMetrics(dict(record), event_logger)
-        metrics.emit()
-
-    return None
+    if not metrics_path:
+        return None
+    record = _build_shadow_record(
+        primary_provider_name=primary_provider_name,
+        primary_response=primary_response,
+        request=request,
+        shadow_payload=shadow_payload,
+        shadow_name=shadow_name,
+    )
+    return _emit_shadow_metrics(
+        record,
+        logger=logger,
+        metrics_path=metrics_path,
+        capture_metrics=capture_metrics,
+    )
 
 
 def run_with_shadow(
@@ -160,13 +142,6 @@ def run_with_shadow(
     logger: EventLogger | None = None,
     capture_metrics: bool = False,
 ) -> ProviderResponse | tuple[ProviderResponse, ShadowMetrics | None]:
-    """Invoke ``primary`` while optionally mirroring the call on ``shadow``.
-
-    The shadow execution runs on a background thread and *never* affects the
-    primary result. Metrics about both executions are appended to a JSONL file
-    so they can be analysed offline.
-    """
-
     if metrics_path is None:
         logger = None
 
@@ -176,36 +151,15 @@ def run_with_shadow(
     shadow_started: float | None = None
     metrics_path_str = _to_path_str(metrics_path)
 
+    payload_holder: list[dict[str, Any]] = []
     if shadow is not None:
         shadow_name = shadow.name()
         shadow_started = time.time()
-        payload_holder: list[dict[str, Any]] = []
 
         def _shadow_worker() -> None:
-            ts0 = time.time()
-            payload: dict[str, Any]
-            try:
-                response = shadow.invoke(req)
-            except Exception as exc:  # pragma: no cover - error branch tested via metrics
-                payload = {
-                    "ok": False,
-                    "error": type(exc).__name__,
-                    "message": str(exc),
-                    "provider": shadow_name,
-                    "outcome": "error",
-                }
-            else:
-                payload = {
-                    "ok": True,
-                    "provider": shadow_name,
-                    "latency_ms": response.latency_ms,
-                    "text_len": len(response.text),
-                    "token_usage_total": _tokens_total(response),
-                    "outcome": "success",
-                }
-            finally:
-                payload["duration_ms"] = int((time.time() - ts0) * 1000)
-                payload_holder.append(payload)
+            payload_holder.append(
+                _run_shadow_sync(shadow, req, provider_name=shadow_name)
+            )
 
         shadow_thread = threading.Thread(target=_shadow_worker, daemon=True)
         shadow_thread.start()
@@ -217,49 +171,34 @@ def run_with_shadow(
             shadow_thread.join(timeout=0)
         raise
 
+    metrics: ShadowMetrics | None = None
     if shadow_thread is not None:
         shadow_thread.join(timeout=10)
         if shadow_thread.is_alive():
-            duration_ms = 0
-            if shadow_started is not None:
-                duration_ms = int((time.time() - shadow_started) * 1000)
-            shadow_payload = {
-                "provider": shadow_name,
-                "ok": False,
-                "error": "ShadowTimeout",
-                "outcome": "timeout",
-                "duration_ms": duration_ms,
-            }
+            duration_ms = (
+                int((time.time() - shadow_started) * 1000)
+                if shadow_started is not None
+                else None
+            )
+            shadow_payload = _make_timeout_payload(shadow_name, duration_ms)
         elif payload_holder:
             shadow_payload = dict(payload_holder[-1])
         else:
-            shadow_payload = {
-                "provider": shadow_name,
-                "ok": False,
-                "outcome": "error",
-            }
+            shadow_payload = _make_shadow_payload(provider_name=shadow_name)
 
-        if metrics_path_str:
-            record = _build_shadow_record(
-                primary_provider_name=primary.name(),
-                primary_response=primary_res,
-                request=req,
-                shadow_payload=shadow_payload,
-                shadow_name=shadow_name,
-            )
-            metrics = _emit_shadow_metrics(
-                record,
-                logger=logger,
-                metrics_path=metrics_path_str,
-                capture_metrics=capture_metrics,
-            )
-
-            if capture_metrics:
-                return primary_res, metrics
+        metrics = _finalize_shadow_metrics(
+            metrics_path=metrics_path_str,
+            capture_metrics=capture_metrics,
+            logger=logger,
+            primary_provider_name=primary.name(),
+            primary_response=primary_res,
+            request=req,
+            shadow_payload=shadow_payload,
+            shadow_name=shadow_name,
+        )
 
     if capture_metrics:
-        return primary_res, None
-
+        return primary_res, metrics
     return primary_res
 
 
@@ -289,28 +228,11 @@ async def run_with_shadow_async(
         shadow_started = time.time()
 
         async def _shadow_worker() -> dict[str, Any]:
-            ts0 = time.time()
-            try:
-                response = await shadow_async.invoke_async(req)
-            except Exception as exc:  # pragma: no cover - logged below
-                payload = {
-                    "ok": False,
-                    "error": type(exc).__name__,
-                    "message": str(exc),
-                    "provider": shadow_name,
-                    "outcome": "error",
-                }
-            else:
-                payload = {
-                    "ok": True,
-                    "provider": shadow_name,
-                    "latency_ms": response.latency_ms,
-                    "text_len": len(response.text),
-                    "token_usage_total": _tokens_total(response),
-                    "outcome": "success",
-                }
-            payload["duration_ms"] = int((time.time() - ts0) * 1000)
-            return payload
+            return await _run_shadow_async(
+                shadow_async,
+                req,
+                provider_name=shadow_name,
+            )
 
         shadow_task = asyncio.create_task(_shadow_worker())
 
@@ -323,6 +245,7 @@ async def run_with_shadow_async(
                 await shadow_task
         raise
 
+    metrics: ShadowMetrics | None = None
     if shadow_task is not None:
         try:
             shadow_payload = await asyncio.wait_for(shadow_task, timeout=10)
@@ -330,51 +253,31 @@ async def run_with_shadow_async(
             shadow_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await shadow_task
-            duration_ms = 0
-            if shadow_started is not None:
-                duration_ms = int((time.time() - shadow_started) * 1000)
-            shadow_payload = {
-                "provider": shadow_name,
-                "ok": False,
-                "error": "ShadowTimeout",
-                "outcome": "timeout",
-                "duration_ms": duration_ms,
-            }
+            duration_ms = (
+                int((time.time() - shadow_started) * 1000)
+                if shadow_started is not None
+                else None
+            )
+            shadow_payload = _make_timeout_payload(shadow_name, duration_ms)
         except asyncio.CancelledError:  # pragma: no cover - defensive
-            shadow_payload = {
-                "provider": shadow_name,
-                "ok": False,
-                "outcome": "error",
-            }
+            shadow_payload = _make_shadow_payload(provider_name=shadow_name)
 
         if shadow_payload is None:
-            shadow_payload = {
-                "provider": shadow_name,
-                "ok": False,
-                "outcome": "error",
-            }
+            shadow_payload = _make_shadow_payload(provider_name=shadow_name)
 
-        if metrics_path_str:
-            record = _build_shadow_record(
-                primary_provider_name=primary_async.name(),
-                primary_response=primary_res,
-                request=req,
-                shadow_payload=shadow_payload,
-                shadow_name=shadow_name,
-            )
-            metrics = _emit_shadow_metrics(
-                record,
-                logger=logger,
-                metrics_path=metrics_path_str,
-                capture_metrics=capture_metrics,
-            )
-
-            if capture_metrics:
-                return primary_res, metrics
+        metrics = _finalize_shadow_metrics(
+            metrics_path=metrics_path_str,
+            capture_metrics=capture_metrics,
+            logger=logger,
+            primary_provider_name=primary_async.name(),
+            primary_response=primary_res,
+            request=req,
+            shadow_payload=shadow_payload,
+            shadow_name=shadow_name,
+        )
 
     if capture_metrics:
-        return primary_res, None
-
+        return primary_res, metrics
     return primary_res
 
 
@@ -384,3 +287,4 @@ __all__ = [
     "DEFAULT_METRICS_PATH",
     "ShadowMetrics",
 ]
+
