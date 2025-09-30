@@ -41,6 +41,7 @@ class RunnerConfig:
     aggregate: str | None = None
     quorum: int | None = None
     tie_breaker: str | None = None
+    provider_weights: dict[str, float] | None = None
     schema: Path | None = None
     judge: Path | None = None
     judge_provider: ProviderConfig | None = None
@@ -98,6 +99,7 @@ def run_compare(
     aggregate: str | None = None,
     quorum: int | None = None,
     tie_breaker: str | None = None,
+    provider_weights: dict[str, float] | None = None,
     schema: Path | str | None = None,
     judge: str | None = None,
     max_concurrency: int | None = None,
@@ -115,6 +117,7 @@ def run_compare(
             aggregate=aggregate,
             quorum=_sanitize_positive_int(quorum),
             tie_breaker=tie_breaker,
+            provider_weights=provider_weights,
             schema=_resolve_optional_path(schema),
             judge=judge_path,
             judge_provider=judge_provider,

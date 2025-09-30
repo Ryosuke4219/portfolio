@@ -61,8 +61,8 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--aggregate",
-        default=None,
-        help="複数応答の集約ストラテジ (例: majority, judge)",
+        choices=["majority_vote", "max_score", "weighted_vote"],
+        help="複数応答の集約ストラテジ",
     )
     parser.add_argument(
         "--quorum",
@@ -73,7 +73,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tie-breaker",
         dest="tie_breaker",
-        default=None,
+        choices=["min_latency", "min_cost", "stable_order"],
         help="合意不能時のタイブレーク手法",
     )
     parser.add_argument(
@@ -85,6 +85,12 @@ def _parse_args() -> argparse.Namespace:
         "--judge",
         default=None,
         help="判定プロバイダ設定ファイル (aggregate=judge など)",
+    )
+    parser.add_argument(
+        "--weights",
+        dest="weights",
+        default=None,
+        help="aggregate=weighted_vote 用の重み (例: openai=1.0,anthropic=0.5)",
     )
     parser.add_argument(
         "--max-concurrency",
@@ -100,6 +106,27 @@ def _parse_args() -> argparse.Namespace:
         help="1 分あたりの呼び出し上限",
     )
     return parser.parse_args()
+
+
+def _parse_weights_arg(raw: str | None) -> dict[str, float] | None:
+    if raw is None:
+        return None
+    items = [part.strip() for part in raw.split(",") if part.strip()]
+    if not items:
+        return None
+    weights: dict[str, float] = {}
+    for item in items:
+        name, sep, value = item.partition("=")
+        if sep != "=" or not name.strip():
+            raise SystemExit("--weights は name=value,... 形式で指定してください")
+        try:
+            clean_value = value.strip()
+            if not clean_value:
+                raise ValueError
+            weights[name.strip()] = float(clean_value)
+        except ValueError as exc:  # pragma: no cover - argparse で捕捉
+            raise SystemExit(f"--weights の値を数値に変換できません: {value}") from exc
+    return weights
 
 
 def main() -> int:
@@ -132,6 +159,7 @@ def main() -> int:
     )
     rpm = args.rpm if args.rpm and args.rpm > 0 else None
     quorum = args.quorum if args.quorum and args.quorum > 0 else None
+    provider_weights = _parse_weights_arg(args.weights)
 
     return runner_api.run_compare(
         provider_paths,
@@ -145,6 +173,7 @@ def main() -> int:
         aggregate=args.aggregate,
         quorum=quorum,
         tie_breaker=args.tie_breaker,
+        provider_weights=provider_weights,
         schema=schema_path,
         judge=args.judge,
         max_concurrency=max_concurrency,
