@@ -26,6 +26,14 @@ ignore_missing_imports = true
 namespace_packages = true
 mypy_path = ["projects/04-llm-adapter-shadow"]
 explicit_package_bases = true
+exclude = """
+(?x)
+^projects/04-llm-adapter/(?:
+    (?!adapter/core/runner_execution_parallel\\.py$)
+    (?!tests/test_parallel_any_executor\\.py$)
+    .*
+)
+"""
 
 [[tool.mypy.overrides]]
 module = "adapter.*"
