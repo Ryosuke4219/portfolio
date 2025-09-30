@@ -25,11 +25,11 @@ from .provider_spi import (
 )
 from .runner_async_modes import (
     AsyncRunContext,
+    collect_failure_details,
     ConsensusRunStrategy,
     ParallelAllRunStrategy,
     ParallelAnyRunStrategy,
     SequentialRunStrategy,
-    collect_failure_details,
     WorkerResult,
 )
 from .runner_config import RunnerConfig, RunnerMode
