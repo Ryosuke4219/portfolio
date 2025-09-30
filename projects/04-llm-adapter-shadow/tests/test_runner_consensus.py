@@ -308,6 +308,7 @@ def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> No
             tokens_out=None,
             shadow_metrics=None,
             shadow_metrics_extra=None,
+            provider_call_logged=True,
         )
         for index, (provider, error) in enumerate(zip(providers, errors, strict=True), start=1)
     ]
@@ -377,6 +378,7 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
             tokens_out=1,
             shadow_metrics=None,
             shadow_metrics_extra=None,
+            provider_call_logged=True,
         ),
         ProviderInvocationResult(
             provider=providers[1],
@@ -389,6 +391,7 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
             tokens_out=None,
             shadow_metrics=None,
             shadow_metrics_extra=None,
+            provider_call_logged=True,
         ),
         ProviderInvocationResult(
             provider=providers[2],
@@ -401,6 +404,7 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
             tokens_out=1,
             shadow_metrics=None,
             shadow_metrics_extra=None,
+            provider_call_logged=True,
         ),
     ]
 
