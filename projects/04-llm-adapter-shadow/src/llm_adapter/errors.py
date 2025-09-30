@@ -7,6 +7,7 @@ Runner retry policy:
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import Enum
 
 
@@ -24,6 +25,14 @@ class SkipError(AdapterError):
 
 class FatalError(AdapterError):
     """Base class for unrecoverable issues that should halt the runner."""
+
+
+class AllFailedError(FatalError):
+    """Raised when all providers fail without yielding a usable response."""
+
+    def __init__(self, message: str, *, failures: Sequence[dict[str, str]] | None = None) -> None:
+        super().__init__(message)
+        self.failures: list[dict[str, str]] = list(failures or [])
 
 
 class TimeoutError(RetryableError):
@@ -90,6 +99,7 @@ __all__ = [
     "AuthError",
     "SkipError",
     "FatalError",
+    "AllFailedError",
     "ProviderSkip",
     "SkipReason",
     "ConfigError",
