@@ -1,8 +1,10 @@
 """応答集約ストラテジ。"""
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import json
+import re
 from pathlib import Path
 from typing import Any, cast, Protocol, runtime_checkable, TYPE_CHECKING
 
@@ -94,7 +96,8 @@ class AggregationStrategy(Protocol):
     def from_string(kind: str, **kwargs: Any) -> AggregationStrategy:
         kind_norm = (kind or "").strip().lower()
         if kind_norm in {"majority", "vote", "maj"}:
-            return cast(AggregationStrategy, MajorityVoteStrategy())
+            schema = kwargs.get("schema")
+            return cast(AggregationStrategy, MajorityVoteStrategy(schema=schema))
         if kind_norm in {"max", "score", "top"}:
             return cast(AggregationStrategy, MaxScoreStrategy())
         if kind_norm in {"judge", "llm-judge"}:
@@ -121,9 +124,30 @@ class AggregationStrategy(Protocol):
 
 
 class MajorityVoteStrategy:
-    """テキスト同一性の多数決（完全一致）。引き分けはタイブレーカー。"""
+    """テキスト/JSON の正規化多数決。引き分けはタイブレーカー。"""
 
     name = "majority"
+
+    def __init__(self, *, schema: Mapping[str, object] | None = None) -> None:
+        self._schema = dict(schema) if schema else None
+        self._json_enabled = False
+        self._expected_keys: set[str] | None = None
+        self._property_types: dict[str, str] = {}
+        if isinstance(self._schema, dict):
+            schema_type = self._schema.get("type")
+            if schema_type == "object":
+                self._json_enabled = True
+                properties = self._schema.get("properties")
+                if isinstance(properties, Mapping):
+                    self._expected_keys = {str(name) for name in properties.keys()}
+                    for key, prop in properties.items():
+                        if isinstance(prop, Mapping):
+                            prop_type = prop.get("type")
+                            if isinstance(prop_type, str):
+                                self._property_types[str(key)] = prop_type
+                required = self._schema.get("required")
+                if isinstance(required, list) and required and self._expected_keys is not None:
+                    self._expected_keys = {str(name) for name in required}
 
     def aggregate(
         self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
@@ -131,16 +155,12 @@ class MajorityVoteStrategy:
         if not candidates:
             raise ValueError("majority: candidates must be non-empty")
 
-        # 正規化：空(None/空文字)は "" として扱いカウント可能に
-        def norm(s: str | None) -> str:
-            return (s or "").strip()
-
         buckets: dict[str, list[AggregationCandidate]] = {}
         for candidate in candidates:
-            key = norm(candidate.text if candidate.text is not None else candidate.response.text)
+            raw_text = candidate.text if candidate.text is not None else candidate.response.text
+            key = self._normalize(raw_text)
             buckets.setdefault(key, []).append(candidate)
 
-        # 最大票のバケットを抽出
         max_bucket: list[AggregationCandidate] = []
         max_count = -1
         for bucket in buckets.values():
@@ -161,6 +181,61 @@ class MajorityVoteStrategy:
             tie_breaker_used=tie_used,
             metadata={"bucket_size": max_count},
         )
+
+    def _normalize(self, raw: str | None) -> str:
+        if self._json_enabled:
+            normalized = self._normalize_json(raw or "")
+            if normalized is not None:
+                return normalized
+        return self._normalize_text(raw or "")
+
+    @staticmethod
+    def _normalize_text(raw: str) -> str:
+        stripped = raw.strip()
+        compressed = re.sub(r"\s+", " ", stripped)
+        return compressed.lower()
+
+    def _normalize_json(self, raw: str) -> str | None:
+        if not raw.strip():
+            return None
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        if self._expected_keys is not None:
+            actual_keys = {str(key) for key in data.keys()}
+            if actual_keys != self._expected_keys:
+                return None
+        for key, expected_type in self._property_types.items():
+            if key not in data:
+                continue
+            if not self._match_type(data[key], expected_type):
+                return None
+        return json.dumps(
+            {str(key): data[key] for key in sorted(data.keys(), key=str)},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    @staticmethod
+    def _match_type(value: object, expected_type: str) -> bool:
+        if expected_type == "string":
+            return isinstance(value, str)
+        if expected_type == "integer":
+            return isinstance(value, int) and not isinstance(value, bool)
+        if expected_type == "number":
+            return isinstance(value, (int, float)) and not isinstance(value, bool)
+        if expected_type == "boolean":
+            return isinstance(value, bool)
+        if expected_type == "array":
+            return isinstance(value, list)
+        if expected_type == "object":
+            return isinstance(value, dict)
+        if expected_type == "null":
+            return value is None
+        return True
 
 
 class MaxScoreStrategy:

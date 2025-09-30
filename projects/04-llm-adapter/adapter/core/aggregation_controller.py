@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol, TYPE_CHECKING
+import json
+from typing import Any, Protocol, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
 from .aggregation import (
     AggregationCandidate,
     AggregationResult,
     AggregationStrategy,
-    FirstTieBreaker,
     TieBreaker,
 )
 from .metrics import hash_text
@@ -67,11 +67,51 @@ class _CostTieBreaker(TieBreaker):
         )
 
 
+class _StableOrderTieBreaker(TieBreaker):
+    name = "stable_order"
+
+    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
+        return min(candidates, key=lambda candidate: candidate.index)
+
+
+class _AutoTieBreaker(TieBreaker):
+    name = "min_latency|min_cost|stable_order"
+
+    def __init__(self, lookup: Mapping[int, SingleRunResult]) -> None:
+        self._lookup = lookup
+
+    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
+        if not candidates:
+            raise ValueError("TieBreaker: candidates must be non-empty")
+        best_latency = min(
+            self._lookup[candidate.index].metrics.latency_ms for candidate in candidates
+        )
+        latency_filtered = [
+            candidate
+            for candidate in candidates
+            if self._lookup[candidate.index].metrics.latency_ms == best_latency
+        ]
+        if len(latency_filtered) == 1:
+            return latency_filtered[0]
+        best_cost = min(
+            self._lookup[candidate.index].metrics.cost_usd for candidate in latency_filtered
+        )
+        cost_filtered = [
+            candidate
+            for candidate in latency_filtered
+            if self._lookup[candidate.index].metrics.cost_usd == best_cost
+        ]
+        if len(cost_filtered) == 1:
+            return cost_filtered[0]
+        return _StableOrderTieBreaker().break_tie(cost_filtered)
+
+
 @dataclass(slots=True)
 class AggregationDecision:
     decision: AggregationResult
     lookup: Mapping[int, SingleRunResult]
     votes: int | None
+    quorum: int | None
 
 
 class AggregationController:
@@ -120,6 +160,8 @@ class AggregationController:
         meta["aggregate_hash"] = hash_text(aggregate_output)
         if selection.votes is not None:
             meta["aggregate_votes"] = selection.votes
+        if selection.quorum is not None:
+            meta["aggregate_quorum"] = selection.quorum
         winner.metrics.ci_meta = meta
 
     def _select_aggregation(
@@ -160,6 +202,7 @@ class AggregationController:
         tiebreaker = self._resolve_tie_breaker(config, lookup)
         decision = strategy.aggregate(candidates, tiebreaker=tiebreaker)
         votes: int | None = None
+        quorum_value: int | None = None
         if mode == "consensus":
             if decision.metadata:
                 raw_votes = decision.metadata.get("bucket_size")
@@ -175,11 +218,18 @@ class AggregationController:
                     and result.raw_output.strip() == winner_output
                 )
             quorum_value = config.quorum
-            quorum = quorum_value if quorum_value is not None else len(candidates)
+            quorum = quorum_value if quorum_value is not None else 2
+            quorum = max(1, min(quorum, len(candidates)))
             if votes < quorum:
                 self._mark_consensus_failure(lookup.values(), quorum, votes)
                 return None
-        return AggregationDecision(decision=decision, lookup=lookup, votes=votes)
+            quorum_value = quorum
+        return AggregationDecision(
+            decision=decision,
+            lookup=lookup,
+            votes=votes,
+            quorum=quorum_value,
+        )
 
     def _resolve_aggregation_strategy(
         self,
@@ -192,7 +242,8 @@ class AggregationController:
         aggregate = (aggregate_raw or "").strip()
         if not aggregate:
             aggregate = "majority"
-        if aggregate.lower() in {"judge", "llm-judge"}:
+        aggregate_norm = aggregate.lower()
+        if aggregate_norm in {"judge", "llm-judge"}:
             judge_config = config.judge_provider or default_judge_config
             if judge_config is None:
                 raise ValueError("aggregate=judge requires judge provider configuration")
@@ -209,7 +260,27 @@ class AggregationController:
                 model=judge_config.model,
                 provider_factory=factory,
             )
-        return AggregationStrategy.from_string(aggregate)
+        extra_kwargs: dict[str, Any] = {}
+        if aggregate_norm in {"majority", "vote", "maj"}:
+            extra_kwargs["schema"] = self._load_schema_payload(config)
+        return AggregationStrategy.from_string(aggregate, **extra_kwargs)
+
+    @staticmethod
+    def _load_schema_payload(config: RunnerConfig) -> dict[str, object] | None:
+        schema_path = getattr(config, "schema", None)
+        if schema_path is None:
+            return None
+        try:
+            if not schema_path.exists():
+                return None
+        except OSError:
+            return None
+        try:
+            with schema_path.open("r", encoding="utf-8") as fp:
+                data = json.load(fp)
+        except (OSError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
 
     @staticmethod
     def _resolve_tie_breaker(
@@ -217,14 +288,14 @@ class AggregationController:
         lookup: Mapping[int, SingleRunResult],
     ) -> TieBreaker | None:
         tie_name = (config.tie_breaker or "").strip().lower()
-        if not tie_name:
-            return None
-        if tie_name == "latency":
+        if not tie_name or tie_name == "auto":
+            return _AutoTieBreaker(lookup)
+        if tie_name in {"latency", "min_latency"}:
             return _LatencyTieBreaker(lookup)
-        if tie_name == "cost":
+        if tie_name in {"cost", "min_cost"}:
             return _CostTieBreaker(lookup)
-        if tie_name == "first":
-            return FirstTieBreaker()
+        if tie_name in {"stable_order", "first"}:
+            return _StableOrderTieBreaker()
         return None
 
     @staticmethod
