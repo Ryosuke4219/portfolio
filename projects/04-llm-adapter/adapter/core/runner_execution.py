@@ -58,7 +58,6 @@ else:  # pragma: no cover - 実行時フォールバック
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .execution.guards import _SchemaValidator, _TokenBucket
 from .errors import (
     AuthError,
     ConfigError,
@@ -67,6 +66,7 @@ from .errors import (
     RetriableError,
     TimeoutError,
 )
+from .execution.guards import _SchemaValidator, _TokenBucket
 from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
 from .provider_spi import ProviderRequest
 from .providers import BaseProvider, ProviderResponse
@@ -350,7 +350,7 @@ class RunnerExecution:
         provider_config: ProviderConfig,
         provider: BaseProvider,
         prompt: str,
-    ) -> "_ProviderCallResult":
+    ) -> _ProviderCallResult:
         result = self._invoke_provider(provider, prompt)
         status, failure_kind = self._check_timeout(
             provider_config, result.latency_ms, result.status, result.failure_kind
