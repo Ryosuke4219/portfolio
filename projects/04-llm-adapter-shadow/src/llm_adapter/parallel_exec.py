@@ -153,6 +153,7 @@ RetryDirective = _parallel_async.RetryDirective
 _AsyncParallelExecutor = _parallel_async._AsyncParallelExecutor
 run_parallel_all_async = _parallel_async.run_parallel_all_async
 run_parallel_any_async = _parallel_async.run_parallel_any_async
+asyncio = _parallel_async.asyncio
 
 
 __all__ = [
@@ -162,6 +163,7 @@ __all__ = [
     "ParallelExecutionError",
     "RetryDirective",
     "SyncWorker",
+    "asyncio",
     "run_parallel_all_async",
     "run_parallel_all_sync",
     "run_parallel_any_async",
