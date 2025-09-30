@@ -188,6 +188,19 @@ def log_provider_skipped(
     )
 
 
+def _normalize_outcome(status: str) -> str:
+    normalized = status.lower()
+    mapping = {
+        "ok": "success",
+        "success": "success",
+        "error": "error",
+        "failure": "error",
+        "skip": "skipped",
+        "skipped": "skipped",
+    }
+    return mapping.get(normalized, normalized)
+
+
 def log_provider_call(
     event_logger: EventLogger | None,
     *,
@@ -213,12 +226,15 @@ def log_provider_call(
         "provider_call",
         {
             "request_fingerprint": request_fingerprint,
+            "run_id": request_fingerprint,
             "request_hash": _request_hash(provider_name, request),
             "provider": provider_name,
+            "provider_id": provider_name,
             "model": provider_model(provider, allow_private=allow_private_model),
             "attempt": attempt,
             "total_providers": total_providers,
             "status": status,
+            "outcome": _normalize_outcome(status),
             "latency_ms": latency_ms,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
@@ -226,6 +242,9 @@ def log_provider_call(
             "error_message": str(error) if error is not None else None,
             "error_family": error_family(error),
             "shadow_used": shadow_used,
+            "shadow_provider_id": metadata.get("shadow_provider_id"),
+            "mode": metadata.get("mode"),
+            "providers": metadata.get("providers"),
             "trace_id": metadata.get("trace_id"),
             "project_id": metadata.get("project_id"),
         },
@@ -252,22 +271,36 @@ def log_run_metric(
         return
 
     provider_name = _provider_name(provider)
+    mode = metadata.get("mode")
+    providers = metadata.get("providers")
+    shadow_provider_id = metadata.get("shadow_provider_id")
+    retries = attempts - 1 if attempts > 0 else 0
+    outcome = _normalize_outcome(status)
+    cost_estimate = float(cost_usd)
     event_logger.emit(
         "run_metric",
         {
             "request_fingerprint": request_fingerprint,
+            "run_id": request_fingerprint,
             "request_hash": _request_hash(provider_name, request),
             "provider": provider_name,
+            "provider_id": provider_name,
             "status": status,
+            "outcome": outcome,
             "attempts": attempts,
+            "retries": retries,
             "latency_ms": latency_ms,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
-            "cost_usd": float(cost_usd),
+            "cost_usd": cost_estimate,
+            "cost_estimate": cost_estimate,
             "error_type": type(error).__name__ if error is not None else None,
             "error_message": str(error) if error is not None else None,
             "error_family": error_family(error),
             "shadow_used": shadow_used,
+            "shadow_provider_id": shadow_provider_id,
+            "mode": mode,
+            "providers": providers,
             "trace_id": metadata.get("trace_id"),
             "project_id": metadata.get("project_id"),
         },
