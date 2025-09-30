@@ -16,6 +16,13 @@ if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
     from .runner_execution import SingleRunResult
 
+    _RunSingle = Callable[
+        [ProviderConfig, BaseProvider, GoldenTask, int, str],
+        SingleRunResult,
+    ]
+else:
+    _RunSingle = Callable[[ProviderConfig, BaseProvider, GoldenTask, int, str], object]
+
 
 _single_run_result_cls: type[Any] | None = None
 
@@ -43,7 +50,6 @@ _RunSingle = Callable[
     [ProviderConfig, BaseProvider, GoldenTask, int, str],
     "SingleRunResult",
 ]
-
 
 class SequentialAttemptExecutor:
     """Executor to handle sequential provider attempts."""
