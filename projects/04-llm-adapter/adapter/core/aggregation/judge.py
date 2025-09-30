@@ -1,10 +1,10 @@
 """LLM ジャッジ集約の実装。"""
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import re
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from ..aggregation import (
     AggregationCandidate,
