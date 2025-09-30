@@ -194,6 +194,26 @@ class CompareRunner:
         return results
 
 
+    def _run_provider_call(
+        self,
+        provider_config: ProviderConfig,
+        provider: BaseProvider,
+        prompt: str,
+    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
+        """Backward-compatible proxy to :class:`RunnerExecution` helper."""
+
+        response, status, failure_kind, error_message, latency_ms = (
+            RunnerExecution._invoke_provider(provider, prompt)
+        )
+        status, failure_kind = RunnerExecution._check_timeout(
+            provider_config, latency_ms, status, failure_kind
+        )
+        status, failure_kind = RunnerExecution._enforce_output_guard(
+            response.output_text, status, failure_kind
+        )
+        return response, status, failure_kind, error_message, latency_ms
+
+
     def _finalize_task(
         self,
         task: GoldenTask,
