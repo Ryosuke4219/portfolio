@@ -16,18 +16,18 @@ from .errors import (
     TimeoutError,
 )
 from .observability import EventLogger
+from .parallel_exec import (
+    ParallelAllResult,
+    ParallelExecutionError,
+    run_parallel_all_async,
+    run_parallel_any_async,
+)
 from .provider_spi import (
     AsyncProviderSPI,
     ensure_async_provider,
     ProviderRequest,
     ProviderResponse,
     ProviderSPI,
-)
-from .parallel_exec import (
-    ParallelAllResult,
-    ParallelExecutionError,
-    run_parallel_all_async,
-    run_parallel_any_async,
 )
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_parallel import compute_consensus
