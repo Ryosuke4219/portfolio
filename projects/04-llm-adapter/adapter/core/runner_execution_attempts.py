@@ -3,67 +3,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from concurrent.futures import CancelledError
-from dataclasses import dataclass
-from threading import Event, Lock
-from typing import Any, Protocol, TYPE_CHECKING
-import uuid
+from typing import TYPE_CHECKING
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .errors import AllFailedError
-from .metrics import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
 from .providers import BaseProvider
+from .runner_execution_parallel import (
+    ParallelAttemptExecutor,
+    ProviderFailureSummary,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from .runner_api import RunnerConfig
     from .runner_execution import SingleRunResult
 
-    _RunSingle = Callable[
-        [ProviderConfig, BaseProvider, GoldenTask, int, str],
-        SingleRunResult,
-    ]
-else:
-    _RunSingle = Callable[[ProviderConfig, BaseProvider, GoldenTask, int, str], object]
-
-
-_single_run_result_cls: type[Any] | None = None
-
-
-def _get_single_run_result_cls() -> type[SingleRunResult]:
-    global _single_run_result_cls
-    if _single_run_result_cls is None:
-        from .runner_execution import SingleRunResult as _SingleRunResult
-
-        _single_run_result_cls = _SingleRunResult
-    return _single_run_result_cls
-
-
-class _ParallelRunner(Protocol):
-    def __call__(
-        self,
-        workers: Sequence[Callable[[], int]],
-        *,
-        max_concurrency: int | None = None,
-    ) -> object:
-        ...
-
-
-_RunSingle = Callable[
-    [ProviderConfig, BaseProvider, GoldenTask, int, str],
-    "SingleRunResult",
-]
-
-@dataclass(frozen=True, slots=True)
-class ProviderFailureSummary:
-    index: int
-    provider: str
-    status: str
-    failure_kind: str | None
-    error_message: str | None
-    backoff_next_provider: bool
-    retries: int
-    error_type: str | None
+_RunSingle = Callable[[ProviderConfig, BaseProvider, GoldenTask, int, str], "SingleRunResult"]
 
 
 class SequentialAttemptExecutor:
@@ -78,8 +32,8 @@ class SequentialAttemptExecutor:
         task: GoldenTask,
         attempt_index: int,
         mode: str,
-    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
-        batch: list[tuple[int, SingleRunResult]] = []
+    ) -> tuple[list[tuple[int, "SingleRunResult"]], str | None]:
+        batch: list[tuple[int, "SingleRunResult"]] = []
         stop_reason: str | None = None
         failures: list[ProviderFailureSummary] = []
         success_found = False
@@ -113,212 +67,9 @@ class SequentialAttemptExecutor:
         return batch, stop_reason
 
 
-class ParallelAttemptExecutor:
-    """Executor to handle parallel provider attempts."""
-
-    def __init__(
-        self,
-        run_single: _RunSingle,
-        normalize_concurrency: Callable[[int, int | None], int],
-        *,
-        run_parallel_all_sync: _ParallelRunner,
-        run_parallel_any_sync: _ParallelRunner,
-        parallel_execution_error: type[Exception],
-    ) -> None:
-        self._run_single = run_single
-        self._normalize_concurrency = normalize_concurrency
-        self._run_parallel_all_sync = run_parallel_all_sync
-        self._run_parallel_any_sync = run_parallel_any_sync
-        self._parallel_execution_error = parallel_execution_error
-
-    def run(
-        self,
-        providers: Sequence[tuple[ProviderConfig, BaseProvider]],
-        task: GoldenTask,
-        attempt_index: int,
-        config: RunnerConfig,
-    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
-        if not providers:
-            return [], None
-
-        max_concurrency = getattr(config, "max_concurrency", None)
-        max_workers = self._normalize_concurrency(len(providers), max_concurrency)
-
-        stop_reason: str | None = None
-        results: list[SingleRunResult | None] = [None] * len(providers)
-        cancel_event = Event()
-        winner_lock = Lock()
-        failure_lock = Lock()
-        failure_indices: set[int] = set()
-        winner_index: int | None = None
-        failure_summaries: list[ProviderFailureSummary] = []
-
-        cancel_message = "parallel-any cancelled after winner"
-
-        def mark_cancelled(index: int) -> None:
-            result = results[index]
-            if result is not None:
-                metrics = result.metrics
-                metrics.status = "skip"
-                if not metrics.failure_kind:
-                    metrics.failure_kind = "cancelled"
-                metrics.error_message = cancel_message
-                result.stop_reason = result.stop_reason or "cancelled"
-                return
-            provider_config, _ = providers[index]
-            metrics = RunMetrics(
-                ts=now_ts(),
-                run_id=f"run_{task.task_id}_{attempt_index}_{uuid.uuid4().hex}",
-                provider=provider_config.provider,
-                model=provider_config.model,
-                mode=config.mode,
-                prompt_id=task.task_id,
-                prompt_name=task.name,
-                seed=provider_config.seed,
-                temperature=provider_config.temperature,
-                top_p=provider_config.top_p,
-                max_tokens=provider_config.max_tokens,
-                input_tokens=0,
-                output_tokens=0,
-                latency_ms=0,
-                cost_usd=0.0,
-                status="skip",
-                failure_kind="cancelled",
-                error_message=cancel_message,
-                output_text=None,
-                output_hash=None,
-                eval=EvalMetrics(),
-                budget=BudgetSnapshot(0.0, False),
-                ci_meta={},
-            )
-            single_run_result_cls = _get_single_run_result_cls()
-            results[index] = single_run_result_cls(
-                metrics=metrics,
-                raw_output="",
-                stop_reason="cancelled",
-            )
-
-        def build_worker(
-            index: int, provider_config: ProviderConfig, provider: BaseProvider
-        ) -> Callable[[], int]:
-            def worker() -> int:
-                nonlocal stop_reason, winner_index
-                if cancel_event.is_set():
-                    raise CancelledError()
-                try:
-                    result = self._run_single(
-                        provider_config,
-                        provider,
-                        task,
-                        attempt_index,
-                        config.mode,
-                    )
-                    should_cancel = cancel_event.is_set()
-                    if config.mode == "parallel-any":
-                        if result.metrics.status != "ok":
-                            results[index] = result
-                            with failure_lock:
-                                failure_summaries.append(
-                                    ProviderFailureSummary(
-                                        index=index,
-                                        provider=provider_config.provider,
-                                        status=result.metrics.status,
-                                        failure_kind=result.metrics.failure_kind,
-                                        error_message=result.metrics.error_message,
-                                        backoff_next_provider=result.backoff_next_provider,
-                                        retries=result.metrics.retries,
-                                        error_type=(
-                                            type(result.error).__name__
-                                            if result.error
-                                            else None
-                                        ),
-                                    )
-                                )
-                                failure_indices.add(index)
-                            raise RuntimeError("parallel-any failure")
-                        with winner_lock:
-                            if winner_index is None:
-                                winner_index = index
-                                cancel_event.set()
-                                should_cancel = False
-                            else:
-                                should_cancel = winner_index != index
-                    results[index] = result
-                    if should_cancel:
-                        raise CancelledError()
-                    if result.stop_reason and not stop_reason:
-                        stop_reason = result.stop_reason
-                    return index
-                except CancelledError:
-                    mark_cancelled(index)
-                    raise
-
-            return worker
-
-        workers = [
-            build_worker(index, provider_config, provider)
-            for index, (provider_config, provider) in enumerate(providers)
-        ]
-        if config.mode == "parallel-any":
-            caught_error: Exception | None = None
-            try:
-                self._run_parallel_any_sync(workers, max_concurrency=max_workers)
-            except self._parallel_execution_error as exc:
-                caught_error = exc
-            except RuntimeError as exc:
-                caught_error = exc
-        else:
-            self._run_parallel_all_sync(workers, max_concurrency=max_workers)
-
-        if config.mode == "parallel-any":
-            for index, result in enumerate(results):
-                if result is None:
-                    mark_cancelled(index)
-            success_found = any(
-                result is not None and result.metrics.status == "ok"
-                for result in results
-            )
-            if not success_found:
-                for index, result in enumerate(results):
-                    if result is None:
-                        continue
-                    if index in failure_indices:
-                        continue
-                    failure_summaries.append(
-                        ProviderFailureSummary(
-                            index=index,
-                            provider=providers[index][0].provider,
-                            status=result.metrics.status,
-                            failure_kind=result.metrics.failure_kind,
-                            error_message=result.metrics.error_message,
-                            backoff_next_provider=result.backoff_next_provider,
-                            retries=result.metrics.retries,
-                            error_type=(
-                                type(result.error).__name__ if result.error else None
-                            ),
-                        )
-                    )
-                    failure_indices.add(index)
-                error = self._parallel_execution_error("parallel-any failed")
-                error.failures = failure_summaries  # type: ignore[attr-defined]
-                error.batch = [
-                    (index, result)
-                    for index, result in enumerate(results)
-                    if result is not None
-                ]  # type: ignore[attr-defined]
-                if caught_error is not None:
-                    raise error from caught_error
-                raise error
-
-        batch = [
-            (index, result)
-            for index, result in enumerate(results)
-            if result is not None
-        ]
-        return batch, stop_reason
-
-
 __all__ = [
     "SequentialAttemptExecutor",
     "ParallelAttemptExecutor",
+    "ProviderFailureSummary",
 ]
+
