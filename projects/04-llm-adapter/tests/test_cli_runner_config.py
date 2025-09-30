@@ -10,6 +10,27 @@ from adapter.core import runner_api
 import adapter.run_compare as run_compare_module
 
 
+def test_parse_args_accepts_aggregate_alias(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = tmp_path / "providers.yaml"
+    provider.write_text("{}\n", encoding="utf-8")
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text("{}\n", encoding="utf-8")
+    argv = [
+        "run-compare",
+        "--providers",
+        str(provider),
+        "--prompts",
+        str(prompts),
+        "--aggregate",
+        "vote",
+    ]
+    monkeypatch.setattr(run_compare_module.argparse._sys, "argv", argv)
+
+    parsed = run_compare_module._parse_args()
+
+    assert parsed.aggregate == "vote"
+
+
 def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     provider = tmp_path / "providers.yaml"
     provider.write_text("{}\n", encoding="utf-8")
@@ -120,6 +141,64 @@ def test_run_compare_sanitizes_runner_config(
     assert captured["provider_weights"] is None
     assert captured["metrics_path"].name == "metrics.jsonl"
     assert captured["repeat"] == 1
+
+
+def test_main_requires_weights_for_weighted(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = tmp_path / "providers.yaml"
+    provider.write_text("{}\n", encoding="utf-8")
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text("{}\n", encoding="utf-8")
+    args = SimpleNamespace(
+        providers=str(provider),
+        prompts=str(prompts),
+        repeat=1,
+        mode="sequential",
+        budgets=None,
+        metrics=None,
+        log_level="INFO",
+        allow_overrun=False,
+        aggregate="weighted",
+        quorum=None,
+        tie_breaker=None,
+        schema=None,
+        judge=None,
+        max_concurrency=None,
+        rpm=None,
+        weights=None,
+    )
+    monkeypatch.setattr(run_compare_module, "_parse_args", lambda: args)
+
+    with pytest.raises(SystemExit, match="weighted_vote"):
+        run_compare_module.main()
+
+
+def test_main_rejects_weights_for_non_weighted(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    provider = tmp_path / "providers.yaml"
+    provider.write_text("{}\n", encoding="utf-8")
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text("{}\n", encoding="utf-8")
+    args = SimpleNamespace(
+        providers=str(provider),
+        prompts=str(prompts),
+        repeat=1,
+        mode="sequential",
+        budgets=None,
+        metrics=None,
+        log_level="INFO",
+        allow_overrun=False,
+        aggregate="max_score",
+        quorum=None,
+        tie_breaker=None,
+        schema=None,
+        judge=None,
+        max_concurrency=None,
+        rpm=None,
+        weights="openai=1.0",
+    )
+    monkeypatch.setattr(run_compare_module, "_parse_args", lambda: args)
+
+    with pytest.raises(SystemExit, match="--weights は aggregate=weighted_vote"):
+        run_compare_module.main()
 
 
 def test_doctor_windows_encoding(monkeypatch: pytest.MonkeyPatch) -> None:

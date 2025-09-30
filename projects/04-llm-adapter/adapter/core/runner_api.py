@@ -105,6 +105,13 @@ def _resolve_optional_path(value: Path | str | None) -> Path | None:
     return Path(value).expanduser().resolve()
 
 
+def _is_weighted_aggregate(value: str | None) -> bool:
+    if not value:
+        return False
+    normalized = value.strip().lower().replace("-", "_")
+    return normalized in {"weighted_vote", "weighted"}
+
+
 def run_compare(
     provider_paths: Sequence[Path],
     prompt_path: Path,
@@ -136,13 +143,18 @@ def run_compare(
     sanitized_max_concurrency = _sanitize_positive_int(max_concurrency)
     sanitized_rpm = _sanitize_positive_int(rpm)
 
+    is_weighted = _is_weighted_aggregate(aggregate)
+    if is_weighted and provider_weights is None:
+        raise ValueError("aggregate=weighted_vote requires provider_weights")
+    sanitized_weights = provider_weights if is_weighted else None
+
     if runner_config is None:
         config = RunnerConfig(
             mode=resolved_mode,
             aggregate=aggregate,
             quorum=sanitized_quorum,
             tie_breaker=tie_breaker,
-            provider_weights=provider_weights,
+            provider_weights=sanitized_weights,
             schema=_resolve_optional_path(schema),
             judge=judge_path,
             judge_provider=judge_provider,
@@ -162,8 +174,8 @@ def run_compare(
             updates["backoff"] = backoff
         if shadow_provider is not None:
             updates["shadow_provider"] = shadow_provider
-        if provider_weights is not None:
-            updates["provider_weights"] = provider_weights
+        if sanitized_weights is not None:
+            updates["provider_weights"] = sanitized_weights
         if config.metrics_path is None:
             updates["metrics_path"] = metrics_path
         if updates:

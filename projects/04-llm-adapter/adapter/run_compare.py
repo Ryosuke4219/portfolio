@@ -61,7 +61,6 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--aggregate",
-        choices=["majority_vote", "max_score", "weighted_vote"],
         help="複数応答の集約ストラテジ",
     )
     parser.add_argument(
@@ -129,8 +128,28 @@ def _parse_weights_arg(raw: str | None) -> dict[str, float] | None:
     return weights
 
 
+def _normalize_aggregate(raw: str | None) -> tuple[str | None, str | None]:
+    if raw is None:
+        return None, None
+    candidate = raw.strip()
+    if not candidate:
+        return None, None
+    normalized = candidate.lower().replace("-", "_")
+    alias_map: dict[str, set[str]] = {
+        "weighted_vote": {"weighted_vote", "weighted"},
+        "majority_vote": {"majority_vote", "majority", "vote", "maj"},
+        "max_score": {"max_score", "max", "score", "top"},
+        "judge": {"judge", "llm_judge", "llmjudge"},
+    }
+    for key, aliases in alias_map.items():
+        if normalized in aliases:
+            return candidate, key
+    return candidate, None
+
+
 def main() -> int:
     args = _parse_args()
+    aggregate_value, aggregate_kind = _normalize_aggregate(args.aggregate)
 
     provider_paths = [
         Path(p.strip()).expanduser().resolve()
@@ -160,6 +179,13 @@ def main() -> int:
     rpm = args.rpm if args.rpm and args.rpm > 0 else None
     quorum = args.quorum if args.quorum and args.quorum > 0 else None
     provider_weights = _parse_weights_arg(args.weights)
+    if aggregate_kind == "weighted_vote":
+        if provider_weights is None:
+            raise SystemExit(
+                "aggregate=weighted_vote/weighted の場合は --weights を指定してください"
+            )
+    elif provider_weights is not None:
+        raise SystemExit("--weights は aggregate=weighted_vote のときのみ利用できます")
 
     return runner_api.run_compare(
         provider_paths,
@@ -170,7 +196,7 @@ def main() -> int:
         mode=args.mode,
         allow_overrun=args.allow_overrun,
         log_level=args.log_level,
-        aggregate=args.aggregate,
+        aggregate=aggregate_value,
         quorum=quorum,
         tie_breaker=args.tie_breaker,
         provider_weights=provider_weights,
