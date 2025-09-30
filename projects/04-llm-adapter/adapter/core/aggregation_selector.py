@@ -129,8 +129,19 @@ class AggregationSelector:
         )
         if strategy is None:
             return None
+        score_metadata: dict[str, float] | None = None
+        if strategy.name == "max_score":
+            score_metadata = self._score_candidates_with_judge(
+                candidates,
+                config=config,
+                default_judge_config=default_judge_config,
+            )
         tiebreaker = self._resolve_tie_breaker(config, lookup)
         decision = strategy.aggregate(candidates, tiebreaker=tiebreaker)
+        if score_metadata is not None:
+            metadata = dict(decision.metadata) if decision.metadata else {}
+            metadata["scores"] = score_metadata
+            decision.metadata = metadata
         votes: int | None = None
         if mode == "consensus":
             if decision.metadata:
@@ -147,6 +158,53 @@ class AggregationSelector:
                     and result.raw_output.strip() == winner_output
                 )
         return AggregationDecision(decision=decision, lookup=lookup, votes=votes)
+
+    def _score_candidates_with_judge(
+        self,
+        candidates: Sequence[AggregationCandidate],
+        *,
+        config: RunnerConfig,
+        default_judge_config: ProviderConfig | None,
+    ) -> dict[str, float]:
+        judge_config = config.judge_provider or default_judge_config
+        if judge_config is None:
+            raise ValueError("max_score aggregation requires judge provider configuration")
+        if self._judge_factory_builder is None:
+            raise ValueError("judge_factory_builder must be provided for max_score aggregation")
+        factory = self._judge_factory_builder(judge_config)
+        judge = factory.create(model=judge_config.model)
+        invoke = getattr(judge, "invoke", None)
+        if not callable(invoke):
+            raise ValueError("judge instance must expose invoke(request)")
+        scores: dict[str, float] = {}
+        for candidate in candidates:
+            request = {
+                "mode": getattr(config, "mode", ""),
+                "provider": candidate.provider,
+                "index": candidate.index,
+                "text": candidate.text if candidate.text is not None else candidate.response.text,
+            }
+            response = invoke(request)
+            score = self._extract_quality_score(response)
+            candidate.score = score
+            if score is not None:
+                scores[candidate.provider] = score
+        return scores
+
+    @staticmethod
+    def _extract_quality_score(response: object) -> float | None:
+        raw = getattr(response, "raw", None)
+        if isinstance(raw, Mapping):
+            value = raw.get("quality_score")
+            if isinstance(value, (int, float)):
+                return float(value)
+        text = getattr(response, "text", None)
+        if isinstance(text, str):
+            try:
+                return float(text.strip())
+            except ValueError:
+                return None
+        return None
 
     def _resolve_aggregation_strategy(
         self,
