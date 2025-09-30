@@ -6,7 +6,7 @@ from ..runner_parallel import compute_consensus
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import content_hash, elapsed_ms
 from .base import ParallelStrategyBase
-from .context import AsyncRunContext, StrategyResult, collect_failure_details
+from .context import AsyncRunContext, collect_failure_details, StrategyResult
 
 
 class ConsensusRunStrategy(ParallelStrategyBase):
