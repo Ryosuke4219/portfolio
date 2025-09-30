@@ -6,12 +6,12 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import CancelledError
 from dataclasses import dataclass
 from threading import Event, Lock
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol, TYPE_CHECKING
 import uuid
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics import BudgetSnapshot, EvalMetrics, RunMetrics, now_ts
+from .metrics import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
 from .providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
@@ -65,7 +65,7 @@ class _ParallelCoordinatorBase:
 
     def __init__(
         self,
-        executor: "ParallelAttemptExecutor",
+        executor: ParallelAttemptExecutor,
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
@@ -180,7 +180,7 @@ class _ParallelAllCoordinator(_ParallelCoordinatorBase):
 class _ParallelAnyCoordinator(_ParallelCoordinatorBase):
     def __init__(
         self,
-        executor: "ParallelAttemptExecutor",
+        executor: ParallelAttemptExecutor,
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
