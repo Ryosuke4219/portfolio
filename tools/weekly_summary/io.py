@@ -1,11 +1,14 @@
+# ruff: noqa: I001
+
 from __future__ import annotations
 
 import csv
 import datetime as dt
 import json
 import re
-from collections.abc import Iterable
 from pathlib import Path
+
+from collections.abc import Iterable
 
 ISO_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})")
 

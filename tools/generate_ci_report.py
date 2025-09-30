@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import datetime as dt
 import json
-import sys
-from collections import Counter
 from pathlib import Path
+import sys
 from typing import Any
 
 try:
@@ -48,6 +48,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for direct execution
     from tools.ci_report.rendering import build_json_payload, render_markdown
 
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate CI reliability snapshot")
     parser.add_argument("--runs", type=Path, required=True, help="Path to runs.jsonl")
@@ -77,7 +78,7 @@ def parse_args() -> argparse.Namespace:
 def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
     timestamps: list[dt.datetime] = []
     for run in runs:
-        ts = parse_iso8601(coerce_str(run.get("ts")))
+        ts = weekly_summary.parse_iso8601(coerce_str(run.get("ts")))
         if ts is not None:
             timestamps.append(ts)
     if not timestamps:
@@ -89,7 +90,7 @@ def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
 def summarize_failure_kinds(
     runs: list[dict[str, object]], limit: int = 3
 ) -> list[dict[str, object]]:
-    counter: Counter[str] = Counter()
+    counter: collections.Counter[str] = collections.Counter()
     for run in runs:
         status_raw = coerce_str(run.get("status"))
         if status_raw is None:
@@ -162,7 +163,7 @@ def build_json_payload(
     flaky_rows: list[dict[str, object]],
     last_updated: str | None,
     recent_runs: list[dict[str, object]],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     total = passes + fails + errors
     pass_rate = (passes / total) if total else None
     return {
@@ -224,7 +225,7 @@ def render_markdown(
         else "-"
     )
     pass_rate_args = {
-        "pass_rate": format_percentage(pass_rate),
+        "pass_rate": weekly_summary.format_percentage(pass_rate),
         "passes": totals["passes"],
         "executions": totals["executions"],
     }
