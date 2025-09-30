@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable
-import csv
 import datetime as dt
-import json
 from pathlib import Path
 import re
+
+from .io import (
+    coerce_str,
+    filter_by_window,
+    load_flaky,
+    load_runs,
+    parse_iso8601,
+)
 
 __all__ = [
     "parse_iso8601",
@@ -30,63 +36,6 @@ __all__ = [
     "fallback_write",
 ]
 
-ISO_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})")
-
-
-def parse_iso8601(value: str | None) -> dt.datetime | None:
-    if not value:
-        return None
-    try:
-        if value.endswith("Z"):
-            value = value[:-1] + "+00:00"
-        return dt.datetime.fromisoformat(value)
-    except ValueError:
-        match = ISO_RE.match(value)
-        if match:
-            return dt.datetime.fromisoformat(match.group("date") + "T00:00:00+00:00")
-    return None
-
-
-def load_runs(path: Path) -> list[dict[str, object]]:
-    if not path.exists():
-        return []
-    runs: list[dict[str, object]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            runs.append(record)
-    return runs
-
-
-def load_flaky(path: Path) -> list[dict[str, object]]:
-    if not path.exists():
-        return []
-    rows: list[dict[str, object]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            rows.append(row)
-    return rows
-
-
-def filter_by_window(
-    items: Iterable[dict[str, object]], start: dt.datetime, end: dt.datetime
-) -> list[dict[str, object]]:
-    results: list[dict[str, object]] = []
-    for item in items:
-        ts_value = coerce_str(item.get("ts"))
-        ts = parse_iso8601(ts_value)
-        if ts is None:
-            continue
-        if start <= ts < end:
-            results.append(item)
-    return results
 
 
 def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
@@ -161,7 +110,6 @@ def coerce_str(value: object | None) -> str | None:
     if isinstance(value, bool | int | float):
         return str(value)
     return None
-
 
 def to_float(value: object) -> float | None:
     if value is None:
