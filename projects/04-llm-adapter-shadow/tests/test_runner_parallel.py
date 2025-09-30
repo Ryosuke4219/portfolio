@@ -27,9 +27,9 @@ from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
+    _normalize_candidate_text,
     compute_consensus,
     ConsensusConfig,
-    _normalize_candidate_text,
 )
 from src.llm_adapter.runner_sync import Runner
 from src.llm_adapter.shadow import run_with_shadow
