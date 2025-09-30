@@ -4,8 +4,15 @@ from collections.abc import Sequence
 
 import pytest
 
-from src.llm_adapter.errors import AuthError, RateLimitError, RetriableError, TimeoutError
-from src.llm_adapter.provider_spi import ProviderSPI
+from src.llm_adapter.errors import (
+    AllFailedError,
+    AuthError,
+    RateLimitError,
+    RetriableError,
+    TimeoutError,
+)
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderSPI
+from src.llm_adapter.runner import Runner
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
 
 from ._runner_test_helpers import (
@@ -79,7 +86,7 @@ def _force_event_logger(
             None,
             2,
             0,
-            TimeoutError,
+            AllFailedError,
             id="all-fail",
         ),
         pytest.param(
@@ -216,15 +223,20 @@ def test_fatal_error_logs_error_family() -> None:
 
 
 def test_provider_chain_failed_records_last_error_family() -> None:
-    _, logger = _run_and_collect(
+    logger = FakeLogger()
+    runner = Runner(
         [
             _ErrorProvider("first", TimeoutError("slow")),
             _ErrorProvider("second", RetriableError("oops")),
         ],
-        expect_exception=RetriableError,
+        logger=logger,
     )
+    request = ProviderRequest(prompt="hello", model="demo-model")
 
-    assert isinstance(logger, FakeLogger)
+    with pytest.raises(AllFailedError) as exc_info:
+        runner.run(request, shadow_metrics_path="unused.jsonl")
+
+    assert isinstance(exc_info.value.__cause__, RetriableError)
 
     chain_event = logger.of_type("provider_chain_failed")[0]
     assert chain_event["last_error_type"] == "RetriableError"
