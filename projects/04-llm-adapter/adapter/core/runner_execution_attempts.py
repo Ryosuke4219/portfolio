@@ -1,4 +1,5 @@
 """Attempt executor helpers for :mod:`adapter.core.runner_execution`."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -8,9 +9,9 @@ from threading import Event, Lock
 from typing import Any, Protocol, TYPE_CHECKING
 import uuid
 
-from .errors import AllFailedError
 from .config import ProviderConfig
 from .datasets import GoldenTask
+from .errors import AllFailedError
 from .metrics import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
 from .providers import BaseProvider
 
