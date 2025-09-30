@@ -24,6 +24,7 @@ class ConsensusConfig:
     schema: str | None = None
     judge: str | None = None
     max_rounds: int | None = None
+    provider_weights: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)
