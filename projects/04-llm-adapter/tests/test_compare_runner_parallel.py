@@ -199,9 +199,19 @@ def test_consensus_majority_and_judge_tiebreak(
     )
     results = runner.run(repeat=1, config=RunnerConfig(mode="consensus", quorum=2))
     winner = next(metric for metric in results if metric.ci_meta.get("aggregate_strategy"))
+    assert winner.providers == ["consensus"]
+    assert winner.token_usage == {"prompt": 1, "completion": 1, "total": 2}
+    assert winner.retries == 0
+    assert winner.outcome == "success"
     assert winner.ci_meta["aggregate_strategy"] == "majority"
     assert winner.ci_meta["aggregate_votes"] == 2
     assert winner.ci_meta["aggregate_mode"] == "consensus"
+    consensus_meta = winner.ci_meta["consensus"]
+    assert consensus_meta["strategy"] == "majority"
+    assert consensus_meta["quorum"] == 2
+    assert consensus_meta["votes"] == 2
+    assert consensus_meta["chosen_provider"] == "consensus"
+    assert consensus_meta.get("metadata", {}) == {"bucket_size": 2}
 
     class JudgeProvider(BaseProvider):
         calls = 0

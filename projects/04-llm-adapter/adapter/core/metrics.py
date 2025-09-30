@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, UTC
 import hashlib
 from statistics import median
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field
 
@@ -95,6 +95,10 @@ class RunMetrics:
     error_message: str | None
     output_text: str | None
     output_hash: str | None
+    providers: list[str] = field(default_factory=list)
+    token_usage: dict[str, int] = field(default_factory=dict)
+    retries: int = 0
+    outcome: Literal["success", "skip", "error"] = "success"
     eval: EvalMetrics = field(default_factory=EvalMetrics)
     budget: BudgetSnapshot = field(default_factory=lambda: BudgetSnapshot(0.0, False))
     ci_meta: Mapping[str, Any] = field(default_factory=dict)

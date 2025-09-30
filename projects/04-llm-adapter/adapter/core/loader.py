@@ -8,6 +8,7 @@ from typing import cast
 
 from pydantic import ValidationError
 
+from .errors import ConfigError as _ConfigErrorBase
 from .models import (
     BudgetBook,
     BudgetRule,
@@ -36,7 +37,7 @@ __all__ = [
 ]
 
 
-class ConfigError(ValueError):
+class ConfigError(_ConfigErrorBase):
     """設定ファイルの検証エラー。"""
 
 

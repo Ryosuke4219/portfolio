@@ -120,6 +120,33 @@ class AggregationController:
         meta["aggregate_hash"] = hash_text(aggregate_output)
         if selection.votes is not None:
             meta["aggregate_votes"] = selection.votes
+        if mode == "consensus":
+            quorum_value = (
+                config.quorum
+                if config.quorum is not None
+                else len(selection.decision.candidates)
+            )
+            consensus_meta: dict[str, object] = {
+                "strategy": selection.decision.strategy,
+                "quorum": quorum_value,
+                "chosen_provider": selection.decision.chosen.provider,
+            }
+            if selection.votes is not None:
+                consensus_meta["votes"] = selection.votes
+            if selection.decision.tie_breaker_used:
+                consensus_meta["tie_breaker"] = selection.decision.tie_breaker_used
+            if selection.decision.reason:
+                consensus_meta["reason"] = selection.decision.reason
+            score_map = {
+                candidate.provider: candidate.score
+                for candidate in selection.decision.candidates
+                if candidate.score is not None
+            }
+            if score_map:
+                consensus_meta["scores"] = score_map
+            if selection.decision.metadata:
+                consensus_meta["metadata"] = selection.decision.metadata
+            meta["consensus"] = consensus_meta
         winner.metrics.ci_meta = meta
 
     def _select_aggregation(
