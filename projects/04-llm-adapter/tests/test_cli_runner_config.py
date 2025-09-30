@@ -24,13 +24,14 @@ def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_pat
         metrics=None,
         log_level="DEBUG",
         allow_overrun=True,
-        aggregate=None,
+        aggregate="weighted_vote",
         quorum=3,
-        tie_breaker=None,
+        tie_breaker="min_cost",
         schema=None,
         judge=None,
         max_concurrency=4,
         rpm=90,
+        weights="openai=1.5,anthropic=0.5",
     )
     monkeypatch.setattr(run_compare_module, "_parse_args", lambda: args)
     captured: dict[str, object] = {}
@@ -49,6 +50,9 @@ def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert forwarded["max_concurrency"] == 4
     assert forwarded["quorum"] == 3
     assert forwarded["rpm"] == 90
+    assert forwarded["aggregate"] == "weighted_vote"
+    assert forwarded["tie_breaker"] == "min_cost"
+    assert forwarded["provider_weights"] == {"openai": 1.5, "anthropic": 0.5}
 
 
 def test_run_compare_sanitizes_runner_config(
@@ -104,11 +108,13 @@ def test_run_compare_sanitizes_runner_config(
         quorum=5,
         max_concurrency=-1,
         rpm=0,
+        provider_weights={"openai": 1.0},
     )
     assert captured["mode"] == "parallel-any"
     assert captured["quorum"] == 5
     assert captured["max_concurrency"] is None
     assert captured["rpm"] is None
+    assert captured["provider_weights"] == {"openai": 1.0}
     assert captured["repeat"] == 1
 
 
