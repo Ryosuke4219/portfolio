@@ -166,9 +166,9 @@ def format_flaky_markdown(rows: list[dict[str, object]]) -> list[str]:
         return lines
     for row in rows:
         p_fail_value = row.get("p_fail")
-        p_fail = float(p_fail_value) if isinstance(p_fail_value, (int, float)) else None
+        p_fail = float(p_fail_value) if isinstance(p_fail_value, int | float) else None
         score_value = row.get("score")
-        score = float(score_value) if isinstance(score_value, (int, float)) else None
+        score = float(score_value) if isinstance(score_value, int | float) else None
         lines.append(
             "| {rank} | {cid} | {attempts} | {p_fail:.2f} | {score:.2f} |".format(
                 rank=row.get("rank", "-"),

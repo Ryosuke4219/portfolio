@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
+import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 project_path = str(PROJECT_ROOT)
