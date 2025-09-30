@@ -8,12 +8,12 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from .parallel_exec import ParallelAllResult
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .providers.factory import create_provider_from_spec, parse_provider_spec, ProviderFactory
 from .runner import AsyncRunner, Runner
 from .runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
-from .parallel_exec import ParallelAllResult
 
 _AGGREGATE: Mapping[str, str] = {
     "majority_vote": "majority",
