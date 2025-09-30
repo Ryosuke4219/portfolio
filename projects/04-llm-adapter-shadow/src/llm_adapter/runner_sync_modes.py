@@ -71,6 +71,49 @@ class SyncRunStrategy(Protocol):
         ...
 
 
+def _limited_providers(
+    providers: Sequence[ProviderSPI], max_attempts: int | None
+) -> Sequence[ProviderSPI]:
+    if max_attempts is None:
+        return providers
+    if max_attempts <= 0:
+        return ()
+    return providers[:max_attempts]
+
+
+def _raise_no_attempts(context: SyncRunContext) -> None:
+    event_logger = context.event_logger
+    runner = context.runner
+    if event_logger is not None:
+        event_logger.emit(
+            "provider_chain_failed",
+            {
+                "request_fingerprint": context.request_fingerprint,
+                "provider_attempts": 0,
+                "providers": [provider.name() for provider in runner.providers],
+                "last_error_type": None,
+                "last_error_message": None,
+                "last_error_family": None,
+            },
+        )
+    log_run_metric(
+        event_logger,
+        request_fingerprint=context.request_fingerprint,
+        request=context.request,
+        provider=None,
+        status="error",
+        attempts=0,
+        latency_ms=elapsed_ms(context.run_started),
+        tokens_in=None,
+        tokens_out=None,
+        cost_usd=0.0,
+        error=None,
+        metadata=context.metadata,
+        shadow_used=context.shadow_used,
+    )
+    raise RuntimeError("No providers succeeded")
+
+
 class SequentialStrategy:
     def execute(
         self, context: SyncRunContext
@@ -184,6 +227,8 @@ class ParallelAnyStrategy:
         runner = context.runner
         total_providers = len(runner.providers)
         results: list[ProviderInvocationResult | None] = [None] * total_providers
+        max_attempts = runner._config.max_attempts
+        providers = _limited_providers(runner.providers, max_attempts)
 
         def make_worker(index: int, provider: ProviderSPI) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
@@ -213,8 +258,10 @@ class ParallelAnyStrategy:
 
         workers = [
             make_worker(index, provider)
-            for index, provider in enumerate(runner.providers, start=1)
+            for index, provider in enumerate(providers, start=1)
         ]
+        if not workers:
+            _raise_no_attempts(context)
 
         attempts_override: dict[int, int] | None = None
         try:
@@ -259,6 +306,8 @@ class ParallelAllStrategy:
         runner = context.runner
         total_providers = len(runner.providers)
         results: list[ProviderInvocationResult | None] = [None] * total_providers
+        max_attempts = runner._config.max_attempts
+        providers = _limited_providers(runner.providers, max_attempts)
 
         def make_worker(index: int, provider: ProviderSPI) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
@@ -288,8 +337,10 @@ class ParallelAllStrategy:
 
         workers = [
             make_worker(index, provider)
-            for index, provider in enumerate(runner.providers, start=1)
+            for index, provider in enumerate(providers, start=1)
         ]
+        if not workers:
+            _raise_no_attempts(context)
 
         try:
             invocations = context.run_parallel_all(
@@ -331,6 +382,8 @@ class ConsensusStrategy:
         runner = context.runner
         total_providers = len(runner.providers)
         results: list[ProviderInvocationResult | None] = [None] * total_providers
+        max_attempts = runner._config.max_attempts
+        providers = _limited_providers(runner.providers, max_attempts)
 
         def make_worker(index: int, provider: ProviderSPI) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
@@ -360,8 +413,10 @@ class ConsensusStrategy:
 
         workers = [
             make_worker(index, provider)
-            for index, provider in enumerate(runner.providers, start=1)
+            for index, provider in enumerate(providers, start=1)
         ]
+        if not workers:
+            _raise_no_attempts(context)
 
         try:
             invocations = context.run_parallel_all(
