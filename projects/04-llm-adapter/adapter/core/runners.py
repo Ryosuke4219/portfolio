@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING
 import uuid
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
     from src.llm_adapter.parallel_exec import ParallelExecutionError
+    from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
 else:  # pragma: no cover - 実行時フォールバック
     try:
         from src.llm_adapter.provider_spi import (  # type: ignore[import-not-found]
