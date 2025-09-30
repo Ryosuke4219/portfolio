@@ -20,7 +20,7 @@ from adapter.core.aggregation import (  # noqa: E402
 from adapter.core.aggregation_controller import AggregationController  # noqa: E402
 from adapter.core.budgets import BudgetManager  # noqa: E402
 from adapter.core.datasets import GoldenTask  # noqa: E402
-from adapter.core.errors import TimeoutError  # noqa: E402
+from adapter.core.errors import ProviderSkip, TimeoutError  # noqa: E402
 from adapter.core.metrics import RunMetrics  # noqa: E402
 from adapter.core.models import (  # noqa: E402
     BudgetBook,
@@ -37,7 +37,10 @@ from adapter.core.providers import (  # noqa: E402
     ProviderResponse,
 )
 from adapter.core.runner_api import RunnerConfig  # noqa: E402
-from adapter.core.runner_execution import SingleRunResult  # noqa: E402
+from adapter.core.runner_execution import (  # noqa: E402
+    ParallelExecutionError,
+    SingleRunResult,
+)
 from adapter.core.runners import CompareRunner  # noqa: E402
 
 
@@ -329,6 +332,119 @@ def test_parallel_any_cancels_pending_workers(
     slow_metric = next(metric for metric in results if metric.model == "slow")
     assert slow_metric.failure_kind == "cancelled"
     assert slow_metric.error_message == "parallel-any cancelled after winner"
+
+
+def test_parallel_any_populates_metrics_for_unscheduled_workers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class WinnerProvider(BaseProvider):
+        calls = 0
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            WinnerProvider.calls += 1
+            return ProviderResponse(
+                output_text="winner",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=5,
+            )
+
+    class IdleProvider(BaseProvider):
+        called = False
+
+        def generate(self, prompt: str) -> ProviderResponse:  # pragma: no cover - 防御ライン
+            IdleProvider.called = True
+            raise AssertionError("idle provider should not run")
+
+    monkeypatch.setitem(ProviderFactory._registry, "winner", WinnerProvider)
+    monkeypatch.setitem(ProviderFactory._registry, "idle", IdleProvider)
+
+    winner_config = _make_provider_config(
+        tmp_path, name="winner", provider="winner", model="winner"
+    )
+    idle_config = _make_provider_config(
+        tmp_path, name="idle", provider="idle", model="idle"
+    )
+
+    from adapter.core import runners as runners_module
+
+    def fake_run_parallel_any(workers, *, max_concurrency=None):  # type: ignore[override]
+        return workers[0]()
+
+    monkeypatch.setattr(runners_module, "run_parallel_any_sync", fake_run_parallel_any)
+
+    runner = CompareRunner(
+        [winner_config, idle_config],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_unscheduled.jsonl",
+    )
+    results = runner.run(repeat=1, config=RunnerConfig(mode="parallel-any", max_concurrency=2))
+
+    metrics_by_model = {metric.model: metric for metric in results}
+    assert WinnerProvider.calls == 1
+    assert IdleProvider.called is False
+
+    idle_metrics = metrics_by_model["idle"]
+    assert idle_metrics.status == "skip"
+    assert idle_metrics.failure_kind == "cancelled"
+    assert idle_metrics.error_message == "parallel-any cancelled after winner"
+    assert idle_metrics.input_tokens == 0
+    assert idle_metrics.output_tokens == 0
+    assert idle_metrics.latency_ms == 0
+    assert idle_metrics.cost_usd == 0.0
+
+
+def test_parallel_any_failure_summary_includes_all_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class SkipProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            raise ProviderSkip("skip me")
+
+    class TimeoutProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            raise TimeoutError("deadline")
+
+    monkeypatch.setitem(ProviderFactory._registry, "skip", SkipProvider)
+    monkeypatch.setitem(ProviderFactory._registry, "timeout", TimeoutProvider)
+
+    skip_config = _make_provider_config(
+        tmp_path, name="skip", provider="skip", model="skip-model"
+    )
+    timeout_config = _make_provider_config(
+        tmp_path, name="timeout", provider="timeout", model="timeout-model"
+    )
+
+    runner = CompareRunner(
+        [skip_config, timeout_config],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_failure_summary.jsonl",
+    )
+
+    with pytest.raises(ParallelExecutionError) as exc_info:
+        runner.run(repeat=1, config=RunnerConfig(mode="parallel-any", max_concurrency=2))
+
+    failures = getattr(exc_info.value, "failures", ())
+    assert len(failures) == 2
+    summary_by_provider = {failure.provider: failure for failure in failures}
+
+    skip_summary = summary_by_provider["skip"]
+    assert skip_summary.status == "skip"
+    assert skip_summary.failure_kind == "skip"
+    assert skip_summary.error_message == "skip me"
+    assert skip_summary.backoff_next_provider is True
+    assert skip_summary.retries == 0
+    assert skip_summary.error_type == "ProviderSkip"
+
+    timeout_summary = summary_by_provider["timeout"]
+    assert timeout_summary.status == "error"
+    assert timeout_summary.failure_kind == "timeout"
+    assert timeout_summary.error_message == "deadline"
+    assert timeout_summary.backoff_next_provider is False
+    assert timeout_summary.retries == 0
+    assert timeout_summary.error_type == "TimeoutError"
 
 
 def test_consensus_majority_and_judge_tiebreak(
