@@ -1,9 +1,10 @@
 """pytest グローバル設定: ルートパスと tools パッケージの解決を安定化。"""
+
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
+import sys
 
 _REPO_ROOT = Path(__file__).resolve().parent
 if _REPO_ROOT.name == "tests":
