@@ -6,12 +6,14 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import CancelledError
 from dataclasses import dataclass
 from threading import Event, Lock
-from typing import TYPE_CHECKING, Any, Protocol
-import uuid
+from uuid import uuid4
+
+# isort: split
+from typing import Any, Protocol, TYPE_CHECKING
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics import BudgetSnapshot, EvalMetrics, RunMetrics, now_ts
+from .metrics import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
 from .providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
@@ -65,7 +67,7 @@ class _ParallelCoordinatorBase:
 
     def __init__(
         self,
-        executor: "ParallelAttemptExecutor",
+        executor: ParallelAttemptExecutor,
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
@@ -100,7 +102,7 @@ class _ParallelCoordinatorBase:
         provider_config, _ = self._providers[index]
         metrics = RunMetrics(
             ts=now_ts(),
-            run_id=f"run_{self._task.task_id}_{self._attempt_index}_{uuid.uuid4().hex}",
+            run_id=f"run_{self._task.task_id}_{self._attempt_index}_{uuid4().hex}",
             provider=provider_config.provider,
             model=provider_config.model,
             mode=self._config.mode,
@@ -180,7 +182,7 @@ class _ParallelAllCoordinator(_ParallelCoordinatorBase):
 class _ParallelAnyCoordinator(_ParallelCoordinatorBase):
     def __init__(
         self,
-        executor: "ParallelAttemptExecutor",
+        executor: ParallelAttemptExecutor,
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
