@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
-from .provider_spi import ProviderSPI, ProviderResponse
+from .provider_spi import ProviderResponse, ProviderSPI
 from .runner_parallel import compute_consensus
+from .runner_sync_modes import _limited_providers, _raise_no_attempts
 from .shadow import ShadowMetrics
 from .utils import content_hash
-from .runner_sync_modes import _limited_providers, _raise_no_attempts
 
 if TYPE_CHECKING:
     from .runner_sync import ProviderInvocationResult
@@ -18,20 +18,20 @@ if TYPE_CHECKING:
 
 class ConsensusStrategy:
     def execute(
-        self, context: "SyncRunContext"
+        self, context: SyncRunContext
     ) -> ProviderResponse | ParallelAllResult[
-        "ProviderInvocationResult", ProviderResponse
+        ProviderInvocationResult, ProviderResponse
     ]:
         runner = context.runner
         total_providers = len(runner.providers)
-        results: list["ProviderInvocationResult" | None] = [None] * total_providers
+        results: list[ProviderInvocationResult | None] = [None] * total_providers
         max_attempts = runner._config.max_attempts
         providers = _limited_providers(runner.providers, max_attempts)
 
         def make_worker(
             index: int, provider: ProviderSPI
-        ) -> Callable[[], "ProviderInvocationResult"]:
-            def worker() -> "ProviderInvocationResult":
+        ) -> Callable[[], ProviderInvocationResult]:
+            def worker() -> ProviderInvocationResult:
                 result = runner._invoke_provider_sync(
                     provider,
                     context.request,
@@ -88,6 +88,7 @@ class ConsensusStrategy:
                     (invocation.provider.name(), response, metadata)
                 )
             if not candidates:
+
                 failure_details: list[dict[str, str]] = []
                 for invocation in invocations:
                     provider_name = invocation.provider.name()
