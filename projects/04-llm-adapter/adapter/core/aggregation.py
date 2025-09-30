@@ -95,11 +95,21 @@ class AggregationStrategy(Protocol):
     @staticmethod
     def from_string(kind: str, **kwargs: Any) -> AggregationStrategy:
         kind_norm = (kind or "").strip().lower()
-        if kind_norm in {"majority", "vote", "maj"}:
+        if kind_norm in {"majority", "majority_vote", "vote", "maj"}:
             schema = kwargs.get("schema")
             return cast(AggregationStrategy, MajorityVoteStrategy(schema=schema))
-        if kind_norm in {"max", "score", "top"}:
+        if kind_norm in {"max", "max_score", "score", "top"}:
             return cast(AggregationStrategy, MaxScoreStrategy())
+        if kind_norm in {"weighted", "weighted_vote"}:
+            try:
+                weights = kwargs["weights"]
+            except KeyError as exc:
+                raise ValueError("WeightedVoteStrategy requires `weights=`") from exc
+            schema = kwargs.get("schema")
+            return cast(
+                AggregationStrategy,
+                WeightedVoteStrategy(weights=cast(Mapping[str, float], weights), schema=schema),
+            )
         if kind_norm in {"judge", "llm-judge"}:
             try:
                 model = kwargs["model"]
@@ -191,6 +201,71 @@ class MajorityVoteStrategy:
         )
 
 
+class WeightedVoteStrategy(MajorityVoteStrategy):
+    """重み付き多数決。重み合計最大のバケットを採択。"""
+
+    name = "weighted_vote"
+
+    def __init__(
+        self,
+        *,
+        weights: Mapping[str, float],
+        schema: Mapping[str, Any] | None = None,
+        default_weight: float = 1.0,
+    ) -> None:
+        if not weights:
+            raise ValueError("weighted_vote: weights must not be empty")
+        super().__init__(schema=schema)
+        self._weights = {provider: float(value) for provider, value in weights.items()}
+        if any(weight < 0 for weight in self._weights.values()):
+            raise ValueError("weighted_vote: weight must be >= 0")
+        if any(not provider for provider in self._weights):
+            raise ValueError("weighted_vote: provider id must be non-empty")
+        self._default_weight = float(default_weight)
+
+    def _candidate_weight(self, candidate: AggregationCandidate) -> float:
+        return self._weights.get(candidate.provider, self._default_weight)
+
+    def aggregate(
+        self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
+    ) -> AggregationResult:
+        if not candidates:
+            raise ValueError("weighted_vote: candidates must be non-empty")
+        buckets: dict[str, list[AggregationCandidate]] = {}
+        totals: dict[str, float] = {}
+        for candidate in candidates:
+            key = self._bucket_key(candidate)
+            buckets.setdefault(key, []).append(candidate)
+            totals[key] = totals.get(key, 0.0) + self._candidate_weight(candidate)
+        top_key = max(totals, key=totals.get)
+        top_weight = totals[top_key]
+        tied_keys = [key for key, value in totals.items() if value == top_weight]
+        breaker = tiebreaker or FirstTieBreaker()
+        if len(tied_keys) == 1:
+            bucket = buckets[top_key]
+            chosen = bucket[0] if len(bucket) == 1 else breaker.break_tie(bucket)
+            tie_used = None if len(bucket) == 1 else breaker.name
+        else:
+            pool = [candidate for key in tied_keys for candidate in buckets[key]]
+            chosen = breaker.break_tie(pool)
+            top_key = self._bucket_key(chosen)
+            tie_used = breaker.name
+        metadata = {
+            "bucket_size": len(buckets[top_key]),
+            "bucket_weight": top_weight,
+            "bucket_weights": totals,
+            "provider_weights": self._weights,
+        }
+        return AggregationResult(
+            chosen=chosen,
+            candidates=list(candidates),
+            strategy=self.name,
+            reason=f"weighted_vote(weight={top_weight})",
+            tie_breaker_used=tie_used,
+            metadata=metadata,
+        )
+
+
 class MaxScoreStrategy:
     """score 最大値を採用。全件 score=None の場合はタイブレーカー。"""
 
@@ -202,7 +277,12 @@ class MaxScoreStrategy:
         if not candidates:
             raise ValueError("max_score: candidates must be non-empty")
 
-        if any(candidate.score is not None for candidate in candidates):
+        score_map = {
+            candidate.provider: candidate.score
+            for candidate in candidates
+            if candidate.score is not None
+        }
+        if score_map:
             chosen = max(
                 candidates,
                 key=lambda c: (c.score is not None, float(c.score or float("-inf")), -c.index),
@@ -213,7 +293,7 @@ class MaxScoreStrategy:
                 strategy=self.name,
                 reason=f"score={chosen.score}",
                 tie_breaker_used=None,
-                metadata=None,
+                metadata={"scores": score_map},
             )
 
         breaker = tiebreaker or FirstTieBreaker()
@@ -224,7 +304,7 @@ class MaxScoreStrategy:
             strategy=self.name,
             reason="all scores are None → tie-break",
             tie_breaker_used=breaker.name,
-            metadata=None,
+            metadata={"scores": score_map} if score_map else None,
         )
 
 
@@ -245,6 +325,7 @@ __all__ = [
     "JudgeStrategy",
     "MajorityVoteStrategy",
     "MaxScoreStrategy",
+    "WeightedVoteStrategy",
 ]
 
 
