@@ -17,6 +17,7 @@ try:
         load_runs,
         select_flaky_rows,
     )
+
     from tools.ci_report.processing import (
         compute_last_updated,
         normalize_flaky_rows,
@@ -36,6 +37,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for direct execution
         load_runs,
         select_flaky_rows,
     )
+
     from tools.ci_report.processing import (
         compute_last_updated,
         normalize_flaky_rows,
