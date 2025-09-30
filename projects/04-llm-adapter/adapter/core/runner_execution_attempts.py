@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from concurrent.futures import CancelledError
+from dataclasses import dataclass
 from threading import Event, Lock
 from typing import Any, Protocol, TYPE_CHECKING
 import uuid
 
+from .errors import AllFailedError
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .metrics import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
@@ -51,6 +53,18 @@ _RunSingle = Callable[
     "SingleRunResult",
 ]
 
+@dataclass(frozen=True, slots=True)
+class ProviderFailureSummary:
+    index: int
+    provider: str
+    status: str
+    failure_kind: str | None
+    error_message: str | None
+    backoff_next_provider: bool
+    retries: int
+    error_type: str | None
+
+
 class SequentialAttemptExecutor:
     """Executor to handle sequential provider attempts."""
 
@@ -66,11 +80,35 @@ class SequentialAttemptExecutor:
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         batch: list[tuple[int, SingleRunResult]] = []
         stop_reason: str | None = None
+        failures: list[ProviderFailureSummary] = []
+        success_found = False
         for index, (provider_config, provider) in enumerate(providers):
             result = self._run_single(provider_config, provider, task, attempt_index, mode)
             batch.append((index, result))
+            metrics = result.metrics
             if result.stop_reason and not stop_reason:
                 stop_reason = result.stop_reason
+            if metrics.status == "ok":
+                success_found = True
+                break
+            failures.append(
+                ProviderFailureSummary(
+                    index=index,
+                    provider=provider_config.provider,
+                    status=metrics.status,
+                    failure_kind=metrics.failure_kind,
+                    error_message=metrics.error_message,
+                    backoff_next_provider=result.backoff_next_provider,
+                    retries=metrics.retries,
+                    error_type=type(result.error).__name__ if result.error else None,
+                )
+            )
+        if not success_found:
+            error = AllFailedError("all providers failed")
+            error.failures = failures  # type: ignore[attr-defined]
+            error.batch = batch  # type: ignore[attr-defined]
+            error.stop_reason = stop_reason  # type: ignore[attr-defined]
+            raise error
         return batch, stop_reason
 
 
@@ -109,7 +147,10 @@ class ParallelAttemptExecutor:
         results: list[SingleRunResult | None] = [None] * len(providers)
         cancel_event = Event()
         winner_lock = Lock()
+        failure_lock = Lock()
+        failure_indices: set[int] = set()
         winner_index: int | None = None
+        failure_summaries: list[ProviderFailureSummary] = []
 
         cancel_message = "parallel-any cancelled after winner"
 
@@ -175,6 +216,24 @@ class ParallelAttemptExecutor:
                     if config.mode == "parallel-any":
                         if result.metrics.status != "ok":
                             results[index] = result
+                            with failure_lock:
+                                failure_summaries.append(
+                                    ProviderFailureSummary(
+                                        index=index,
+                                        provider=provider_config.provider,
+                                        status=result.metrics.status,
+                                        failure_kind=result.metrics.failure_kind,
+                                        error_message=result.metrics.error_message,
+                                        backoff_next_provider=result.backoff_next_provider,
+                                        retries=result.metrics.retries,
+                                        error_type=(
+                                            type(result.error).__name__
+                                            if result.error
+                                            else None
+                                        ),
+                                    )
+                                )
+                                failure_indices.add(index)
                             raise RuntimeError("parallel-any failure")
                         with winner_lock:
                             if winner_index is None:
@@ -200,10 +259,13 @@ class ParallelAttemptExecutor:
             for index, (provider_config, provider) in enumerate(providers)
         ]
         if config.mode == "parallel-any":
+            caught_error: Exception | None = None
             try:
                 self._run_parallel_any_sync(workers, max_concurrency=max_workers)
-            except (self._parallel_execution_error, RuntimeError):
-                pass
+            except self._parallel_execution_error as exc:
+                caught_error = exc
+            except RuntimeError as exc:
+                caught_error = exc
         else:
             self._run_parallel_all_sync(workers, max_concurrency=max_workers)
 
@@ -211,6 +273,41 @@ class ParallelAttemptExecutor:
             for index, result in enumerate(results):
                 if result is None:
                     mark_cancelled(index)
+            success_found = any(
+                result is not None and result.metrics.status == "ok"
+                for result in results
+            )
+            if not success_found:
+                for index, result in enumerate(results):
+                    if result is None:
+                        continue
+                    if index in failure_indices:
+                        continue
+                    failure_summaries.append(
+                        ProviderFailureSummary(
+                            index=index,
+                            provider=providers[index][0].provider,
+                            status=result.metrics.status,
+                            failure_kind=result.metrics.failure_kind,
+                            error_message=result.metrics.error_message,
+                            backoff_next_provider=result.backoff_next_provider,
+                            retries=result.metrics.retries,
+                            error_type=(
+                                type(result.error).__name__ if result.error else None
+                            ),
+                        )
+                    )
+                    failure_indices.add(index)
+                error = self._parallel_execution_error("parallel-any failed")
+                error.failures = failure_summaries  # type: ignore[attr-defined]
+                error.batch = [
+                    (index, result)
+                    for index, result in enumerate(results)
+                    if result is not None
+                ]  # type: ignore[attr-defined]
+                if caught_error is not None:
+                    raise error from caught_error
+                raise error
 
         batch = [
             (index, result)

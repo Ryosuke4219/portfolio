@@ -12,6 +12,7 @@ import uuid
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
+    from src.llm_adapter.parallel_exec import ParallelExecutionError
 else:  # pragma: no cover - 実行時フォールバック
     try:
         from src.llm_adapter.provider_spi import (  # type: ignore[import-not-found]
@@ -38,11 +39,20 @@ else:  # pragma: no cover - 実行時フォールバック
                     total=self.tokens_in + self.tokens_out,
                 )
 
+    try:
+        from src.llm_adapter.parallel_exec import (  # type: ignore[import-not-found]
+            ParallelExecutionError,
+        )
+    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+        class ParallelExecutionError(RuntimeError):
+            """並列実行失敗のフォールバック."""
+
 from .aggregation_controller import AggregationController
 from .budgets import BudgetManager
 from .compare_runner_finalizer import TaskFinalizer
 from .config import ProviderConfig
 from .datasets import GoldenTask
+from .errors import AllFailedError
 from .metrics import BudgetSnapshot, compute_diff_rate, EvalMetrics, hash_text, now_ts, RunMetrics
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 from .runner_execution import (
@@ -189,14 +199,41 @@ class CompareRunner:
         for task in self.tasks:
             histories: list[list[SingleRunResult]] = [[] for _ in providers]
             for attempt in range(repeat):
-                if config.mode == "sequential":
-                    batch, stop_reason = execution.run_sequential_attempt(
-                        providers, task, attempt, config.mode
+                try:
+                    if config.mode == "sequential":
+                        batch, stop_reason = execution.run_sequential_attempt(
+                            providers, task, attempt, config.mode
+                        )
+                    else:
+                        batch, stop_reason = execution.run_parallel_attempt(
+                            providers, task, attempt, config
+                        )
+                except AllFailedError as exc:
+                    batch = getattr(exc, "batch", [])
+                    self._log_attempt_failures(config.mode, getattr(exc, "failures", ()))
+                    if batch:
+                        self._record_failed_batch(
+                            batch,
+                            config,
+                            histories,
+                        )
+                    LOGGER.error(
+                        "タスク%sの試行%dで全プロバイダ失敗", task.task_id, attempt, exc_info=exc
                     )
-                else:
-                    batch, stop_reason = execution.run_parallel_attempt(
-                        providers, task, attempt, config
+                    raise
+                except ParallelExecutionError as exc:
+                    batch = getattr(exc, "batch", [])
+                    self._log_attempt_failures(config.mode, getattr(exc, "failures", ()))
+                    if batch:
+                        self._record_failed_batch(
+                            batch,
+                            config,
+                            histories,
+                        )
+                    LOGGER.error(
+                        "タスク%sの並列実行に失敗", task.task_id, exc_info=exc
                     )
+                    raise
                 self._aggregation.apply(
                     mode=config.mode,
                     config=config,
@@ -212,6 +249,38 @@ class CompareRunner:
                 LOGGER.warning("予算制約により実行を停止します: %s", stop_reason)
                 break
         return results
+
+    def _record_failed_batch(
+        self,
+        batch: Sequence[tuple[int, SingleRunResult]],
+        config: RunnerConfig,
+        histories: list[list[SingleRunResult]],
+    ) -> None:
+        self._aggregation.apply(
+            mode=config.mode,
+            config=config,
+            batch=batch,
+            default_judge_config=self._judge_provider_config,
+        )
+        for index, result in batch:
+            histories[index].append(result)
+
+    def _log_attempt_failures(self, mode: str, failures: Sequence[object]) -> None:
+        if not failures:
+            return
+        for record in failures:
+            provider = getattr(record, "provider", None)
+            status = getattr(record, "status", None)
+            failure_kind = getattr(record, "failure_kind", None)
+            error_message = getattr(record, "error_message", None)
+            LOGGER.warning(
+                "モード%s: provider=%s status=%s failure=%s message=%s",
+                mode,
+                provider,
+                status,
+                failure_kind,
+                error_message,
+            )
 
 
     def _run_provider_call(
