@@ -1,7 +1,7 @@
 """Synchronous runner implementation."""
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import time
 from typing import cast
@@ -9,20 +9,15 @@ from typing import cast
 from .errors import (
     FatalError,
     ProviderSkip,
-    RateLimitError,
-    RetryableError,
-    SkipError,
-    TimeoutError,
 )
 from .observability import EventLogger
 from .parallel_exec import (
     ParallelAllResult,
-    ParallelExecutionError,
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from .runner_config import RunnerConfig, RunnerMode
+from .runner_config import RunnerConfig
 from .runner_shared import (
     estimate_cost,
     log_provider_call,
