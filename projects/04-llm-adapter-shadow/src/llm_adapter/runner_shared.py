@@ -303,9 +303,6 @@ def log_run_metric(
             "providers": providers,
             "trace_id": metadata.get("trace_id"),
             "project_id": metadata.get("project_id"),
-            "run_id": metadata.get("run_id"),
-            "mode": metadata.get("mode"),
-            "providers": metadata.get("providers"),
         },
     )
 
