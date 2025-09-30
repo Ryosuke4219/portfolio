@@ -13,7 +13,7 @@ __path__ = [str(_current_dir)]
 if _legacy_tools.exists():
     __path__.append(str(_legacy_tools))
 
-__all__ = []
+__all__: list[str] = []
 
 
 def _ensure_namespace(package: str, location: Path) -> ModuleType:

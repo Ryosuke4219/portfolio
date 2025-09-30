@@ -38,8 +38,15 @@ def test_sequential_run_metric_contains_required_fields(tmp_path: Path) -> None:
     assert event["mode"] == RunnerMode.SEQUENTIAL.value
     assert event["providers"] == ["primary"]
     assert event["provider_id"] == event["provider"]
-    assert event["cost_estimate"] == pytest.approx(event["cost_usd"])  # type: ignore[arg-type]
-    assert event["retries"] == event["attempts"] - 1  # type: ignore[operator]
+    cost_usd = event["cost_usd"]
+    assert isinstance(cost_usd, (int, float))
+    assert event["cost_estimate"] == pytest.approx(float(cost_usd))
+
+    attempts = event["attempts"]
+    assert isinstance(attempts, int)
+    retries = event["retries"]
+    assert isinstance(retries, int)
+    assert retries == attempts - 1
     assert event["outcome"] == "success"
     assert "shadow_provider_id" in event
 

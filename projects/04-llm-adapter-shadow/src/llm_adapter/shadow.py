@@ -55,7 +55,7 @@ def _make_shadow_payload(
 
 
 def _make_timeout_payload(provider_name: str | None, duration_ms: int | None) -> dict[str, Any]:
-    payload = {
+    payload: dict[str, Any] = {
         "provider": provider_name,
         "ok": False,
         "error": "ShadowTimeout",

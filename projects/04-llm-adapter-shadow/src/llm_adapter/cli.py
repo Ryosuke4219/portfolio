@@ -13,6 +13,7 @@ from .providers.factory import create_provider_from_spec, parse_provider_spec, P
 from .runner import AsyncRunner, Runner
 from .runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
+from .parallel_exec import ParallelAllResult
 
 _AGGREGATE: Mapping[str, str] = {
     "majority_vote": "majority",
@@ -142,17 +143,29 @@ def _format_output(response: ProviderResponse, fmt: str) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _coerce_response(
+    result: ProviderResponse | ParallelAllResult[Any, ProviderResponse]
+) -> ProviderResponse:
+    if isinstance(result, ParallelAllResult):
+        return result.primary_response
+    return result
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         runner, request, metrics_path = prepare_execution(args)
+        raw_response: ProviderResponse | ParallelAllResult[Any, ProviderResponse]
         if isinstance(runner, AsyncRunner):
-            response = asyncio.run(runner.run_async(request, shadow=None, shadow_metrics_path=metrics_path))
+            raw_response = asyncio.run(
+                runner.run_async(request, shadow=None, shadow_metrics_path=metrics_path)
+            )
         else:
-            response = runner.run(request, shadow=None, shadow_metrics_path=metrics_path)
+            raw_response = runner.run(request, shadow=None, shadow_metrics_path=metrics_path)
     except Exception as exc:  # noqa: BLE001
         print(f"Execution failed: {exc}", file=sys.stderr)
         return 1
+    response = _coerce_response(raw_response)
     print(_format_output(response, args.out_format))
     return 0
 
