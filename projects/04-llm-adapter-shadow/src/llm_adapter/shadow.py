@@ -55,6 +55,75 @@ def _tokens_total(res: ProviderResponse) -> int:
     return usage.total
 
 
+def _build_shadow_record(
+    *,
+    primary_provider_name: str,
+    primary_response: ProviderResponse,
+    request: ProviderRequest,
+    shadow_payload: Mapping[str, Any] | None,
+    shadow_name: str | None,
+) -> dict[str, Any]:
+    """Compose the metrics payload for a shadow run."""
+
+    payload: Mapping[str, Any] = shadow_payload or {"provider": shadow_name, "ok": False}
+    primary_text_len = len(primary_response.text)
+    request_fingerprint = content_hash(
+        "runner", request.prompt_text, request.options, request.max_tokens
+    )
+    record: dict[str, Any] = {
+        "request_hash": content_hash(
+            primary_provider_name, request.prompt_text, request.options, request.max_tokens
+        ),
+        "request_fingerprint": request_fingerprint,
+        "primary_provider": primary_provider_name,
+        "primary_latency_ms": primary_response.latency_ms,
+        "primary_text_len": primary_text_len,
+        "primary_token_usage_total": _tokens_total(primary_response),
+        "shadow_provider": payload.get("provider", shadow_name),
+        "shadow_ok": payload.get("ok"),
+        "shadow_latency_ms": payload.get("latency_ms"),
+        "shadow_duration_ms": payload.get("duration_ms"),
+        "shadow_error": payload.get("error"),
+    }
+
+    if payload.get("latency_ms") is not None:
+        record["latency_gap_ms"] = payload["latency_ms"] - primary_response.latency_ms
+
+    if payload.get("text_len") is not None:
+        record["shadow_text_len"] = payload["text_len"]
+
+    if payload.get("token_usage_total") is not None:
+        record["shadow_token_usage_total"] = payload["token_usage_total"]
+
+    if payload.get("message"):
+        record["shadow_error_message"] = payload["message"]
+
+    return record
+
+
+def _emit_shadow_metrics(
+    record: Mapping[str, Any],
+    *,
+    logger: EventLogger | None,
+    metrics_path: str | None,
+    capture_metrics: bool,
+) -> ShadowMetrics | None:
+    """Emit metrics or return them for deferred emission."""
+
+    event_logger = logger
+    if event_logger is None and metrics_path is not None:
+        event_logger = JsonlLogger(metrics_path)
+
+    if capture_metrics:
+        return ShadowMetrics(dict(record), event_logger)
+
+    if event_logger is not None:
+        metrics = ShadowMetrics(dict(record), event_logger)
+        metrics.emit()
+
+    return None
+
+
 def run_with_shadow(
     primary: ProviderSPI,
     shadow: ProviderSPI | None,
@@ -137,51 +206,19 @@ def run_with_shadow(
             shadow_payload = {"provider": shadow_name, "ok": False}
 
         if metrics_path_str:
-            primary_text_len = len(primary_res.text)
-            request_fingerprint = content_hash(
-                "runner", req.prompt_text, req.options, req.max_tokens
+            record = _build_shadow_record(
+                primary_provider_name=primary.name(),
+                primary_response=primary_res,
+                request=req,
+                shadow_payload=shadow_payload,
+                shadow_name=shadow_name,
             )
-            record: dict[str, Any] = {
-                "request_hash": content_hash(
-                    primary.name(), req.prompt_text, req.options, req.max_tokens
-                ),
-                "request_fingerprint": request_fingerprint,
-                "primary_provider": primary.name(),
-                "primary_latency_ms": primary_res.latency_ms,
-                "primary_text_len": primary_text_len,
-                "primary_token_usage_total": _tokens_total(primary_res),
-                "shadow_provider": shadow_payload.get("provider", shadow_name),
-                "shadow_ok": shadow_payload.get("ok"),
-                "shadow_latency_ms": shadow_payload.get("latency_ms"),
-                "shadow_duration_ms": shadow_payload.get("duration_ms"),
-                "shadow_error": shadow_payload.get("error"),
-            }
-
-            if shadow_payload.get("latency_ms") is not None:
-                record["latency_gap_ms"] = shadow_payload["latency_ms"] - primary_res.latency_ms
-
-            if shadow_payload.get("text_len") is not None:
-                record["shadow_text_len"] = shadow_payload["text_len"]
-
-            if shadow_payload.get("token_usage_total") is not None:
-                record["shadow_token_usage_total"] = shadow_payload["token_usage_total"]
-
-            if shadow_payload.get("message"):
-                record["shadow_error_message"] = shadow_payload["message"]
-
-            event_logger = logger
-            if event_logger is None and metrics_path_str is not None:
-                event_logger = JsonlLogger(metrics_path_str)
-
-            metrics: ShadowMetrics | None
-            if capture_metrics:
-                metrics = ShadowMetrics(record, event_logger)
-            elif event_logger is not None:
-                metrics = ShadowMetrics(record, event_logger)
-                metrics.emit()
-                metrics = None
-            else:
-                metrics = None
+            metrics = _emit_shadow_metrics(
+                record,
+                logger=logger,
+                metrics_path=metrics_path_str,
+                capture_metrics=capture_metrics,
+            )
 
             if capture_metrics:
                 return primary_res, metrics
@@ -273,51 +310,19 @@ async def run_with_shadow_async(
             shadow_payload = {"provider": shadow_name, "ok": False}
 
         if metrics_path_str:
-            primary_text_len = len(primary_res.text)
-            request_fingerprint = content_hash(
-                "runner", req.prompt_text, req.options, req.max_tokens
+            record = _build_shadow_record(
+                primary_provider_name=primary_async.name(),
+                primary_response=primary_res,
+                request=req,
+                shadow_payload=shadow_payload,
+                shadow_name=shadow_name,
             )
-            record: dict[str, Any] = {
-                "request_hash": content_hash(
-                    primary_async.name(), req.prompt_text, req.options, req.max_tokens
-                ),
-                "request_fingerprint": request_fingerprint,
-                "primary_provider": primary_async.name(),
-                "primary_latency_ms": primary_res.latency_ms,
-                "primary_text_len": primary_text_len,
-                "primary_token_usage_total": _tokens_total(primary_res),
-                "shadow_provider": shadow_payload.get("provider", shadow_name),
-                "shadow_ok": shadow_payload.get("ok"),
-                "shadow_latency_ms": shadow_payload.get("latency_ms"),
-                "shadow_duration_ms": shadow_payload.get("duration_ms"),
-                "shadow_error": shadow_payload.get("error"),
-            }
-
-            if shadow_payload.get("latency_ms") is not None:
-                record["latency_gap_ms"] = shadow_payload["latency_ms"] - primary_res.latency_ms
-
-            if shadow_payload.get("text_len") is not None:
-                record["shadow_text_len"] = shadow_payload["text_len"]
-
-            if shadow_payload.get("token_usage_total") is not None:
-                record["shadow_token_usage_total"] = shadow_payload["token_usage_total"]
-
-            if shadow_payload.get("message"):
-                record["shadow_error_message"] = shadow_payload["message"]
-
-            event_logger = logger
-            if event_logger is None and metrics_path_str is not None:
-                event_logger = JsonlLogger(metrics_path_str)
-
-            metrics: ShadowMetrics | None
-            if capture_metrics:
-                metrics = ShadowMetrics(record, event_logger)
-            elif event_logger is not None:
-                metrics = ShadowMetrics(record, event_logger)
-                metrics.emit()
-                metrics = None
-            else:
-                metrics = None
+            metrics = _emit_shadow_metrics(
+                record,
+                logger=logger,
+                metrics_path=metrics_path_str,
+                capture_metrics=capture_metrics,
+            )
 
             if capture_metrics:
                 return primary_res, metrics
