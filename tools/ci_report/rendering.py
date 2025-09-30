@@ -6,7 +6,7 @@ from pathlib import Path
 from collections.abc import Iterable
 from typing import Any
 
-from tools.weekly_summary import format_percentage
+from tools import weekly_summary
 
 
 def build_json_payload(
@@ -85,7 +85,7 @@ def render_markdown(
         else "-"
     )
     pass_rate_args = {
-        "pass_rate": format_percentage(pass_rate),
+        "pass_rate": weekly_summary.format_percentage(pass_rate),
         "passes": totals["passes"],
         "executions": totals["executions"],
     }
