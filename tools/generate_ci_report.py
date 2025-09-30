@@ -8,7 +8,6 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -146,7 +145,7 @@ def build_json_payload(
     flaky_rows: list[dict[str, object]],
     last_updated: str | None,
     recent_runs: list[dict[str, object]],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     total = passes + fails + errors
     pass_rate = (passes / total) if total else None
     return {
