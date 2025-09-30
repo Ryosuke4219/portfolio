@@ -4,18 +4,11 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 import time
-from typing import Any, cast
+from typing import Any
 
 from ._event_loop import ensure_socket_free_event_loop_policy
-from .errors import (
-    FatalError,
-    ProviderSkip,
-    RateLimitError,
-    RetryableError,
-    SkipError,
-)
 from .observability import EventLogger
-from .parallel_exec import ParallelAllResult, ParallelExecutionError
+from .parallel_exec import ParallelAllResult
 from .provider_spi import (
     AsyncProviderSPI,
     ensure_async_provider,
@@ -26,25 +19,23 @@ from .provider_spi import (
 from .runner_async_modes import (
     AsyncRunContext,
     AsyncRunStrategy,
-    collect_failure_details,
     ConsensusRunStrategy,
     ParallelAllRunStrategy,
     ParallelAnyRunStrategy,
     SequentialRunStrategy,
     WorkerResult,
 )
+from .runner_async_support import AsyncProviderInvoker, emit_consensus_failure
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_shared import (
     error_family,
-    log_provider_call,
-    log_provider_skipped,
     log_run_metric,
     MetricsPath,
     RateLimiter,
     resolve_event_logger,
     resolve_rate_limiter,
 )
-from .shadow import DEFAULT_METRICS_PATH, run_with_shadow_async, ShadowMetrics
+from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics
 from .utils import content_hash, elapsed_ms
 
 ensure_socket_free_event_loop_policy()
@@ -68,152 +59,7 @@ class AsyncRunner:
         self._logger = logger
         self._config = config or RunnerConfig()
         self._rate_limiter: RateLimiter | None = resolve_rate_limiter(self._config.rpm)
-
-    async def _invoke_provider_async(
-        self,
-        provider: ProviderSPI | AsyncProviderSPI,
-        async_provider: AsyncProviderSPI,
-        request: ProviderRequest,
-        *,
-        attempt: int,
-        total_providers: int,
-        event_logger: EventLogger | None,
-        request_fingerprint: str,
-        metadata: Mapping[str, Any],
-        shadow: ProviderSPI | AsyncProviderSPI | None,
-        shadow_async: AsyncProviderSPI | None,
-        metrics_path: str | None,
-        capture_shadow_metrics: bool,
-    ) -> tuple[ProviderResponse, ShadowMetrics | None]:
-        if self._rate_limiter is not None:
-            await self._rate_limiter.acquire_async()
-        attempt_started = time.time()
-        shadow_metrics: ShadowMetrics | None = None
-        response: ProviderResponse
-        try:
-            if capture_shadow_metrics:
-                response_with_metrics = await run_with_shadow_async(
-                    async_provider,
-                    shadow_async,
-                    request,
-                    metrics_path=metrics_path,
-                    logger=event_logger,
-                    capture_metrics=True,
-                )
-                response, shadow_metrics = cast(
-                    tuple[ProviderResponse, ShadowMetrics | None],
-                    response_with_metrics,
-                )
-            else:
-                response_only = await run_with_shadow_async(
-                    async_provider,
-                    shadow_async,
-                    request,
-                    metrics_path=metrics_path,
-                    logger=event_logger,
-                    capture_metrics=False,
-                )
-                response = cast(ProviderResponse, response_only)
-        except RateLimitError as err:
-            log_provider_call(
-                event_logger,
-                request_fingerprint=request_fingerprint,
-                provider=provider,
-                request=request,
-                attempt=attempt,
-                total_providers=total_providers,
-                status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
-                error=err,
-                metadata=metadata,
-                shadow_used=shadow is not None,
-                allow_private_model=True,
-            )
-            raise
-        except RetryableError as err:
-            log_provider_call(
-                event_logger,
-                request_fingerprint=request_fingerprint,
-                provider=provider,
-                request=request,
-                attempt=attempt,
-                total_providers=total_providers,
-                status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
-                error=err,
-                metadata=metadata,
-                shadow_used=shadow is not None,
-                allow_private_model=True,
-            )
-            raise
-        except SkipError as err:
-            if isinstance(err, ProviderSkip):
-                log_provider_skipped(
-                    event_logger,
-                    request_fingerprint=request_fingerprint,
-                    provider=provider,
-                    request=request,
-                    attempt=attempt,
-                    total_providers=total_providers,
-                    error=err,
-                )
-            log_provider_call(
-                event_logger,
-                request_fingerprint=request_fingerprint,
-                provider=provider,
-                request=request,
-                attempt=attempt,
-                total_providers=total_providers,
-                status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
-                error=err,
-                metadata=metadata,
-                shadow_used=shadow is not None,
-                allow_private_model=True,
-            )
-            raise
-        except FatalError as err:
-            log_provider_call(
-                event_logger,
-                request_fingerprint=request_fingerprint,
-                provider=provider,
-                request=request,
-                attempt=attempt,
-                total_providers=total_providers,
-                status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
-                error=err,
-                metadata=metadata,
-                shadow_used=shadow is not None,
-                allow_private_model=True,
-            )
-            raise
-        token_usage = response.token_usage
-        log_provider_call(
-            event_logger,
-            request_fingerprint=request_fingerprint,
-            provider=provider,
-            request=request,
-            attempt=attempt,
-            total_providers=total_providers,
-            status="ok",
-            latency_ms=response.latency_ms,
-            tokens_in=token_usage.prompt,
-            tokens_out=token_usage.completion,
-            error=None,
-            metadata=metadata,
-            shadow_used=shadow is not None,
-            allow_private_model=True,
-        )
-        return response, shadow_metrics
+        self._invoker = AsyncProviderInvoker(rate_limiter=self._rate_limiter)
 
     async def run_async(
         self,
@@ -247,7 +93,7 @@ class AsyncRunner:
             async_provider: AsyncProviderSPI,
             capture_shadow_metrics: bool,
         ) -> tuple[ProviderResponse, ShadowMetrics | None]:
-            return await self._invoke_provider_async(
+            return await self._invoker.invoke(
                 provider,
                 async_provider,
                 request,
@@ -301,28 +147,12 @@ class AsyncRunner:
         failure_details = strategy_result.failure_details
 
         if mode == RunnerMode.CONSENSUS:
-            if results is not None:
-                for _, _, _, metrics in results:
-                    if metrics is not None:
-                        metrics.emit()
-                no_success = not any(
-                    len(entry) >= 3 and entry[2] is not None for entry in results
-                )
-                if no_success and not failure_details:
-                    failure_details = collect_failure_details(context)
-            elif not failure_details:
-                failure_details = collect_failure_details(context)
-            if failure_details and (
-                last_err is None or not isinstance(last_err, ParallelExecutionError)
-            ):
-                detail_text = "; ".join(
-                    f"{item['provider']} (attempt {item['attempt']}): {item['summary']}"
-                    for item in failure_details
-                )
-                message = "all workers failed"
-                if detail_text:
-                    message = f"{message}: {detail_text}"
-                last_err = ParallelExecutionError(message, failures=failure_details)
+            failure_details, last_err = emit_consensus_failure(
+                context=context,
+                results=results,
+                failure_details=failure_details,
+                last_error=last_err,
+            )
 
         if event_logger is not None:
             event_logger.emit(
