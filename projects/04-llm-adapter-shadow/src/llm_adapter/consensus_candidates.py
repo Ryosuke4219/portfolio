@@ -17,7 +17,7 @@ class _Candidate:
     normalized: str
     text: str
     raw_text: str
-    entries: list[tuple[int, "ConsensusObservation"]] = field(default_factory=list)
+    entries: list[tuple[int, ConsensusObservation]] = field(default_factory=list)
     votes: int = 0
     score: float = 0.0
     best_score: float = 0.0
@@ -29,7 +29,7 @@ class _Candidate:
     def record(
         self,
         index: int,
-        observation: "ConsensusObservation",
+        observation: ConsensusObservation,
         weight: float,
     ) -> None:
         response = observation.response
@@ -59,7 +59,7 @@ class CandidateSet:
     @classmethod
     def from_observations(
         cls,
-        entries: Iterable[tuple[int, "ConsensusObservation"]],
+        entries: Iterable[tuple[int, ConsensusObservation]],
         provider_weights: Mapping[str, float] | None,
     ) -> CandidateSet:
         candidates: dict[str, _Candidate] = {}
@@ -207,8 +207,8 @@ def _apply_tie_breaker(
 
 
 def validate_consensus_schema(
-    responses: Sequence["ConsensusObservation"], schema: str | None
-) -> tuple[list[tuple[int, "ConsensusObservation"]], dict[int, str], bool]:
+    responses: Sequence[ConsensusObservation], schema: str | None
+) -> tuple[list[tuple[int, ConsensusObservation]], dict[int, str], bool]:
     if not schema:
         return list(enumerate(responses)), {}, False
 
@@ -219,7 +219,7 @@ def validate_consensus_schema(
     if not isinstance(schema_spec, Mapping):
         raise ValueError("invalid consensus schema")
 
-    valid_entries: list[tuple[int, "ConsensusObservation"]] = []
+    valid_entries: list[tuple[int, ConsensusObservation]] = []
     failures: dict[int, str] = {}
     expected_type = schema_spec.get("type")
     required_fields = [str(field) for field in schema_spec.get("required", [])]
@@ -246,7 +246,7 @@ def validate_consensus_schema(
 
 
 def _resolve_latency(
-    observation: "ConsensusObservation", response: ProviderResponse
+    observation: ConsensusObservation, response: ProviderResponse
 ) -> int:
     if observation.latency_ms is not None:
         return int(observation.latency_ms)
@@ -254,7 +254,7 @@ def _resolve_latency(
 
 
 def _resolve_cost(
-    observation: "ConsensusObservation", response: ProviderResponse
+    observation: ConsensusObservation, response: ProviderResponse
 ) -> float:
     if observation.cost_estimate is not None:
         return float(observation.cost_estimate)
