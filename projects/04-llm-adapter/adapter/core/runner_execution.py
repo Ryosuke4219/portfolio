@@ -59,7 +59,7 @@ else:  # pragma: no cover - 実行時フォールバック
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .execution.guards import _SchemaValidator, _TokenBucket
-from .metrics import BudgetSnapshot, RunMetrics, estimate_cost
+from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
 from .provider_spi import ProviderRequest
 from .providers import BaseProvider, ProviderResponse
 
