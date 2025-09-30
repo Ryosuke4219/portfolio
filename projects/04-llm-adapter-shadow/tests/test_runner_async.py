@@ -151,7 +151,7 @@ def _patch_runner_sleep(
         await clock.async_sleep(duration)
 
     monkeypatch.setattr("src.llm_adapter.runner_async.asyncio.sleep", _fake_sleep)
-    monkeypatch.setattr("src.llm_adapter.runner_parallel.asyncio.sleep", _fake_sleep)
+    monkeypatch.setattr("src.llm_adapter.parallel_exec.asyncio.sleep", _fake_sleep)
 
 
 def test_async_runner_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
