@@ -44,6 +44,7 @@ class ParallelAnyCallable(Protocol):
         workers: Sequence[Callable[[], ProviderInvocationResult]],
         *,
         max_concurrency: int | None = ...,
+        on_cancelled: Callable[[Sequence[int]], None] | None = ...,
     ) -> ProviderInvocationResult:
         ...
 
@@ -300,9 +301,17 @@ class ParallelAnyStrategy:
             _raise_no_attempts(context)
 
         attempts_override: dict[int, int] | None = None
+        cancelled_slots: tuple[int, ...] = ()
+
+        def _record_cancelled(indices: Sequence[int]) -> None:
+            nonlocal cancelled_slots
+            cancelled_slots = tuple(indices)
+
         try:
             winner = context.run_parallel_any(
-                workers, max_concurrency=runner._config.max_concurrency
+                workers,
+                max_concurrency=runner._config.max_concurrency,
+                on_cancelled=_record_cancelled,
             )
             fatal = runner._extract_fatal_error(results)
             if fatal is not None:
@@ -321,6 +330,14 @@ class ParallelAnyStrategy:
                 raise fatal from None
             raise exc
         finally:
+            if cancelled_slots:
+                runner._apply_cancelled_results(
+                    results,
+                    providers=providers,
+                    cancelled_indices=cancelled_slots,
+                    total_providers=total_providers,
+                    run_started=context.run_started,
+                )
             runner._log_parallel_results(
                 results,
                 event_logger=context.event_logger,

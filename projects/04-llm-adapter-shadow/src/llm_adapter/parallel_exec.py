@@ -89,40 +89,56 @@ def _normalize_concurrency(total: int, limit: int | None) -> int:
 
 
 def run_parallel_any_sync(
-    workers: Sequence[SyncWorker[T]], *, max_concurrency: int | None = None
+    workers: Sequence[SyncWorker[T]],
+    *,
+    max_concurrency: int | None = None,
+    on_cancelled: Callable[[Sequence[int]], None] | None = None,
 ) -> T:
     """Execute workers concurrently until the first success."""
 
     if not workers:
         raise ValueError("workers must not be empty")
-    max_workers = _normalize_concurrency(len(workers), max_concurrency)
+    total_workers = len(workers)
+    max_workers = _normalize_concurrency(total_workers, max_concurrency)
     errors: list[BaseException] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        worker_iter = iter(enumerate(workers))
         future_map: dict[Future[T], int] = {}
+        next_index = 0
 
         def _submit_next() -> None:
-            try:
-                idx, worker = next(worker_iter)
-            except StopIteration:
+            nonlocal next_index
+            if next_index >= total_workers:
                 return
-            future_map[executor.submit(worker)] = idx
+            idx = next_index
+            next_index += 1
+            future_map[executor.submit(workers[idx])] = idx
 
-        for _ in range(max_workers):
+        for _ in range(min(max_workers, total_workers)):
             _submit_next()
 
         while future_map:
             done, _ = wait(future_map, return_when=FIRST_COMPLETED)
             for future in done:
-                future_map.pop(future, None)
+                index = future_map.pop(future, None)
+                if index is None:
+                    continue
                 try:
                     result = future.result()
                 except BaseException as exc:  # noqa: BLE001
                     errors.append(exc)
                     _submit_next()
                     continue
+                cancelled: tuple[int, ...] = ()
+                if on_cancelled is not None:
+                    pending = list(future_map.values())
+                    if next_index < total_workers:
+                        pending.extend(range(next_index, total_workers))
+                    if pending:
+                        cancelled = tuple(sorted(pending))
                 for pending in list(future_map):
                     pending.cancel()
+                if on_cancelled is not None and cancelled:
+                    on_cancelled(cancelled)
                 return result
     raise ParallelExecutionError("all workers failed") from errors[-1] if errors else None
 
