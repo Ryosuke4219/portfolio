@@ -3,35 +3,35 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import datetime as dt
 import json
-import sys
-from collections import Counter
 from pathlib import Path
+import sys
 from typing import Any
 
-import weekly_summary
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from ci_metrics import compute_recent_deltas, compute_run_history
-from weekly_summary import (
-    aggregate_status,
-    filter_by_window,
-    load_flaky,
-    load_runs,
-    select_flaky_rows,
-)
-from weekly_summary import coerce_str, format_percentage, to_float
-
 from tools.ci_report.processing import (
     compute_last_updated,
     normalize_flaky_rows,
     summarize_failure_kinds,
 )
 from tools.ci_report.rendering import build_json_payload, render_markdown
+from weekly_summary import (
+    aggregate_status,
+    coerce_str,
+    filter_by_window,
+    format_percentage,
+    load_flaky,
+    load_runs,
+    parse_iso8601,
+    select_flaky_rows,
+    to_float,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,7 +75,7 @@ def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
 def summarize_failure_kinds(
     runs: list[dict[str, object]], limit: int = 3
 ) -> list[dict[str, object]]:
-    counter: Counter[str] = Counter()
+    counter: collections.Counter[str] = collections.Counter()
     for run in runs:
         status_raw = coerce_str(run.get("status"))
         if status_raw is None:
@@ -148,7 +148,7 @@ def build_json_payload(
     flaky_rows: list[dict[str, object]],
     last_updated: str | None,
     recent_runs: list[dict[str, object]],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     total = passes + fails + errors
     pass_rate = (passes / total) if total else None
     return {
