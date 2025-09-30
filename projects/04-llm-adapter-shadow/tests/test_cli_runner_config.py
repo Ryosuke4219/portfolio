@@ -8,10 +8,10 @@ import pytest
 from src.llm_adapter import cli
 from src.llm_adapter.runner import AsyncRunner, Runner
 from src.llm_adapter.runner_config import (
+    ConsensusConfig,
     DEFAULT_MAX_CONCURRENCY,
     RunnerConfig,
     RunnerMode,
-    ConsensusConfig,
 )
 from src.llm_adapter.shadow import DEFAULT_METRICS_PATH
 
