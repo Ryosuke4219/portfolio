@@ -8,13 +8,7 @@ import datetime as dt
 from pathlib import Path
 import re
 
-from .io import (
-    coerce_str,
-    filter_by_window,
-    load_flaky,
-    load_runs,
-    parse_iso8601,
-)
+from .io import filter_by_window, load_flaky, load_runs, parse_iso8601
 
 __all__ = [
     "parse_iso8601",
@@ -107,7 +101,7 @@ def coerce_str(value: object | None) -> str | None:
     if isinstance(value, str):
         stripped = value.strip()
         return stripped or None
-    if isinstance(value, bool | int | float):
+    if isinstance(value, (bool, int, float)):
         return str(value)
     return None
 
@@ -116,7 +110,7 @@ def to_float(value: object) -> float | None:
         return None
     if isinstance(value, bool):
         return float(value)
-    if isinstance(value, int | float):
+    if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
         s = value.strip()
