@@ -10,28 +10,43 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from ci_metrics import compute_recent_deltas, compute_run_history
-from tools.ci_report.processing import (
-    compute_last_updated,
-    normalize_flaky_rows,
-    summarize_failure_kinds,
-)
-from tools.ci_report.rendering import build_json_payload, render_markdown
-from weekly_summary import (
-    aggregate_status,
-    coerce_str,
-    filter_by_window,
-    format_percentage,
-    load_flaky,
-    load_runs,
-    parse_iso8601,
-    select_flaky_rows,
-    to_float,
-)
+try:
+    from ci_metrics import compute_recent_deltas, compute_run_history
+    from weekly_summary import (
+        aggregate_status,
+        filter_by_window,
+        load_flaky,
+        load_runs,
+        select_flaky_rows,
+    )
+    from weekly_summary import coerce_str, format_percentage, parse_iso8601, to_float
+    from tools.ci_report.processing import (
+        compute_last_updated,
+        normalize_flaky_rows,
+        summarize_failure_kinds,
+    )
+    from tools.ci_report.rendering import build_json_payload, render_markdown
+except ModuleNotFoundError:  # pragma: no cover - fallback for direct execution
+    REPO_ROOT = Path(__file__).resolve().parents[1]
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+    from ci_metrics import compute_recent_deltas, compute_run_history
+    from weekly_summary import (
+        aggregate_status,
+        filter_by_window,
+        load_flaky,
+        load_runs,
+        select_flaky_rows,
+    )
+    from weekly_summary import coerce_str, format_percentage, parse_iso8601, to_float
+    from tools.ci_report.processing import (
+        compute_last_updated,
+        normalize_flaky_rows,
+        summarize_failure_kinds,
+    )
+    from tools.ci_report.rendering import build_json_payload, render_markdown
+
 
 
 def parse_args() -> argparse.Namespace:
