@@ -192,6 +192,8 @@ class AsyncRunner:
             shadow_used=shadow is not None,
         )
         if last_err is not None:
+            if mode == RunnerMode.CONSENSUS or total_providers <= 1:
+                raise last_err
             raise failure_error from last_err
         raise failure_error
 
