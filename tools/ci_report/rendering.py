@@ -50,9 +50,9 @@ def _format_flaky_markdown(rows: Iterable[dict[str, object]]) -> list[str]:
         return lines
     for row in materialized:
         p_fail_value = row.get("p_fail")
-        p_fail = float(p_fail_value) if isinstance(p_fail_value, (int, float)) else None
+        p_fail = weekly_summary.to_float(p_fail_value)
         score_value = row.get("score")
-        score = float(score_value) if isinstance(score_value, (int, float)) else None
+        score = weekly_summary.to_float(score_value)
         lines.append(
             "| {rank} | {cid} | {attempts} | {p_fail:.2f} | {score:.2f} |".format(
                 rank=row.get("rank", "-"),

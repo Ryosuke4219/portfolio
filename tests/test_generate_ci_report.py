@@ -52,3 +52,28 @@ def test_render_markdown_includes_summary(sample_runs: list[dict[str, object]]) 
 
     assert any("# QA Reliability Snapshot — 2024-06-05" in line for line in markdown)
     assert any("flake 2" in line for line in markdown)
+
+
+def test_render_markdown_formats_numeric_strings() -> None:
+    markdown = render_markdown(
+        today=dt.date(2024, 6, 5),
+        window_days=7,
+        totals={"passes": 1, "fails": 0, "errors": 0, "executions": 1},
+        pass_rate=1.0,
+        failure_kinds=[],
+        flaky_rows=[
+            {
+                "rank": 1,
+                "canonical_id": "sample",
+                "attempts": "3",
+                "p_fail": "0.25",
+                "score": "0.5",
+            }
+        ],
+        last_updated="2024-06-05T09:00:00Z",
+        runs_path=Path("runs.jsonl"),
+        flaky_path=Path("flaky.csv"),
+    )
+
+    table_line = next(line for line in markdown if line.startswith("| 1 |"))
+    assert table_line.endswith("| 3 | 0.25 | 0.50 |")
