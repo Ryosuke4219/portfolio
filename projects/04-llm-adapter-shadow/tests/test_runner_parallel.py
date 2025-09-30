@@ -11,6 +11,12 @@ from typing import Any, cast
 import pytest
 
 from src.llm_adapter.errors import RateLimitError, TimeoutError
+from src.llm_adapter.parallel_exec import (
+    ParallelExecutionError,
+    run_parallel_all_async,
+    run_parallel_all_sync,
+    run_parallel_any_sync,
+)
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
     ProviderResponse,
@@ -18,12 +24,6 @@ from src.llm_adapter.provider_spi import (
     TokenUsage,
 )
 from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.parallel_exec import (
-    ParallelExecutionError,
-    run_parallel_all_async,
-    run_parallel_all_sync,
-    run_parallel_any_sync,
-)
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import compute_consensus, ConsensusConfig
