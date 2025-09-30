@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
 from .provider_spi import ProviderSPI, ProviderResponse
-from .runner_parallel import compute_consensus
+from .runner_parallel import ConsensusInput, compute_consensus
 from .shadow import ShadowMetrics
 from .utils import content_hash
 from .runner_sync_modes import _limited_providers, _raise_no_attempts
@@ -102,9 +102,16 @@ class ConsensusStrategy:
                     message = f"{message}: {detail_text}"
                 error = ParallelExecutionError(message, failures=failure_details)
                 raise error
-            responses_for_consensus = [response for _, response in successful]
+            consensus_inputs = [
+                ConsensusInput(
+                    provider=invocation.provider,
+                    response=response,
+                    order=index,
+                )
+                for index, (invocation, response) in enumerate(successful)
+            ]
             consensus = compute_consensus(
-                responses_for_consensus,
+                consensus_inputs,
                 config=runner._config.consensus,
             )
             winner_invocation = next(
@@ -116,6 +123,12 @@ class ConsensusStrategy:
                 consensus.total_voters - consensus.votes - consensus.abstained
             )
             event_logger = context.event_logger
+            strategy_value = getattr(consensus.strategy, "value", consensus.strategy)
+            tie_breaker_value = (
+                getattr(consensus.tie_breaker, "value", consensus.tie_breaker)
+                if consensus.tie_breaker is not None
+                else None
+            )
             if event_logger is not None:
                 candidate_summaries = [
                     {
@@ -130,8 +143,8 @@ class ConsensusStrategy:
                     "consensus_vote",
                     {
                         "request_fingerprint": context.request_fingerprint,
-                        "strategy": consensus.strategy,
-                        "tie_breaker": consensus.tie_breaker,
+                        "strategy": strategy_value,
+                        "tie_breaker": tie_breaker_value,
                         "min_votes": consensus.min_votes,
                         "score_threshold": consensus.score_threshold,
                         "voters_total": consensus.total_voters,

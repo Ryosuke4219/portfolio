@@ -30,6 +30,7 @@ from src.llm_adapter.runner_parallel import (
     _normalize_candidate_text,
     compute_consensus,
     ConsensusConfig,
+    ConsensusInput,
 )
 from src.llm_adapter.runner_sync import Runner
 from src.llm_adapter.shadow import run_with_shadow
@@ -117,6 +118,20 @@ class _RetryProbeProvider:
         )
 
 
+class _StubProvider:
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - unused
+        raise NotImplementedError
+
+
 class _RecordingThreadPoolExecutor(ThreadPoolExecutor):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -180,12 +195,20 @@ def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
         tuple(_worker_for(provider, request) for provider in providers)
     )
     assert [res.text for res in collected] == ["echo(p1): hello", "echo(p2): hello"]
-    responses = [ProviderResponse("A", 0), ProviderResponse("A", 0), ProviderResponse("B", 0)]
-    result = compute_consensus(responses, config=ConsensusConfig(quorum=2))
+    responses = [
+        ProviderResponse("A", 0),
+        ProviderResponse("A", 0),
+        ProviderResponse("B", 0),
+    ]
+    entries = [
+        ConsensusInput(provider=_StubProvider(f"p{index}"), response=response, order=index)
+        for index, response in enumerate(responses)
+    ]
+    result = compute_consensus(entries, config=ConsensusConfig())
     assert result.response.text == "A"
     assert result.votes == 2
     with pytest.raises(ParallelExecutionError):
-        compute_consensus(responses, config=ConsensusConfig(quorum=3))
+        compute_consensus(entries, config=ConsensusConfig(quorum=3))
 
 
 def test_compute_consensus_accepts_numeric_scores() -> None:
@@ -193,14 +216,72 @@ def test_compute_consensus_accepts_numeric_scores() -> None:
         ProviderResponse(text="int", latency_ms=0, raw={"score": 1}),
         ProviderResponse(text="float", latency_ms=0, raw={"score": 1.5}),
     ]
+    entries = [
+        ConsensusInput(provider=_StubProvider(f"p{index}"), response=response, order=index)
+        for index, response in enumerate(responses)
+    ]
 
     result = compute_consensus(
-        responses,
-        config=ConsensusConfig(strategy="weighted", quorum=1),
+        entries,
+        config=ConsensusConfig(strategy="max_score", quorum=1),
     )
 
     assert result.response.text == "float"
     assert result.scores == {"int": 1.0, "float": 1.5}
+
+
+def test_weighted_vote_uses_provider_weights() -> None:
+    responses = [
+        ProviderResponse(text="alpha", latency_ms=12),
+        ProviderResponse(text="beta", latency_ms=10),
+        ProviderResponse(text="alpha", latency_ms=8),
+    ]
+    providers = [
+        _StubProvider("primary"),
+        _StubProvider("shadow"),
+        _StubProvider("observer"),
+    ]
+    entries = [
+        ConsensusInput(provider=provider, response=response, order=index)
+        for index, (provider, response) in enumerate(zip(providers, responses, strict=True))
+    ]
+
+    result = compute_consensus(
+        entries,
+        config=ConsensusConfig(
+            strategy="weighted_vote",
+            quorum=2,
+            provider_weights={"primary": 0.5, "shadow": 2.0, "observer": 1.0},
+        ),
+    )
+
+    assert result.response.text == "beta"
+    assert result.tie_break_applied is False
+
+
+def test_tie_breaker_falls_back_to_stable_order() -> None:
+    responses = [
+        ProviderResponse(text="alpha", latency_ms=50, tokens_in=5, tokens_out=5),
+        ProviderResponse(text="beta", latency_ms=50, tokens_in=2, tokens_out=3),
+        ProviderResponse(text="gamma", latency_ms=50, tokens_in=2, tokens_out=3),
+    ]
+    providers = [
+        _StubProvider("p1"),
+        _StubProvider("p2"),
+        _StubProvider("p3"),
+    ]
+    entries = [
+        ConsensusInput(provider=provider, response=response, order=index)
+        for index, (provider, response) in enumerate(zip(providers, responses, strict=True))
+    ]
+
+    result = compute_consensus(
+        entries, config=ConsensusConfig(strategy="majority_vote", quorum=1)
+    )
+
+    assert result.response.text == "beta"
+    assert result.tie_break_applied is True
+    assert result.tie_breaker_selected == "stable_order"
 
 
 def test_normalize_candidate_text_for_strings() -> None:
@@ -525,7 +606,7 @@ def test_consensus_vote_event_and_shadow_delta(
     consensus_event = next(
         item for item in payloads if item.get("event") == "consensus_vote"
     )
-    assert consensus_event["strategy"] == "majority"
+    assert consensus_event["strategy"] == "majority_vote"
     assert consensus_event["voters_total"] == 3
     assert consensus_event["votes_for"] == 2
     assert consensus_event["votes_against"] == 1

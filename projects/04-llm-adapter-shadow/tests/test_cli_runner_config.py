@@ -7,7 +7,12 @@ import pytest
 
 from src.llm_adapter import cli
 from src.llm_adapter.runner import AsyncRunner, Runner
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from src.llm_adapter.runner_config import (
+    ConsensusStrategy,
+    ConsensusTieBreaker,
+    RunnerConfig,
+    RunnerMode,
+)
 from src.llm_adapter.shadow import DEFAULT_METRICS_PATH
 
 
@@ -80,9 +85,9 @@ def test_cli_prepare_execution_with_consensus(tmp_path: Path) -> None:
     assert config.mode is RunnerMode.CONSENSUS
     consensus = config.consensus
     assert consensus is not None
-    assert consensus.strategy == "max_score"
+    assert consensus.strategy is ConsensusStrategy.MAX_SCORE
     assert consensus.quorum == 3
-    assert consensus.tie_breaker == "latency"
+    assert consensus.tie_breaker is ConsensusTieBreaker.MIN_LATENCY
     assert consensus.schema == schema_path.read_text(encoding="utf-8")
     assert consensus.judge == "pkg:judge"
     assert consensus.provider_weights == {"mock:fast": 1.0, "mock:slow": 0.5}

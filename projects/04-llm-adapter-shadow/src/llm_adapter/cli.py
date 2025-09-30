@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -11,19 +12,21 @@ from typing import Any
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .providers.factory import create_provider_from_spec, parse_provider_spec, ProviderFactory
 from .runner import AsyncRunner, Runner
-from .runner_config import ConsensusConfig, RunnerConfig, RunnerMode
+from .runner_config import (
+    ConsensusConfig,
+    ConsensusStrategy,
+    ConsensusTieBreaker,
+    RunnerConfig,
+    RunnerMode,
+)
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
-_AGGREGATE: Mapping[str, str] = {
-    "majority_vote": "majority",
-    "max_score": "max_score",
-    "weighted_vote": "weighted",
-}
-_TIE: Mapping[str, str | None] = {
-    "min_latency": "latency",
-    "min_cost": "cost",
-    "stable_order": None,
-}
+_AGGREGATE_CHOICES: tuple[str, ...] = tuple(
+    strategy.value for strategy in ConsensusStrategy
+)
+_TIE_CHOICES: tuple[str, ...] = tuple(
+    breaker.value for breaker in ConsensusTieBreaker
+)
 
 
 def _parse_csv(value: str) -> tuple[str, ...]:
@@ -54,12 +57,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--providers", required=True, type=_parse_csv)
     parser.add_argument("--max-concurrency", dest="max_concurrency", type=int)
     parser.add_argument("--rpm", type=int)
-    parser.add_argument("--aggregate", choices=tuple(_AGGREGATE))
+    parser.add_argument("--aggregate", choices=_AGGREGATE_CHOICES)
     parser.add_argument("--quorum", type=int)
-    parser.add_argument("--tie-breaker", choices=tuple(_TIE), dest="tie_breaker")
+    parser.add_argument("--tie-breaker", choices=_TIE_CHOICES, dest="tie_breaker")
     parser.add_argument("--schema")
     parser.add_argument("--judge")
     parser.add_argument("--weights", type=_parse_weights)
+    parser.add_argument("--shadow-provider", dest="shadow_provider")
     parser.add_argument("--input", required=True)
     parser.add_argument("--out-format", dest="out_format", default="text", choices=("text", "json", "jsonl"))
     parser.add_argument("--metrics")
@@ -79,11 +83,11 @@ def _build_consensus_config(args: argparse.Namespace) -> ConsensusConfig | None:
         return None
     payload: dict[str, Any] = {}
     if args.aggregate:
-        payload["strategy"] = _AGGREGATE[args.aggregate]
+        payload["strategy"] = args.aggregate
     if args.quorum is not None:
         payload["quorum"] = args.quorum
     if args.tie_breaker is not None:
-        payload["tie_breaker"] = _TIE[args.tie_breaker]
+        payload["tie_breaker"] = args.tie_breaker
     if schema_text is not None:
         payload["schema"] = schema_text
     if args.judge is not None:
@@ -93,12 +97,22 @@ def _build_consensus_config(args: argparse.Namespace) -> ConsensusConfig | None:
     return ConsensusConfig(**payload)
 
 
-def build_runner_config(args: argparse.Namespace) -> RunnerConfig:
+def build_runner_config(
+    args: argparse.Namespace, shadow_provider: ProviderSPI | None = None
+) -> RunnerConfig:
+    consensus = _build_consensus_config(args)
+    if (
+        consensus is not None
+        and shadow_provider is not None
+        and consensus.shadow_provider is None
+    ):
+        consensus = replace(consensus, shadow_provider=shadow_provider)
     return RunnerConfig(
         mode=RunnerMode(args.mode.replace("-", "_")),
         max_concurrency=args.max_concurrency,
         rpm=args.rpm,
-        consensus=_build_consensus_config(args),
+        consensus=consensus,
+        shadow_provider=shadow_provider,
     )
 
 
@@ -128,7 +142,12 @@ def prepare_execution(
         prompt=Path(args.input).read_text(encoding="utf-8") if args.input != "-" else sys.stdin.read(),
         model=_resolve_model_name(args.providers[0], providers[0]),
     )
-    config = build_runner_config(args)
+    shadow_provider: ProviderSPI | None = None
+    if args.shadow_provider:
+        shadow_provider = create_provider_from_spec(
+            args.shadow_provider, factories=factories
+        )
+    config = build_runner_config(args, shadow_provider=shadow_provider)
     metrics_path: MetricsPath = args.metrics or DEFAULT_METRICS_PATH
     use_async = async_mode if async_mode is not None else args.async_runner
     runner: Runner | AsyncRunner = AsyncRunner(providers, config=config) if use_async else Runner(providers, config=config)
