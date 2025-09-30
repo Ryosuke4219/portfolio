@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol, TYPE_CHECKING
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
@@ -25,7 +25,7 @@ class _ParallelRunner(Protocol):
 
 _RunSingle = Callable[
     [ProviderConfig, BaseProvider, GoldenTask, int, str],
-    "SingleRunResult",
+    SingleRunResult,
 ]
 
 
@@ -41,8 +41,8 @@ class SequentialAttemptExecutor:
         task: GoldenTask,
         attempt_index: int,
         mode: str,
-    ) -> tuple[list[tuple[int, "SingleRunResult"]], str | None]:
-        batch: list[tuple[int, "SingleRunResult"]] = []
+    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
+        batch: list[tuple[int, SingleRunResult]] = []
         stop_reason: str | None = None
         for index, (provider_config, provider) in enumerate(providers):
             result = self._run_single(provider_config, provider, task, attempt_index, mode)
@@ -75,8 +75,8 @@ class ParallelAttemptExecutor:
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
-        config: "RunnerConfig",
-    ) -> tuple[list[tuple[int, "SingleRunResult"]], str | None]:
+        config: RunnerConfig,
+    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
             return [], None
 
@@ -84,7 +84,7 @@ class ParallelAttemptExecutor:
         max_workers = self._normalize_concurrency(len(providers), max_concurrency)
 
         stop_reason: str | None = None
-        results: list["SingleRunResult" | None] = [None] * len(providers)
+        results: list[SingleRunResult | None] = [None] * len(providers)
 
         def build_worker(
             index: int, provider_config: ProviderConfig, provider: BaseProvider
