@@ -13,7 +13,6 @@ from .errors import (
     RateLimitError,
     RetryableError,
     SkipError,
-    TimeoutError,
 )
 from .observability import EventLogger
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
@@ -34,10 +33,8 @@ from .runner_async_modes import (
     WorkerResult,
 )
 from .runner_config import RunnerConfig, RunnerMode
-from .runner_parallel import compute_consensus
 from .runner_shared import (
     error_family,
-    estimate_cost,
     log_provider_call,
     log_provider_skipped,
     log_run_metric,
