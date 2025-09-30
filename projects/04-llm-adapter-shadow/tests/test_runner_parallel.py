@@ -26,7 +26,11 @@ from src.llm_adapter.provider_spi import (
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
-from src.llm_adapter.runner_parallel import compute_consensus, ConsensusConfig
+from src.llm_adapter.runner_parallel import (
+    compute_consensus,
+    ConsensusConfig,
+    _normalize_candidate_text,
+)
 from src.llm_adapter.runner_sync import Runner
 from src.llm_adapter.shadow import run_with_shadow
 
@@ -197,6 +201,27 @@ def test_compute_consensus_accepts_numeric_scores() -> None:
 
     assert result.response.text == "float"
     assert result.scores == {"int": 1.0, "float": 1.5}
+
+
+def test_normalize_candidate_text_for_strings() -> None:
+    normalized_a, display_a = _normalize_candidate_text(" Foo   Bar ")
+    normalized_b, display_b = _normalize_candidate_text("foo bar")
+    normalized_c, _ = _normalize_candidate_text("Foo baz")
+
+    assert normalized_a == normalized_b
+    assert normalized_a != normalized_c
+    assert display_a == "Foo   Bar"
+    assert display_b == "foo bar"
+
+
+def test_normalize_candidate_text_for_json_payloads() -> None:
+    normalized_a, _ = _normalize_candidate_text('{"b":[2,3],"a":1}')
+    normalized_b, display_b = _normalize_candidate_text('{ "a" : 1, "b" : [2,3] }')
+    normalized_c, _ = _normalize_candidate_text('{"a":2,"b":[2,3]}')
+
+    assert normalized_a == normalized_b
+    assert normalized_a != normalized_c
+    assert display_b == '{ "a" : 1, "b" : [2,3] }'
 
 
 def test_runner_parallel_all_returns_full_result() -> None:
