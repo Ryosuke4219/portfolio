@@ -68,7 +68,8 @@ def test_max_score_selects_highest_quality() -> None:
     builder_calls: list[ProviderConfig] = []
 
     def builder(config: ProviderConfig) -> _DummyFactory:
-        builder_calls.append(config); return factory
+        builder_calls.append(config)
+        return factory
 
     selector = AggregationSelector(judge_factory_builder=builder)
     config = RunnerConfig(mode="consensus", aggregate="max")
