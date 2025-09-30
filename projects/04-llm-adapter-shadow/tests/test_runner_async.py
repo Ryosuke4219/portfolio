@@ -10,7 +10,6 @@ from _pytest.recwarn import WarningsRecorder
 import pytest
 
 from src.llm_adapter.errors import RateLimitError, TimeoutError
-import src.llm_adapter.runner_async_modes as runner_async_modes
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import (
     ProviderRequest,
@@ -19,6 +18,7 @@ from src.llm_adapter.provider_spi import (
 )
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult, Runner
+import src.llm_adapter.runner_async_modes as runner_async_modes
 from src.llm_adapter.runner_config import (
     BackoffPolicy,
     ConsensusConfig,
