@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import datetime as dt
 import importlib
-import sys
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -15,7 +15,6 @@ if root_str not in sys.path:
 weekly_summary = importlib.import_module("tools.weekly_summary")
 legacy_load_runs = weekly_summary.load_runs
 legacy_load_flaky = weekly_summary.load_flaky
-
 
 @pytest.mark.parametrize(
     "loader, filename, payload, expected",
@@ -61,8 +60,8 @@ def test_io_module_provides_same_interfaces(tmp_path: Path) -> None:
     flaky = load_flaky(flaky_path)
     window = filter_by_window(
         runs,
-        dt.datetime(2023, 1, 1, tzinfo=dt.timezone.utc),
-        dt.datetime(2024, 6, 1, tzinfo=dt.timezone.utc),
+        dt.datetime(2023, 1, 1, tzinfo=dt.UTC),
+        dt.datetime(2024, 6, 1, tzinfo=dt.UTC),
     )
 
     assert runs[0]["status"] == "pass"

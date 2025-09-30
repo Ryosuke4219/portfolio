@@ -76,7 +76,7 @@ def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
 def summarize_failure_kinds(
     runs: list[dict[str, object]], limit: int = 3
 ) -> list[dict[str, object]]:
-    counter: Counter[str] = Counter()
+    counter: collections.Counter[str] = collections.Counter()
     for run in runs:
         status_raw = coerce_str(run.get("status"))
         if status_raw is None:
