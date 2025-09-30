@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from tests.shadow._runner_test_helpers import _ErrorProvider, _SuccessProvider, FakeLogger
 from src.llm_adapter.errors import RetriableError
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.runner_async import AllFailedError, AsyncRunner
-
+from tests.shadow._runner_test_helpers import _ErrorProvider, _SuccessProvider, FakeLogger
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
 
