@@ -61,8 +61,8 @@ def test_io_module_provides_same_interfaces(tmp_path: Path) -> None:
     flaky = load_flaky(flaky_path)
     window = filter_by_window(
         runs,
-        dt.datetime(2023, 1, 1, tzinfo=dt.timezone.utc),
-        dt.datetime(2024, 6, 1, tzinfo=dt.timezone.utc),
+        dt.datetime(2023, 1, 1, tzinfo=dt.UTC),
+        dt.datetime(2024, 6, 1, tzinfo=dt.UTC),
     )
 
     assert runs[0]["status"] == "pass"
