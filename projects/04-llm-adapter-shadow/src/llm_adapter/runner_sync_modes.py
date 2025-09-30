@@ -7,6 +7,7 @@ import time
 from typing import cast, Protocol, TYPE_CHECKING
 
 from .errors import (
+    AllFailedError,
     AuthError,
     ConfigError,
     FatalError,
@@ -84,6 +85,7 @@ def _limited_providers(
 def _raise_no_attempts(context: SyncRunContext) -> None:
     event_logger = context.event_logger
     runner = context.runner
+    error = AllFailedError("no providers were attempted", failures=[])
     if event_logger is not None:
         event_logger.emit(
             "provider_chain_failed",
@@ -107,11 +109,11 @@ def _raise_no_attempts(context: SyncRunContext) -> None:
         tokens_in=None,
         tokens_out=None,
         cost_usd=0.0,
-        error=None,
+        error=error,
         metadata=context.metadata,
         shadow_used=context.shadow_used,
     )
-    raise RuntimeError("No providers succeeded")
+    raise error
 
 
 class SequentialStrategy:
@@ -125,6 +127,7 @@ class SequentialStrategy:
         max_attempts = config.max_attempts
         event_logger = context.event_logger
         last_err: Exception | None = None
+        failure_details: list[dict[str, str]] = []
         attempt_count = 0
 
         for loop_index, provider in enumerate(runner.providers, start=1):
@@ -167,6 +170,15 @@ class SequentialStrategy:
 
             error = result.error
             last_err = error
+            if error is not None:
+                summary = f"{type(error).__name__}: {error}"
+                failure_details.append(
+                    {
+                        "provider": provider.name(),
+                        "attempt": str(attempt_index),
+                        "summary": summary,
+                    }
+                )
             if error is None:
                 continue
             if isinstance(error, FatalError):
@@ -213,6 +225,15 @@ class SequentialStrategy:
                     "last_error_family": error_family(last_err),
                 },
             )
+        detail_text = "; ".join(
+            f"{item['provider']} (attempt {item['attempt']}): {item['summary']}"
+            for item in failure_details
+        )
+        message = "all providers failed"
+        if detail_text:
+            message = f"{message}: {detail_text}"
+        failure_error = AllFailedError(message, failures=failure_details)
+        metric_error = last_err if last_err is not None else failure_error
         log_run_metric(
             event_logger,
             request_fingerprint=context.request_fingerprint,
@@ -224,11 +245,13 @@ class SequentialStrategy:
             tokens_in=None,
             tokens_out=None,
             cost_usd=0.0,
-            error=last_err,
+            error=metric_error,
             metadata=context.metadata,
             shadow_used=context.shadow_used,
         )
-        raise last_err if last_err is not None else RuntimeError("No providers succeeded")
+        if last_err is not None:
+            raise failure_error from last_err
+        raise failure_error
 
 
 class ParallelAnyStrategy:
