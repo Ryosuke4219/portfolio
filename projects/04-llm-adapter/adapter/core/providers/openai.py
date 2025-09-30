@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from ..config import ProviderConfig
+from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
 from .openai_utils import (
     build_chat_messages,
@@ -104,11 +105,12 @@ class OpenAIProvider(BaseProvider):
         factory = OpenAIClientFactory(_openai)
         self._client = factory.create(api_key, config, self._endpoint_url, default_headers)
 
-    def generate(self, prompt: str) -> ProviderResponse:
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        prompt = request.prompt
         last_error: Exception | None = None
         for mode in self._preferred_modes:
             try:
-                response = self._invoke_mode(mode, prompt)
+                response = self._invoke_mode(mode, request)
                 if response is None:
                     continue
                 break
@@ -128,24 +130,25 @@ class OpenAIProvider(BaseProvider):
         output_text = extract_text_from_response(result_obj)
         prompt_tokens, completion_tokens = extract_usage_tokens(result_obj, prompt, output_text)
         raw_output = coerce_raw_output(result_obj)
+        token_usage = TokenUsage(prompt=prompt_tokens, completion=completion_tokens)
         return ProviderResponse(
-            output_text=output_text,
-            input_tokens=prompt_tokens,
-            output_tokens=completion_tokens,
+            text=output_text,
             latency_ms=latency_ms,
-            raw_output=dict(raw_output) if isinstance(raw_output, Mapping) else None,
+            token_usage=token_usage,
+            model=request.model,
+            raw=dict(raw_output) if isinstance(raw_output, Mapping) else None,
         )
 
-    def _invoke_mode(self, mode: str, prompt: str) -> tuple[Any, int] | None:
+    def _invoke_mode(self, mode: str, request: ProviderRequest) -> tuple[Any, int] | None:
         if mode == "responses":
-            return self._call_responses(prompt)
+            return self._call_responses(request)
         if mode == "chat_completions":
-            return self._call_chat_completions(prompt)
+            return self._call_chat_completions(request)
         if mode == "completions":
-            return self._call_completions(prompt)
+            return self._call_completions(request)
         return None
 
-    def _call_responses(self, prompt: str) -> tuple[Any, int] | None:
+    def _call_responses(self, request: ProviderRequest) -> tuple[Any, int] | None:
         try:
             create = self._client.responses.create
         except AttributeError:
@@ -153,17 +156,18 @@ class OpenAIProvider(BaseProvider):
         if not callable(create):
             return None
         kwargs = dict(self._request_kwargs)
-        if self.config.max_tokens:
-            kwargs.setdefault("max_output_tokens", int(self.config.max_tokens))
+        max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
+        if max_tokens:
+            kwargs.setdefault("max_output_tokens", int(max_tokens))
         if self._response_format:
             kwargs.setdefault("response_format", dict(self._response_format))
-        contents = build_system_user_contents(self._system_prompt, prompt)
+        contents = build_system_user_contents(self._system_prompt, request.prompt)
         ts0 = time.time()
-        result = create(model=self._model, input=contents, **kwargs)
+        result = create(model=request.model, input=contents, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
         return result, latency_ms
 
-    def _call_chat_completions(self, prompt: str) -> tuple[Any, int] | None:
+    def _call_chat_completions(self, request: ProviderRequest) -> tuple[Any, int] | None:
         try:
             create = self._client.chat.completions.create
         except AttributeError:
@@ -177,17 +181,18 @@ class OpenAIProvider(BaseProvider):
         if not callable(create):
             return None
         kwargs = dict(self._request_kwargs)
-        if self.config.max_tokens:
-            kwargs.setdefault("max_tokens", int(self.config.max_tokens))
+        max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
+        if max_tokens:
+            kwargs.setdefault("max_tokens", int(max_tokens))
         if self._response_format and "response_format" not in kwargs:
             kwargs["response_format"] = dict(self._response_format)
-        messages = build_chat_messages(self._system_prompt, prompt)
+        messages = list(request.messages or build_chat_messages(self._system_prompt, request.prompt))
         ts0 = time.time()
-        result = create(model=self._model, messages=messages, **kwargs)
+        result = create(model=request.model, messages=messages, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
         return result, latency_ms
 
-    def _call_completions(self, prompt: str) -> tuple[Any, int] | None:
+    def _call_completions(self, request: ProviderRequest) -> tuple[Any, int] | None:
         # v0 系の text-davinci シリーズ向けエンドポイント
         try:
             create = self._client.completions.create
@@ -201,15 +206,16 @@ class OpenAIProvider(BaseProvider):
         if not callable(create):
             return None
         kwargs = dict(self._request_kwargs)
-        if self.config.max_tokens:
-            kwargs.setdefault("max_tokens", int(self.config.max_tokens))
-        prompt_text = prompt
+        max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
+        if max_tokens:
+            kwargs.setdefault("max_tokens", int(max_tokens))
+        prompt_text = request.prompt
         if self._system_prompt:
             prompt_text = (
-                f"{self._system_prompt}\n\n{prompt}" if prompt else self._system_prompt
+                f"{self._system_prompt}\n\n{request.prompt}" if request.prompt else self._system_prompt
             )
         ts0 = time.time()
-        result = create(model=self._model, prompt=prompt_text, **kwargs)
+        result = create(model=request.model, prompt=prompt_text, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
         return result, latency_ms
 
