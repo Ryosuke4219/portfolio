@@ -117,7 +117,12 @@ class CompareRunner:
         self.provider_configs = list(provider_configs)
         self.tasks = list(tasks)
         self.budget_manager = budget_manager
-        self.metrics_path = metrics_path
+        resolved_metrics_path = (
+            runner_config.metrics_path
+            if runner_config and runner_config.metrics_path is not None
+            else metrics_path
+        )
+        self.metrics_path = resolved_metrics_path
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.allow_overrun = allow_overrun
         self.runner_config = runner_config
@@ -128,12 +133,29 @@ class CompareRunner:
         self._judge_provider_config: ProviderConfig | None = (
             runner_config.judge_provider if runner_config else None
         )
+        self._shadow_provider = runner_config.shadow_provider if runner_config else None
+        self._provider_weights = (
+            dict(runner_config.provider_weights)
+            if runner_config and runner_config.provider_weights is not None
+            else None
+        )
+        self._backoff = runner_config.backoff if runner_config else None
         self._aggregation = AggregationController(
             judge_factory_builder=lambda cfg: _JudgeProviderFactoryAdapter(cfg)
         )
 
     def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
+
+        self.runner_config = config
+        if config.metrics_path is not None and config.metrics_path != self.metrics_path:
+            self.metrics_path = config.metrics_path
+            self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        self._shadow_provider = config.shadow_provider
+        self._provider_weights = (
+            dict(config.provider_weights) if config.provider_weights is not None else None
+        )
+        self._backoff = config.backoff
 
         rpm = getattr(config, "rpm", None)
         self._token_bucket = _TokenBucket(rpm)
@@ -149,6 +171,10 @@ class CompareRunner:
             evaluate_budget=self._evaluate_budget,
             build_metrics=self._build_metrics,
             normalize_concurrency=self._normalize_concurrency,
+            backoff=self._backoff,
+            shadow_provider=self._shadow_provider,
+            metrics_path=config.metrics_path,
+            provider_weights=self._provider_weights,
         )
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []

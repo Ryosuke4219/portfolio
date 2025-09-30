@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar, Protocol
+
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.parallel_exec import (
@@ -47,17 +48,19 @@ else:  # pragma: no cover - 実行時フォールバック
                 raise ParallelExecutionError(str(last_error)) from last_error
             raise ParallelExecutionError("no worker executed successfully")
 
+if TYPE_CHECKING:  # pragma: no cover - 型補完用
+    from src.llm_adapter.provider_spi import ProviderSPI
+else:  # pragma: no cover - 実行時フォールバック
+    try:
+        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
+    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+        class ProviderSPI(Protocol):
+            """プロバイダ SPI フォールバック."""
+
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
 from .providers import BaseProvider, ProviderResponse
-from .runner_execution_attempts import (
-    ParallelAttemptExecutor,
-    SequentialAttemptExecutor,
-)
-
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from .runner_api import RunnerConfig
 
 
 class _TokenBucket:
@@ -115,6 +118,15 @@ class SingleRunResult:
     aggregate_output: str | None = None
 
 
+from .runner_execution_attempts import (
+    ParallelAttemptExecutor,
+    SequentialAttemptExecutor,
+)
+
+if TYPE_CHECKING:  # pragma: no cover - 型補完用
+    from .runner_api import BackoffPolicy, RunnerConfig
+
+
 _EvaluateBudget = Callable[
     [ProviderConfig, float, str, str | None, str | None],
     tuple[BudgetSnapshot, str | None, str, str | None, str | None],
@@ -147,12 +159,20 @@ class RunnerExecution:
         evaluate_budget: _EvaluateBudget,
         build_metrics: _BuildMetrics,
         normalize_concurrency: _NormalizeConcurrency,
+        backoff: BackoffPolicy | None,
+        shadow_provider: ProviderSPI | None,
+        metrics_path: Path | None,
+        provider_weights: dict[str, float] | None,
     ) -> None:
         self._token_bucket = token_bucket
         self._schema_validator = schema_validator
         self._evaluate_budget = evaluate_budget
         self._build_metrics = build_metrics
         self._normalize_concurrency = normalize_concurrency
+        self._backoff = backoff
+        self._shadow_provider = shadow_provider
+        self._metrics_path = metrics_path
+        self._provider_weights = provider_weights
         self._sequential_executor = SequentialAttemptExecutor(self._run_single)
         self._parallel_executor = ParallelAttemptExecutor(
             self._run_single,

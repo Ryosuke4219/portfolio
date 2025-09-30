@@ -6,6 +6,8 @@ from concurrent.futures import CancelledError
 from threading import Event, Lock
 from typing import Any, Protocol, TYPE_CHECKING
 
+from .runner_execution import SingleRunResult
+
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .providers import BaseProvider
