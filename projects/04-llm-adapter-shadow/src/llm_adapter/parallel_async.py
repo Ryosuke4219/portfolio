@@ -121,7 +121,8 @@ async def run_parallel_any_async(
     max_concurrency: int | None = None,
     max_attempts: int | None = None,
     on_retry: Callable[[int, int, BaseException], Awaitable[RetryDirective] | RetryDirective]
-    | None = None,
+        | None = None,
+    on_cancelled: Callable[[Sequence[int]], None] | None = None,
 ) -> T:
     """Async variant of :func:`run_parallel_any_sync` with retry support."""
     if not workers:
@@ -149,24 +150,37 @@ async def run_parallel_any_async(
             if failures == len(workers) and not winner.done():
                 winner.set_exception(ParallelExecutionError("all workers failed"))
 
-    tasks = [
-        asyncio.create_task(
-            executor.run_worker(
-                idx,
-                worker,
-                on_success=_on_success,
-                on_failure=_on_failure,
-                propagate_failure=False,
-            )
+    task_pairs = [
+        (
+            idx,
+            asyncio.create_task(
+                executor.run_worker(
+                    idx,
+                    worker,
+                    on_success=_on_success,
+                    on_failure=_on_failure,
+                    propagate_failure=False,
+                )
+            ),
         )
         for idx, worker in enumerate(workers)
     ]
     try:
         return await winner
     finally:
-        for task in tasks:
+        for _, task in task_pairs:
             task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(
+            *(task for _, task in task_pairs), return_exceptions=True
+        )
+        if on_cancelled is not None:
+            cancelled = [
+                index
+                for (index, _), outcome in zip(task_pairs, results, strict=False)
+                if isinstance(outcome, asyncio.CancelledError)
+            ]
+            if cancelled:
+                on_cancelled(tuple(sorted(cancelled)))
 
 
 async def run_parallel_all_async(

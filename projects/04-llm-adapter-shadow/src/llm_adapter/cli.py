@@ -15,17 +15,6 @@ from .runner import AsyncRunner, Runner
 from .runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
-_AGGREGATE: Mapping[str, str] = {
-    "majority_vote": "majority",
-    "max_score": "max_score",
-    "weighted_vote": "weighted",
-}
-_TIE: Mapping[str, str | None] = {
-    "min_latency": "latency",
-    "min_cost": "cost",
-    "stable_order": None,
-}
-
 
 def _parse_csv(value: str) -> tuple[str, ...]:
     parts = tuple(entry.strip() for entry in value.split(",") if entry.strip())
@@ -55,9 +44,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--providers", required=True, type=_parse_csv)
     parser.add_argument("--max-concurrency", dest="max_concurrency", type=int)
     parser.add_argument("--rpm", type=int)
-    parser.add_argument("--aggregate", choices=tuple(_AGGREGATE))
+    parser.add_argument("--aggregate", choices=("majority_vote", "max_score", "weighted_vote"))
     parser.add_argument("--quorum", type=int)
-    parser.add_argument("--tie-breaker", choices=tuple(_TIE), dest="tie_breaker")
+    parser.add_argument("--tie-breaker", choices=("min_latency", "min_cost", "stable_order"), dest="tie_breaker")
     parser.add_argument("--schema")
     parser.add_argument("--judge")
     parser.add_argument("--weights", type=_parse_weights)
@@ -80,11 +69,11 @@ def _build_consensus_config(args: argparse.Namespace) -> ConsensusConfig | None:
         return None
     payload: dict[str, Any] = {}
     if args.aggregate:
-        payload["strategy"] = _AGGREGATE[args.aggregate]
+        payload["strategy"] = args.aggregate
     if args.quorum is not None:
         payload["quorum"] = args.quorum
     if args.tie_breaker is not None:
-        payload["tie_breaker"] = _TIE[args.tie_breaker]
+        payload["tie_breaker"] = args.tie_breaker
     if schema_text is not None:
         payload["schema"] = schema_text
     if args.judge is not None:
@@ -95,12 +84,20 @@ def _build_consensus_config(args: argparse.Namespace) -> ConsensusConfig | None:
 
 
 def build_runner_config(args: argparse.Namespace) -> RunnerConfig:
-    return RunnerConfig(
-        mode=RunnerMode(args.mode.replace("-", "_")),
-        max_concurrency=args.max_concurrency,
-        rpm=args.rpm,
-        consensus=_build_consensus_config(args),
-    )
+    metrics_path: MetricsPath
+    if args.metrics:
+        metrics_path = Path(args.metrics)
+    else:
+        metrics_path = DEFAULT_METRICS_PATH
+    config_kwargs: dict[str, object] = {
+        "mode": RunnerMode(args.mode.replace("-", "_")),
+        "rpm": args.rpm,
+        "consensus": _build_consensus_config(args),
+        "metrics_path": metrics_path,
+    }
+    if args.max_concurrency is not None:
+        config_kwargs["max_concurrency"] = args.max_concurrency
+    return RunnerConfig(**config_kwargs)
 
 
 def _resolve_model_name(spec: str, provider: ProviderSPI) -> str:
@@ -130,7 +127,12 @@ def prepare_execution(
         model=_resolve_model_name(args.providers[0], providers[0]),
     )
     config = build_runner_config(args)
-    metrics_path: MetricsPath = args.metrics or DEFAULT_METRICS_PATH
+    metrics_path_value = config.metrics_path
+    metrics_path: MetricsPath
+    if isinstance(metrics_path_value, Path):
+        metrics_path = str(metrics_path_value)
+    else:
+        metrics_path = metrics_path_value
     use_async = async_mode if async_mode is not None else args.async_runner
     runner: Runner | AsyncRunner = AsyncRunner(providers, config=config) if use_async else Runner(providers, config=config)
     return runner, request, metrics_path

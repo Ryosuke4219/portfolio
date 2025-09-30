@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from concurrent.futures import CancelledError
 from dataclasses import dataclass
 import time
 from typing import cast
@@ -45,6 +46,7 @@ class ProviderInvocationResult:
     tokens_out: int | None
     shadow_metrics: ShadowMetrics | None
     shadow_metrics_extra: dict[str, object] | None
+    provider_call_logged: bool
 
 
 class Runner:
@@ -156,7 +158,54 @@ class Runner:
             tokens_out=tokens_out,
             shadow_metrics=shadow_metrics,
             shadow_metrics_extra=None,
+            provider_call_logged=True,
         )
+
+    def _create_cancelled_result(
+        self,
+        *,
+        provider: ProviderSPI,
+        attempt: int,
+        total_providers: int,
+        run_started: float,
+    ) -> ProviderInvocationResult:
+        error = CancelledError()
+        latency_ms = elapsed_ms(run_started)
+        return ProviderInvocationResult(
+            provider=provider,
+            attempt=attempt,
+            total_providers=total_providers,
+            response=None,
+            error=error,
+            latency_ms=latency_ms,
+            tokens_in=None,
+            tokens_out=None,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=False,
+        )
+
+    def _apply_cancelled_results(
+        self,
+        results: list[ProviderInvocationResult | None],
+        *,
+        providers: Sequence[ProviderSPI],
+        cancelled_indices: Sequence[int],
+        total_providers: int,
+        run_started: float,
+    ) -> None:
+        for index in cancelled_indices:
+            if index < 0 or index >= len(providers):
+                continue
+            if results[index] is not None:
+                continue
+            provider = providers[index]
+            results[index] = self._create_cancelled_result(
+                provider=provider,
+                attempt=index + 1,
+                total_providers=total_providers,
+                run_started=run_started,
+            )
 
     def _log_parallel_results(
         self,
@@ -185,13 +234,32 @@ class Runner:
                 tokens_in = result.tokens_in if result.tokens_in is not None else 0
                 tokens_out = result.tokens_out if result.tokens_out is not None else 0
                 cost_usd = estimate_cost(result.provider, tokens_in, tokens_out)
+                error_for_metric: Exception | None = None
             else:
                 tokens_in = None
                 tokens_out = None
                 cost_usd = 0.0
+                error_for_metric = result.error
             latency_ms = result.latency_ms
             if latency_ms is None:
                 latency_ms = elapsed_ms(run_started)
+            if not result.provider_call_logged:
+                log_provider_call(
+                    event_logger,
+                    request_fingerprint=request_fingerprint,
+                    provider=result.provider,
+                    request=request,
+                    attempt=result.attempt,
+                    total_providers=result.total_providers,
+                    status=status,
+                    latency_ms=latency_ms,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    error=error_for_metric,
+                    metadata=metadata,
+                    shadow_used=shadow_used,
+                )
+                result.provider_call_logged = True
             attempts_value = attempts_map.get(result.attempt, result.attempt)
             log_run_metric(
                 event_logger,
@@ -204,7 +272,7 @@ class Runner:
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
                 cost_usd=cost_usd,
-                error=None if status == "ok" else result.error,
+                error=error_for_metric,
                 metadata=metadata,
                 shadow_used=shadow_used,
             )
@@ -230,8 +298,13 @@ class Runner:
     ]:
         """Execute ``request`` with fallback semantics."""
 
+        metrics_path = (
+            self._config.metrics_path
+            if shadow_metrics_path == DEFAULT_METRICS_PATH
+            else shadow_metrics_path
+        )
         event_logger, metrics_path_str = resolve_event_logger(
-            self._logger, shadow_metrics_path
+            self._logger, metrics_path
         )
         metadata = dict(request.metadata or {})
         run_started = time.time()

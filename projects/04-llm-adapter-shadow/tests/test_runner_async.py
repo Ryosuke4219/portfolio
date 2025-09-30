@@ -223,6 +223,35 @@ def test_async_runner_matches_sync(tmp_path: Path) -> None:
     assert async_metrics.exists()
 
 
+def test_async_runner_parallel_any_logs_cancelled_providers() -> None:
+    fast = _AsyncProbeProvider("fast", delay=0.0, text="fast")
+    slow = _AsyncProbeProvider("slow", delay=0.2, text="slow")
+    logger = _CapturingLogger()
+    runner = AsyncRunner(
+        [fast, slow],
+        logger=logger,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="hi", model="async-parallel-any-cancel")
+
+    response = asyncio.run(runner.run_async(request))
+
+    assert response.text == "fast:hi"
+    provider_calls = {
+        event["provider"]: event for event in logger.of_type("provider_call")
+    }
+    assert provider_calls["fast"]["status"] == "ok"
+    assert provider_calls["slow"]["status"] == "error"
+    assert provider_calls["slow"]["error_type"] == "CancelledError"
+    run_metrics = {
+        event["provider"]: event for event in logger.of_type("run_metric")
+        if event["provider"] is not None
+    }
+    assert run_metrics["fast"]["status"] == "ok"
+    assert run_metrics["slow"]["status"] == "error"
+    assert run_metrics["slow"]["error_type"] == "CancelledError"
+
+
 def test_async_shadow_exec_uses_injected_logger(tmp_path: Path) -> None:
     primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())

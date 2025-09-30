@@ -389,6 +389,44 @@ def test_runner_parallel_any_returns_success_after_fast_failure(
     assert (cost_tokens_in, cost_tokens_out) == (1, 1)
 
 
+def test_runner_parallel_any_logs_cancelled_providers() -> None:
+    class _SlowProvider(_StaticProvider):
+        def __init__(self, name: str, text: str, latency_ms: int, delay: float) -> None:
+            super().__init__(name, text, latency_ms)
+            self._delay = delay
+
+        def invoke(self, request: ProviderRequest) -> ProviderResponse:
+            time.sleep(self._delay)
+            return super().invoke(request)
+
+    fast = _StaticProvider("fast", "fast-ok", latency_ms=1)
+    slow = _SlowProvider("slow", "slow-ok", latency_ms=10, delay=0.1)
+    logger = RecordingLogger()
+    runner = Runner(
+        [fast, slow],
+        logger=logger,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="hello", model="parallel-any-cancel")
+
+    response = runner.run(request)
+
+    assert response.text == "fast-ok"
+    provider_calls = {
+        event["provider"]: event for event in logger.of_type("provider_call")
+    }
+    assert provider_calls["fast"]["status"] == "ok"
+    assert provider_calls["slow"]["status"] == "error"
+    assert provider_calls["slow"]["error_type"] == "CancelledError"
+    run_metrics = {
+        event["provider"]: event for event in logger.of_type("run_metric")
+        if event["provider"] is not None
+    }
+    assert run_metrics["fast"]["status"] == "ok"
+    assert run_metrics["slow"]["status"] == "error"
+    assert run_metrics["slow"]["error_type"] == "CancelledError"
+
+
 def test_runner_parallel_any_retries_until_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -553,7 +591,7 @@ def test_consensus_vote_event_and_shadow_delta(
     consensus_event = next(
         item for item in payloads if item.get("event") == "consensus_vote"
     )
-    assert consensus_event["strategy"] == "majority"
+    assert consensus_event["strategy"] == "majority_vote"
     assert consensus_event["voters_total"] == 3
     assert consensus_event["votes_for"] == 2
     assert consensus_event["votes_against"] == 1

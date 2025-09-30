@@ -100,7 +100,7 @@ class _ParallelCoordinatorBase:
         provider_config, _ = self._providers[index]
         metrics = RunMetrics(
             ts=now_ts(),
-            run_id=f"run_{self._task.task_id}_{self._attempt_index}_{uuid.uuid4().hex}",
+            run_id=f"run_{self._task.task_id}_{self._attempt_index}_{uuid4().hex}",
             provider=provider_config.provider,
             model=provider_config.model,
             mode=self._config.mode,

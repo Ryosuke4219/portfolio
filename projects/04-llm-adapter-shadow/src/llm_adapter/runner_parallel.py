@@ -14,8 +14,18 @@ from .consensus_candidates import (
     validate_consensus_schema,
 )
 from .parallel_exec import ParallelExecutionError
-from .provider_spi import ProviderResponse
+from .provider_spi import ProviderResponse, TokenUsage
 from .runner_config import ConsensusConfig
+
+
+@dataclass(slots=True)
+class ConsensusObservation:
+    provider_id: str
+    response: ProviderResponse | None
+    latency_ms: int | None = None
+    tokens: TokenUsage | None = None
+    cost_estimate: float | None = None
+    error: BaseException | None = None
 
 
 @dataclass(slots=True)
@@ -75,7 +85,8 @@ def invoke_consensus_judge(
 
 
 def compute_consensus(
-    responses: Iterable[ProviderResponse], *, config: ConsensusConfig | None = None
+    responses: Iterable[ProviderResponse | ConsensusObservation], *,
+    config: ConsensusConfig | None = None,
 ) -> ConsensusResult:
     """Return the majority response according to ``config``."""
 
@@ -85,18 +96,22 @@ def compute_consensus(
     if config is None:
         config = ConsensusConfig()
     strategy = (config.strategy or "majority").strip()
-    tie_breaker = (config.tie_breaker or "").strip().lower() or None
-    if tie_breaker is not None and tie_breaker not in {"latency", "cost"}:
-        raise ValueError(f"unsupported tie_breaker: {config.tie_breaker!r}")
+    tie_breaker = (config.tie_breaker or "").strip() or None
+
+    observations = _normalize_observations(collected)
+    provider_weights = {
+        provider: float(weight)
+        for provider, weight in (config.provider_weights or {}).items()
+    }
 
     valid_entries, schema_failures, schema_checked = validate_consensus_schema(
-        collected, config.schema
+        observations, config.schema
     )
 
     if not valid_entries:
         raise ParallelExecutionError("all responses failed schema validation")
 
-    candidate_set = CandidateSet.from_entries(valid_entries)
+    candidate_set = CandidateSet.from_observations(valid_entries, provider_weights)
     if candidate_set.is_empty():
         raise ParallelExecutionError("consensus tally is empty")
 
@@ -119,11 +134,25 @@ def compute_consensus(
             raise ParallelExecutionError("consensus max_rounds exhausted")
         rounds += 1
 
-    if tie_break_applied and tie_breaker is not None:
-        _next_round()
-        remaining, tie_break_reason, tie_breaker_selected = _apply_tie_breaker(
-            tie_breaker, remaining
-        )
+    if tie_break_applied:
+        if tie_breaker is not None:
+            _next_round()
+            remaining, tie_break_reason, tie_breaker_selected = _apply_tie_breaker(
+                tie_breaker, remaining
+            )
+        else:
+            _next_round()
+            for fallback in ("min_latency", "min_cost", "stable_order"):
+                if len(remaining) <= 1:
+                    break
+                narrowed, reason, selected = _apply_tie_breaker(fallback, remaining)
+                if len(narrowed) < len(remaining):
+                    remaining = narrowed
+                    tie_break_reason = reason
+                    tie_breaker_selected = selected
+                    break
+            else:  # pragma: no cover - defensive guard
+                remaining, tie_break_reason, tie_breaker_selected = remaining, None, None
 
     if len(remaining) > 1 and config.judge:
         _next_round()
@@ -149,7 +178,7 @@ def compute_consensus(
         response=winner.primary,
         votes=votes,
         tally=tally,
-        total_voters=len(collected),
+        total_voters=len(observations),
         strategy=config.strategy,
         min_votes=config.quorum,
         score_threshold=None,
@@ -168,9 +197,32 @@ def compute_consensus(
     )
 
 
+def _normalize_observations(
+    responses: Sequence[ProviderResponse | ConsensusObservation],
+) -> list[ConsensusObservation]:
+    observations: list[ConsensusObservation] = []
+    for index, entry in enumerate(responses):
+        if isinstance(entry, ConsensusObservation):
+            observations.append(entry)
+            continue
+        if isinstance(entry, ProviderResponse):
+            observations.append(
+                ConsensusObservation(
+                    provider_id=f"provider-{index}",
+                    response=entry,
+                    latency_ms=int(entry.latency_ms),
+                    tokens=entry.token_usage,
+                )
+            )
+            continue
+        raise TypeError("responses must be ProviderResponse or ConsensusObservation")
+    return observations
+
+
 __all__ = [
     "ParallelExecutionError",
     "ConsensusResult",
+    "ConsensusObservation",
     "invoke_consensus_judge",
     "_normalize_candidate_text",
     "validate_consensus_schema",

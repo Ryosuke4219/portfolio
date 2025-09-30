@@ -7,7 +7,12 @@ import pytest
 
 from src.llm_adapter import cli
 from src.llm_adapter.runner import AsyncRunner, Runner
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from src.llm_adapter.runner_config import (
+    ConsensusConfig,
+    DEFAULT_MAX_CONCURRENCY,
+    RunnerConfig,
+    RunnerMode,
+)
 from src.llm_adapter.shadow import DEFAULT_METRICS_PATH
 
 
@@ -32,6 +37,21 @@ def test_runner_config_accepts_enum_members() -> None:
     mutated = replace(config, mode=RunnerMode.SEQUENTIAL)
     assert mutated.mode is RunnerMode.SEQUENTIAL
     assert config.mode is RunnerMode.CONSENSUS
+
+
+def test_runner_config_validates_max_concurrency_and_metrics_path(tmp_path: Path) -> None:
+    metrics_path = tmp_path / "custom.jsonl"
+    config = RunnerConfig(metrics_path=metrics_path)
+    assert config.max_concurrency == DEFAULT_MAX_CONCURRENCY
+    assert config.metrics_path == metrics_path
+    with pytest.raises(ValueError):
+        RunnerConfig(max_concurrency=0)
+
+
+def test_consensus_config_defaults() -> None:
+    config = ConsensusConfig()
+    assert config.strategy == "majority_vote"
+    assert config.quorum == 2
 
 
 def test_cli_prepare_execution_with_consensus(tmp_path: Path) -> None:
@@ -82,11 +102,12 @@ def test_cli_prepare_execution_with_consensus(tmp_path: Path) -> None:
     assert consensus is not None
     assert consensus.strategy == "max_score"
     assert consensus.quorum == 3
-    assert consensus.tie_breaker == "latency"
+    assert consensus.tie_breaker == "min_latency"
     assert consensus.schema == schema_path.read_text(encoding="utf-8")
     assert consensus.judge == "pkg:judge"
     assert consensus.provider_weights == {"mock:fast": 1.0, "mock:slow": 0.5}
     assert metrics == str(metrics_path)
+    assert config.metrics_path == metrics_path
     assert request.prompt_text == "hello world"
     assert request.model == "fast"
 
@@ -113,3 +134,24 @@ def test_cli_prepare_execution_async(tmp_path: Path) -> None:
     assert runner._config.mode is RunnerMode.PARALLEL_ANY
     assert metrics == DEFAULT_METRICS_PATH
     assert request.model == "one"
+
+
+def test_cli_prepare_execution_uses_defaults(tmp_path: Path) -> None:
+    prompt_path = tmp_path / "prompt.txt"
+    prompt_path.write_text("ping", encoding="utf-8")
+
+    args = cli.parse_args(
+        [
+            "--mode",
+            "sequential",
+            "--providers",
+            "mock:primary",
+            "--input",
+            str(prompt_path),
+        ]
+    )
+
+    runner, _request, metrics = cli.prepare_execution(args)
+    assert runner._config.max_concurrency == DEFAULT_MAX_CONCURRENCY
+    assert runner._config.metrics_path == DEFAULT_METRICS_PATH
+    assert metrics == DEFAULT_METRICS_PATH
