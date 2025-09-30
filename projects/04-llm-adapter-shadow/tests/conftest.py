@@ -9,6 +9,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+CORE_ROOT = PROJECT_ROOT.parent / "04-llm-adapter"
+if str(CORE_ROOT) not in sys.path:
+    sys.path.insert(0, str(CORE_ROOT))
+
 
 @pytest.fixture(autouse=True)
 def _fast_mock_provider_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
