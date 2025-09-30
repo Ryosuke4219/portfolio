@@ -1,7 +1,9 @@
 """応答集約ストラテジ。"""
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast, Protocol, runtime_checkable, TYPE_CHECKING
@@ -94,7 +96,8 @@ class AggregationStrategy(Protocol):
     def from_string(kind: str, **kwargs: Any) -> AggregationStrategy:
         kind_norm = (kind or "").strip().lower()
         if kind_norm in {"majority", "vote", "maj"}:
-            return cast(AggregationStrategy, MajorityVoteStrategy())
+            schema = kwargs.get("schema")
+            return cast(AggregationStrategy, MajorityVoteStrategy(schema=schema))
         if kind_norm in {"max", "score", "top"}:
             return cast(AggregationStrategy, MaxScoreStrategy())
         if kind_norm in {"judge", "llm-judge"}:
@@ -120,10 +123,40 @@ class AggregationStrategy(Protocol):
 # ===== 既定ストラテジ実装 =====
 
 
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
 class MajorityVoteStrategy:
-    """テキスト同一性の多数決（完全一致）。引き分けはタイブレーカー。"""
+    """テキスト同一性の多数決（正規化+JSON対応）。引き分けはタイブレーカー。"""
 
     name = "majority"
+
+    def __init__(self, *, schema: Mapping[str, Any] | None = None) -> None:
+        self._schema = schema
+
+    def _normalize_text(self, value: str | None) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            return ""
+        normalized = _WHITESPACE_RE.sub(" ", normalized)
+        return normalized.lower()
+
+    def _json_bucket_key(self, value: str) -> str | None:
+        if not self._schema:
+            return None
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return f"json:{canonical}"
+
+    def _bucket_key(self, candidate: AggregationCandidate) -> str:
+        raw = candidate.text if candidate.text is not None else candidate.response.text
+        json_key = self._json_bucket_key(raw)
+        if json_key is not None:
+            return json_key
+        return self._normalize_text(raw)
 
     def aggregate(
         self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
@@ -131,16 +164,11 @@ class MajorityVoteStrategy:
         if not candidates:
             raise ValueError("majority: candidates must be non-empty")
 
-        # 正規化：空(None/空文字)は "" として扱いカウント可能に
-        def norm(s: str | None) -> str:
-            return (s or "").strip()
-
         buckets: dict[str, list[AggregationCandidate]] = {}
         for candidate in candidates:
-            key = norm(candidate.text if candidate.text is not None else candidate.response.text)
+            key = self._bucket_key(candidate)
             buckets.setdefault(key, []).append(candidate)
 
-        # 最大票のバケットを抽出
         max_bucket: list[AggregationCandidate] = []
         max_count = -1
         for bucket in buckets.values():

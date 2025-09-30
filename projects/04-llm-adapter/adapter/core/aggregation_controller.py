@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol, TYPE_CHECKING
+from pathlib import Path
+from typing import Any, Protocol, TYPE_CHECKING, cast
 
 from . import aggregation as aggregation_module
 from .aggregation import (
@@ -41,30 +43,39 @@ class JudgeProviderFactory(Protocol):
         ...
 
 
-class _LatencyTieBreaker(TieBreaker):
-    name = "latency"
+class _CompositeTieBreaker(TieBreaker):
+    _DISPLAY_NAMES = {"latency": "latency", "cost": "cost", "stable_order": "first"}
 
-    def __init__(self, lookup: Mapping[int, SingleRunResult]) -> None:
-        self._lookup = lookup
+    def __init__(
+        self,
+        order: Sequence[tuple[str, Callable[[AggregationCandidate], float | int]]],
+    ) -> None:
+        if not order:
+            raise ValueError("tie breaker order must not be empty")
+        self._order = list(order)
+        self._last_used = self._DISPLAY_NAMES[self._order[-1][0]]
 
-    def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
-        return min(
-            candidates,
-            key=lambda candidate: self._lookup[candidate.index].metrics.latency_ms,
-        )
-
-
-class _CostTieBreaker(TieBreaker):
-    name = "cost"
-
-    def __init__(self, lookup: Mapping[int, SingleRunResult]) -> None:
-        self._lookup = lookup
+    @property
+    def name(self) -> str:
+        return self._last_used
 
     def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
-        return min(
-            candidates,
-            key=lambda candidate: self._lookup[candidate.index].metrics.cost_usd,
-        )
+        if not candidates:
+            raise ValueError("TieBreaker: candidates must be non-empty")
+        scored: list[tuple[tuple[float | int, ...], AggregationCandidate]] = []
+        for candidate in candidates:
+            score = tuple(key(candidate) for _, key in self._order)
+            scored.append((score, candidate))
+        scored.sort(key=lambda item: item[0])
+        best_score, best_candidate = scored[0]
+        chosen_name = self._order[-1][0]
+        for index, (name, _) in enumerate(self._order):
+            pivot = best_score[index]
+            if any(entry[0][index] != pivot for entry in scored[1:]):
+                chosen_name = name
+                break
+        self._last_used = self._DISPLAY_NAMES[chosen_name]
+        return best_candidate
 
 
 @dataclass(slots=True)
@@ -81,6 +92,8 @@ class AggregationController:
         judge_factory_builder: Callable[[ProviderConfig], JudgeProviderFactory] | None = None,
     ) -> None:
         self._judge_factory_builder = judge_factory_builder
+        self._cached_schema_path: Path | None = None
+        self._cached_schema: Mapping[str, Any] | None = None
 
     def apply(
         self,
@@ -202,7 +215,7 @@ class AggregationController:
                     and result.raw_output.strip() == winner_output
                 )
             quorum_value = config.quorum
-            quorum = quorum_value if quorum_value is not None else len(candidates)
+            quorum = quorum_value if quorum_value is not None else 2
             if votes < quorum:
                 self._mark_consensus_failure(lookup.values(), quorum, votes)
                 return None
@@ -236,7 +249,8 @@ class AggregationController:
                 model=judge_config.model,
                 provider_factory=factory,
             )
-        return AggregationStrategy.from_string(aggregate)
+        schema_data = self._load_schema(getattr(config, "schema", None))
+        return AggregationStrategy.from_string(aggregate, schema=schema_data)
 
     @staticmethod
     def _resolve_tie_breaker(
@@ -244,15 +258,52 @@ class AggregationController:
         lookup: Mapping[int, SingleRunResult],
     ) -> TieBreaker | None:
         tie_name = (config.tie_breaker or "").strip().lower()
-        if not tie_name:
-            return None
-        if tie_name == "latency":
-            return _LatencyTieBreaker(lookup)
-        if tie_name == "cost":
-            return _CostTieBreaker(lookup)
-        if tie_name == "first":
+        alias = {
+            "latency": "latency",
+            "min_latency": "latency",
+            "cost": "cost",
+            "min_cost": "cost",
+            "first": "stable_order",
+            "stable_order": "stable_order",
+        }
+        preferred = alias.get(tie_name) if tie_name else None
+        if preferred == "stable_order" and tie_name:
             return FirstTieBreaker()
-        return None
+        if tie_name and preferred is None:
+            return None
+
+        key_funcs: dict[str, Callable[[AggregationCandidate], float | int]] = {
+            "latency": lambda candidate: lookup[candidate.index].metrics.latency_ms,
+            "cost": lambda candidate: lookup[candidate.index].metrics.cost_usd,
+            "stable_order": lambda candidate: candidate.index,
+        }
+
+        order: list[tuple[str, Callable[[AggregationCandidate], float | int]]] = []
+        if preferred is not None:
+            order.append((preferred, key_funcs[preferred]))
+        for fallback in ("latency", "cost", "stable_order"):
+            if all(existing_name != fallback for existing_name, _ in order):
+                order.append((fallback, key_funcs[fallback]))
+        if not order:
+            return None
+        if order[0][0] == "stable_order" and len(order) == 1:
+            return FirstTieBreaker()
+        return _CompositeTieBreaker(order)
+
+    def _load_schema(self, schema_path: Path | None) -> Mapping[str, Any] | None:
+        if schema_path is None:
+            self._cached_schema_path = None
+            self._cached_schema = None
+            return None
+        if self._cached_schema_path == schema_path and self._cached_schema is not None:
+            return self._cached_schema
+        if schema_path.exists():
+            with schema_path.open("r", encoding="utf-8") as fp:
+                self._cached_schema = cast(Mapping[str, Any], json.load(fp))
+        else:
+            self._cached_schema = None
+        self._cached_schema_path = schema_path
+        return self._cached_schema
 
     @staticmethod
     def _mark_consensus_failure(
@@ -272,3 +323,8 @@ class AggregationController:
                     metrics.error_message = f"{metrics.error_message} | {message}"
             else:
                 metrics.error_message = message
+            meta = dict(metrics.ci_meta)
+            meta["aggregate_mode"] = "consensus"
+            meta["aggregate_quorum"] = quorum
+            meta["aggregate_votes"] = votes
+            metrics.ci_meta = meta
