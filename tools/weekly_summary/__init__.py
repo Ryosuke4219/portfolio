@@ -101,16 +101,6 @@ def select_flaky_rows(
     return selected
 
 
-def coerce_str(value: object | None) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        stripped = value.strip()
-        return stripped or None
-    if isinstance(value, bool | int | float):
-        return str(value)
-    return None
-
 def to_float(value: object) -> float | None:
     if value is None:
         return None
