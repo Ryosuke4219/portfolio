@@ -8,6 +8,7 @@ from typing import Any, Protocol, TYPE_CHECKING
 import uuid
 
 from .config import ProviderConfig
+from .errors import AllFailedError
 from .datasets import GoldenTask
 from .metrics import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
 from .providers import BaseProvider
@@ -66,11 +67,20 @@ class SequentialAttemptExecutor:
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         batch: list[tuple[int, SingleRunResult]] = []
         stop_reason: str | None = None
+        success = False
         for index, (provider_config, provider) in enumerate(providers):
             result = self._run_single(provider_config, provider, task, attempt_index, mode)
             batch.append((index, result))
             if result.stop_reason and not stop_reason:
                 stop_reason = result.stop_reason
+            if result.metrics.status == "ok":
+                success = True
+                break
+        if not success:
+            error = AllFailedError("all providers failed")
+            setattr(error, "results", batch)
+            setattr(error, "stop_reason", stop_reason)
+            raise error
         return batch, stop_reason
 
 

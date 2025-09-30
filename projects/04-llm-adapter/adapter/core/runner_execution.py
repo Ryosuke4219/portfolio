@@ -5,6 +5,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
+import time
 from typing import Literal, Protocol, TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
@@ -56,6 +57,15 @@ else:  # pragma: no cover - 実行時フォールバック
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
+from .errors import (
+    AdapterError,
+    AuthError,
+    ConfigError,
+    ProviderSkip,
+    RateLimitError,
+    RetriableError,
+    TimeoutError,
+)
 from .execution.guards import _SchemaValidator, _TokenBucket
 from .metrics import BudgetSnapshot, RunMetrics, estimate_cost
 from .providers import BaseProvider, ProviderResponse
@@ -173,78 +183,107 @@ class RunnerExecution:
         attempt_index: int,
         mode: str,
     ) -> SingleRunResult:
-        if self._token_bucket:
-            self._token_bucket.acquire()
         prompt = task.render_prompt()
-        response, status, failure_kind, error_message, latency_ms = self._run_provider_call(
-            provider_config,
-            provider,
-            prompt,
-        )
-        cost_usd = estimate_cost(
-            provider_config, response.input_tokens, response.output_tokens
-        )
-        budget_snapshot, stop_reason, status, failure_kind, error_message = (
-            self._evaluate_budget(
+        max_attempts = max(1, provider_config.retries.max + 1)
+        attempt = 0
+        last_result: SingleRunResult | None = None
+        while attempt < max_attempts:
+            attempt += 1
+            if self._token_bucket:
+                self._token_bucket.acquire()
+            response, status, failure_kind, error_message, latency_ms = (
+                self._run_provider_call(
+                    provider_config,
+                    provider,
+                    prompt,
+                )
+            )
+            cost_usd = estimate_cost(
+                provider_config, response.input_tokens, response.output_tokens
+            )
+            (
+                budget_snapshot,
+                stop_reason,
+                status,
+                failure_kind,
+                error_message,
+            ) = self._evaluate_budget(
                 provider_config,
                 cost_usd,
                 status,
                 failure_kind,
                 error_message,
             )
-        )
-        schema_error: str | None = None
-        validator = self._schema_validator
-        if validator is not None:
-            try:
-                validator.validate(response.output_text or "")
-            except ValueError as exc:
-                schema_error = str(exc)
-        if schema_error:
-            if status == "ok":
-                status = "error"
-            failure_kind = failure_kind or "schema_violation"
-            error_message = (
-                f"{error_message} | {schema_error}" if error_message else schema_error
+            schema_error: str | None = None
+            validator = self._schema_validator
+            if validator is not None:
+                try:
+                    validator.validate(response.output_text or "")
+                except ValueError as exc:
+                    schema_error = str(exc)
+            if schema_error:
+                if status == "ok":
+                    status = "error"
+                failure_kind = failure_kind or "schema_violation"
+                error_message = (
+                    f"{error_message} | {schema_error}" if error_message else schema_error
+                )
+            run_metrics, raw_output = self._build_metrics(
+                provider_config,
+                task,
+                attempt_index,
+                mode,
+                response,
+                status,
+                failure_kind,
+                error_message,
+                latency_ms,
+                budget_snapshot,
+                cost_usd,
             )
-        run_metrics, raw_output = self._build_metrics(
-            provider_config,
-            task,
-            attempt_index,
-            mode,
-            response,
-            status,
-            failure_kind,
-            error_message,
-            latency_ms,
-            budget_snapshot,
-            cost_usd,
-        )
-        provider_ids: list[str] = []
-        for provider_id in self._active_provider_ids:
-            if provider_id not in provider_ids:
-                provider_ids.append(provider_id)
-        run_metrics.providers = provider_ids
-        usage = response.token_usage
-        prompt_tokens = int(getattr(usage, "prompt", response.input_tokens))
-        completion_tokens = int(getattr(usage, "completion", response.output_tokens))
-        total_tokens = int(getattr(usage, "total", prompt_tokens + completion_tokens))
-        run_metrics.token_usage = {
-            "prompt": prompt_tokens,
-            "completion": completion_tokens,
-            "total": total_tokens,
-        }
-        run_metrics.retries = max(self._current_attempt_index, 0)
-        if schema_error:
-            run_metrics.status = status
-            run_metrics.failure_kind = failure_kind
-            run_metrics.error_message = error_message
-        run_metrics.outcome = self._resolve_outcome(run_metrics.status)
-        return SingleRunResult(
-            metrics=run_metrics,
-            raw_output=raw_output,
-            stop_reason=stop_reason,
-        )
+            provider_ids: list[str] = []
+            for provider_id in self._active_provider_ids:
+                if provider_id not in provider_ids:
+                    provider_ids.append(provider_id)
+            run_metrics.providers = provider_ids
+            usage = response.token_usage
+            prompt_tokens = int(getattr(usage, "prompt", response.input_tokens))
+            completion_tokens = int(
+                getattr(usage, "completion", response.output_tokens)
+            )
+            total_tokens = int(getattr(usage, "total", prompt_tokens + completion_tokens))
+            run_metrics.token_usage = {
+                "prompt": prompt_tokens,
+                "completion": completion_tokens,
+                "total": total_tokens,
+            }
+            run_metrics.retries = max(self._current_attempt_index + attempt - 1, 0)
+            if schema_error:
+                run_metrics.status = status
+                run_metrics.failure_kind = failure_kind
+                run_metrics.error_message = error_message
+            run_metrics.outcome = self._resolve_outcome(run_metrics.status)
+            result = SingleRunResult(
+                metrics=run_metrics,
+                raw_output=raw_output,
+                stop_reason=stop_reason,
+            )
+            last_result = result
+            classified_error = self._classify_failure(
+                run_metrics.status,
+                run_metrics.failure_kind,
+                run_metrics.error_message,
+            )
+            if classified_error is None:
+                return result
+            if isinstance(classified_error, ProviderSkip):
+                return result
+            if not self._should_retry(classified_error, attempt, max_attempts):
+                return result
+            self._apply_backoff(classified_error, provider_config)
+        if last_result is None:  # pragma: no cover - safety guard
+            raise RuntimeError("run_single executed without producing a result")
+        return last_result
 
     def _run_provider_call(
         self,
@@ -296,6 +335,34 @@ class RunnerExecution:
         error_message: str | None = None
         try:
             response = provider.generate(prompt)
+        except ProviderSkip as exc:
+            latency_ms = int((perf_counter() - start) * 1000)
+            reason = getattr(exc, "reason", None)
+            if hasattr(reason, "value"):
+                reason_value = str(getattr(reason, "value"))
+            elif reason is None:
+                reason_value = "skip"
+            else:
+                reason_value = str(reason)
+            response = ProviderResponse(
+                output_text="",
+                input_tokens=len(prompt.split()),
+                output_tokens=0,
+                latency_ms=latency_ms,
+            )
+            return response, "skip", reason_value, str(exc), latency_ms
+        except AdapterError as exc:  # pragma: no cover - provider normalized error
+            status = "error"
+            failure_kind = RunnerExecution._failure_kind_from_exception(exc)
+            error_message = str(exc)
+            latency_ms = int((perf_counter() - start) * 1000)
+            response = ProviderResponse(
+                output_text="",
+                input_tokens=len(prompt.split()),
+                output_tokens=0,
+                latency_ms=latency_ms,
+            )
+            return response, status, failure_kind, error_message, latency_ms
         except Exception as exc:  # pragma: no cover - 実プロバイダ利用時の防御
             status = "error"
             failure_kind = "provider_error"
@@ -311,12 +378,84 @@ class RunnerExecution:
         return response, status, failure_kind, error_message, response.latency_ms
 
     @staticmethod
+    def _failure_kind_from_exception(exc: AdapterError) -> str:
+        if isinstance(exc, RateLimitError):
+            return "rate_limit"
+        if isinstance(exc, TimeoutError):
+            return "timeout"
+        if isinstance(exc, AuthError):
+            return "auth"
+        if isinstance(exc, ConfigError):
+            return "config"
+        if isinstance(exc, RetriableError):
+            return "retryable"
+        return "provider_error"
+
+    @staticmethod
     def _resolve_outcome(status: str) -> Literal["success", "skip", "error"]:
         if status == "ok":
             return "success"
         if status == "skip":
             return "skip"
         return "error"
+
+    def _classify_failure(
+        self,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+    ) -> AdapterError | None:
+        if status == "ok":
+            return None
+        message = error_message or failure_kind or status
+        normalized = (failure_kind or "").replace("-", "_").lower()
+        if status == "skip" or normalized == "skip":
+            return ProviderSkip(message or "skip", reason=failure_kind)
+        if normalized in {"rate_limit", "ratelimit", "quota"}:
+            return RateLimitError(message)
+        if normalized in {"auth", "auth_error", "authentication"}:
+            return AuthError(message)
+        if normalized in {"timeout", "deadline"}:
+            return TimeoutError(message)
+        if normalized in {"config", "config_error"}:
+            return ConfigError(message)
+        if normalized in {"retryable", "provider_error", "transient"} or status == "error":
+            return RetriableError(message)
+        return None
+
+    def _should_retry(
+        self, error: AdapterError, attempt: int, max_attempts: int
+    ) -> bool:
+        if attempt >= max_attempts:
+            return False
+        policy = self._backoff
+        if isinstance(error, RateLimitError):
+            if policy and policy.retryable_next_provider:
+                return False
+            return True
+        if isinstance(error, TimeoutError):
+            if policy and policy.timeout_next_provider:
+                return False
+            return True
+        if isinstance(error, RetriableError):
+            if policy and policy.retryable_next_provider:
+                return False
+            return True
+        return False
+
+    def _apply_backoff(
+        self, error: AdapterError, provider_config: ProviderConfig
+    ) -> None:
+        sleep_seconds: float | None = None
+        if isinstance(error, RateLimitError):
+            if self._backoff and self._backoff.rate_limit_sleep_s:
+                sleep_seconds = self._backoff.rate_limit_sleep_s
+        elif isinstance(error, (RetriableError, TimeoutError)):
+            backoff_s = provider_config.retries.backoff_s
+            if backoff_s > 0:
+                sleep_seconds = backoff_s
+        if sleep_seconds and sleep_seconds > 0:
+            time.sleep(sleep_seconds)
 
 
 __all__ = [

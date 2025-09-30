@@ -43,6 +43,7 @@ from .budgets import BudgetManager
 from .compare_runner_finalizer import TaskFinalizer
 from .config import ProviderConfig
 from .datasets import GoldenTask
+from .errors import AllFailedError
 from .metrics import BudgetSnapshot, EvalMetrics, RunMetrics, compute_diff_rate, hash_text, now_ts
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 from .runner_execution import (
@@ -189,14 +190,31 @@ class CompareRunner:
         for task in self.tasks:
             histories: list[list[SingleRunResult]] = [[] for _ in providers]
             for attempt in range(repeat):
-                if config.mode == "sequential":
-                    batch, stop_reason = execution.run_sequential_attempt(
-                        providers, task, attempt, config.mode
+                try:
+                    if config.mode == "sequential":
+                        batch, stop_reason = execution.run_sequential_attempt(
+                            providers, task, attempt, config.mode
+                        )
+                    else:
+                        batch, stop_reason = execution.run_parallel_attempt(
+                            providers, task, attempt, config
+                        )
+                except AllFailedError as exc:
+                    batch = getattr(exc, "results", [])
+                    stop_reason = getattr(exc, "stop_reason", None)
+                    if batch:
+                        self._aggregation.apply(
+                            mode=config.mode,
+                            config=config,
+                            batch=batch,
+                            default_judge_config=self._judge_provider_config,
+                        )
+                        for index, result in batch:
+                            histories[index].append(result)
+                    self._task_finalizer.finalize_task(
+                        task, providers, histories, results
                     )
-                else:
-                    batch, stop_reason = execution.run_parallel_attempt(
-                        providers, task, attempt, config
-                    )
+                    raise
                 self._aggregation.apply(
                     mode=config.mode,
                     config=config,
