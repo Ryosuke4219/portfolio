@@ -3,24 +3,25 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import datetime as dt
 import json
 from pathlib import Path
-from typing import Any
 
 from ci_metrics import compute_recent_deltas, compute_run_history
 from weekly_summary import (
     aggregate_status,
-    coerce_str,
     filter_by_window,
-    format_percentage,
     load_flaky,
     load_runs,
-    parse_iso8601,
     select_flaky_rows,
-    to_float,
 )
+
+from tools.ci_report.processing import (
+    compute_last_updated,
+    normalize_flaky_rows,
+    summarize_failure_kinds,
+)
+from tools.ci_report.rendering import build_json_payload, render_markdown
 
 
 def parse_args() -> argparse.Namespace:
