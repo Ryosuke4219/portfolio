@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics import RunMetrics, compute_diff_rate
+from .metrics import compute_diff_rate, RunMetrics
 from .providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
@@ -94,7 +94,7 @@ class TaskFinalizer:
         self,
         task: GoldenTask,
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
-        histories: Sequence[Sequence["SingleRunResult"]],
+        histories: Sequence[Sequence[SingleRunResult]],
         results: list[RunMetrics],
     ) -> None:
         for index, (provider_config, _) in enumerate(providers):
