@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
 def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
     timestamps: list[dt.datetime] = []
     for run in runs:
-        ts = parse_iso8601(coerce_str(run.get("ts")))
+        ts = weekly_summary.parse_iso8601(coerce_str(run.get("ts")))
         if ts is not None:
             timestamps.append(ts)
     if not timestamps:
