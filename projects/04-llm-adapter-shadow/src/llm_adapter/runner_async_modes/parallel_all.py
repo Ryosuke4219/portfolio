@@ -5,7 +5,7 @@ from ..parallel_exec import ParallelAllResult, run_parallel_all_async
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import elapsed_ms
 from .base import ParallelStrategyBase
-from .context import AsyncRunContext, StrategyResult, collect_failure_details
+from .context import AsyncRunContext, collect_failure_details, StrategyResult
 
 
 class ParallelAllRunStrategy(ParallelStrategyBase):
