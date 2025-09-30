@@ -6,7 +6,6 @@ import argparse
 from collections import Counter
 import datetime as dt
 import json
-import collections
 from pathlib import Path
 import sys
 from typing import Any
