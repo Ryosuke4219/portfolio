@@ -7,8 +7,7 @@ import json
 from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
-from typing import TYPE_CHECKING, Literal, TypeVar, Protocol
-
+from typing import Literal, Protocol, TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.parallel_exec import (
@@ -61,6 +60,10 @@ from .config import ProviderConfig
 from .datasets import GoldenTask
 from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
 from .providers import BaseProvider, ProviderResponse
+from .runner_execution_attempts import (
+    ParallelAttemptExecutor,
+    SequentialAttemptExecutor,
+)
 
 
 class _TokenBucket:
@@ -116,13 +119,6 @@ class SingleRunResult:
     raw_output: str
     stop_reason: str | None = None
     aggregate_output: str | None = None
-
-
-from .runner_execution_attempts import (
-    ParallelAttemptExecutor,
-    SequentialAttemptExecutor,
-)
-
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import BackoffPolicy, RunnerConfig
 
