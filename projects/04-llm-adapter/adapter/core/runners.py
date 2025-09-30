@@ -9,57 +9,36 @@ import os
 from pathlib import Path
 import re
 from statistics import median, pstdev
-from threading import Lock
-from time import perf_counter, sleep
 from typing import TYPE_CHECKING
 import uuid
 
-try:  # pragma: no cover - 実環境では src.* が存在する
+if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
-except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-    from dataclasses import dataclass
-    from types import SimpleNamespace
-    from typing import Any
+else:  # pragma: no cover - 実行時フォールバック
+    try:
+        from src.llm_adapter.provider_spi import (  # type: ignore[import-not-found]
+            ProviderResponse as JudgeProviderResponse,
+        )
+    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+        from dataclasses import dataclass
+        from types import SimpleNamespace
+        from typing import Any
 
-    @dataclass(slots=True)
-    class JudgeProviderResponse:  # type: ignore[override]
-        text: str
-        latency_ms: int
-        tokens_in: int = 0
-        tokens_out: int = 0
-        raw: Any | None = None
+        @dataclass(slots=True)
+        class JudgeProviderResponse:
+            text: str
+            latency_ms: int
+            tokens_in: int = 0
+            tokens_out: int = 0
+            raw: Any | None = None
 
-        @property
-        def token_usage(self) -> SimpleNamespace:
-            return SimpleNamespace(
-                prompt=self.tokens_in,
-                completion=self.tokens_out,
-                total=self.tokens_in + self.tokens_out,
-            )
-
-try:  # pragma: no cover - 実環境では src.* が存在する
-    from src.llm_adapter.runner_parallel import (
-        ParallelExecutionError,
-        run_parallel_all_sync,
-        run_parallel_any_sync,
-    )
-except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-    class ParallelExecutionError(RuntimeError):
-        """並列実行時エラーのフォールバック。"""
-
-    def run_parallel_all_sync(workers, *, max_concurrency: int | None = None):  # type: ignore[override]
-        return [worker() for worker in workers]
-
-    def run_parallel_any_sync(workers, *, max_concurrency: int | None = None):  # type: ignore[override]
-        last_error: Exception | None = None
-        for worker in workers:
-            try:
-                worker()
-                return
-            except Exception as exc:  # pragma: no cover - テスト環境でのみ到達
-                last_error = exc
-        if last_error is not None:
-            raise ParallelExecutionError(str(last_error)) from last_error
+            @property
+            def token_usage(self) -> SimpleNamespace:
+                return SimpleNamespace(
+                    prompt=self.tokens_in,
+                    completion=self.tokens_out,
+                    total=self.tokens_in + self.tokens_out,
+                )
 
 from .aggregation import (
     AggregationCandidate,
@@ -74,13 +53,20 @@ from .datasets import GoldenTask
 from .metrics import (
     BudgetSnapshot,
     compute_diff_rate,
-    estimate_cost,
     EvalMetrics,
     hash_text,
     now_ts,
     RunMetrics,
 )
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
+from .runner_execution import (
+    RunnerExecution,
+    SingleRunResult,
+    _SchemaValidator,
+    _TokenBucket,
+    run_parallel_all_sync,
+    run_parallel_any_sync,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
@@ -93,14 +79,6 @@ class AggregationDecision:
     winner_index: int
     output: str
     votes: int | None = None
-
-
-@dataclass(slots=True)
-class SingleRunResult:
-    metrics: RunMetrics
-    raw_output: str
-    stop_reason: str | None = None
-    aggregate_output: str | None = None
 
 
 class _LatencyTieBreaker(TieBreaker):
@@ -134,7 +112,7 @@ class _JudgeInvoker:
         self._provider = provider
         self._config = config
 
-    def invoke(self, request: object) -> JudgeProviderResponse:  # type: ignore[override]
+    def invoke(self, request: object) -> JudgeProviderResponse:
         if hasattr(request, "prompt_text"):
             prompt = request.prompt_text or ""
         elif hasattr(request, "prompt"):
@@ -155,57 +133,10 @@ class _JudgeProviderFactoryAdapter:
     def __init__(self, config: ProviderConfig) -> None:
         self._config = config
 
-    def create(self, *, model: str) -> _JudgeInvoker:  # type: ignore[override]
+    def create(self, *, model: str) -> _JudgeInvoker:
         provider_config = replace(self._config, model=model)
         provider = ProviderFactory.create(provider_config)
         return _JudgeInvoker(provider, provider_config)
-
-
-class _TokenBucket:
-    def __init__(self, rpm: int | None) -> None:
-        self.capacity = rpm or 0
-        self.tokens = float(self.capacity)
-        self.updated = perf_counter()
-        self.lock = Lock()
-
-    def acquire(self) -> None:
-        if self.capacity <= 0:
-            return
-        refill_rate = self.capacity / 60.0
-        while True:
-            with self.lock:
-                now = perf_counter()
-                elapsed = now - self.updated
-                if elapsed > 0:
-                    self.tokens = min(
-                        float(self.capacity), self.tokens + elapsed * refill_rate
-                    )
-                    self.updated = now
-                if self.tokens >= 1.0:
-                    self.tokens -= 1.0
-                    return
-            sleep(max(1.0 / max(self.capacity, 1), 0.01))
-
-
-class _SchemaValidator:
-    def __init__(self, schema_path: Path | None) -> None:
-        self.schema: dict[str, object] | None = None
-        if schema_path and schema_path.exists():
-            with schema_path.open("r", encoding="utf-8") as fp:
-                self.schema = json.load(fp)
-
-    def validate(self, payload: str) -> None:
-        if self.schema is None or not payload.strip():
-            return
-        data = json.loads(payload)
-        required = self.schema.get("required") if isinstance(self.schema, dict) else None
-        if isinstance(required, list):
-            missing = [field for field in required if field not in data]
-            if missing:
-                raise ValueError(f"missing required fields: {', '.join(missing)}")
-        expected_type = self.schema.get("type") if isinstance(self.schema, dict) else None
-        if expected_type == "object" and not isinstance(data, dict):
-            raise ValueError("schema type mismatch: expected object")
 
 
 class CompareRunner:
@@ -239,20 +170,21 @@ class CompareRunner:
     def run(self, repeat: int, config: RunnerConfig) -> list[RunMetrics]:
         repeat = max(repeat, 1)
 
-        try:
-            rpm = config.rpm  # type: ignore[attr-defined]
-        except AttributeError:
-            rpm = None
+        rpm = getattr(config, "rpm", None)
         self._token_bucket = _TokenBucket(rpm)
 
-        try:
-            schema_path = config.schema  # type: ignore[attr-defined]
-        except AttributeError:
-            schema_path = None
+        schema_path = getattr(config, "schema", None)
         self._schema_validator = _SchemaValidator(schema_path)
         if config.judge_provider is not None:
             self._judge_provider_config = config.judge_provider
 
+        execution = RunnerExecution(
+            token_bucket=self._token_bucket,
+            schema_validator=self._schema_validator,
+            evaluate_budget=self._evaluate_budget,
+            build_metrics=self._build_metrics,
+            normalize_concurrency=self._normalize_concurrency,
+        )
 
         providers: list[tuple[ProviderConfig, BaseProvider]] = []
         for provider_config in self.provider_configs:
@@ -273,11 +205,11 @@ class CompareRunner:
             histories: list[list[SingleRunResult]] = [[] for _ in providers]
             for attempt in range(repeat):
                 if config.mode == "sequential":
-                    batch, stop_reason = self._run_sequential_attempt(
+                    batch, stop_reason = execution.run_sequential_attempt(
                         providers, task, attempt, config.mode
                     )
                 else:
-                    batch, stop_reason = self._run_parallel_attempt(
+                    batch, stop_reason = execution.run_parallel_attempt(
                         providers, task, attempt, config
                     )
                 self._apply_aggregation(config.mode, config, batch)
@@ -290,85 +222,6 @@ class CompareRunner:
                 LOGGER.warning("予算制約により実行を停止します: %s", stop_reason)
                 break
         return results
-
-    def _run_sequential_attempt(
-        self,
-        providers: Sequence[tuple[ProviderConfig, BaseProvider]],
-        task: GoldenTask,
-        attempt_index: int,
-        mode: str,
-    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
-        batch: list[tuple[int, SingleRunResult]] = []
-        stop_reason: str | None = None
-        for index, (provider_config, provider) in enumerate(providers):
-            result = self._run_single(provider_config, provider, task, attempt_index, mode)
-            batch.append((index, result))
-            if result.stop_reason and not stop_reason:
-                stop_reason = result.stop_reason
-        return batch, stop_reason
-
-    def _run_parallel_attempt(
-        self,
-        providers: Sequence[tuple[ProviderConfig, BaseProvider]],
-        task: GoldenTask,
-        attempt_index: int,
-        config: RunnerConfig,
-    ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
-        if not providers:
-            return [], None
-        try:
-            max_concurrency = config.max_concurrency  # type: ignore[attr-defined]
-        except AttributeError:
-            max_concurrency = None
-
-        if max_concurrency is None:
-            max_workers = self._normalize_concurrency(len(providers), None)
-        else:
-            max_workers = self._normalize_concurrency(
-                len(providers), max_concurrency
-            )
-        stop_reason: str | None = None
-        results: list[SingleRunResult | None] = [None] * len(providers)
-
-        def build_worker(index: int, provider_config: ProviderConfig, provider: BaseProvider):
-            def worker() -> int:
-                nonlocal stop_reason
-                result = self._run_single(
-                    provider_config,
-                    provider,
-                    task,
-                    attempt_index,
-                    config.mode,
-                )
-                results[index] = result
-                if result.stop_reason and not stop_reason:
-                    stop_reason = result.stop_reason
-                if (
-                    config.mode == "parallel-any"
-                    and result.metrics.status != "ok"
-                ):
-                    raise RuntimeError("parallel-any failure")
-                return index
-
-            return worker
-
-        workers = [
-            build_worker(index, provider_config, provider)
-            for index, (provider_config, provider) in enumerate(providers)
-        ]
-        if config.mode == "parallel-any":
-            try:
-                run_parallel_any_sync(workers, max_concurrency=max_workers)
-            except (ParallelExecutionError, RuntimeError):
-                pass
-        else:
-            run_parallel_all_sync(workers, max_concurrency=max_workers)
-        batch = [
-            (index, result)
-            for index, result in enumerate(results)
-            if result is not None
-        ]
-        return batch, stop_reason
 
     def _apply_aggregation(
         self,
@@ -535,134 +388,6 @@ class CompareRunner:
         if limit is None or limit <= 0:
             return total
         return max(1, min(total, limit))
-
-    def _run_single(
-        self,
-        provider_config: ProviderConfig,
-        provider: BaseProvider,
-        task: GoldenTask,
-        attempt_index: int,
-        mode: str,
-    ) -> SingleRunResult:
-        if self._token_bucket:
-            self._token_bucket.acquire()
-        prompt = task.render_prompt()
-        response, status, failure_kind, error_message, latency_ms = self._run_provider_call(
-            provider_config,
-            provider,
-            prompt,
-        )
-        cost_usd = estimate_cost(
-            provider_config, response.input_tokens, response.output_tokens
-        )
-        budget_snapshot, stop_reason, status, failure_kind, error_message = (
-            self._evaluate_budget(
-                provider_config,
-                cost_usd,
-                status,
-                failure_kind,
-                error_message,
-            )
-        )
-        schema_error: str | None = None
-        validator = self._schema_validator
-        if validator is not None:
-            try:
-                validator.validate(response.output_text or "")
-            except ValueError as exc:
-                schema_error = str(exc)
-        if schema_error:
-            if status == "ok":
-                status = "error"
-            failure_kind = failure_kind or "schema_violation"
-            error_message = (
-                f"{error_message} | {schema_error}" if error_message else schema_error
-            )
-        run_metrics, raw_output = self._build_metrics(
-            provider_config,
-            task,
-            attempt_index,
-            mode,
-            response,
-            status,
-            failure_kind,
-            error_message,
-            latency_ms,
-            budget_snapshot,
-            cost_usd,
-        )
-        if schema_error:
-            run_metrics.status = status
-            run_metrics.failure_kind = failure_kind
-            run_metrics.error_message = error_message
-        return SingleRunResult(
-            metrics=run_metrics,
-            raw_output=raw_output,
-            stop_reason=stop_reason,
-        )
-
-    def _run_provider_call(
-        self,
-        provider_config: ProviderConfig,
-        provider: BaseProvider,
-        prompt: str,
-    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
-        response, status, failure_kind, error_message, latency_ms = self._invoke_provider(
-            provider, prompt
-        )
-        status, failure_kind = self._check_timeout(
-            provider_config, latency_ms, status, failure_kind
-        )
-        status, failure_kind = self._enforce_output_guard(
-            response.output_text, status, failure_kind
-        )
-        return response, status, failure_kind, error_message, latency_ms
-
-    def _check_timeout(
-        self,
-        provider_config: ProviderConfig,
-        latency_ms: int,
-        status: str,
-        failure_kind: str | None,
-    ) -> tuple[str, str | None]:
-        if (
-            provider_config.timeout_s > 0
-            and latency_ms > provider_config.timeout_s * 1000
-            and status == "ok"
-        ):
-            return "error", "timeout"
-        return status, failure_kind
-
-    def _enforce_output_guard(
-        self, output_text: str | None, status: str, failure_kind: str | None
-    ) -> tuple[str, str | None]:
-        if (output_text is None or not output_text.strip()) and status == "ok":
-            return "error", failure_kind or "guard_violation"
-        return status, failure_kind
-
-    def _invoke_provider(
-        self, provider: BaseProvider, prompt: str
-    ) -> tuple[ProviderResponse, str, str | None, str | None, int]:
-        start = perf_counter()
-        status = "ok"
-        failure_kind: str | None = None
-        error_message: str | None = None
-        try:
-            response = provider.generate(prompt)
-        except Exception as exc:  # pragma: no cover - 実プロバイダ利用時の防御
-            status = "error"
-            failure_kind = "provider_error"
-            error_message = str(exc)
-            latency_ms = int((perf_counter() - start) * 1000)
-            # フォールバックのダミー応答
-            response = ProviderResponse(
-                output_text="",
-                input_tokens=len(prompt.split()),
-                output_tokens=0,
-                latency_ms=latency_ms,
-            )
-            return response, status, failure_kind, error_message, latency_ms
-        return response, status, failure_kind, error_message, response.latency_ms
 
     def _build_metrics(
         self,
