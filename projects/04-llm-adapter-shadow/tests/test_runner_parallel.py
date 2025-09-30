@@ -203,6 +203,34 @@ def test_compute_consensus_accepts_numeric_scores() -> None:
     assert result.scores == {"int": 1.0, "float": 1.5}
 
 
+def test_compute_consensus_records_schema_failures_and_applies_tie_breaker() -> None:
+    schema = json.dumps({"type": "object", "required": ["answer"]})
+    responses = [
+        ProviderResponse(
+            text=json.dumps({"answer": "slow"}),
+            latency_ms=20,
+        ),
+        ProviderResponse(
+            text=json.dumps({"answer": "fast"}),
+            latency_ms=10,
+        ),
+        ProviderResponse(text="oops", latency_ms=1),
+    ]
+
+    result = compute_consensus(
+        responses,
+        config=ConsensusConfig(schema=schema, tie_breaker="latency", quorum=1),
+    )
+
+    assert result.response.text == json.dumps({"answer": "fast"})
+    assert result.tie_break_applied is True
+    assert result.tie_breaker_selected == "latency"
+    assert result.tie_break_reason == "latency(min=10)"
+    assert result.abstained == 1
+    assert result.schema_checked is True
+    assert result.schema_failures == {2: "invalid json: Expecting value"}
+
+
 def test_normalize_candidate_text_for_strings() -> None:
     normalized_a, display_a = _normalize_candidate_text(" Foo   Bar ")
     normalized_b, display_b = _normalize_candidate_text("foo bar")
