@@ -158,7 +158,7 @@ def coerce_str(value: object | None) -> str | None:
     if isinstance(value, str):
         stripped = value.strip()
         return stripped or None
-    if isinstance(value, (int, float, bool)):
+    if isinstance(value, bool | int | float):
         return str(value)
     return None
 
