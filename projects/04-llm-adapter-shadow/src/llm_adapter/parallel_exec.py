@@ -10,7 +10,9 @@ from concurrent.futures import (
     wait,
 )
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar
+
+from . import parallel_async as _parallel_async
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -144,9 +146,6 @@ def run_parallel_all_sync(
                 pending.cancel()
             raise
     return responses
-
-
-from . import parallel_async as _parallel_async
 
 AsyncWorker = _parallel_async.AsyncWorker
 RetryDirective = _parallel_async.RetryDirective
