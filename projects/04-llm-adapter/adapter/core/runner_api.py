@@ -66,7 +66,6 @@ class RunnerConfig:
     backoff: BackoffPolicy = field(default_factory=BackoffPolicy)
     shadow_provider: ProviderSPI | None = None
     metrics_path: Path | None = None
-    provider_weights: dict[str, float] | None = None
 
 
 def default_budgets_path() -> Path:
@@ -127,7 +126,6 @@ def run_compare(
     runner_config: RunnerConfig | None = None,
     backoff: BackoffPolicy | None = None,
     shadow_provider: ProviderSPI | None = None,
-    provider_weights: dict[str, float] | None = None,
 ) -> int:
     logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO))
 
@@ -153,7 +151,6 @@ def run_compare(
             backoff=backoff or BackoffPolicy(),
             shadow_provider=shadow_provider,
             metrics_path=metrics_path,
-            provider_weights=provider_weights,
         )
     else:
         config = runner_config
