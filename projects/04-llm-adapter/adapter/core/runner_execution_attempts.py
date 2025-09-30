@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import Any, TYPE_CHECKING
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
