@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from src.llm_adapter.errors import TimeoutError
+from src.llm_adapter.errors import AllFailedError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
@@ -137,12 +137,13 @@ def test_runner_emits_chain_failed_metric(tmp_path: Path) -> None:
 
     metrics_path = tmp_path / "failure.jsonl"
 
-    with pytest.raises(TimeoutError):
+    with pytest.raises(AllFailedError) as exc_info:
         runner.run(
             ProviderRequest(prompt="[TIMEOUT] hard", model="fallback-model"),
             shadow=None,
             shadow_metrics_path=metrics_path,
         )
+    assert isinstance(exc_info.value.__cause__, TimeoutError)
 
     payloads = _read_metrics(metrics_path)
     call_events = [item for item in payloads if item["event"] == "provider_call"]
