@@ -76,11 +76,8 @@ class AggregationController:
         if selection.votes is not None:
             meta["aggregate_votes"] = selection.votes
         if mode == "consensus":
-            quorum_value = (
-                config.quorum
-                if config.quorum is not None
-                else len(selection.decision.candidates)
-            )
+            quorum_value = config.quorum if config.quorum is not None else 2
+            meta["aggregate_quorum"] = quorum_value
             consensus_meta: dict[str, object] = {
                 "strategy": selection.decision.strategy,
                 "quorum": quorum_value,

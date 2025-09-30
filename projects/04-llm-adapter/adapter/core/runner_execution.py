@@ -308,6 +308,10 @@ class RunnerExecution:
             "completion": completion_tokens,
             "total": total_tokens,
         }
+        run_metrics.attempts = attempt_index + 1
+        run_metrics.error_type = (
+            type(provider_result.error).__name__ if provider_result.error else None
+        )
         run_metrics.retries = max(self._current_attempt_index, 0) + max(
             provider_result.retries - 1, 0
         )

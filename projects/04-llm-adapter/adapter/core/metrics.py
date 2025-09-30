@@ -95,8 +95,10 @@ class RunMetrics:
     error_message: str | None
     output_text: str | None
     output_hash: str | None
+    error_type: str | None = None
     providers: list[str] = field(default_factory=list)
     token_usage: dict[str, int] = field(default_factory=dict)
+    attempts: int = 0
     retries: int = 0
     outcome: Literal["success", "skip", "error"] = "success"
     shadow_provider_id: str | None = None
