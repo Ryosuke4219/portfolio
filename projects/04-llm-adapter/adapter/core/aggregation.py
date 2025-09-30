@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, cast, Protocol, runtime_checkable, TYPE_CHECKING
 
 __path__ = [str(Path(__file__).with_name("aggregation"))]
 
@@ -200,9 +200,6 @@ class MaxScoreStrategy:
         )
 
 
-from .aggregation.judge import DEFAULT_JUDGE_TEMPLATE, JudgeStrategy
-
-
 # 便利ヘルパー：API/CLI から簡単に呼べるように
 def AggregationResolver(kind: str, **kwargs: Any) -> AggregationStrategy:
     return AggregationStrategy.from_string(kind, **kwargs)
@@ -221,3 +218,15 @@ __all__ = [
     "MajorityVoteStrategy",
     "MaxScoreStrategy",
 ]
+
+
+if TYPE_CHECKING:  # pragma: no cover - 型補完用
+    from .aggregation.judge import DEFAULT_JUDGE_TEMPLATE, JudgeStrategy
+
+
+def __getattr__(name: str) -> Any:  # pragma: no cover - 動的リレーエクスポート
+    if name in {"DEFAULT_JUDGE_TEMPLATE", "JudgeStrategy"}:
+        from .aggregation.judge import DEFAULT_JUDGE_TEMPLATE, JudgeStrategy
+
+        return DEFAULT_JUDGE_TEMPLATE if name == "DEFAULT_JUDGE_TEMPLATE" else JudgeStrategy
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
