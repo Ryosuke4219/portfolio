@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
-from typing import TYPE_CHECKING, TypeVar, Protocol
+from typing import TYPE_CHECKING, Literal, TypeVar, Protocol
+
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.parallel_exec import (
@@ -180,6 +181,8 @@ class RunnerExecution:
             run_parallel_any_sync=run_parallel_any_sync,
             parallel_execution_error=ParallelExecutionError,
         )
+        self._active_provider_ids: tuple[str, ...] = ()
+        self._current_attempt_index = 0
 
     def run_sequential_attempt(
         self,
@@ -188,6 +191,8 @@ class RunnerExecution:
         attempt_index: int,
         mode: str,
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
+        self._active_provider_ids = tuple(cfg.provider for cfg, _ in providers)
+        self._current_attempt_index = attempt_index
         return self._sequential_executor.run(
             providers,
             task,
@@ -202,6 +207,8 @@ class RunnerExecution:
         attempt_index: int,
         config: RunnerConfig,
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
+        self._active_provider_ids = tuple(cfg.provider for cfg, _ in providers)
+        self._current_attempt_index = attempt_index
         return self._parallel_executor.run(
             providers,
             task,
@@ -264,10 +271,26 @@ class RunnerExecution:
             budget_snapshot,
             cost_usd,
         )
+        provider_ids: list[str] = []
+        for provider_id in self._active_provider_ids:
+            if provider_id not in provider_ids:
+                provider_ids.append(provider_id)
+        run_metrics.providers = provider_ids
+        usage = response.token_usage
+        prompt_tokens = int(getattr(usage, "prompt", response.input_tokens))
+        completion_tokens = int(getattr(usage, "completion", response.output_tokens))
+        total_tokens = int(getattr(usage, "total", prompt_tokens + completion_tokens))
+        run_metrics.token_usage = {
+            "prompt": prompt_tokens,
+            "completion": completion_tokens,
+            "total": total_tokens,
+        }
+        run_metrics.retries = max(self._current_attempt_index, 0)
         if schema_error:
             run_metrics.status = status
             run_metrics.failure_kind = failure_kind
             run_metrics.error_message = error_message
+        run_metrics.outcome = self._resolve_outcome(run_metrics.status)
         return SingleRunResult(
             metrics=run_metrics,
             raw_output=raw_output,
@@ -337,6 +360,14 @@ class RunnerExecution:
             )
             return response, status, failure_kind, error_message, latency_ms
         return response, status, failure_kind, error_message, response.latency_ms
+
+    @staticmethod
+    def _resolve_outcome(status: str) -> Literal["success", "skip", "error"]:
+        if status == "ok":
+            return "success"
+        if status == "skip":
+            return "skip"
+        return "error"
 
 
 __all__ = [
