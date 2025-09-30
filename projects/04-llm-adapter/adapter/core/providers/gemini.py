@@ -288,8 +288,7 @@ class GeminiProvider(BaseProvider):
             )
         except Exception as exc:  # pragma: no cover - 実行時例外は発生環境依存
             normalized = _normalize_gemini_exception(exc)
-            normalized.__cause__ = exc
-            raise normalized
+            raise normalized from exc
         latency_ms = int((time.time() - ts0) * 1000)
         output_text = _extract_output_text(response)
         prompt_tokens, output_tokens = _extract_usage(response, prompt, output_text)
