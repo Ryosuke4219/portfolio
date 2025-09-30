@@ -5,9 +5,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
+from . import rate_limiter as _rate_limiter
 from .errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger, JsonlLogger
-from . import rate_limiter as _rate_limiter
 from .utils import content_hash
 
 if TYPE_CHECKING:
