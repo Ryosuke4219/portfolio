@@ -16,8 +16,8 @@ from .runner_config import ConsensusConfig
 @dataclass(slots=True)
 class ConsensusResult:
     response: ProviderResponse
-    votes: int
-    tally: dict[str, int]
+    votes: float
+    tally: dict[str, float]
     total_voters: int
     strategy: str
     min_votes: int | None
@@ -40,15 +40,27 @@ class ConsensusResult:
 class _Candidate:
     text: str
     entries: list[tuple[int, ProviderResponse]] = field(default_factory=list)
+    provider_ids: list[str | None] = field(default_factory=list)
+    weights: list[float] = field(default_factory=list)
     votes: int = 0
+    total_weight: float = 0.0
     score: float = 0.0
     best_score: float = 0.0
     latency: int = 0
     cost: float = 0.0
 
-    def record(self, index: int, response: ProviderResponse) -> None:
+    def record(
+        self,
+        index: int,
+        provider_id: str | None,
+        weight: float,
+        response: ProviderResponse,
+    ) -> None:
         self.entries.append((index, response))
+        self.provider_ids.append(provider_id)
+        self.weights.append(weight)
         self.votes += 1
+        self.total_weight += weight
         value = _extract_score(response)
         self.score += value
         self.best_score = value if self.votes == 1 else max(self.best_score, value)
@@ -94,6 +106,17 @@ def _select_candidates(
             if candidate.votes == pivot_votes
         ]
         return pool, float(pivot_votes), None
+    if normalized == "weighted_vote":
+        weights = {text: candidate.total_weight for text, candidate in candidates.items()}
+        pivot_weight = max(weights.values())
+        pool = [
+            candidate
+            for candidate in candidates.values()
+            if math.isclose(
+                candidate.total_weight, pivot_weight, rel_tol=1e-9, abs_tol=1e-9
+            )
+        ]
+        return pool, float(pivot_weight), weights
     if normalized == "weighted":
         scores = {text: candidate.score for text, candidate in candidates.items()}
         pivot_score = max(scores.values())
@@ -204,8 +227,11 @@ def invoke_consensus_judge(
     return _invoke_judge(_load_judge(judge), candidates)
 
 
+_ConsensusInput = ProviderResponse | tuple[str | None, ProviderResponse]
+
+
 def compute_consensus(
-    responses: Iterable[ProviderResponse], *, config: ConsensusConfig | None = None
+    responses: Iterable[_ConsensusInput], *, config: ConsensusConfig | None = None
 ) -> ConsensusResult:
     """Return the majority response according to ``config``."""
 
@@ -215,27 +241,50 @@ def compute_consensus(
     if config is None:
         config = ConsensusConfig()
     strategy = (config.strategy or "majority").strip()
+    normalized_strategy = strategy.lower()
     tie_breaker = (config.tie_breaker or "").strip().lower() or None
     if tie_breaker is not None and tie_breaker not in {"latency", "cost"}:
         raise ValueError(f"unsupported tie_breaker: {config.tie_breaker!r}")
 
+    normalized_entries: list[tuple[str | None, ProviderResponse]] = []
+    for item in collected:
+        if isinstance(item, ProviderResponse):
+            normalized_entries.append((None, item))
+            continue
+        if (
+            isinstance(item, tuple)
+            and len(item) == 2
+            and isinstance(item[1], ProviderResponse)
+        ):
+            provider_id = None if item[0] is None else str(item[0])
+            normalized_entries.append((provider_id, item[1]))
+            continue
+        raise TypeError("responses must be ProviderResponse or (provider_id, response)")
+
+    response_only = [response for _, response in normalized_entries]
     valid_entries, schema_failures, schema_checked = validate_consensus_schema(
-        collected, config.schema
+        response_only, config.schema
     )
 
     if not valid_entries:
         raise ParallelExecutionError("all responses failed schema validation")
 
     candidates: dict[str, _Candidate] = {}
+    provider_weights = config.provider_weights or {}
     for index, response in valid_entries:
         key = response.text.strip()
         candidate = candidates.get(key)
         if candidate is None:
             candidate = _Candidate(text=key)
             candidates[key] = candidate
-        candidate.record(index, response)
+        provider_id = normalized_entries[index][0]
+        weight = float(provider_weights.get(provider_id, 1.0)) if provider_id else 1.0
+        candidate.record(index, provider_id, weight, response)
 
-    tally = {text: candidate.votes for text, candidate in candidates.items()}
+    if normalized_strategy == "weighted_vote":
+        tally = {text: candidate.total_weight for text, candidate in candidates.items()}
+    else:
+        tally = {text: candidate.votes for text, candidate in candidates.items()}
     if not tally:
         raise ParallelExecutionError("consensus tally is empty")
 
@@ -277,7 +326,11 @@ def compute_consensus(
         raise ParallelExecutionError("consensus tie could not be resolved")
 
     winner = remaining[0]
-    votes = winner.votes
+    votes: float
+    if normalized_strategy == "weighted_vote":
+        votes = winner.total_weight
+    else:
+        votes = float(winner.votes)
     quorum = config.quorum or len(valid_entries)
     if votes < quorum:
         raise ParallelExecutionError("consensus quorum not reached")

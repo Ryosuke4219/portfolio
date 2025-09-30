@@ -55,7 +55,10 @@ class ConsensusRunStrategy(ParallelStrategyBase):
 
         try:
             consensus = compute_consensus(
-                [response for _, _, response, _ in successful_entries],
+                [
+                    (provider.name(), response)
+                    for _, provider, response, _ in successful_entries
+                ],
                 config=context.config.consensus,
             )
         except ParallelExecutionError as err:
@@ -87,7 +90,7 @@ class ConsensusRunStrategy(ParallelStrategyBase):
                 results=results,
             )
         attempt_index, provider, response, shadow_metrics = winner_entry
-        votes_against = consensus.total_voters - consensus.votes - consensus.abstained
+        votes_against = sum(consensus.tally.values()) - consensus.votes
         if context.event_logger is not None:
             candidate_summaries = [
                 {

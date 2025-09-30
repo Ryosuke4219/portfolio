@@ -88,6 +88,24 @@ def test_weighted_strategy_records_scores() -> None:
     assert tie_breaker_selected == "cost"
 
 
+def test_weighted_vote_uses_provider_weights() -> None:
+    responses = [
+        ("p1", _response("A", 10)),
+        ("p2", _response("B", 12)),
+        ("p3", _response("B", 8)),
+    ]
+    config = ConsensusConfig(
+        strategy="weighted_vote",
+        quorum=1,
+        provider_weights={"p1": 5.0, "p2": 1.0, "p3": 0.5},
+    )
+    result = compute_consensus(responses, config=config)
+    assert result.response.text == "A"
+    assert result.tally == pytest.approx({"A": 5.0, "B": 1.5})
+    assert result.votes == pytest.approx(5.0)
+    assert result.scores == pytest.approx({"A": 5.0, "B": 1.5})
+
+
 def test_max_score_strategy_prefers_best_latency() -> None:
     responses = [
         _response("A", 18, score=0.6),

@@ -425,8 +425,8 @@ class ConsensusStrategy:
             fatal = runner._extract_fatal_error(results)
             if fatal is not None:
                 raise fatal from None
-            successful: list[tuple[ProviderInvocationResult, ProviderResponse]] = [
-                (res, res.response)
+            successful: list[tuple[str, ProviderInvocationResult, ProviderResponse]] = [
+                (res.provider.name(), res, res.response)
                 for res in invocations
                 if res.response is not None
             ]
@@ -457,19 +457,19 @@ class ConsensusStrategy:
                     message = f"{message}: {detail_text}"
                 error = ParallelExecutionError(message, failures=failure_details)
                 raise error
-            responses_for_consensus = [response for _, response in successful]
+            responses_for_consensus = [
+                (provider_id, response) for provider_id, _, response in successful
+            ]
             consensus = compute_consensus(
                 responses_for_consensus,
                 config=runner._config.consensus,
             )
             winner_invocation = next(
                 invocation
-                for invocation, response in successful
+                for provider_id, invocation, response in successful
                 if response is consensus.response
             )
-            votes_against = (
-                consensus.total_voters - consensus.votes - consensus.abstained
-            )
+            votes_against = sum(consensus.tally.values()) - consensus.votes
             event_logger = context.event_logger
             if event_logger is not None:
                 candidate_summaries = [
@@ -479,7 +479,7 @@ class ConsensusStrategy:
                         "votes": consensus.tally.get(response.text.strip(), 0),
                         "text_hash": content_hash("consensus", response.text),
                     }
-                    for invocation, response in successful
+                    for provider_id, invocation, response in successful
                 ]
                 event_logger.emit(
                     "consensus_vote",
