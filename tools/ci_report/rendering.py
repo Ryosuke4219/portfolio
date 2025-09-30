@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import datetime as dt
 from pathlib import Path
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from tools.weekly_summary import format_percentage
 

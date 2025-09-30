@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import datetime as dt
 import json
-import sys
-from collections import Counter
 from pathlib import Path
+import sys
 from typing import Any
 
 from ci_metrics import compute_recent_deltas, compute_run_history
@@ -75,7 +75,7 @@ def compute_last_updated(runs: list[dict[str, object]]) -> str | None:
 def summarize_failure_kinds(
     runs: list[dict[str, object]], limit: int = 3
 ) -> list[dict[str, object]]:
-    counter: Counter[str] = Counter()
+    counter: collections.Counter[str] = collections.Counter()
     for run in runs:
         status_raw = coerce_str(run.get("status"))
         if status_raw is None:
@@ -148,7 +148,7 @@ def build_json_payload(
     flaky_rows: list[dict[str, object]],
     last_updated: str | None,
     recent_runs: list[dict[str, object]],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     total = passes + fails + errors
     pass_rate = (passes / total) if total else None
     return {
