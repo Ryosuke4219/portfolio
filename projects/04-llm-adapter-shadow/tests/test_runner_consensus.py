@@ -45,7 +45,7 @@ def _observation(
     provider_id: str,
     text: str,
     latency: int,
-    *,
+    *extra_cost: float,
     tokens_in: int = 1,
     tokens_out: int = 1,
     cost_estimate: float | None = None,
@@ -72,9 +72,12 @@ def _observation(
         cost_field := next(
             (name for name in ("cost_estimate", "cost") if name in annotations), None
         )
-    ) or cost_estimate is not None:
+    ) or cost_estimate is not None or extra_cost:
+        estimate = cost_estimate if cost_estimate is not None else extra_cost[0] if extra_cost else None
         kwargs[cost_field or "cost_estimate"] = (
-            cost_estimate if cost_estimate is not None else float(tokens_in + tokens_out)
+            float(estimate)
+            if estimate is not None
+            else float(tokens_in + tokens_out)
         )
     if "error" in annotations:
         kwargs.setdefault("error", None)
