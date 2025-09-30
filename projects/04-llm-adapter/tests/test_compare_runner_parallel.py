@@ -20,6 +20,7 @@ from adapter.core.aggregation import (  # noqa: E402
 from adapter.core.aggregation_controller import AggregationController  # noqa: E402
 from adapter.core.budgets import BudgetManager  # noqa: E402
 from adapter.core.datasets import GoldenTask  # noqa: E402
+from adapter.core.errors import TimeoutError  # noqa: E402
 from adapter.core.metrics import RunMetrics  # noqa: E402
 from adapter.core.models import (  # noqa: E402
     BudgetBook,
@@ -539,3 +540,62 @@ def test_runner_config_dataclass_initializes_helpers(
 
     assert token_bucket_args == [3]
     assert schema_args == [schema_path]
+
+
+def test_run_metrics_records_error_type_and_attempts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class FlakyProvider(BaseProvider):
+        def __init__(self, config: ProviderConfig) -> None:
+            super().__init__(config)
+            self.calls = 0
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("boom")
+            return ProviderResponse(
+                output_text="flaky-ok",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=5,
+            )
+
+    class StableProvider(BaseProvider):
+        def __init__(self, config: ProviderConfig) -> None:
+            super().__init__(config)
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(
+                output_text="stable-ok",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=2,
+            )
+
+    monkeypatch.setitem(ProviderFactory._registry, "flaky", FlakyProvider)
+    monkeypatch.setitem(ProviderFactory._registry, "stable", StableProvider)
+
+    runner = CompareRunner(
+        [
+            _make_provider_config(tmp_path, name="flaky", provider="flaky", model="F"),
+            _make_provider_config(tmp_path, name="stable", provider="stable", model="S"),
+        ],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_attempts.jsonl",
+    )
+    results = runner.run(repeat=2, config=RunnerConfig(mode="parallel-all"))
+
+    flaky_attempts = {metric.attempts: metric for metric in results if metric.provider == "flaky"}
+    stable_attempts = sorted(
+        (metric.attempts, metric.error_type)
+        for metric in results
+        if metric.provider == "stable"
+    )
+
+    assert flaky_attempts[1].status == "error"
+    assert flaky_attempts[1].error_type == "TimeoutError"
+    assert flaky_attempts[2].status == "ok"
+    assert flaky_attempts[2].error_type is None
+    assert stable_attempts == [(1, None), (2, None)]
