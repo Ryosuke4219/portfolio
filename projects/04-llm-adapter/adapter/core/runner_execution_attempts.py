@@ -5,18 +5,28 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import CancelledError
 from threading import Event, Lock
 from typing import Any, Protocol, TYPE_CHECKING
-
-from .runner_execution import SingleRunResult
+import uuid
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
+from .metrics import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
 from .providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
     from .runner_execution import SingleRunResult
-else:  # pragma: no cover - 実行時循環参照対策
-    SingleRunResult = Any  # type: ignore[assignment]
+
+
+_single_run_result_cls: type[Any] | None = None
+
+
+def _get_single_run_result_cls() -> type["SingleRunResult"]:
+    global _single_run_result_cls
+    if _single_run_result_cls is None:
+        from .runner_execution import SingleRunResult as _SingleRunResult
+
+        _single_run_result_cls = _SingleRunResult
+    return _single_run_result_cls
 
 
 class _ParallelRunner(Protocol):
@@ -108,10 +118,6 @@ class ParallelAttemptExecutor:
                 result.stop_reason = result.stop_reason or "cancelled"
                 return
             provider_config, _ = providers[index]
-            from .metrics import BudgetSnapshot, EvalMetrics, RunMetrics, now_ts
-            from .runner_execution import SingleRunResult as _SingleRunResult
-            import uuid
-
             metrics = RunMetrics(
                 ts=now_ts(),
                 run_id=f"run_{task.task_id}_{attempt_index}_{uuid.uuid4().hex}",
@@ -137,7 +143,8 @@ class ParallelAttemptExecutor:
                 budget=BudgetSnapshot(0.0, False),
                 ci_meta={},
             )
-            results[index] = _SingleRunResult(
+            single_run_result_cls = _get_single_run_result_cls()
+            results[index] = single_run_result_cls(
                 metrics=metrics,
                 raw_output="",
                 stop_reason="cancelled",
