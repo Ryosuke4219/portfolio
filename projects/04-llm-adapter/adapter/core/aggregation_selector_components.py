@@ -119,7 +119,7 @@ class JudgeScorer:
 
 
 class _CompositeTieBreaker(TieBreaker):
-    _DISPLAY_NAMES = {"latency": "latency", "cost": "cost", "stable_order": "first"}
+    _DISPLAY_NAMES = {"latency": "latency", "cost": "cost", "stable_order": "stable_order"}
 
     def __init__(
         self,
@@ -161,7 +161,7 @@ class TieBreakerFactory:
         config: RunnerConfig,
         lookup: Mapping[int, SingleRunResult],
     ) -> TieBreaker | None:
-        tie_name = (config.tie_breaker or "").strip().lower()
+        tie_name = (config.tie_breaker or "").strip().lower().replace("-", "_")
         alias = {
             "latency": "latency",
             "min_latency": "latency",
