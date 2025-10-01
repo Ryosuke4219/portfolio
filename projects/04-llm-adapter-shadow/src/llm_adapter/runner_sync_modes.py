@@ -105,6 +105,26 @@ def _raise_no_attempts(context: SyncRunContext) -> None:
     raise error
 
 
+def _collect_parallel_failures(
+    results: Sequence["ProviderInvocationResult" | None],
+) -> list[dict[str, str]]:
+    failures: list[dict[str, str]] = []
+    for invocation in results:
+        if invocation is None:
+            continue
+        error = invocation.error
+        if error is None:
+            continue
+        failures.append(
+            {
+                "provider": invocation.provider.name(),
+                "attempt": str(invocation.attempt),
+                "summary": f"{type(error).__name__}: {error}",
+            }
+        )
+    return failures
+
+
 class ParallelAnyStrategy:
     def execute(
         self, context: SyncRunContext
@@ -170,7 +190,11 @@ class ParallelAnyStrategy:
                 raise fatal from None
             response = winner.response
             if response is None:
-                raise ParallelExecutionError("all workers failed")
+                failures = _collect_parallel_failures(results)
+                raise ParallelExecutionError(
+                    "all workers failed",
+                    failures=failures or None,
+                )
             attempts_final = sum(1 for item in results if item is not None)
             if attempts_final == 0:
                 attempts_final = winner.attempt
@@ -180,6 +204,8 @@ class ParallelAnyStrategy:
             fatal = runner._extract_fatal_error(results)
             if fatal is not None:
                 raise fatal from None
+            failures = _collect_parallel_failures(results)
+            exc.failures = failures if failures else None
             raise exc
         finally:
             if cancelled_slots:
@@ -258,7 +284,11 @@ class ParallelAllStrategy:
                 raise fatal from None
             for invocation in invocations:
                 if invocation.response is None:
-                    raise ParallelExecutionError("all workers failed")
+                    failures = _collect_parallel_failures(results)
+                    raise ParallelExecutionError(
+                        "all workers failed",
+                        failures=failures or None,
+                    )
             return ParallelAllResult(
                 invocations,
                 lambda invocation: cast(ProviderResponse, invocation.response),
@@ -267,6 +297,8 @@ class ParallelAllStrategy:
             fatal = runner._extract_fatal_error(results)
             if fatal is not None:
                 raise fatal from None
+            failures = _collect_parallel_failures(results)
+            exc.failures = failures if failures else None
             raise exc
         finally:
             runner._log_parallel_results(

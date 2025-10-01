@@ -97,6 +97,40 @@ def test_run_parallel_any_sync_cancels_pending_futures(
     slow_gate.set()
 
 
+def test_runner_parallel_any_records_failures() -> None:
+    provider_a = _RetryProbeProvider(
+        "fail-a",
+        [TimeoutError("primary timeout")],
+    )
+    provider_b = _RetryProbeProvider(
+        "fail-b",
+        [RateLimitError("secondary limit")],
+    )
+    runner = Runner(
+        [provider_a, provider_b],
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY),
+    )
+    request = ProviderRequest(prompt="fail", model="parallel-any-fail")
+
+    with pytest.raises(ParallelExecutionError) as excinfo:
+        runner.run(request, shadow=None)
+
+    failures = excinfo.value.failures
+    assert failures is not None
+    assert failures == [
+        {
+            "provider": "fail-a",
+            "attempt": "1",
+            "summary": "TimeoutError: primary timeout",
+        },
+        {
+            "provider": "fail-b",
+            "attempt": "2",
+            "summary": "RateLimitError: secondary limit",
+        },
+    ]
+
+
 def test_cancelled_results_builder_populates_cancelled_slots() -> None:
     run_started = 100.0
     builder = CancelledResultsBuilder(run_started=run_started, elapsed_ms=lambda _: 42)
