@@ -78,8 +78,8 @@ def test_render_markdown_formats_numeric_strings() -> None:
 
 
 def test_select_flaky_rows_includes_end_date() -> None:
-    start = dt.datetime(2024, 6, 2, tzinfo=dt.timezone.utc)
-    end = dt.datetime(2024, 6, 9, tzinfo=dt.timezone.utc)
+    start = dt.datetime(2024, 6, 2, tzinfo=dt.UTC)
+    end = dt.datetime(2024, 6, 9, tzinfo=dt.UTC)
     rows = [
         {"canonical_id": "kept", "as_of": "2024-06-09T10:00:00Z"},
         {"canonical_id": "excluded", "as_of": "2024-06-10T00:00:00Z"},
