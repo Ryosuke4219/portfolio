@@ -40,6 +40,18 @@ def test_create_provider_from_spec_supports_overrides():
     assert provider.name() == "dummy:test-model"
 
 
+def test_create_provider_from_spec_supports_openai():
+    provider = providers_factory.create_provider_from_spec("openai:gpt-4o-mini")
+    assert provider.__class__.__name__ == "OpenAIProvider"
+
+
+def test_create_provider_from_spec_supports_openrouter():
+    provider = providers_factory.create_provider_from_spec(
+        "openrouter:meta/llama3.1-8b-instruct"
+    )
+    assert provider.__class__.__name__ == "OpenRouterProvider"
+
+
 def test_provider_from_environment_optional_none(monkeypatch):
     monkeypatch.setenv("SHADOW_PROVIDER", "none")
     result = providers_factory.provider_from_environment(
@@ -58,3 +70,14 @@ def test_provider_from_environment_disabled_requires_optional(monkeypatch):
             optional=False,
             factories={"gemini": lambda model: DummyProvider(model)},
         )
+
+
+def test_create_provider_from_spec_unsupported_prefix_error_message():
+    with pytest.raises(ValueError) as exc_info:
+        providers_factory.create_provider_from_spec("invalid:demo")
+
+    message = str(exc_info.value)
+    assert message.startswith("unsupported provider prefix: invalid. supported: ")
+    assert message.endswith(
+        ". OpenAI は無印、Gemini は google-genai を導入してください。"
+    )
