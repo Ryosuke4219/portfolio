@@ -1,4 +1,5 @@
 """Execution guard utilities for runner execution."""
+
 from __future__ import annotations
 
 import importlib.util
