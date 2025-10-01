@@ -1,9 +1,8 @@
 """Parallel-any strategy helpers for synchronous runner."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol, TYPE_CHECKING
 
 from .errors import AllFailedError
 from .observability import EventLogger
@@ -20,11 +19,11 @@ if TYPE_CHECKING:
 class ParallelAnyCallable(Protocol):
     def __call__(
         self,
-        workers: Sequence[Callable[[], "ProviderInvocationResult"]],
+        workers: Sequence[Callable[[], ProviderInvocationResult]],
         *,
         max_concurrency: int | None = ...,
         on_cancelled: Callable[[Sequence[int]], None] | None = ...,
-    ) -> "ProviderInvocationResult": ...
+    ) -> ProviderInvocationResult: ...
 
 
 def _limited_providers(
@@ -37,7 +36,7 @@ def _limited_providers(
     return providers[:max_attempts]
 
 
-def _raise_no_attempts(context: "SyncRunContext") -> None:
+def _raise_no_attempts(context: SyncRunContext) -> None:
     event_logger: EventLogger | None = context.event_logger
     runner = context.runner
     error = AllFailedError("no providers were attempted", failures=[])
@@ -72,7 +71,7 @@ def _raise_no_attempts(context: "SyncRunContext") -> None:
 
 
 def _collect_parallel_failures(
-    results: Sequence["ProviderInvocationResult" | None],
+    results: Sequence[ProviderInvocationResult | None],
 ) -> list[dict[str, str]]:
     failures: list[dict[str, str]] = []
     for invocation in results:
@@ -93,18 +92,18 @@ def _collect_parallel_failures(
 
 class ParallelAnyStrategy:
     def execute(
-        self, context: "SyncRunContext"
+        self, context: SyncRunContext
     ) -> ProviderResponse:
         runner = context.runner
         total_providers = len(runner.providers)
-        results: list["ProviderInvocationResult" | None] = [None] * total_providers
+        results: list[ProviderInvocationResult | None] = [None] * total_providers
         max_attempts = runner._config.max_attempts
         providers = _limited_providers(runner.providers, max_attempts)
 
         def make_worker(
             index: int, provider: ProviderSPI
-        ) -> Callable[[], "ProviderInvocationResult"]:
-            def worker() -> "ProviderInvocationResult":
+        ) -> Callable[[], ProviderInvocationResult]:
+            def worker() -> ProviderInvocationResult:
                 result = runner._invoke_provider_sync(
                     provider,
                     context.request,
