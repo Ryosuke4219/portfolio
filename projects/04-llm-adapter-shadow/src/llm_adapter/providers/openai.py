@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, MutableMapping
 import json
 import os
 import time
-from collections.abc import Iterable, Mapping, MutableMapping
 from typing import Any
 
 from ..errors import RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from ._requests_compat import SessionProtocol, create_session, requests_exceptions
+from ._requests_compat import create_session, requests_exceptions, SessionProtocol
 from .base import BaseProvider
 
 __all__ = ["OpenAIProvider"]
