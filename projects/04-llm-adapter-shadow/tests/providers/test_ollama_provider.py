@@ -104,13 +104,15 @@ def test_ollama_provider_auto_pull_and_chat(monkeypatch: pytest.MonkeyPatch) -> 
     show_calls = [url for url, *_ in session.calls if url.endswith("/api/show")]
     assert len(show_calls) == 2
 
-    chat_payload = next(
-        payload for url, payload, _ in session.calls if url.endswith("/api/chat")
+    chat_call = next(
+        call for call in session.calls if call[0].endswith("/api/chat")
     )
+    chat_payload = chat_call[1]
     assert chat_payload is not None
     assert chat_payload["model"] == "gemma3n:e2b"
     assert chat_payload["messages"] == [{"role": "user", "content": "hello"}]
-    assert chat_payload["stream"] is False
+    assert "stream" not in chat_payload
+    assert chat_call[2] is False
 
 
 def test_ollama_provider_merges_request_options() -> None:
@@ -151,12 +153,12 @@ def test_ollama_provider_merges_request_options() -> None:
     )
     provider.invoke(request)
 
-    chat_payload = next(
-        payload for url, payload, _ in session.calls if url.endswith("/api/chat")
+    chat_call = next(
+        call for call in session.calls if call[0].endswith("/api/chat")
     )
+    chat_payload = chat_call[1]
     assert chat_payload is not None
-    assert chat_payload["stream"] is True
-    assert session.last_stream is True
+    assert chat_call[2] is True
     assert chat_payload["model"] == "gemma3"
     options_payload = chat_payload["options"]
     assert options_payload["num_predict"] == 32
