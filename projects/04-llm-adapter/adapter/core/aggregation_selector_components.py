@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 import json
 from pathlib import Path
-from typing import Any, Protocol, TYPE_CHECKING, cast
+from typing import Any, cast, Protocol, TYPE_CHECKING
 
 from .aggregation import AggregationCandidate, FirstTieBreaker, TieBreaker
 from .runner_execution import SingleRunResult
