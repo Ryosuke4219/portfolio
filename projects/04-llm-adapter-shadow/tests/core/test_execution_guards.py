@@ -27,7 +27,7 @@ def test_schema_validator_imports_without_jsonschema(monkeypatch: pytest.MonkeyP
     ) -> importlib.machinery.ModuleSpec | None:
         if name == "jsonschema":
             return None
-        return path_finder.find_spec(name, path, target)
+        return path_finder.find_spec(name, path=path, target=target)
 
     monkeypatch.setattr(importlib.util, "find_spec", _fake_find_spec)
 
