@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import CancelledError
 from dataclasses import dataclass
 import time
-from typing import cast, Protocol
+from typing import Literal, Protocol, overload, cast
 
 from .errors import ProviderSkip
 from .observability import EventLogger
@@ -18,21 +18,51 @@ from .runner_shared import (
     MetricsPath,
     RateLimiter,
 )
-from .shadow import run_with_shadow, ShadowMetrics
+from .shadow import DEFAULT_METRICS_PATH, run_with_shadow, ShadowMetrics
 from .utils import elapsed_ms
 
 
 class _RunWithShadowCallable(Protocol):
+    @overload
     def __call__(
         self,
         primary: ProviderSPI,
         shadow: ProviderSPI | None,
         request: ProviderRequest,
-        metrics_path: MetricsPath = ...,
-        logger: EventLogger | None = ...,
-        capture_metrics: bool = ...,
+        metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+        *,
+        logger: EventLogger | None = None,
+        capture_metrics: Literal[True],
+    ) -> tuple[ProviderResponse, ShadowMetrics | None]:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        primary: ProviderSPI,
+        shadow: ProviderSPI | None,
+        request: ProviderRequest,
+        metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+        *,
+        logger: EventLogger | None = None,
+        capture_metrics: Literal[False] = False,
+    ) -> ProviderResponse:
+        ...
+
+    def __call__(
+        self,
+        primary: ProviderSPI,
+        shadow: ProviderSPI | None,
+        request: ProviderRequest,
+        metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+        *,
+        logger: EventLogger | None = None,
+        capture_metrics: bool = False,
     ) -> ProviderResponse | tuple[ProviderResponse, ShadowMetrics | None]:
         ...
+
+
+_DEFAULT_RUN_WITH_SHADOW = cast(_RunWithShadowCallable, run_with_shadow)
 
 
 @dataclass(slots=True)
@@ -57,7 +87,7 @@ class ProviderInvoker:
         self,
         *,
         rate_limiter: RateLimiter | None,
-        run_with_shadow: _RunWithShadowCallable = run_with_shadow,
+        run_with_shadow: _RunWithShadowCallable = _DEFAULT_RUN_WITH_SHADOW,
         log_provider_call: Callable[..., None] = log_provider_call,
         log_provider_skipped: Callable[..., None] = log_provider_skipped,
         time_fn: Callable[[], float] = time.time,
@@ -93,21 +123,24 @@ class ProviderInvoker:
         tokens_out: int | None = None
         shadow_metrics: ShadowMetrics | None = None
         try:
-            result = self._run_with_shadow(
-                provider,
-                shadow,
-                request,
-                metrics_path=metrics_path,
-                logger=event_logger,
-                capture_metrics=capture_shadow_metrics,
-            )
             if capture_shadow_metrics:
-                response, shadow_metrics = cast(
-                    tuple[ProviderResponse, ShadowMetrics | None],
-                    result,
+                response, shadow_metrics = self._run_with_shadow(
+                    provider,
+                    shadow,
+                    request,
+                    metrics_path=metrics_path,
+                    logger=event_logger,
+                    capture_metrics=True,
                 )
             else:
-                response = cast(ProviderResponse, result)
+                response = self._run_with_shadow(
+                    provider,
+                    shadow,
+                    request,
+                    metrics_path=metrics_path,
+                    logger=event_logger,
+                    capture_metrics=False,
+                )
         except Exception as exc:  # noqa: BLE001
             error = exc
             latency_ms = self._elapsed_ms(attempt_started)

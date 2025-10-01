@@ -60,6 +60,44 @@ def _response(text: str) -> ProviderResponse:
     return ProviderResponse(text=text, latency_ms=10, tokens_in=5, tokens_out=3)
 
 
+def test_runner_initializes_with_dummy_shadow(monkeypatch: pytest.MonkeyPatch) -> None:
+    dummy_called = False
+
+    def _dummy_run_with_shadow(
+        primary: _MockProvider,
+        shadow: _MockProvider | None,
+        request: ProviderRequest,
+        metrics_path: object = None,
+        *,
+        logger: object | None = None,
+        capture_metrics: bool = False,
+    ) -> ProviderResponse | tuple[ProviderResponse, None]:
+        nonlocal dummy_called
+        dummy_called = True
+        response = primary.invoke(request)
+        if capture_metrics:
+            return response, None
+        return response
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync_invocation._DEFAULT_RUN_WITH_SHADOW",
+        _dummy_run_with_shadow,
+    )
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync._DEFAULT_RUN_WITH_SHADOW",
+        _dummy_run_with_shadow,
+    )
+
+    provider = _MockProvider("dummy", lambda req: _response(f"echo:{req.prompt}"))
+    runner = Runner([provider])
+
+    request = ProviderRequest(model="gpt-test", prompt="hi")
+    response = runner.run(request)
+
+    assert response.text == "echo:hi"
+    assert dummy_called is True
+
+
 def test_runner_parallel_any_cancels_pending_workers() -> None:
     request = ProviderRequest(model="gpt-test", prompt="hi")
 

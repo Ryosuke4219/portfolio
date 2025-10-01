@@ -5,7 +5,7 @@ import asyncio
 import contextlib
 import threading
 import time
-from typing import Any
+from typing import Any, Literal, overload
 
 from .observability import EventLogger
 from .provider_spi import (
@@ -131,6 +131,32 @@ def _finalize_shadow_metrics(
         metrics_path=metrics_path,
         capture_metrics=capture_metrics,
     )
+
+
+@overload
+def run_with_shadow(
+    primary: ProviderSPI,
+    shadow: ProviderSPI | None,
+    req: ProviderRequest,
+    metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+    *,
+    logger: EventLogger | None = None,
+    capture_metrics: Literal[True],
+) -> tuple[ProviderResponse, ShadowMetrics | None]:
+    ...
+
+
+@overload
+def run_with_shadow(
+    primary: ProviderSPI,
+    shadow: ProviderSPI | None,
+    req: ProviderRequest,
+    metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+    *,
+    logger: EventLogger | None = None,
+    capture_metrics: Literal[False] = False,
+) -> ProviderResponse:
+    ...
 
 
 def run_with_shadow(
