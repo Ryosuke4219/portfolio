@@ -721,6 +721,64 @@ def test_consensus_quorum_failure_marks_metrics(
         assert metric.ci_meta["aggregate_votes"] == 2
 
 
+def test_consensus_quorum_falls_back_to_judge(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class ConsensusProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(
+                output_text="YES",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=5,
+            )
+
+    class JudgeProvider(BaseProvider):
+        calls = 0
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            JudgeProvider.calls += 1
+            return ProviderResponse(
+                output_text="JUDGE",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=5,
+            )
+
+    monkeypatch.setitem(ProviderFactory._registry, "consensus", ConsensusProvider)
+    monkeypatch.setitem(ProviderFactory._registry, "judge-consensus", JudgeProvider)
+
+    judge_config = _make_provider_config(
+        tmp_path, name="judge", provider="judge-consensus", model="judge-model"
+    )
+    runner = CompareRunner(
+        [
+            _make_provider_config(tmp_path, name="c1", provider="consensus", model="A"),
+            _make_provider_config(tmp_path, name="c2", provider="consensus", model="A"),
+        ],
+        [_make_task()],
+        _make_budget_manager(),
+        tmp_path / "metrics_consensus_quorum_fallback.jsonl",
+    )
+
+    results = runner.run(
+        repeat=1,
+        config=RunnerConfig(mode="consensus", quorum=3, judge_provider=judge_config),
+    )
+
+    winner = next(
+        metric for metric in results if metric.ci_meta.get("aggregate_strategy") == "judge"
+    )
+
+    assert winner.status == "ok"
+    assert winner.failure_kind is None
+    assert winner.ci_meta["aggregate_mode"] == "consensus"
+    assert winner.ci_meta["aggregate_quorum"] == 3
+    assert winner.ci_meta["consensus"]["fallback"] == "judge"
+    assert JudgeProvider.calls == 1
+    assert all(metric.failure_kind != "consensus_quorum" for metric in results)
+
+
 def test_consensus_default_quorum_requires_two_votes(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
