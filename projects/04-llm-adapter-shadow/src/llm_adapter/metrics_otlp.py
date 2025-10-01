@@ -7,7 +7,7 @@ ScopeAttrs = list[dict[str, Any]]
 
 
 def _timestamp_ns(value: Any) -> str:
-    return str(int(float(value) * 1_000_000)) if isinstance(value, (int, float)) else "0"
+    return str(int(float(value) * 1_000_000)) if isinstance(value, int | float) else "0"
 
 
 def _encode_attrs(values: Mapping[str, Any]) -> ScopeAttrs:
@@ -95,6 +95,6 @@ class OtlpJsonExporter:
         prefix = f"llm_adapter.{event_type}."
         for field in fields:
             value = record.get(field)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if isinstance(value, int | float) and not isinstance(value, bool):
                 metrics.append(_gauge(prefix + field, timestamp, float(value), attrs))
         return metrics

@@ -25,7 +25,7 @@ class MajorityVoteStrategy:
         if not isinstance(schema, Mapping):
             return frozenset()
         required = schema.get("required")
-        if isinstance(required, Sequence) and not isinstance(required, (str, bytes)):
+        if isinstance(required, Sequence) and not isinstance(required, str | bytes):
             keys = [key for key in required if isinstance(key, str)]
             return frozenset(keys)
         return frozenset()

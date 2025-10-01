@@ -181,7 +181,9 @@ def prepare_execution(
             prompt_value = input_prompt if isinstance(input_prompt, str) else ""
         request_kwargs["prompt"] = prompt_value
         messages = raw_payload.get("messages")
-        if isinstance(messages, Sequence) and not isinstance(messages, (str, bytes, bytearray)):
+        if isinstance(messages, Sequence) and not isinstance(
+            messages, str | bytes | bytearray
+        ):
             normalized = [dict(entry) for entry in messages if isinstance(entry, Mapping)]
             if normalized:
                 request_kwargs["messages"] = normalized

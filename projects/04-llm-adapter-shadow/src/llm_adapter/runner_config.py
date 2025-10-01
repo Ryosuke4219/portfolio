@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, FrozenInstanceError
 from enum import Enum
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
