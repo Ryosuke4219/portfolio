@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import replace
+from enum import Enum
 import logging
 import os
 import re
@@ -68,7 +69,7 @@ class RunMetricsBuilder:
         provider_config: ProviderConfig,
         task: GoldenTask,
         attempt_index: int,
-        mode: str,
+        mode: str | Enum,
         response: ProviderResponse,
         status: str,
         failure_kind: str | None,
@@ -83,12 +84,13 @@ class RunMetricsBuilder:
         status, failure_kind = self._merge_eval_failure(status, failure_kind, eval_failure_kind)
         output_text_record = output_text if provider_config.persist_output else None
         output_hash = self._compute_output_hash(output_text)
+        resolved_mode = mode.value if isinstance(mode, Enum) else mode
         run_metrics = RunMetrics(
             ts=now_ts(),
             run_id=f"run_{task.task_id}_{attempt_index}_{uuid.uuid4().hex}",
             provider=provider_config.provider,
             model=provider_config.model,
-            mode=mode,
+            mode=str(resolved_mode),
             prompt_id=task.task_id,
             prompt_name=task.name,
             seed=provider_config.seed,
