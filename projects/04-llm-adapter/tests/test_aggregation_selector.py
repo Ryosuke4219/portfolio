@@ -87,3 +87,27 @@ def test_max_score_selects_highest_quality() -> None:
     assert scores == {"p1": 0.1, "p2": 0.9}
     assert decision.decision.metadata == {"scores": {"p1": 0.1, "p2": 0.9}}
     assert decision.decision.chosen.provider == "p2"
+
+
+def test_weighted_vote_aggregates_with_provider_weights() -> None:
+    selector = AggregationSelector(judge_factory_builder=lambda config: _DummyFactory(_DummyJudge()))
+    config = RunnerConfig(
+        mode="consensus",
+        aggregate="weighted_vote",
+        provider_weights={"p1": 2.0, "p2": 0.5},
+    )
+    batch = [
+        (0, SingleRunResult(metrics=_metrics("p1", "Alpha"), raw_output="Alpha")),
+        (1, SingleRunResult(metrics=_metrics("p2", "Beta"), raw_output="Beta")),
+        (2, SingleRunResult(metrics=_metrics("p3", "Alpha"), raw_output="Alpha")),
+    ]
+
+    decision = selector.select("consensus", config, batch, default_judge_config=_judge_config())
+
+    assert decision is not None
+    assert decision.decision.chosen.provider == "p1"
+    assert decision.votes == 3.0
+    assert decision.decision.metadata is not None
+    assert decision.decision.metadata.get("bucket_weight") == 3.0
+    assert decision.decision.metadata.get("bucket_size") == 2
+    assert decision.decision.metadata.get("weighted_votes") == {"Alpha": 3.0, "Beta": 0.5}
