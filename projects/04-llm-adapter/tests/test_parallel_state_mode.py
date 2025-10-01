@@ -65,5 +65,7 @@ def test_build_cancelled_result_uses_mode_value(tmp_path: Path) -> None:
     )
 
     metrics = result.metrics
-    assert metrics.mode == RunnerMode.PARALLEL_ANY.value
+    expected_mode = config.mode.value if isinstance(config.mode, Enum) else str(config.mode)
+    assert metrics.mode == expected_mode
     assert type(metrics.mode) is str
+    assert metrics.cost_estimate == 0.0
