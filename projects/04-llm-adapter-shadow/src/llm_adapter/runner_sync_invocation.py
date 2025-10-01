@@ -5,7 +5,9 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import CancelledError
 from dataclasses import dataclass
 import time
-from typing import cast, Protocol
+from typing import cast, runtime_checkable
+
+from typing_extensions import Protocol
 
 from .errors import ProviderSkip
 from .observability import EventLogger
@@ -18,21 +20,32 @@ from .runner_shared import (
     MetricsPath,
     RateLimiter,
 )
-from .shadow import run_with_shadow, ShadowMetrics
+from .shadow import DEFAULT_METRICS_PATH, run_with_shadow, ShadowMetrics
 from .utils import elapsed_ms
 
 
+@runtime_checkable
 class _RunWithShadowCallable(Protocol):
     def __call__(
         self,
         primary: ProviderSPI,
         shadow: ProviderSPI | None,
         request: ProviderRequest,
-        metrics_path: MetricsPath = ...,
-        logger: EventLogger | None = ...,
-        capture_metrics: bool = ...,
+        metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
+        *,
+        logger: EventLogger | None = None,
+        capture_metrics: bool = False,
     ) -> ProviderResponse | tuple[ProviderResponse, ShadowMetrics | None]:
         ...
+
+
+_DEFAULT_RUN_WITH_SHADOW: _RunWithShadowCallable = cast(
+    _RunWithShadowCallable, run_with_shadow
+)
+
+RunWithShadowParameter = _RunWithShadowCallable | Callable[
+    ..., ProviderResponse | tuple[ProviderResponse, ShadowMetrics | None]
+]
 
 
 @dataclass(slots=True)
@@ -57,14 +70,14 @@ class ProviderInvoker:
         self,
         *,
         rate_limiter: RateLimiter | None,
-        run_with_shadow: _RunWithShadowCallable = run_with_shadow,
+        run_with_shadow: RunWithShadowParameter = _DEFAULT_RUN_WITH_SHADOW,
         log_provider_call: Callable[..., None] = log_provider_call,
         log_provider_skipped: Callable[..., None] = log_provider_skipped,
         time_fn: Callable[[], float] = time.time,
         elapsed_ms: Callable[[float], int] = elapsed_ms,
     ) -> None:
         self._rate_limiter = rate_limiter
-        self._run_with_shadow = run_with_shadow
+        self._run_with_shadow = cast(_RunWithShadowCallable, run_with_shadow)
         self._log_provider_call = log_provider_call
         self._log_provider_skipped = log_provider_skipped
         self._time_fn = time_fn

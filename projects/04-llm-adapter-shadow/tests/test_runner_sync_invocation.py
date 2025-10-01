@@ -10,7 +10,12 @@ import pytest
 
 from src.llm_adapter.errors import ProviderSkip
 from src.llm_adapter.observability import EventLogger
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from src.llm_adapter.provider_spi import (
+    ProviderRequest,
+    ProviderResponse,
+    ProviderSPI,
+    TokenUsage,
+)
 from src.llm_adapter.runner_shared import RateLimiter
 from src.llm_adapter.runner_sync_invocation import (
     CancelledResultsBuilder,
@@ -58,6 +63,71 @@ def _make_response() -> ProviderResponse:
         latency_ms=42,
         token_usage=TokenUsage(prompt=3, completion=5),
     )
+
+
+def test_invoker_uses_keyword_arguments_for_shadow_call() -> None:
+    provider = _StubProvider("primary")
+    shadow = _StubProvider("shadow")
+    request = ProviderRequest(model="gpt", prompt="hi")
+    event_logger = _RecorderLogger()
+
+    class _KeywordOnlyRunWithShadow:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        def __call__(
+            self,
+            primary: ProviderSPI,
+            shadow_provider: ProviderSPI | None,
+            req: ProviderRequest,
+            *,
+            metrics_path: str | None,
+            logger: EventLogger | None,
+            capture_metrics: bool,
+        ) -> ProviderResponse:
+            assert primary is provider
+            assert shadow_provider is shadow
+            assert req is request
+            self.calls.append(
+                {
+                    "metrics_path": metrics_path,
+                    "logger": logger,
+                    "capture_metrics": capture_metrics,
+                }
+            )
+            return _make_response()
+
+    run_with_shadow = _KeywordOnlyRunWithShadow()
+
+    invoker = ProviderInvoker(
+        rate_limiter=None,
+        run_with_shadow=run_with_shadow,
+        log_provider_call=lambda *a, **k: None,
+        log_provider_skipped=lambda *a, **k: None,
+        time_fn=lambda: 1.0,
+        elapsed_ms=lambda start: 5,
+    )
+
+    result = invoker.invoke(
+        provider,
+        request,
+        attempt=1,
+        total_providers=2,
+        event_logger=event_logger,
+        request_fingerprint="fp",
+        metadata={},
+        shadow=shadow,
+        metrics_path="metrics.jsonl",
+        capture_shadow_metrics=False,
+    )
+
+    assert result.response is not None
+    assert run_with_shadow.calls
+    assert run_with_shadow.calls[-1] == {
+        "metrics_path": "metrics.jsonl",
+        "logger": event_logger,
+        "capture_metrics": False,
+    }
 
 
 def test_invoker_returns_shadow_metrics_after_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
