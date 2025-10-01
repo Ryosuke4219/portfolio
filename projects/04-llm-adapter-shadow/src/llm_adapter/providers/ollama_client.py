@@ -124,9 +124,13 @@ class OllamaClient:
         timeout: float | None = None,
         stream: bool = False,
     ) -> ResponseProtocol:
+        payload_stream = payload.get("stream")
+        stream_flag = stream
+        if payload_stream is not None:
+            stream_flag = bool(payload_stream)
         return self._ensure_success(
             "/api/chat",
-            self._post("/api/chat", payload, timeout=timeout, stream=stream),
+            self._post("/api/chat", payload, timeout=timeout, stream=stream_flag),
         )
 
     def _post(
