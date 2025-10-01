@@ -29,9 +29,10 @@ from .runner_sync_invocation import (
     ParallelResultLogger,
     ProviderInvocationResult,
     ProviderInvoker,
+    _DEFAULT_RUN_WITH_SHADOW,
 )
 from .runner_sync_modes import get_sync_strategy, SyncRunContext
-from .shadow import DEFAULT_METRICS_PATH, run_with_shadow
+from .shadow import DEFAULT_METRICS_PATH
 from .utils import content_hash, elapsed_ms
 
 
@@ -55,7 +56,7 @@ class Runner:
         self._elapsed_ms = elapsed_ms
         self._provider_invoker = ProviderInvoker(
             rate_limiter=self._rate_limiter,
-            run_with_shadow=run_with_shadow,
+            run_with_shadow=_DEFAULT_RUN_WITH_SHADOW,
             log_provider_call=log_provider_call,
             log_provider_skipped=log_provider_skipped,
             time_fn=self._time_fn,
