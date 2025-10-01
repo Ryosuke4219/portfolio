@@ -70,6 +70,12 @@ class BaseProvider:
     def __init__(self, config: ProviderConfig) -> None:
         self.config = config
 
+    def name(self) -> str:
+        return self.config.provider
+
+    def capabilities(self) -> set[str]:
+        return {"chat"}
+
     def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - インタフェース
         raise NotImplementedError
 
