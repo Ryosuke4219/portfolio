@@ -63,6 +63,7 @@ from .errors import (
     ProviderSkip,
     RateLimitError,
     RetriableError,
+    RetryableError,
     TimeoutError,
 )
 from .execution.guards import _SchemaValidator, _TokenBucket
@@ -192,11 +193,35 @@ class RunnerExecution:
         prompt = task.render_prompt()
         shadow_runner = ShadowRunner(self._shadow_provider)
         shadow_runner.start(provider_config, prompt)
-        provider_result = self._run_provider_call(
-            provider_config,
-            provider,
-            prompt,
-        )
+        retries_config = provider_config.retries
+        max_attempts = max(0, retries_config.max) + 1
+        attempt = 0
+        provider_result: _ProviderCallResult | None = None
+        while attempt < max_attempts:
+            attempt += 1
+            provider_result = self._run_provider_call(
+                provider_config,
+                provider,
+                prompt,
+            )
+            provider_result.retries = attempt
+            if provider_result.status == "ok":
+                break
+            error = provider_result.error
+            if provider_result.backoff_next_provider:
+                if isinstance(error, RateLimitError) and attempt < max_attempts:
+                    pass
+                else:
+                    break
+            if attempt >= max_attempts:
+                break
+            if not isinstance(error, RetryableError):
+                break
+            backoff_delay = float(retries_config.backoff_s or 0.0)
+            if backoff_delay > 0.0:
+                sleep(backoff_delay)
+        if provider_result is None:  # pragma: no cover - defensive
+            raise RuntimeError("provider call did not yield a result")
         response = provider_result.response
         status = provider_result.status
         failure_kind = provider_result.failure_kind
