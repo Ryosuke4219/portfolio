@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from adapter.core.aggregation import AggregationCandidate
 from adapter.core.aggregation_selector import AggregationSelector
 from adapter.core.metrics import RunMetrics
 from adapter.core.models import (
@@ -38,6 +39,22 @@ def _judge_config() -> ProviderConfig:
         pricing=PricingConfig(), rate_limit=RateLimitConfig(),
         quality_gates=QualityGatesConfig(), raw={},
     )
+
+
+def test_select_builds_aggregation_candidates() -> None:
+    selector = AggregationSelector()
+    config = RunnerConfig(mode="consensus", aggregate="majority")
+    batch = [
+        (0, SingleRunResult(metrics=_metrics("p1", "Alpha"), raw_output="Alpha")),
+        (1, SingleRunResult(metrics=_metrics("p2", "Beta"), raw_output="Beta")),
+    ]
+
+    decision = selector.select("consensus", config, batch, default_judge_config=None)
+
+    assert decision is not None
+    candidates = decision.decision.candidates
+    assert [candidate.provider for candidate in candidates] == ["p1", "p2"]
+    assert all(isinstance(candidate, AggregationCandidate) for candidate in candidates)
 
 
 class _DummyJudge:
