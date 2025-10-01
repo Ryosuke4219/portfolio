@@ -78,11 +78,13 @@ def test_run_metrics_builder_merges_eval_failures(
     builder = RunMetricsBuilder()
     snapshot = BudgetSnapshot(run_budget_usd=1.0, hit_stop=False)
 
+    mode = "parallel_any"
+
     run_metrics, output_text = builder.build(
         provider_config=provider_config,
         task=golden_task,
         attempt_index=2,
-        mode="parallel-any",
+        mode=mode,
         response=provider_response,
         status="ok",
         failure_kind=None,
@@ -94,6 +96,7 @@ def test_run_metrics_builder_merges_eval_failures(
 
     assert run_metrics.status == "error"
     assert run_metrics.failure_kind == "parsing"
+    assert run_metrics.mode == mode
     assert run_metrics.output_text == provider_response.output_text
     assert run_metrics.output_hash == hash_text(provider_response.output_text)
     assert run_metrics.eval.len_tokens == provider_response.output_tokens
@@ -108,11 +111,13 @@ def test_run_metrics_builder_sets_cost_estimate(
     builder = RunMetricsBuilder()
     snapshot = BudgetSnapshot(run_budget_usd=1.0, hit_stop=False)
 
+    mode = "parallel_any"
+
     run_metrics, _ = builder.build(
         provider_config=provider_config,
         task=golden_task,
         attempt_index=0,
-        mode="parallel-any",
+        mode=mode,
         response=provider_response,
         status="ok",
         failure_kind=None,
@@ -122,6 +127,7 @@ def test_run_metrics_builder_sets_cost_estimate(
         cost_usd=0.5,
     )
 
+    assert run_metrics.mode == mode
     assert run_metrics.cost_estimate == pytest.approx(run_metrics.cost_usd)
 
     payload = run_metrics.to_json_dict()
