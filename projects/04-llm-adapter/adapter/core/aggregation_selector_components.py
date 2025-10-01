@@ -120,7 +120,11 @@ class JudgeScorer:
 
 
 class _CompositeTieBreaker(TieBreaker):
-    _DISPLAY_NAMES = {"latency": "latency", "cost": "cost", "stable_order": "stable_order"}
+    _DISPLAY_NAMES = {
+        "latency": "min_latency",
+        "cost": "min_cost",
+        "stable_order": "stable_order",
+    }
 
     def __init__(
         self,
