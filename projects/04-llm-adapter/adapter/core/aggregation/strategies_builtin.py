@@ -49,7 +49,7 @@ class MaxScoreTieBreaker:
 
 
 class MajorityVoteStrategy:
-    name = "majority"
+    name = "majority_vote"
 
     def __init__(self, *, schema: Mapping[str, Any] | None = None) -> None:
         self._schema = schema
@@ -82,7 +82,7 @@ class MajorityVoteStrategy:
         self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
     ) -> AggregationResult:
         if not candidates:
-            raise ValueError("majority: candidates must be non-empty")
+            raise ValueError("majority_vote: candidates must be non-empty")
 
         buckets: dict[str, list[AggregationCandidate]] = {}
         for candidate in candidates:
@@ -98,7 +98,7 @@ class MajorityVoteStrategy:
 
         breaker = tiebreaker or FirstTieBreaker()
         chosen = max_bucket[0] if len(max_bucket) == 1 else breaker.break_tie(max_bucket)
-        reason = f"majority({max_count})"
+        reason = f"majority_vote({max_count})"
         tie_used = None if len(max_bucket) == 1 else breaker.name
 
         return AggregationResult(
@@ -245,14 +245,14 @@ def _build_judge(**kwargs: Any) -> AggregationStrategy:
 
 
 _STRATEGY_FACTORIES: dict[str, StrategyFactory] = {
-    "majority": _build_majority,
+    "majority_vote": _build_majority,
     "max_score": _build_max_score,
     "weighted_vote": _build_weighted,
     "judge": _build_judge,
 }
 
 _STRATEGY_ALIASES: dict[str, set[str]] = {
-    "majority": {"majority", "majority_vote", "vote", "maj"},
+    "majority_vote": {"majority", "majority_vote", "vote", "maj"},
     "max_score": {"max", "max_score", "score", "top"},
     "weighted_vote": {"weighted_vote", "weighted"},
     "judge": {"judge", "llm_judge"},
