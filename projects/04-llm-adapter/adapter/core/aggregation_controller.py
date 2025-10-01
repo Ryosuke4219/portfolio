@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
@@ -46,13 +47,33 @@ class AggregationController:
         )
         if selection is None:
             return
+        fallback_kind: str | None = None
         if mode == "consensus":
             votes = selection.votes if selection.votes is not None else 0
             quorum_setting = config.quorum
             quorum = quorum_setting if quorum_setting is not None else 2
             if votes < quorum:
-                self._mark_consensus_failure(selection.lookup.values(), quorum, votes)
-                return
+                fallback_available = config.judge_provider or default_judge_config
+                if fallback_available and selection.decision.strategy != "judge":
+                    judge_config = replace(config, aggregate="judge")
+                    fallback_selection = self._selector.select(
+                        mode,
+                        judge_config,
+                        batch,
+                        default_judge_config=default_judge_config,
+                    )
+                    if fallback_selection is not None:
+                        selection = fallback_selection
+                        selection.votes = votes
+                        fallback_kind = "judge"
+                    else:
+                        self._mark_consensus_failure(
+                            selection.lookup.values(), quorum, votes
+                        )
+                        return
+                else:
+                    self._mark_consensus_failure(selection.lookup.values(), quorum, votes)
+                    return
         winner = selection.lookup.get(selection.decision.chosen.index)
         if winner is None:
             return
@@ -61,6 +82,15 @@ class AggregationController:
             or selection.decision.chosen.response.text
             or ""
         )
+        if fallback_kind:
+            reason = selection.decision.reason
+            fallback_reason = f"fallback={fallback_kind}"
+            selection.decision.reason = (
+                f"{reason} | {fallback_reason}" if reason else fallback_reason
+            )
+            metadata = dict(selection.decision.metadata or {})
+            metadata["fallback"] = fallback_kind
+            selection.decision.metadata = metadata
         winner.aggregate_output = aggregate_output
         meta = dict(winner.metrics.ci_meta)
         meta["aggregate_mode"] = mode
@@ -98,6 +128,8 @@ class AggregationController:
                 consensus_meta["scores"] = score_map
             if selection.decision.metadata:
                 consensus_meta["metadata"] = selection.decision.metadata
+            if fallback_kind:
+                consensus_meta["fallback"] = fallback_kind
             meta["consensus"] = consensus_meta
         winner.metrics.ci_meta = meta
 
