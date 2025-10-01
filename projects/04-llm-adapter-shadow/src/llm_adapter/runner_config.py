@@ -1,9 +1,9 @@
 """Configuration objects for runner orchestration behavior."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import FrozenInstanceError, dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Mapping, NamedTuple
+from typing import Mapping, NamedTuple, TYPE_CHECKING
 
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
@@ -20,18 +20,85 @@ class RunnerMode(str, Enum):
     CONSENSUS = "consensus"
 
 
-class ConsensusConfig(NamedTuple):
+class _FrozenField:
+    """Descriptor that exposes a read-only attribute backed by a private slot."""
+
+    def __init__(self, name: str) -> None:
+        self._private_name = f"_{name}"
+        self._public_name = name
+
+    def __set_name__(self, owner: type[object], name: str) -> None:
+        self._private_name = f"_{name}"
+        self._public_name = name
+
+    def __get__(self, instance: object | None, owner: type[object]) -> object:
+        if instance is None:
+            return self
+        return getattr(instance, self._private_name)
+
+    def __set__(self, instance: object, value: object) -> None:  # pragma: no cover - defensive
+        raise FrozenInstanceError(
+            f"Cannot mutate '{self._public_name}' on ConsensusConfig"
+        )
+
+
+@dataclass(eq=True, repr=True, init=False)
+class ConsensusConfig:
     """Configuration for consensus style orchestrations."""
 
-    strategy: str = "majority_vote"
-    quorum: int = 2
-    tie_breaker: str | None = None
-    schema: str | None = None
-    judge: str | None = None
-    max_rounds: int | None = None
-    provider_weights: Mapping[str, float] | None = None
-    max_latency_ms: int | None = None
-    max_cost_usd: float | None = None
+    strategy: str = field(default="majority_vote", init=False)
+    quorum: int = field(default=2, init=False)
+    tie_breaker: str | None = field(default=None, init=False)
+    schema: str | None = field(default=None, init=False)
+    judge: str | None = field(default=None, init=False)
+    max_rounds: int | None = field(default=None, init=False)
+    provider_weights: dict[str, float] | None = field(default=None, init=False)
+    max_latency_ms: int | None = field(default=None, init=False)
+    max_cost_usd: float | None = field(default=None, init=False)
+
+    __slots__ = (
+        "_strategy",
+        "_quorum",
+        "_tie_breaker",
+        "_schema",
+        "_judge",
+        "_max_rounds",
+        "_provider_weights",
+        "_max_latency_ms",
+        "_max_cost_usd",
+    )
+
+    strategy = _FrozenField("strategy")
+    quorum = _FrozenField("quorum")
+    tie_breaker = _FrozenField("tie_breaker")
+    schema = _FrozenField("schema")
+    judge = _FrozenField("judge")
+    max_rounds = _FrozenField("max_rounds")
+    provider_weights = _FrozenField("provider_weights")
+    max_latency_ms = _FrozenField("max_latency_ms")
+    max_cost_usd = _FrozenField("max_cost_usd")
+
+    def __init__(
+        self,
+        strategy: str = "majority_vote",
+        quorum: int = 2,
+        tie_breaker: str | None = None,
+        schema: str | None = None,
+        judge: str | None = None,
+        max_rounds: int | None = None,
+        provider_weights: dict[str, float] | None = None,
+        max_latency_ms: int | None = None,
+        max_cost_usd: float | None = None,
+    ) -> None:
+        object.__setattr__(self, "_strategy", strategy)
+        object.__setattr__(self, "_quorum", quorum)
+        object.__setattr__(self, "_tie_breaker", tie_breaker)
+        object.__setattr__(self, "_schema", schema)
+        object.__setattr__(self, "_judge", judge)
+        object.__setattr__(self, "_max_rounds", max_rounds)
+        object.__setattr__(self, "_provider_weights", provider_weights)
+        object.__setattr__(self, "_max_latency_ms", max_latency_ms)
+        object.__setattr__(self, "_max_cost_usd", max_cost_usd)
 
 
 @dataclass(frozen=True)

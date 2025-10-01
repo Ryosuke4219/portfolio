@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import dataclasses
 from typing import cast
 
 import pytest
@@ -227,8 +228,10 @@ def test_constraints_filter_candidates_before_consensus() -> None:
         _observation("fast-1", "B", 12, cost_estimate=0.05),
         _observation("fast-2", "B", 14, cost_estimate=0.08),
     ]
-    config = ConsensusConfig(
-        strategy="majority", quorum=2, max_latency_ms=20, max_cost_usd=0.2
+    config = dataclasses.replace(
+        ConsensusConfig(strategy="majority", quorum=2),
+        max_latency_ms=20,
+        max_cost_usd=0.2,
     )
 
     result = compute_consensus(observations, config=config)
@@ -245,8 +248,10 @@ def test_constraints_exhaust_candidates_with_failures() -> None:
         _observation("pricy", "B", 18, cost_estimate=0.5),
         _observation("both", "C", 60, cost_estimate=0.45),
     ]
-    config = ConsensusConfig(
-        strategy="majority", quorum=2, max_latency_ms=20, max_cost_usd=0.2
+    config = dataclasses.replace(
+        ConsensusConfig(strategy="majority", quorum=2),
+        max_latency_ms=20,
+        max_cost_usd=0.2,
     )
 
     with pytest.raises(ParallelExecutionError) as excinfo:
