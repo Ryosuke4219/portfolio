@@ -212,8 +212,10 @@ class OllamaProvider(BaseProvider):
         if options_payload:
             payload["options"] = {**options_payload, **payload.get("options", {})}
 
+        stream_flag = bool(payload.get("stream"))
+
         ts0 = time.time()
-        response = self._client.chat(payload, timeout=timeout_override)
+        response = self._client.chat(payload, timeout=timeout_override, stream=stream_flag)
 
         try:
             payload_json = response.json()
