@@ -4,7 +4,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 import os
 
-from ..provider_spi import ProviderSPI
+from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from .base import BaseProvider
 from .gemini import GeminiProvider
 from .mock import MockProvider
 from .ollama import OllamaProvider
@@ -13,10 +14,32 @@ __all__ = [
     "parse_provider_spec",
     "create_provider_from_spec",
     "provider_from_environment",
+    "OpenAIProvider",
+    "OpenRouterProvider",
 ]
 
 
 ProviderFactory = Callable[[str], ProviderSPI]
+
+
+class _ModelOnlyProvider(BaseProvider):
+    def __init__(self, *, name: str, model: str) -> None:
+        super().__init__(name=name, model=model)
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover
+        raise NotImplementedError(
+            f"{self.name()} provider requires full implementation"
+        )
+
+
+class OpenAIProvider(_ModelOnlyProvider):
+    def __init__(self, model: str) -> None:
+        super().__init__(name="openai", model=model)
+
+
+class OpenRouterProvider(_ModelOnlyProvider):
+    def __init__(self, model: str) -> None:
+        super().__init__(name="openrouter", model=model)
 
 
 def parse_provider_spec(spec: str) -> tuple[str, str]:
@@ -50,6 +73,8 @@ def create_provider_from_spec(
 
     default_factories: dict[str, ProviderFactory] = {
         "gemini": lambda model: GeminiProvider(model=model),
+        "openai": lambda model: OpenAIProvider(model=model),
+        "openrouter": lambda model: OpenRouterProvider(model=model),
         "ollama": lambda model: OllamaProvider(model=model),
         "mock": lambda model: MockProvider(model),
     }
