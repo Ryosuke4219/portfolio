@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, cast, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
-from .aggregation import AggregationResult, AggregationStrategy
+from .aggregation import AggregationResult, AggregationStrategy, TieBreaker
 from .aggregation_selector_components import (
     CandidateBuilder,
     JudgeProviderFactory,
@@ -146,17 +146,9 @@ class AggregationSelector:
                 raise ValueError("aggregate=judge requires judge provider configuration")
             if self._judge_factory_builder is None:
                 raise ValueError("judge_factory_builder must be provided for judge aggregation")
-            if "JudgeStrategy" not in aggregation_module.__dict__:
-                attr_name = "JudgeStrategy"
-                aggregation_module.JudgeStrategy = getattr(  # type: ignore[attr-defined]
-                    aggregation_module, attr_name
-                )
             factory = self._judge_factory_builder(judge_config)
-            return AggregationStrategy.from_string(
-                aggregate,
-                model=judge_config.model,
-                provider_factory=factory,
-            )
+            strategy_cls = aggregation_module.JudgeStrategy
+            return strategy_cls(model=judge_config.model, provider_factory=factory)
         schema_data = self._schema_cache.load(getattr(config, "schema", None))
         provider_weights = getattr(config, "provider_weights", None)
         extra: dict[str, Any] = {"schema": schema_data}
@@ -164,6 +156,14 @@ class AggregationSelector:
         if normalized in {"weighted_vote", "weighted"}:
             extra["provider_weights"] = provider_weights
         return AggregationStrategy.from_string(aggregate, **extra)
+
+    @staticmethod
+    def _resolve_tie_breaker(
+        config: RunnerConfig,
+        lookup: Mapping[int, SingleRunResult],
+    ) -> TieBreaker | None:
+        factory = TieBreakerFactory()
+        return factory.create(config, lookup)
 
 
 __all__ = [
