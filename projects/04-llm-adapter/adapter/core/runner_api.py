@@ -40,7 +40,7 @@ class _ModeValue(str):
 
     __slots__ = ("_alias",)
 
-    def __new__(cls, canonical: str, alias: str | None = None) -> "_ModeValue":
+    def __new__(cls, canonical: str, alias: str | None = None) -> _ModeValue:
         obj = cast("_ModeValue", str.__new__(cls, canonical))
         obj._alias = alias or canonical.replace("_", "-")
         return obj
@@ -67,7 +67,7 @@ class _ModeValue(str):
 
 
 class RunnerMode(str, Enum):
-    def __new__(cls, canonical: str, alias: str | None = None) -> "RunnerMode":
+    def __new__(cls, canonical: str, alias: str | None = None) -> RunnerMode:
         mode_value = _ModeValue(canonical, alias)
         obj = cast("RunnerMode", str.__new__(cls, mode_value))
         obj._value_ = mode_value
