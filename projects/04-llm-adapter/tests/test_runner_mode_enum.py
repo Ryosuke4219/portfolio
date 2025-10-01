@@ -1,6 +1,6 @@
 import pytest
 
-from adapter.core.runner_api import RunnerConfig, RunnerMode, _normalize_mode
+from adapter.core.runner_api import _normalize_mode, RunnerConfig, RunnerMode
 
 
 def test_runner_mode_values_and_aliases() -> None:
