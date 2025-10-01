@@ -1,13 +1,13 @@
 """RunnerExecution のシャドー計測検証。"""
 from __future__ import annotations
 
+from collections.abc import Callable
 import contextlib
-import logging
 from dataclasses import replace
+import logging
 from pathlib import Path
 import sys
 from types import SimpleNamespace
-from typing import Callable
 
 import pytest
 
