@@ -22,7 +22,9 @@ def test_majority_vote_normalizes_buckets() -> None:
     ]
     result = majority.aggregate(cands)
     assert result.chosen == cands[0]
-    assert result.reason == "majority(2)"
+    assert result.strategy == "majority_vote"
+    assert result.reason == "majority_vote(2)"
+    assert result.metadata == {"bucket_size": 2}
 
 
 def test_max_score_falls_back_to_tiebreaker() -> None:
