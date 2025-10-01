@@ -7,7 +7,7 @@ from concurrent.futures import CancelledError
 from dataclasses import dataclass
 from threading import Event, Lock
 from typing import Any, cast, Protocol, TYPE_CHECKING
-import uuid
+from uuid import uuid4
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
