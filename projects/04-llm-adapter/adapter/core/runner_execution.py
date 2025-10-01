@@ -3,14 +3,33 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from enum import Enum
 import logging
 from pathlib import Path
 from time import perf_counter, sleep
 from typing import Literal, Protocol, TYPE_CHECKING, TypeVar
 
+from . import errors as core_errors
+
+
+def _get_parallel_execution_error() -> type[Exception]:
+    parallel_error = getattr(core_errors, "ParallelExecutionError", None)
+    if isinstance(parallel_error, type) and issubclass(parallel_error, Exception):
+        return parallel_error
+    try:
+        from src.llm_adapter.parallel_exec import ParallelExecutionError as shadow_error
+    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+        class ParallelExecutionError(RuntimeError):
+            """並列実行時エラーのフォールバック。"""
+
+        parallel_error = ParallelExecutionError
+    else:
+        parallel_error = shadow_error
+    setattr(core_errors, "ParallelExecutionError", parallel_error)
+    return parallel_error
+
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.parallel_exec import (
-        ParallelExecutionError,
         run_parallel_all_sync,
         run_parallel_any_sync,
     )
@@ -18,15 +37,11 @@ if TYPE_CHECKING:  # pragma: no cover - 型補完用
 else:  # pragma: no cover - 実行時フォールバック
     try:
         from src.llm_adapter.parallel_exec import (
-            ParallelExecutionError,
             run_parallel_all_sync,
             run_parallel_any_sync,
         )
     except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
         T = TypeVar("T")
-
-        class ParallelExecutionError(RuntimeError):
-            """並列実行時エラーのフォールバック。"""
 
         def run_parallel_all_sync(
             workers: Sequence[Callable[[], T]], *, max_concurrency: int | None = None
@@ -43,8 +58,8 @@ else:  # pragma: no cover - 実行時フォールバック
                 except Exception as exc:  # pragma: no cover - テスト環境でのみ到達
                     last_error = exc
             if last_error is not None:
-                raise ParallelExecutionError(str(last_error)) from last_error
-            raise ParallelExecutionError("no worker executed successfully")
+                raise _get_parallel_execution_error()(str(last_error)) from last_error
+            raise _get_parallel_execution_error()("no worker executed successfully")
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.provider_spi import ProviderSPI
@@ -72,6 +87,26 @@ from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
 from .providers import BaseProvider, ProviderResponse
 
 LOGGER = logging.getLogger(__name__)
+
+
+class RunnerMode(str, Enum):
+    """Runner execution strategies."""
+
+    SEQUENTIAL = "sequential"
+    PARALLEL_ANY = "parallel-any"
+    PARALLEL_ALL = "parallel-all"
+    CONSENSUS = "consensus"
+
+
+def _coerce_mode_value(mode: RunnerMode | str) -> str:
+    if isinstance(mode, RunnerMode):
+        return mode.value
+    if isinstance(mode, str):
+        return mode
+    value = getattr(mode, "value", mode)
+    if isinstance(value, str):
+        return value
+    return str(value)
 
 @dataclass(slots=True)
 class SingleRunResult:
@@ -138,12 +173,13 @@ class RunnerExecution:
         self._metrics_path = metrics_path
         self._provider_weights = provider_weights
         self._sequential_executor = SequentialAttemptExecutor(self._run_single)
+        parallel_error = _get_parallel_execution_error()
         self._parallel_executor = ParallelAttemptExecutor(
             self._run_single,
             normalize_concurrency,
             run_parallel_all_sync=run_parallel_all_sync,
             run_parallel_any_sync=run_parallel_any_sync,
-            parallel_execution_error=ParallelExecutionError,
+            parallel_execution_error=parallel_error,
         )
         self._active_provider_ids: tuple[str, ...] = ()
         self._current_attempt_index = 0
@@ -153,15 +189,16 @@ class RunnerExecution:
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
         task: GoldenTask,
         attempt_index: int,
-        mode: str,
+        mode: RunnerMode | str,
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         self._active_provider_ids = tuple(cfg.provider for cfg, _ in providers)
         self._current_attempt_index = attempt_index
+        normalized_mode = _coerce_mode_value(mode)
         return self._sequential_executor.run(
             providers,
             task,
             attempt_index,
-            mode,
+            normalized_mode,
         )
 
     def run_parallel_attempt(
@@ -186,8 +223,9 @@ class RunnerExecution:
         provider: BaseProvider,
         task: GoldenTask,
         attempt_index: int,
-        mode: str,
+        mode: RunnerMode | str,
     ) -> SingleRunResult:
+        mode_value = _coerce_mode_value(mode)
         if self._token_bucket:
             self._token_bucket.acquire()
         prompt = task.render_prompt()
@@ -249,7 +287,7 @@ class RunnerExecution:
             provider_config,
             task,
             attempt_index,
-            mode,
+            mode_value,
             response,
             status,
             failure_kind,
@@ -581,6 +619,7 @@ class RunnerExecution:
 
 
 __all__ = [
+    "RunnerMode",
     "RunnerExecution",
     "SequentialAttemptExecutor",
     "ParallelAttemptExecutor",

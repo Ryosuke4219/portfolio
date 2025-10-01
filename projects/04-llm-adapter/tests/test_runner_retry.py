@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from adapter.core.models import (
 from adapter.core.provider_spi import TokenUsage
 from adapter.core.providers import BaseProvider, ProviderResponse
 from adapter.core.runner_api import BackoffPolicy
-from adapter.core.runner_execution import RunnerExecution
+from adapter.core.runner_execution import RunnerExecution, RunnerMode
 
 
 class _RateLimitStubProvider(BaseProvider):
@@ -77,24 +78,34 @@ def _make_task() -> GoldenTask:
     )
 
 
-def test_rate_limit_retry_advances_after_max(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr("adapter.core.runner_execution.sleep", lambda _seconds: None)
-    task = _make_task()
-    retry_config = RetryConfig(max=1, backoff_s=0.1)
-    failing_config = _make_provider_config(tmp_path, "rate-limit", retries=retry_config)
-    success_config = _make_provider_config(tmp_path, "next")
-    failing_provider = _RateLimitStubProvider(failing_config, failures=2)
-    success_provider = _SuccessProvider(success_config)
+def _evaluate_budget_stub(
+    provider_config: ProviderConfig,
+    cost_usd: float,
+    status: str,
+    failure_kind: str | None,
+    error_message: str | None,
+) -> tuple[BudgetSnapshot, str | None, str, str | None, str | None]:
+    return BudgetSnapshot(0.0, False), None, status, failure_kind, error_message
 
-    def evaluate_budget(
-        provider_config: ProviderConfig,
-        cost_usd: float,
-        status: str,
-        failure_kind: str | None,
-        error_message: str | None,
-    ) -> tuple[BudgetSnapshot, str | None, str, str | None, str | None]:
-        return BudgetSnapshot(0.0, False), None, status, failure_kind, error_message
 
+def _make_build_metrics_stub(
+    recorder: list[str] | None = None,
+) -> Callable[
+    [
+        ProviderConfig,
+        GoldenTask,
+        int,
+        str,
+        ProviderResponse,
+        str,
+        str | None,
+        str | None,
+        int,
+        BudgetSnapshot,
+        float,
+    ],
+    tuple[RunMetrics, str],
+]:
     def build_metrics(
         provider_config: ProviderConfig,
         task_obj: GoldenTask,
@@ -108,6 +119,8 @@ def test_rate_limit_retry_advances_after_max(monkeypatch: pytest.MonkeyPatch, tm
         budget_snapshot: BudgetSnapshot,
         cost_usd: float,
     ) -> tuple[RunMetrics, str]:
+        if recorder is not None:
+            recorder.append(mode)
         metrics = RunMetrics(
             ts="2024-01-01T00:00:00Z",
             run_id=f"run-{provider_config.provider}",
@@ -133,11 +146,23 @@ def test_rate_limit_retry_advances_after_max(monkeypatch: pytest.MonkeyPatch, tm
         )
         return metrics, response.output_text or ""
 
+    return build_metrics
+
+
+def test_rate_limit_retry_advances_after_max(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("adapter.core.runner_execution.sleep", lambda _seconds: None)
+    task = _make_task()
+    retry_config = RetryConfig(max=1, backoff_s=0.1)
+    failing_config = _make_provider_config(tmp_path, "rate-limit", retries=retry_config)
+    success_config = _make_provider_config(tmp_path, "next")
+    failing_provider = _RateLimitStubProvider(failing_config, failures=2)
+    success_provider = _SuccessProvider(success_config)
+
     execution = RunnerExecution(
         token_bucket=None,
         schema_validator=None,
-        evaluate_budget=evaluate_budget,
-        build_metrics=build_metrics,
+        evaluate_budget=_evaluate_budget_stub,
+        build_metrics=_make_build_metrics_stub(),
         normalize_concurrency=lambda total, limit: total,
         backoff=BackoffPolicy(timeout_next_provider=False, retryable_next_provider=False),
         shadow_provider=None,
@@ -165,3 +190,48 @@ def test_rate_limit_retry_advances_after_max(monkeypatch: pytest.MonkeyPatch, tm
     second_result = batch[1][1]
     assert second_result.metrics.status == "ok"
     assert second_result.metrics.retries == 0
+
+
+def test_runner_execution_accepts_runner_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("adapter.core.runner_execution.sleep", lambda _seconds: None)
+    task = _make_task()
+    provider_config = _make_provider_config(tmp_path, "success")
+    provider = _SuccessProvider(provider_config)
+
+    recorded_modes: list[str] = []
+
+    class CustomParallelExecutionError(RuntimeError):
+        pass
+
+    monkeypatch.setattr(
+        "adapter.core.errors.ParallelExecutionError",
+        CustomParallelExecutionError,
+        raising=False,
+    )
+    execution = RunnerExecution(
+        token_bucket=None,
+        schema_validator=None,
+        evaluate_budget=_evaluate_budget_stub,
+        build_metrics=_make_build_metrics_stub(recorded_modes),
+        normalize_concurrency=lambda total, limit: total,
+        backoff=BackoffPolicy(timeout_next_provider=False, retryable_next_provider=False),
+        shadow_provider=None,
+        metrics_path=None,
+        provider_weights=None,
+    )
+
+    batch, stop_reason = execution.run_sequential_attempt(
+        [(provider_config, provider)],
+        task,
+        attempt_index=0,
+        mode=RunnerMode.SEQUENTIAL,
+    )
+
+    assert stop_reason is None
+    assert recorded_modes == [RunnerMode.SEQUENTIAL.value]
+    assert execution._parallel_executor._parallel_execution_error is CustomParallelExecutionError
+    assert len(batch) == 1
+    result = batch[0][1]
+    assert result.metrics.status == "ok"
