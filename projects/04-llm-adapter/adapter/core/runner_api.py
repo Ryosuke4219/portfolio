@@ -115,6 +115,9 @@ class RunnerConfig:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", _normalize_mode(self.mode))
+        object.__setattr__(self, "schema", _resolve_optional_path(self.schema))
+        object.__setattr__(self, "judge", _resolve_optional_path(self.judge))
+        object.__setattr__(self, "metrics_path", _resolve_optional_path(self.metrics_path))
 
 
 def default_budgets_path() -> Path:
