@@ -1,8 +1,8 @@
 """組み込みストラテジのレジストリ。"""
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, Mapping, cast
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 from .. import AggregationStrategy
 from .majority_vote import MajorityVoteStrategy
