@@ -1,14 +1,44 @@
 """Execution guard utilities for runner execution."""
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
 from typing import Any
+from types import SimpleNamespace
 
-from jsonschema import exceptions as jsonschema_exceptions
-from jsonschema import validators
+_jsonschema_spec = importlib.util.find_spec("jsonschema")
+if _jsonschema_spec is None:
+    class _MissingValidationError(RuntimeError):
+        """Raised when jsonschema is required but unavailable."""
+
+        def __init__(self) -> None:
+            super().__init__(
+                "jsonschema is required to validate request payloads. Install "
+                "the optional dependency to enable schema validation."
+            )
+
+    class _MissingValidator:
+        def __init__(self, schema: dict[str, Any]) -> None:
+            self.schema = schema
+
+        @classmethod
+        def check_schema(cls, _: dict[str, Any]) -> None:
+            raise _MissingValidationError()
+
+        def validate(self, _: Any) -> None:
+            raise _MissingValidationError()
+
+    def _validator_for(_: dict[str, Any]) -> type[_MissingValidator]:
+        return _MissingValidator
+
+    jsonschema_exceptions = SimpleNamespace(ValidationError=_MissingValidationError)
+    validators = SimpleNamespace(validator_for=_validator_for)
+else:
+    from jsonschema import exceptions as jsonschema_exceptions
+    from jsonschema import validators
 
 
 class _TokenBucket:
