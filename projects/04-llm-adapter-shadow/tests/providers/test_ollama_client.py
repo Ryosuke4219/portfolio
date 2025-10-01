@@ -59,6 +59,32 @@ def test_ollama_client_success_paths() -> None:
     assert session.timeouts == [12.5, 45.0, 2.5]
 
 
+def test_ollama_client_normalizes_payload_stream_flag() -> None:
+    class Session(FakeSession):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls: list[tuple[str, dict[str, object] | None, bool]] = []
+
+        def post(
+            self,
+            url: str,
+            json: dict[str, object] | None = None,
+            stream: bool = False,
+            timeout: float | None = None,
+        ) -> FakeResponse:
+            self.calls.append((url, json, stream))
+            return FakeResponse(status_code=200, payload={"message": {"content": "ok"}})
+
+    session = Session()
+    client = OllamaClient(host="http://h", session=session, timeout=10.0, pull_timeout=5.0)
+
+    client.chat({"messages": [], "stream": "yes"})
+
+    chat_call = next((call for call in session.calls if call[0].endswith("/api/chat")), None)
+    assert chat_call is not None
+    assert chat_call[2] is True
+
+
 @pytest.mark.parametrize(
     ("factory", "expected"),
     [
