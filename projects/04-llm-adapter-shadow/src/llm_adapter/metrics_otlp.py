@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from typing import Any
+
 ScopeAttrs = list[dict[str, Any]]
+
+
 def _timestamp_ns(value: Any) -> str:
     return str(int(float(value) * 1_000_000)) if isinstance(value, (int, float)) else "0"
 
