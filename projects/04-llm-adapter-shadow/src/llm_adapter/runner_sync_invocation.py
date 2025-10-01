@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import CancelledError
 from dataclasses import dataclass
 import time
-from typing import Literal, Protocol, overload, cast
+from typing import cast, Literal, overload, Protocol
 
 from .errors import ProviderSkip
 from .observability import EventLogger
