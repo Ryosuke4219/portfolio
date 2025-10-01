@@ -24,4 +24,4 @@ def test_consensus_config_is_frozen() -> None:
     config = ConsensusConfig()
 
     with pytest.raises(dataclasses.FrozenInstanceError):
-        config.max_latency_ms = 1
+        object.__setattr__(config, "max_latency_ms", 1)
