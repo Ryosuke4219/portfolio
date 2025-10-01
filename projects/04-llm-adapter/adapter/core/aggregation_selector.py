@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, cast, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
@@ -47,7 +48,7 @@ class AggregationSelector:
 
     def select(
         self,
-        mode: str,
+        mode: str | Enum,
         config: RunnerConfig,
         batch: Sequence[tuple[int, SingleRunResult]],
         *,
@@ -59,6 +60,7 @@ class AggregationSelector:
         candidates = self._candidate_builder.build(batch)
         if not candidates:
             return None
+        mode_value = mode.value if isinstance(mode, Enum) else mode
         strategy = self._resolve_aggregation_strategy(
             mode,
             config,
@@ -82,7 +84,7 @@ class AggregationSelector:
         votes: float | int | None = None
         aggregate_kind = (config.aggregate or "").strip().lower().replace("-", "_")
         is_weighted = aggregate_kind in {"weighted_vote", "weighted"}
-        if mode == "consensus":
+        if mode_value == "consensus":
             if decision.metadata:
                 key = "bucket_weight" if is_weighted else "bucket_size"
                 raw_votes = decision.metadata.get(key)
@@ -138,7 +140,7 @@ class AggregationSelector:
 
     def _resolve_aggregation_strategy(
         self,
-        mode: str,
+        mode: str | Enum,
         config: RunnerConfig,
         *,
         default_judge_config: ProviderConfig | None,

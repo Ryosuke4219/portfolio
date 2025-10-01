@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,7 +50,7 @@ def test_select_builds_aggregation_candidates() -> None:
         (1, SingleRunResult(metrics=_metrics("p2", "Beta"), raw_output="Beta")),
     ]
 
-    decision = selector.select("consensus", config, batch, default_judge_config=None)
+    decision = selector.select(_Mode.CONSENSUS, config, batch, default_judge_config=None)
 
     assert decision is not None
     candidates = decision.decision.candidates
@@ -78,6 +79,10 @@ class _DummyFactory:
         return self._judge
 
 
+class _Mode(Enum):
+    CONSENSUS = "consensus"
+
+
 def test_select_accepts_cli_aggregate_aliases() -> None:
     judge_config = _judge_config()
     judge = _DummyJudge()
@@ -97,7 +102,7 @@ def test_select_accepts_cli_aggregate_aliases() -> None:
 
     majority_config = RunnerConfig(mode="consensus", aggregate="majority_vote")
     majority_decision = selector.select(
-        "consensus",
+        _Mode.CONSENSUS,
         majority_config,
         batch,
         default_judge_config=judge_config,
@@ -110,7 +115,7 @@ def test_select_accepts_cli_aggregate_aliases() -> None:
 
     max_score_config = RunnerConfig(mode="consensus", aggregate="max_score")
     max_score_decision = selector.select(
-        "consensus",
+        _Mode.CONSENSUS,
         max_score_config,
         batch,
         default_judge_config=judge_config,
@@ -140,7 +145,7 @@ def test_max_score_selects_highest_quality() -> None:
         (0, SingleRunResult(metrics=_metrics("p1", "Alpha"), raw_output="Alpha")),
         (1, SingleRunResult(metrics=_metrics("p2", "Beta"), raw_output="Beta")),
     ]
-    decision = selector.select("consensus", config, batch, default_judge_config=judge_config)
+    decision = selector.select(_Mode.CONSENSUS, config, batch, default_judge_config=judge_config)
 
     assert decision is not None
     assert builder_calls == [judge_config]
@@ -165,7 +170,7 @@ def test_weighted_vote_aggregates_with_provider_weights() -> None:
         (2, SingleRunResult(metrics=_metrics("p3", "Alpha"), raw_output="Alpha")),
     ]
 
-    decision = selector.select("consensus", config, batch, default_judge_config=_judge_config())
+    decision = selector.select(_Mode.CONSENSUS, config, batch, default_judge_config=_judge_config())
 
     assert decision is not None
     assert decision.decision.chosen.provider == "p1"
