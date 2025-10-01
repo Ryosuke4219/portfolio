@@ -1,6 +1,7 @@
 """Normalized exception hierarchy for adapter core."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import Enum
 
 
@@ -76,6 +77,21 @@ class AllFailedError(FatalError):
     """Raised when all providers fail to produce a result."""
 
 
+class ParallelExecutionError(FatalError):
+    """Raised when a parallel execution encounters unrecoverable failures."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        failures: Sequence[Exception],
+        batch: object | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.failures = failures
+        self.batch = batch
+
+
 __all__ = [
     "AdapterError",
     "RetryableError",
@@ -89,4 +105,5 @@ __all__ = [
     "SkipReason",
     "ConfigError",
     "AllFailedError",
+    "ParallelExecutionError",
 ]
