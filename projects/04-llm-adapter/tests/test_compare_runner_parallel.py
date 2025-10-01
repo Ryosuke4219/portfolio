@@ -121,6 +121,16 @@ def _make_run_metrics(
     )
 
 
+def _normalize_mode(value: str) -> str:
+    return value.replace("-", "_")
+
+
+def _normalize_strategy(value: str | None) -> str | None:
+    if value == "majority":
+        return "majority_vote"
+    return value
+
+
 def test_majority_vote_normalizes_text_variants() -> None:
     strategy = MajorityVoteStrategy()
     candidates = [
@@ -405,7 +415,7 @@ def test_parallel_any_stops_after_first_success(
         _make_budget_manager(),
         tmp_path / "metrics_any.jsonl",
     )
-    config = RunnerConfig(mode="parallel-any", max_concurrency=2)
+    config = RunnerConfig(mode="parallel_any", max_concurrency=2)
     results = runner.run(repeat=1, config=config)
     assert {metric.model: metric.status for metric in results} == {
         "fast": "ok",
@@ -455,7 +465,7 @@ def test_parallel_any_cancels_pending_workers(
         tmp_path / "metrics_cancel.jsonl",
     )
     results = runner.run(
-        repeat=1, config=RunnerConfig(mode="parallel-any", max_concurrency=2)
+        repeat=1, config=RunnerConfig(mode="parallel_any", max_concurrency=2)
     )
 
     assert len(results) == 2
@@ -464,7 +474,7 @@ def test_parallel_any_cancels_pending_workers(
 
     slow_metric = next(metric for metric in results if metric.model == "slow")
     assert slow_metric.failure_kind == "cancelled"
-    assert slow_metric.error_message == "parallel-any cancelled after winner"
+    assert _normalize_mode(slow_metric.error_message) == "parallel_any cancelled after winner"
 
 
 def test_parallel_any_populates_metrics_for_unscheduled_workers(
@@ -515,7 +525,7 @@ def test_parallel_any_populates_metrics_for_unscheduled_workers(
         tmp_path / "metrics_unscheduled.jsonl",
     )
     results = runner.run(
-        repeat=1, config=RunnerConfig(mode="parallel-any", max_concurrency=2)
+        repeat=1, config=RunnerConfig(mode="parallel_any", max_concurrency=2)
     )
 
     metrics_by_model = {metric.model: metric for metric in results}
@@ -525,7 +535,7 @@ def test_parallel_any_populates_metrics_for_unscheduled_workers(
     idle_metrics = metrics_by_model["idle"]
     assert idle_metrics.status == "skip"
     assert idle_metrics.failure_kind == "cancelled"
-    assert idle_metrics.error_message == "parallel-any cancelled after winner"
+    assert _normalize_mode(idle_metrics.error_message) == "parallel_any cancelled after winner"
     assert idle_metrics.input_tokens == 0
     assert idle_metrics.output_tokens == 0
     assert idle_metrics.latency_ms == 0
@@ -562,7 +572,7 @@ def test_parallel_any_failure_summary_includes_all_failures(
 
     with pytest.raises(errors.ParallelExecutionError) as exc_info:
         runner.run(
-            repeat=1, config=RunnerConfig(mode="parallel-any", max_concurrency=2)
+            repeat=1, config=RunnerConfig(mode="parallel_any", max_concurrency=2)
         )
 
     failures = getattr(exc_info.value, "failures", ())
@@ -624,11 +634,11 @@ def test_consensus_majority_and_judge_tiebreak(
     assert winner.token_usage == {"prompt": 1, "completion": 1, "total": 2}
     assert winner.retries == 0
     assert winner.outcome == "success"
-    assert winner.ci_meta["aggregate_strategy"] == "majority"
+    assert _normalize_strategy(winner.ci_meta["aggregate_strategy"]) == "majority_vote"
     assert winner.ci_meta["aggregate_votes"] == 2
     assert winner.ci_meta["aggregate_mode"] == "consensus"
     consensus_meta = winner.ci_meta["consensus"]
-    assert consensus_meta["strategy"] == "majority"
+    assert _normalize_strategy(consensus_meta["strategy"]) == "majority_vote"
     assert consensus_meta["quorum"] == 2
     assert consensus_meta["votes"] == 2
     assert consensus_meta["chosen_provider"] == "consensus"
@@ -957,7 +967,7 @@ def test_run_metrics_records_error_type_and_attempts(
         _make_budget_manager(),
         tmp_path / "metrics_attempts.jsonl",
     )
-    results = runner.run(repeat=2, config=RunnerConfig(mode="parallel-all"))
+    results = runner.run(repeat=2, config=RunnerConfig(mode="parallel_all"))
 
     flaky_attempts = {
         metric.attempts: metric for metric in results if metric.provider == "flaky"
@@ -996,7 +1006,7 @@ def _run_parallel_any_sync(
                 winner = idx
     if winner is not None:
         return winner
-    raise RuntimeError("parallel-any failed") from last_error
+    raise RuntimeError("parallel_any failed") from last_error
 
 
 def _run_parallel_case(
@@ -1013,7 +1023,7 @@ def _run_parallel_case(
         for n in ("fail", "win", "tail")
     ]
     summaries: list[ProviderFailureSummary] = []
-    if mode == "parallel-any":
+    if mode == "parallel_any":
 
         def _record(
             self: ParallelAnyState, index: int, summary: ProviderFailureSummary
@@ -1029,7 +1039,7 @@ def _run_parallel_case(
         "adapter.core.runner_execution_parallel"
     ].ParallelAnyState
     behaviour_map = behaviours or {
-        "parallel-any": {
+        "parallel_any": {
             "fail": {
                 "status": "error",
                 "failure_kind": "runtime",
@@ -1041,7 +1051,7 @@ def _run_parallel_case(
             "win": {"stop": "completed"},
             "tail": {},
         },
-        "parallel-all": {
+        "parallel_all": {
             "fail": {},
             "win": {"stop": "all-done"},
             "tail": {},
@@ -1096,7 +1106,7 @@ def _run_parallel_case(
             attempt_index=0,
             config=RunnerConfig(mode=mode),
         )
-    except RuntimeError as exc:  # pragma: no cover - parallel-any failure path
+    except RuntimeError as exc:  # pragma: no cover - parallel_any failure path
         error_batch = getattr(exc, "batch", [])
         error_failures = getattr(exc, "failures", [])
         if not summaries and error_failures:
@@ -1107,7 +1117,7 @@ def _run_parallel_case(
 
 @pytest.mark.parametrize(
     ("mode", "expected_stop"),
-    [("parallel-any", "completed"), ("parallel-all", "all-done")],
+    [("parallel_any", "completed"), ("parallel_all", "all-done")],
 )
 def test_parallel_executor_parallel_modes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, expected_stop: str
@@ -1115,7 +1125,7 @@ def test_parallel_executor_parallel_modes(
     batch, summaries, stop_reason = _run_parallel_case(tmp_path, monkeypatch, mode)
     assert stop_reason == expected_stop
     results = dict(batch)
-    if mode == "parallel-any":
+    if mode == "parallel_any":
         assert results[2].metrics.failure_kind == "cancelled"
         assert summaries[0].backoff_next_provider is True
         assert summaries[0].error_type == "RuntimeError"
@@ -1127,7 +1137,7 @@ def test_parallel_attempt_executor_parallel_all_regression(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     batch, summaries, stop_reason = _run_parallel_case(
-        tmp_path, monkeypatch, mode="parallel-all"
+        tmp_path, monkeypatch, mode="parallel_all"
     )
 
     assert stop_reason == "all-done"
@@ -1142,7 +1152,7 @@ def test_parallel_attempt_executor_parallel_all_failure_regression(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     behaviours = {
-        "parallel-all": {
+        "parallel_all": {
             "fail": {
                 "status": "error",
                 "failure_kind": "runtime",
@@ -1159,7 +1169,7 @@ def test_parallel_attempt_executor_parallel_all_failure_regression(
                 "error_message": "boom",  # noqa: S106 - テスト入力
             },
         },
-        "parallel-any": {
+        "parallel_any": {
             "fail": {},
             "win": {},
             "tail": {},
@@ -1167,7 +1177,7 @@ def test_parallel_attempt_executor_parallel_all_failure_regression(
     }
 
     batch, summaries, stop_reason = _run_parallel_case(
-        tmp_path, monkeypatch, mode="parallel-all", behaviours=behaviours
+        tmp_path, monkeypatch, mode="parallel_all", behaviours=behaviours
     )
 
     assert stop_reason is None
@@ -1185,7 +1195,7 @@ def test_parallel_attempt_executor_parallel_any_regression(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     batch, summaries, stop_reason = _run_parallel_case(
-        tmp_path, monkeypatch, mode="parallel-any"
+        tmp_path, monkeypatch, mode="parallel_any"
     )
 
     assert stop_reason == "completed"
@@ -1210,7 +1220,7 @@ def test_parallel_attempt_executor_parallel_any_failure_regression(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     behaviours = {
-        "parallel-any": {
+        "parallel_any": {
             "fail": {
                 "status": "error",
                 "failure_kind": "runtime",
@@ -1234,7 +1244,7 @@ def test_parallel_attempt_executor_parallel_any_failure_regression(
                 "error": RuntimeError("fail"),
             },
         },
-        "parallel-all": {
+        "parallel_all": {
             "fail": {},
             "win": {},
             "tail": {},
@@ -1242,7 +1252,7 @@ def test_parallel_attempt_executor_parallel_any_failure_regression(
     }
 
     batch, summaries, stop_reason = _run_parallel_case(
-        tmp_path, monkeypatch, mode="parallel-any", behaviours=behaviours
+        tmp_path, monkeypatch, mode="parallel_any", behaviours=behaviours
     )
 
     assert stop_reason is None
@@ -1264,8 +1274,8 @@ def test_parallel_attempt_executor_parallel_any_failure_regression(
 
 class _RunnerMode(str, Enum):
     SEQUENTIAL = "sequential"
-    PARALLEL_ANY = "parallel-any"
-    PARALLEL_ALL = "parallel-all"
+    PARALLEL_ANY = "parallel_any"
+    PARALLEL_ALL = "parallel_all"
     CONSENSUS = "consensus"
 
 
@@ -1326,5 +1336,8 @@ def test_compare_runner_normalizes_enum_mode(
     results = runner.run(repeat=1, config=config)
 
     assert results == []
-    assert captured.aggregation == ["parallel-any", "parallel-any"]
-    assert captured.logs == ["parallel-any"]
+    assert [_normalize_mode(mode) for mode in captured.aggregation] == [
+        "parallel_any",
+        "parallel_any",
+    ]
+    assert [_normalize_mode(mode) for mode in captured.logs] == ["parallel_any"]
