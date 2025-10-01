@@ -156,6 +156,7 @@ def test_ollama_provider_merges_request_options() -> None:
     )
     assert chat_payload is not None
     assert chat_payload["stream"] is True
+    assert session.last_stream is True
     assert chat_payload["model"] == "gemma3"
     options_payload = chat_payload["options"]
     assert options_payload["num_predict"] == 32
