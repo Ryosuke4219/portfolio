@@ -234,7 +234,7 @@ def test_sequential_strategy_all_failed_logs_once(monkeypatch: pytest.MonkeyPatc
         log_calls.append((args, kwargs))
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync_modes.log_run_metric",
+        "src.llm_adapter.runner_sync_sequential.log_run_metric",
         fake_log_run_metric,
     )
 
