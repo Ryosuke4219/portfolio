@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from enum import Enum
 from threading import Event, Lock
-from typing import Any, cast, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, cast
 from uuid import uuid4
 
 from .config import ProviderConfig
@@ -122,12 +123,18 @@ def build_cancelled_result(
     config: RunnerConfig,
     cancel_message: str,
 ) -> SingleRunResult:
+    mode = config.mode
+    if isinstance(mode, Enum):
+        mode_value = mode.value if isinstance(mode.value, str) else str(mode.value)
+    else:
+        mode_value = cast(str, mode)
+
     metrics = RunMetrics(
         ts=now_ts(),
         run_id=f"run_{task.task_id}_{attempt_index}_{uuid4().hex}",
         provider=provider_config.provider,
         model=provider_config.model,
-        mode=config.mode,
+        mode=mode_value,
         prompt_id=task.task_id,
         prompt_name=task.name,
         seed=provider_config.seed,
