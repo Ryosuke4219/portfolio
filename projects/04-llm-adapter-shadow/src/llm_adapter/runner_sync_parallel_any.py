@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
 
 from .errors import AllFailedError
 from .observability import EventLogger
@@ -11,8 +11,10 @@ from .parallel_exec import ParallelExecutionError
 from .provider_spi import ProviderResponse, ProviderSPI
 from .runner_shared import log_run_metric
 from .runner_sync import ProviderInvocationResult
-from .runner_sync_modes import SyncRunContext
 from .utils import elapsed_ms
+
+if TYPE_CHECKING:
+    from .runner_sync_modes import SyncRunContext
 
 
 class ParallelAnyCallable(Protocol):
