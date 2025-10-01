@@ -8,6 +8,7 @@ from pathlib import Path
 import threading
 import time
 from typing import Any, cast
+from types import SimpleNamespace
 
 import pytest
 
@@ -33,6 +34,11 @@ from src.llm_adapter.runner_parallel import (
     ConsensusConfig,
 )
 from src.llm_adapter.runner_sync import Runner
+from src.llm_adapter.runner_sync_modes import (
+    ParallelAllStrategy,
+    ParallelAnyStrategy,
+    SyncRunContext,
+)
 from src.llm_adapter.shadow import run_with_shadow
 
 
@@ -669,3 +675,56 @@ def test_consensus_vote_event_and_shadow_delta(
     )
     assert winner_diff["shadow_consensus_delta"]["votes_for"] == 2
     assert winner_diff["shadow_consensus_delta"]["votes_total"] == 3
+@pytest.mark.parametrize("strategy", [ParallelAnyStrategy(), ParallelAllStrategy()])
+def test_parallel_strategies_shared_harness(monkeypatch: pytest.MonkeyPatch, strategy: object) -> None:
+    provider = SimpleNamespace(name=lambda: "p1"); record: dict[str, Any] = {"raised": []}
+    result = SimpleNamespace(response=None, error=None, attempt=1, provider=provider)
+    runner = SimpleNamespace(providers=[provider], _config=SimpleNamespace(max_attempts=None, max_concurrency=None))
+    monkeypatch.setattr(runner, "_invoke_provider_sync", lambda *a, **k: result, raising=False)
+    monkeypatch.setattr(runner, "_extract_fatal_error", lambda _results: None, raising=False)
+    monkeypatch.setattr(runner, "_apply_cancelled_results", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(
+        runner,
+        "_log_parallel_results",
+        lambda results, **_: record.update(log=record.get("log", 0) + 1, results=list(results)),
+        raising=False,
+    )
+
+    def _record(exc: Exception) -> None:
+        record["raised"].append(exc)
+
+    def run_any(workers, **_):
+        try:
+            return workers[0]()
+        except Exception as exc:  # noqa: BLE001
+            _record(exc)
+            raise
+
+    def run_all(workers, **_):
+        try:
+            return [workers[0]()]
+        except Exception as exc:  # noqa: BLE001
+            _record(exc)
+            raise
+
+    context = SyncRunContext(
+        runner=runner,
+        request=ProviderRequest(model="m"),
+        event_logger=None,
+        metadata={},
+        run_started=0.0,
+        request_fingerprint="f",
+        shadow=None,
+        shadow_used=False,
+        metrics_path=SimpleNamespace(),
+        run_parallel_all=run_all,
+        run_parallel_any=run_any,
+    )
+
+    with pytest.raises(ParallelExecutionError):
+        strategy.execute(context)  # type: ignore[call-arg]
+
+    assert record["log"] == 1
+    assert record["results"][0] is result
+    assert sum(isinstance(exc, ParallelExecutionError) for exc in record["raised"]) == 1
+

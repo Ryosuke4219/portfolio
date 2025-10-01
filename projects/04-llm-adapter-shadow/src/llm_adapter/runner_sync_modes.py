@@ -117,6 +117,75 @@ def _raise_no_attempts(context: SyncRunContext) -> None:
     raise error
 
 
+class _ParallelWorkersHarness:
+    def __init__(self, context: SyncRunContext) -> None:
+        self._context = context
+        self.runner = context.runner
+        self.total_providers = len(self.runner.providers)
+        self.providers = _limited_providers(
+            self.runner.providers, self.runner._config.max_attempts
+        )
+        self.results: list[ProviderInvocationResult | None] = [None] * self.total_providers
+        self._cancelled_slots: tuple[int, ...] = ()
+
+    def build_workers(self) -> Sequence[Callable[[], ProviderInvocationResult]]:
+        context, runner, total = self._context, self.runner, self.total_providers
+
+        def make_worker(index: int, provider: ProviderSPI) -> Callable[[], ProviderInvocationResult]:
+            def worker() -> ProviderInvocationResult:
+                result = runner._invoke_provider_sync(
+                    provider,
+                    context.request,
+                    attempt=index,
+                    total_providers=total,
+                    event_logger=context.event_logger,
+                    request_fingerprint=context.request_fingerprint,
+                    metadata=context.metadata,
+                    shadow=context.shadow,
+                    metrics_path=context.metrics_path,
+                    capture_shadow_metrics=False,
+                )
+                self.results[index - 1] = result
+                if result.response is None:
+                    error = result.error or ParallelExecutionError(
+                        "provider returned no response"
+                    )
+                    result.error = error
+                    raise error
+                return result
+
+            return worker
+
+        return [
+            make_worker(index, provider)
+            for index, provider in enumerate(self.providers, start=1)
+        ]
+
+    def record_cancelled(self, indices: Sequence[int]) -> None:
+        self._cancelled_slots = tuple(indices)
+
+    def finalize(self, *, attempts_override: dict[int, int] | None = None) -> None:
+        context, runner = self._context, self.runner
+        if self._cancelled_slots:
+            runner._apply_cancelled_results(
+                self.results,
+                providers=self.providers,
+                cancelled_indices=self._cancelled_slots,
+                total_providers=self.total_providers,
+                run_started=context.run_started,
+            )
+        runner._log_parallel_results(
+            self.results,
+            event_logger=context.event_logger,
+            request=context.request,
+            request_fingerprint=context.request_fingerprint,
+            metadata=context.metadata,
+            run_started=context.run_started,
+            shadow_used=context.shadow_used,
+            attempts_override=attempts_override,
+        )
+
+
 class SequentialStrategy:
     def execute(
         self, context: SyncRunContext
@@ -262,56 +331,19 @@ class ParallelAnyStrategy:
         ProviderInvocationResult, ProviderResponse
     ]:
         runner = context.runner
-        total_providers = len(runner.providers)
-        results: list[ProviderInvocationResult | None] = [None] * total_providers
-        max_attempts = runner._config.max_attempts
-        providers = _limited_providers(runner.providers, max_attempts)
-
-        def make_worker(index: int, provider: ProviderSPI) -> Callable[[], ProviderInvocationResult]:
-            def worker() -> ProviderInvocationResult:
-                result = runner._invoke_provider_sync(
-                    provider,
-                    context.request,
-                    attempt=index,
-                    total_providers=total_providers,
-                    event_logger=context.event_logger,
-                    request_fingerprint=context.request_fingerprint,
-                    metadata=context.metadata,
-                    shadow=context.shadow,
-                    metrics_path=context.metrics_path,
-                    capture_shadow_metrics=False,
-                )
-                results[index - 1] = result
-                if result.response is None:
-                    error = result.error
-                    if error is not None:
-                        raise error
-                    error = ParallelExecutionError("provider returned no response")
-                    result.error = error
-                    raise error
-                return result
-
-            return worker
-
-        workers = [
-            make_worker(index, provider)
-            for index, provider in enumerate(providers, start=1)
-        ]
+        harness = _ParallelWorkersHarness(context)
+        workers = harness.build_workers()
         if not workers:
             _raise_no_attempts(context)
 
         attempts_override: dict[int, int] | None = None
-        cancelled_slots: tuple[int, ...] = ()
-
-        def _record_cancelled(indices: Sequence[int]) -> None:
-            nonlocal cancelled_slots
-            cancelled_slots = tuple(indices)
+        results = harness.results
 
         try:
             winner = context.run_parallel_any(
                 workers,
                 max_concurrency=runner._config.max_concurrency,
-                on_cancelled=_record_cancelled,
+                on_cancelled=harness.record_cancelled,
             )
             fatal = runner._extract_fatal_error(results)
             if fatal is not None:
@@ -330,24 +362,7 @@ class ParallelAnyStrategy:
                 raise fatal from None
             raise exc
         finally:
-            if cancelled_slots:
-                runner._apply_cancelled_results(
-                    results,
-                    providers=providers,
-                    cancelled_indices=cancelled_slots,
-                    total_providers=total_providers,
-                    run_started=context.run_started,
-                )
-            runner._log_parallel_results(
-                results,
-                event_logger=context.event_logger,
-                request=context.request,
-                request_fingerprint=context.request_fingerprint,
-                metadata=context.metadata,
-                run_started=context.run_started,
-                shadow_used=context.shadow_used,
-                attempts_override=attempts_override,
-            )
+            harness.finalize(attempts_override=attempts_override)
 
 
 class ParallelAllStrategy:
@@ -357,44 +372,12 @@ class ParallelAllStrategy:
         ProviderInvocationResult, ProviderResponse
     ]:
         runner = context.runner
-        total_providers = len(runner.providers)
-        results: list[ProviderInvocationResult | None] = [None] * total_providers
-        max_attempts = runner._config.max_attempts
-        providers = _limited_providers(runner.providers, max_attempts)
-
-        def make_worker(index: int, provider: ProviderSPI) -> Callable[[], ProviderInvocationResult]:
-            def worker() -> ProviderInvocationResult:
-                result = runner._invoke_provider_sync(
-                    provider,
-                    context.request,
-                    attempt=index,
-                    total_providers=total_providers,
-                    event_logger=context.event_logger,
-                    request_fingerprint=context.request_fingerprint,
-                    metadata=context.metadata,
-                    shadow=context.shadow,
-                    metrics_path=context.metrics_path,
-                    capture_shadow_metrics=False,
-                )
-                results[index - 1] = result
-                if result.response is None:
-                    error = result.error
-                    if error is not None:
-                        raise error
-                    error = ParallelExecutionError("provider returned no response")
-                    result.error = error
-                    raise error
-                return result
-
-            return worker
-
-        workers = [
-            make_worker(index, provider)
-            for index, provider in enumerate(providers, start=1)
-        ]
+        harness = _ParallelWorkersHarness(context)
+        workers = harness.build_workers()
         if not workers:
             _raise_no_attempts(context)
 
+        results = harness.results
         try:
             invocations = context.run_parallel_all(
                 workers, max_concurrency=runner._config.max_concurrency
@@ -415,15 +398,7 @@ class ParallelAllStrategy:
                 raise fatal from None
             raise exc
         finally:
-            runner._log_parallel_results(
-                results,
-                event_logger=context.event_logger,
-                request=context.request,
-                request_fingerprint=context.request_fingerprint,
-                metadata=context.metadata,
-                run_started=context.run_started,
-                shadow_used=context.shadow_used,
-            )
+            harness.finalize()
 
 
 # Imported at the end to avoid circular dependency with ConsensusStrategy helper imports.
