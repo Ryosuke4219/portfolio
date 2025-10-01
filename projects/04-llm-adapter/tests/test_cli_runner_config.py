@@ -41,7 +41,7 @@ def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_pat
         providers=str(provider),
         prompts=str(prompts),
         repeat=2,
-        mode="parallel-any",
+        mode="parallel_any",
         budgets=None,
         metrics=None,
         log_level="DEBUG",
@@ -76,6 +76,7 @@ def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert forwarded["tie_breaker"] == "min_cost"
     assert forwarded["provider_weights"] == {"openai": 1.5, "anthropic": 0.5}
     assert forwarded["mode"] is RunnerMode.PARALLEL_ANY
+    assert RunnerMode.from_raw("parallel-any") is RunnerMode.PARALLEL_ANY
 
 
 def test_run_compare_sanitizes_runner_config(
@@ -133,7 +134,8 @@ def test_run_compare_sanitizes_runner_config(
         rpm=0,
         provider_weights={"openai": 1.0},
     )
-    assert captured["mode"] == "parallel-any"
+    assert captured["mode"] is runner_api.RunnerMode.PARALLEL_ANY
+    assert captured["mode"].value.replace("-", "_") == "parallel_any"
     assert captured["quorum"] == 5
     assert captured["max_concurrency"] is None
     assert captured["rpm"] is None

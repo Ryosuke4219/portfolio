@@ -20,16 +20,24 @@ class RunnerMode(str, Enum):
     """比較ランナーの実行モード."""
 
     SEQUENTIAL = "sequential"
-    PARALLEL_ANY = "parallel-any"
-    PARALLEL_ALL = "parallel-all"
+    PARALLEL_ANY = "parallel_any"
+    PARALLEL_ALL = "parallel_all"
     CONSENSUS = "consensus"
 
     @classmethod
     def from_raw(cls, raw: str) -> "RunnerMode":
         """CLI から渡された値を RunnerMode に変換する."""
 
-        candidate = raw.strip().lower().replace("_", "-")
+        candidate = raw.strip().lower().replace("-", "_")
         return cls(candidate)
+
+    @classmethod
+    def cli_choices(cls) -> list[str]:
+        """CLI に表示するモード選択肢."""
+
+        values = {mode.value for mode in cls}
+        hyphen_aliases = {value.replace("_", "-") for value in values}
+        return sorted(values | hyphen_aliases)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -52,7 +60,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=[mode.value for mode in RunnerMode],
+        choices=RunnerMode.cli_choices(),
         default="sequential",
         help="比較実行モード",
     )
