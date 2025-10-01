@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from enum import Enum
 import logging
-from typing import Any, TYPE_CHECKING
+import typing
 
 from ..config import ProviderConfig
 from ..datasets import GoldenTask
@@ -12,7 +12,7 @@ from ..metrics import RunMetrics
 from ..providers import BaseProvider, ProviderFactory
 from ..runner_execution import RunnerExecution, SingleRunResult
 
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
+if typing.TYPE_CHECKING:  # pragma: no cover - 型補完用
     from ..runner_api import RunnerConfig
 
 
@@ -108,7 +108,9 @@ def _handle_failure(
     log_attempt_failures: Callable[[str, Sequence[object]], None],
     message: str,
 ) -> None:
-    batch: Sequence[tuple[int, SingleRunResult]] | Any = getattr(exc, "batch", [])
+    batch: Sequence[tuple[int, SingleRunResult]] | typing.Any = getattr(
+        exc, "batch", []
+    )
     failures = getattr(exc, "failures", ())
     log_attempt_failures(_mode_value(config.mode), failures)
     if batch:
