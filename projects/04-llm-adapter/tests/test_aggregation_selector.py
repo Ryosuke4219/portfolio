@@ -109,7 +109,7 @@ def test_select_accepts_cli_aggregate_aliases() -> None:
     )
 
     assert majority_decision is not None
-    assert majority_decision.decision.strategy == "majority"
+    assert majority_decision.decision.strategy == "majority_vote"
     assert majority_decision.decision.chosen.provider == "p1"
     assert majority_decision.votes == 2
 

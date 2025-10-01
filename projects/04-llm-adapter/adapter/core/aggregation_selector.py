@@ -77,12 +77,19 @@ class AggregationSelector:
             )
         tiebreaker = self._tie_breaker_factory.create(config, lookup)
         decision = strategy.aggregate(candidates, tiebreaker=tiebreaker)
+        aggregate_kind = (config.aggregate or "").strip().lower().replace("-", "_")
+        alias_to_preferred = {
+            "majority_vote": "majority_vote",
+            "weighted_vote": "weighted_vote",
+            "weighted": "weighted_vote",
+        }
+        preferred_strategy = alias_to_preferred.get(aggregate_kind, strategy.name)
+        decision.strategy = preferred_strategy
         if score_metadata is not None:
             metadata = dict(decision.metadata) if decision.metadata else {}
             metadata["scores"] = score_metadata
             decision.metadata = metadata
         votes: float | int | None = None
-        aggregate_kind = (config.aggregate or "").strip().lower().replace("-", "_")
         is_weighted = aggregate_kind in {"weighted_vote", "weighted"}
         if mode_value == "consensus":
             if decision.metadata:
