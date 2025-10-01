@@ -1,14 +1,20 @@
-"""Shadow execution helpers."""
+"""Asynchronous shadow execution helpers."""
 
 from __future__ import annotations
 
-import threading
+import asyncio
+import contextlib
 import time
-from typing import Any, Literal, overload
+from typing import Any
 
 from .observability import EventLogger
-from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from .shadow_async import run_with_shadow_async
+from .provider_spi import (
+    AsyncProviderSPI,
+    ensure_async_provider,
+    ProviderRequest,
+    ProviderResponse,
+    ProviderSPI,
+)
 from .shadow_metrics import _to_path_str, MetricsPath, ShadowMetrics
 from .shadow_shared import (
     _finalize_shadow_metrics,
@@ -18,16 +24,16 @@ from .shadow_shared import (
 )
 
 
-def _run_shadow_sync(
-    shadow: ProviderSPI,
+async def _run_shadow_async(
+    shadow_async: AsyncProviderSPI,
     req: ProviderRequest,
     *,
     provider_name: str | None,
 ) -> dict[str, Any]:
     ts0 = time.time()
     try:
-        response = shadow.invoke(req)
-    except Exception as exc:  # pragma: no cover - error branch tested via metrics
+        response = await shadow_async.invoke_async(req)
+    except Exception as exc:  # pragma: no cover - logged below
         return _make_shadow_payload(
             provider_name=provider_name,
             error=exc,
@@ -40,88 +46,74 @@ def _run_shadow_sync(
     )
 
 
-@overload
-def run_with_shadow(
-    primary: ProviderSPI,
-    shadow: ProviderSPI | None,
-    req: ProviderRequest,
-    metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
-    *,
-    logger: EventLogger | None = None,
-    capture_metrics: Literal[True],
-) -> tuple[ProviderResponse, ShadowMetrics | None]: ...
-
-
-@overload
-def run_with_shadow(
-    primary: ProviderSPI,
-    shadow: ProviderSPI | None,
-    req: ProviderRequest,
-    metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
-    *,
-    logger: EventLogger | None = None,
-    capture_metrics: Literal[False] = False,
-) -> ProviderResponse: ...
-
-
-def run_with_shadow(
-    primary: ProviderSPI,
-    shadow: ProviderSPI | None,
+async def run_with_shadow_async(
+    primary: ProviderSPI | AsyncProviderSPI,
+    shadow: ProviderSPI | AsyncProviderSPI | None,
     req: ProviderRequest,
     metrics_path: MetricsPath = DEFAULT_METRICS_PATH,
     *,
     logger: EventLogger | None = None,
     capture_metrics: bool = False,
 ) -> ProviderResponse | tuple[ProviderResponse, ShadowMetrics | None]:
+    primary_async = ensure_async_provider(primary)
+    shadow_async = ensure_async_provider(shadow) if shadow is not None else None
+
     if metrics_path is None:
         logger = None
 
-    shadow_thread: threading.Thread | None = None
+    shadow_task: asyncio.Task[dict[str, Any]] | None = None
     shadow_payload: dict[str, Any] | None = None
     shadow_name: str | None = None
     shadow_started: float | None = None
     metrics_path_str = _to_path_str(metrics_path)
 
-    payload_holder: list[dict[str, Any]] = []
-    if shadow is not None:
-        shadow_name = shadow.name()
+    if shadow_async is not None:
+        shadow_name = shadow_async.name()
         shadow_started = time.time()
 
-        def _shadow_worker() -> None:
-            payload_holder.append(
-                _run_shadow_sync(shadow, req, provider_name=shadow_name)
+        async def _shadow_worker() -> dict[str, Any]:
+            return await _run_shadow_async(
+                shadow_async,
+                req,
+                provider_name=shadow_name,
             )
 
-        shadow_thread = threading.Thread(target=_shadow_worker, daemon=True)
-        shadow_thread.start()
+        shadow_task = asyncio.create_task(_shadow_worker())
 
     try:
-        primary_res = primary.invoke(req)
+        primary_res = await primary_async.invoke_async(req)
     except Exception:
-        if shadow_thread is not None:
-            shadow_thread.join(timeout=0)
+        if shadow_task is not None:
+            shadow_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await shadow_task
         raise
 
     metrics: ShadowMetrics | None = None
-    if shadow_thread is not None:
-        shadow_thread.join(timeout=10)
-        if shadow_thread.is_alive():
+    if shadow_task is not None:
+        try:
+            shadow_payload = await asyncio.wait_for(shadow_task, timeout=10)
+        except TimeoutError:
+            shadow_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await shadow_task
             duration_ms = (
                 int((time.time() - shadow_started) * 1000)
                 if shadow_started is not None
                 else None
             )
             shadow_payload = _make_timeout_payload(shadow_name, duration_ms)
-        elif payload_holder:
-            shadow_payload = dict(payload_holder[-1])
-        else:
+        except asyncio.CancelledError:  # pragma: no cover - defensive
+            shadow_payload = _make_shadow_payload(provider_name=shadow_name)
+
+        if shadow_payload is None:
             shadow_payload = _make_shadow_payload(provider_name=shadow_name)
 
         metrics = _finalize_shadow_metrics(
             metrics_path=metrics_path_str,
             capture_metrics=capture_metrics,
             logger=logger,
-            primary_provider_name=primary.name(),
+            primary_provider_name=primary_async.name(),
             primary_response=primary_res,
             request=req,
             shadow_payload=shadow_payload,
@@ -134,9 +126,6 @@ def run_with_shadow(
 
 
 __all__ = [
-    "run_with_shadow",
     "run_with_shadow_async",
-    "DEFAULT_METRICS_PATH",
-    "MetricsPath",
-    "ShadowMetrics",
+    "_run_shadow_async",
 ]
