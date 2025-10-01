@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, FrozenInstanceError
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
@@ -69,15 +69,17 @@ class ConsensusConfig:
         "_max_cost_usd",
     )
 
-    strategy = _FrozenField("strategy")
-    quorum = _FrozenField("quorum")
-    tie_breaker = _FrozenField("tie_breaker")
-    schema = _FrozenField("schema")
-    judge = _FrozenField("judge")
-    max_rounds = _FrozenField("max_rounds")
-    provider_weights = _FrozenField("provider_weights")
-    max_latency_ms = _FrozenField("max_latency_ms")
-    max_cost_usd = _FrozenField("max_cost_usd")
+    strategy = cast(str, _FrozenField("strategy"))
+    quorum = cast(int, _FrozenField("quorum"))
+    tie_breaker = cast(str | None, _FrozenField("tie_breaker"))
+    schema = cast(str | None, _FrozenField("schema"))
+    judge = cast(str | None, _FrozenField("judge"))
+    max_rounds = cast(int | None, _FrozenField("max_rounds"))
+    provider_weights = cast(
+        dict[str, float] | None, _FrozenField("provider_weights")
+    )
+    max_latency_ms = cast(int | None, _FrozenField("max_latency_ms"))
+    max_cost_usd = cast(float | None, _FrozenField("max_cost_usd"))
 
     def __init__(
         self,
