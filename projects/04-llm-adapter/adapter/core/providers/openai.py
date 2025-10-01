@@ -160,7 +160,9 @@ class OpenAIProvider(BaseProvider):
                 break
             except Exception as exc:  # pragma: no cover - 実行時エラーを保持して次のモードへ
                 normalized = _normalize_openai_exception(exc)
-                if isinstance(normalized, (RateLimitError, AuthError, TimeoutError, ProviderSkip)):
+                if isinstance(
+                    normalized, RateLimitError | AuthError | TimeoutError | ProviderSkip
+                ):
                     raise normalized from exc
                 last_error = normalized
                 last_cause = exc
