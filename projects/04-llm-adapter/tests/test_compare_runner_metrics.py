@@ -7,7 +7,7 @@ from adapter.core.budgets import BudgetBook, BudgetManager, BudgetRule
 from adapter.core.compare_runner_support import BudgetEvaluator, RunMetricsBuilder
 from adapter.core.config import ProviderConfig
 from adapter.core.datasets import GoldenTask
-from adapter.core.metrics import BudgetSnapshot, hash_text
+from adapter.core.metrics import BudgetSnapshot, RunMetrics, hash_text
 from adapter.core.models import (
     PricingConfig,
     QualityGatesConfig,
@@ -98,6 +98,36 @@ def test_run_metrics_builder_merges_eval_failures(
     assert run_metrics.output_hash == hash_text(provider_response.output_text)
     assert run_metrics.eval.len_tokens == provider_response.output_tokens
     assert output_text == provider_response.output_text
+
+
+def test_run_metrics_to_json_includes_cost_estimate() -> None:
+    metrics = RunMetrics(
+        ts="2024-01-01T00:00:00Z",
+        run_id="run",
+        provider="mock",
+        model="model",
+        mode="test",
+        prompt_id="prompt",
+        prompt_name="Prompt",
+        seed=0,
+        temperature=0.0,
+        top_p=1.0,
+        max_tokens=16,
+        input_tokens=8,
+        output_tokens=4,
+        latency_ms=10,
+        cost_usd=0.5,
+        status="ok",
+        failure_kind=None,
+        error_message=None,
+        output_text=None,
+        output_hash=None,
+    )
+
+    payload = metrics.to_json_dict()
+
+    assert payload["cost_usd"] == pytest.approx(0.5)
+    assert payload["cost_estimate"] == pytest.approx(0.5)
 
 
 def test_budget_evaluator_flags_budget_exceed(

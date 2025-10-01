@@ -6,6 +6,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, UTC
 import hashlib
+import math
 from statistics import median
 from typing import Any, Literal, Protocol, TYPE_CHECKING
 
@@ -111,11 +112,25 @@ class RunMetrics:
     eval: EvalMetrics = field(default_factory=EvalMetrics)
     budget: BudgetSnapshot = field(default_factory=lambda: BudgetSnapshot(0.0, False))
     ci_meta: Mapping[str, Any] = field(default_factory=dict)
+    cost_estimate: float = field(default=float("nan"))
 
     def to_json_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = asdict(self)
         payload["eval"] = {k: v for k, v in payload["eval"].items() if v is not None}
+        payload["cost_usd"] = float(self.cost_usd)
+        payload["cost_estimate"] = float(self.cost_estimate)
         return payload
+
+    def __post_init__(self) -> None:
+        cost_usd = float(self.cost_usd)
+        try:
+            estimate = float(self.cost_estimate)
+        except (TypeError, ValueError):
+            estimate = cost_usd
+        if math.isnan(estimate):
+            estimate = cost_usd
+        self.cost_usd = cost_usd
+        self.cost_estimate = estimate
 
 
 class ProviderCallResult(Protocol):
