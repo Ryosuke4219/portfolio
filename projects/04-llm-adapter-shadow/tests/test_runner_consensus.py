@@ -221,6 +221,48 @@ def test_max_rounds_exhausted_before_judge_round() -> None:
         )
 
 
+def test_constraints_filter_candidates_before_consensus() -> None:
+    observations = [
+        _observation("slow", "A", 45, cost_estimate=0.35),
+        _observation("fast-1", "B", 12, cost_estimate=0.05),
+        _observation("fast-2", "B", 14, cost_estimate=0.08),
+    ]
+    config = ConsensusConfig(strategy="majority", quorum=2)
+    object.__setattr__(config, "max_latency_ms", 20)
+    object.__setattr__(config, "max_cost_usd", 0.2)
+
+    result = compute_consensus(observations, config=config)
+
+    assert result.response.text == "B"
+    assert result.votes == 2
+    assert result.rounds == 1
+    assert result.tally["B"] == 2
+
+
+def test_constraints_exhaust_candidates_with_failures() -> None:
+    observations = [
+        _observation("slow", "A", 45, cost_estimate=0.35),
+        _observation("pricy", "B", 18, cost_estimate=0.5),
+        _observation("both", "C", 60, cost_estimate=0.45),
+    ]
+    config = ConsensusConfig(strategy="majority", quorum=2)
+    object.__setattr__(config, "max_latency_ms", 20)
+    object.__setattr__(config, "max_cost_usd", 0.2)
+
+    with pytest.raises(ParallelExecutionError) as excinfo:
+        compute_consensus(observations, config=config)
+
+    error = excinfo.value
+    assert isinstance(error, ParallelExecutionError)
+    assert str(error) == "no responses satisfied consensus constraints"
+    failures = error.failures
+    assert failures is not None
+    assert {entry["provider"] for entry in failures} == {"slow", "pricy", "both"}
+    summaries = {entry["summary"] for entry in failures}
+    assert any("latency" in summary for summary in summaries)
+    assert any("cost" in summary for summary in summaries)
+
+
 def test_weighted_vote_uses_provider_weights_and_srs_names() -> None:
     observations = [
         _observation(provider, text, latency, tokens_in=1, tokens_out=1)
