@@ -25,11 +25,11 @@ from .runner_shared import (
     resolve_rate_limiter,
 )
 from .runner_sync_invocation import (
+    _DEFAULT_RUN_WITH_SHADOW,
     CancelledResultsBuilder,
     ParallelResultLogger,
     ProviderInvocationResult,
     ProviderInvoker,
-    _DEFAULT_RUN_WITH_SHADOW,
 )
 from .runner_sync_modes import get_sync_strategy, SyncRunContext
 from .shadow import DEFAULT_METRICS_PATH
