@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover - RunnerMode 未導入環境向け
 
     class RunnerMode(str, Enum):
         SEQUENTIAL = "sequential"
-        PARALLEL_ANY = "parallel-any"
+        PARALLEL_ANY = "parallel_any"
         PARALLEL_ALL = "parallel-all"
         CONSENSUS = "consensus"
 from adapter.core.runner_execution import SingleRunResult
@@ -33,6 +33,9 @@ from adapter.core.runner_execution_parallel import (
     ParallelAttemptExecutor,
     ProviderFailureSummary,
 )
+
+
+PARALLEL_ANY_VALUE = RunnerMode.PARALLEL_ANY.value.replace("-", "_")
 
 
 class FakeParallelExecutionError(RuntimeError):
@@ -92,7 +95,7 @@ def _make_executor(run_single: Callable[..., SingleRunResult]) -> ParallelAttemp
             except BaseException as exc:  # noqa: BLE001
                 errors.append(exc)
                 continue
-        raise FakeParallelExecutionError("parallel-any failed") from (
+        raise FakeParallelExecutionError("parallel_any failed") from (
             errors[-1] if errors else None
         )
 
@@ -105,13 +108,19 @@ def _make_executor(run_single: Callable[..., SingleRunResult]) -> ParallelAttemp
     )
 
 
-def _make_metrics(provider: ProviderConfig, *, status: str, failure_kind: str | None, error_message: str | None) -> RunMetrics:
+def _make_metrics(
+    provider: ProviderConfig,
+    *,
+    status: str,
+    failure_kind: str | None,
+    error_message: str | None,
+) -> RunMetrics:
     return RunMetrics(
         ts="2024-01-01T00:00:00Z",
         run_id=f"run-{provider.provider}",
         provider=provider.provider,
         model=provider.model,
-        mode=RunnerMode.PARALLEL_ANY.value,
+        mode=PARALLEL_ANY_VALUE,
         prompt_id="prompt",
         prompt_name="prompt",
         seed=provider.seed,
@@ -149,7 +158,7 @@ def test_parallel_any_success_marks_failures_and_cancellations(tmp_path: Path) -
         _attempt: int,
         _mode: str,
     ) -> SingleRunResult:
-        assert _mode == RunnerMode.PARALLEL_ANY.value
+        assert _mode == PARALLEL_ANY_VALUE
         if config.provider == "failure":
             metrics = _make_metrics(
                 config,
@@ -219,7 +228,7 @@ def test_parallel_any_all_failures_raise_parallel_error(tmp_path: Path) -> None:
         _attempt: int,
         _mode: str,
     ) -> SingleRunResult:
-        assert _mode == RunnerMode.PARALLEL_ANY.value
+        assert _mode == PARALLEL_ANY_VALUE
         metrics = _make_metrics(
             config,
             status="error",
@@ -254,3 +263,45 @@ def test_parallel_any_all_failures_raise_parallel_error(tmp_path: Path) -> None:
     assert isinstance(error.batch, list)
     assert len(error.batch) == 2
     assert all(isinstance(result.metrics, RunMetrics) for _, result in error.batch)
+
+
+def test_parallel_any_mode_accepts_hyphen_compatibility(tmp_path: Path) -> None:
+    task = _make_task()
+    providers = [_make_provider_config(tmp_path, "winner")]
+
+    observed_modes: list[str] = []
+
+    def run_single(
+        config: ProviderConfig,
+        _provider: object,
+        _task: GoldenTask,
+        _attempt: int,
+        _mode: str,
+    ) -> SingleRunResult:
+        observed_modes.append(_mode)
+        metrics = _make_metrics(
+            config,
+            status="ok",
+            failure_kind=None,
+            error_message=None,
+        )
+        return SingleRunResult(
+            metrics=metrics,
+            raw_output="ok",
+            stop_reason="completed",
+        )
+
+    executor = _make_executor(run_single)
+    provider_pairs = [(cfg, cast(BaseProvider, object())) for cfg in providers]
+    config = RunnerConfig(mode="parallel-any")
+
+    batch, stop_reason = executor.run(
+        provider_pairs, task, attempt_index=0, config=config
+    )
+
+    assert observed_modes == [PARALLEL_ANY_VALUE]
+    assert stop_reason == "completed"
+    assert len(batch) == 1
+    index, result = batch[0]
+    assert index == 0
+    assert result.raw_output == "ok"

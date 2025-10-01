@@ -10,6 +10,7 @@ from .config import ProviderConfig
 from .datasets import GoldenTask
 from .parallel.coordinators import (
     _is_parallel_any_mode,
+    _normalize_mode_value,
     _ParallelAllCoordinator,
     _ParallelAnyCoordinator,
     _ParallelCoordinatorBase,
@@ -83,7 +84,8 @@ class ParallelAttemptExecutor:
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
             return [], None
-        if _is_parallel_any_mode(config.mode):
+        normalized_mode = _normalize_mode_value(config.mode)
+        if _is_parallel_any_mode(normalized_mode):
             coordinator: _ParallelCoordinatorBase = _ParallelAnyCoordinator(
                 self,
                 providers,

@@ -54,6 +54,11 @@ else:
     _BuildSummary = Callable[[int, ProviderConfig, object], ProviderFailureSummary]
 
 
+_PARALLEL_ANY_SNAKE = "parallel_any"
+_PARALLEL_ANY_LEGACY = "parallel-any"
+_PARALLEL_ANY_FAILED_MESSAGE = "parallel_any failed"
+
+
 class ParallelAnyState:
     def __init__(self, cancel_event: Event) -> None:
         self._cancel_event = cancel_event
@@ -103,7 +108,7 @@ class ParallelAnyState:
             summary = build_summary(index, provider_config, cast("SingleRunResult", result))
             self._failure_indices.add(index)
             self._failure_summaries.append(summary)
-        error = error_factory("parallel-any failed")
+        error = error_factory(_PARALLEL_ANY_FAILED_MESSAGE)
         error_any = cast(Any, error)
         error_any.failures = self._failure_summaries
         error_any.batch = [
@@ -128,6 +133,8 @@ def build_cancelled_result(
         mode_value = mode.value if isinstance(mode.value, str) else str(mode.value)
     else:
         mode_value = cast(str, mode)
+    if mode_value == _PARALLEL_ANY_LEGACY:
+        mode_value = _PARALLEL_ANY_SNAKE
 
     metrics = RunMetrics(
         ts=now_ts(),
