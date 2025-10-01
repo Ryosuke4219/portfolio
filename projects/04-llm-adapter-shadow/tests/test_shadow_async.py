@@ -69,6 +69,9 @@ async def test_run_with_shadow_async_success_records_metrics(tmp_path: Path) -> 
         metrics_path=metrics_path,
     )
 
+    if isinstance(response, tuple):
+        response, _ = response
+
     assert response.text == "primary"
     assert metrics_path.exists()
 
@@ -125,6 +128,9 @@ async def test_run_with_shadow_async_timeout_records_timeout(
         metrics_path=metrics_path,
     )
 
+    if isinstance(response, tuple):
+        response, _ = response
+
     assert response.text == "primary"
     assert metrics_path.exists()
 
@@ -160,6 +166,9 @@ async def test_run_with_shadow_async_records_shadow_error(tmp_path: Path) -> Non
         request,
         metrics_path=metrics_path,
     )
+
+    if isinstance(response, tuple):
+        response, _ = response
 
     assert response.text == "primary"
     assert metrics_path.exists()
