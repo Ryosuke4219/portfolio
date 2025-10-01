@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -42,6 +44,10 @@ from adapter.core.runner_execution import (  # noqa: E402
     ParallelExecutionError,
     RunnerExecution,
     SingleRunResult,
+)
+from adapter.core.runner_execution_parallel import (  # noqa: E402
+    ParallelAttemptExecutor,
+    ProviderFailureSummary,
 )
 from adapter.core.runners import CompareRunner  # noqa: E402
 
@@ -926,3 +932,123 @@ def test_run_metrics_records_error_type_and_attempts(
     assert flaky_attempts[2].status == "ok"
     assert flaky_attempts[2].error_type is None
     assert stable_attempts == [(1, None), (2, None)]
+
+
+def _run_parallel_all_sync(
+    workers: Sequence[Callable[[], int]], *, max_concurrency: int | None = None
+) -> list[int]:
+    return [worker() for worker in workers]
+
+
+def _run_parallel_any_sync(
+    workers: Sequence[Callable[[], int]], *, max_concurrency: int | None = None
+) -> int:
+    winner: int | None = None
+    last_error: BaseException | None = None
+    for worker in workers:
+        try:
+            idx = worker()
+        except BaseException as exc:  # noqa: BLE001
+            last_error = exc
+        else:
+            if winner is None:
+                winner = idx
+    if winner is not None:
+        return winner
+    raise RuntimeError("parallel-any failed") from last_error
+
+
+def _run_parallel_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> tuple[dict[int, SingleRunResult], list[ProviderFailureSummary], str]:
+    from adapter.core.runner_execution_parallel import ParallelAnyState
+
+    task = _make_task()
+    providers = [_make_provider_config(tmp_path, name=n, provider=n, model=n) for n in ("fail", "win", "tail")]
+    summaries: list[ProviderFailureSummary] = []
+    if mode == "parallel-any":
+        def _record(self: ParallelAnyState, index: int, summary: ProviderFailureSummary) -> None:
+            summaries.append(summary)
+            ParallelAnyState.register_failure(self, index, summary)
+
+        monkeypatch.setattr(
+            "adapter.core.runner_execution_parallel.ParallelAnyState",
+            type("RecordingState", (ParallelAnyState,), {"register_failure": _record}),
+        )
+    state_factory = sys.modules[
+        "adapter.core.runner_execution_parallel"
+    ].ParallelAnyState
+    behaviours: dict[str, dict[str, dict[str, object]]] = {
+        "parallel-any": {
+            "fail": {
+                "status": "error",
+                "failure_kind": "runtime",
+                "error_message": "boom",
+                "retries": 1,
+                "error": RuntimeError("boom"),
+                "backoff": True,
+            },
+            "win": {"stop": "completed"},
+            "tail": {},
+        },
+        "parallel-all": {
+            "fail": {},
+            "win": {"stop": "all-done"},
+            "tail": {},
+        },
+    }
+
+    def run_single(
+        config: ProviderConfig, _provider: object, _task: GoldenTask, _attempt: int, _mode: str
+    ) -> SingleRunResult:
+        metrics = _make_run_metrics(provider=config.provider, model=config.model, latency_ms=0, cost_usd=0.0)
+        data = behaviours[mode][config.provider]
+        status = data.get("status")
+        if isinstance(status, str):
+            metrics.status = status
+        failure_kind = data.get("failure_kind")
+        if isinstance(failure_kind, str):
+            metrics.failure_kind = failure_kind
+        message = data.get("error_message")
+        if isinstance(message, str):
+            metrics.error_message = message
+        retries = data.get("retries")
+        if isinstance(retries, int):
+            metrics.retries = retries
+        return SingleRunResult(
+            metrics=metrics,
+            raw_output=config.provider,
+            stop_reason=data.get("stop") if isinstance(data.get("stop"), str) else None,
+            error=data.get("error") if isinstance(data.get("error"), Exception) else None,
+            backoff_next_provider=bool(data.get("backoff", False)),
+        )
+
+    executor = ParallelAttemptExecutor(
+        run_single,
+        lambda total, limit: total,
+        run_parallel_all_sync=_run_parallel_all_sync,
+        run_parallel_any_sync=_run_parallel_any_sync,
+        parallel_execution_error=RuntimeError,
+        parallel_any_state_factory=state_factory,
+    )
+    batch, stop_reason = executor.run(
+        [(cfg, cast(BaseProvider, object())) for cfg in providers],
+        task,
+        attempt_index=0,
+        config=RunnerConfig(mode=mode),
+    )
+    return dict(batch), summaries, stop_reason
+
+
+@pytest.mark.parametrize(("mode", "expected_stop"), [("parallel-any", "completed"), ("parallel-all", "all-done")])
+def test_parallel_executor_parallel_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, expected_stop: str
+) -> None:
+    results, summaries, stop_reason = _run_parallel_case(tmp_path, monkeypatch, mode)
+    assert stop_reason == expected_stop
+    if mode == "parallel-any":
+        assert results[2].metrics.failure_kind == "cancelled"
+        assert summaries[0].backoff_next_provider is True
+        assert summaries[0].error_type == "RuntimeError"
+    else:
+        assert results[1].stop_reason == expected_stop
