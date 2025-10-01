@@ -100,6 +100,7 @@ class ParallelResultLogger:
     ) -> None:
         skipped = skip or ()
         attempts_map = dict(attempts_override or {})
+        fallback_attempts = max(attempts_map.values(), default=None)
         for result in results:
             if result is None:
                 continue
@@ -138,7 +139,11 @@ class ParallelResultLogger:
                     shadow_used=shadow_used,
                 )
                 result.provider_call_logged = True
-            attempts_value = attempts_map.get(result.attempt, result.attempt)
+            attempts_value = attempts_map.get(result.attempt)
+            if attempts_value is None and fallback_attempts is not None:
+                attempts_value = fallback_attempts
+            if attempts_value is None:
+                attempts_value = result.attempt
             self._log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,

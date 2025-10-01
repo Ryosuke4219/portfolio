@@ -122,6 +122,7 @@ class OllamaClient:
         payload: Mapping[str, object],
         *,
         timeout: float | None = None,
+        stream: bool | None = None,
     ) -> ResponseProtocol:
         stream = bool(payload.get("stream"))
         return self._ensure_success(
