@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from concurrent.futures import CancelledError
+from enum import Enum
 from threading import Event
-from typing import Protocol, TYPE_CHECKING
+from typing import Protocol, TYPE_CHECKING, cast
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
@@ -34,6 +35,16 @@ else:
         object,
     ]
 _StateFactory = Callable[[Event], ParallelAnyState]
+
+
+def _normalize_mode_value(mode: object) -> str:
+    if isinstance(mode, Enum):
+        return cast(str, mode.value)
+    return cast(str, mode)
+
+
+def _is_parallel_any_mode(mode: object) -> bool:
+    return _normalize_mode_value(mode) == "parallel-any"
 
 
 class _ParallelRunner(Protocol):
@@ -72,6 +83,7 @@ class _ParallelCoordinatorBase:
         self._results: list[SingleRunResult | None] = [None] * len(providers)
         self._stop_reason: str | None = None
         self._cancel_event = Event()
+        self._mode_value = _normalize_mode_value(config.mode)
 
     def execute(self) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         raise NotImplementedError
@@ -149,7 +161,7 @@ class _ParallelAllCoordinator(_ParallelCoordinatorBase):
                     provider,
                     self._task,
                     self._attempt_index,
-                    self._config.mode,
+                    self._mode_value,
                 )
                 self._results[index] = result
                 self._update_stop_reason(result)
@@ -213,7 +225,7 @@ class _ParallelAnyCoordinator(_ParallelCoordinatorBase):
                     provider,
                     self._task,
                     self._attempt_index,
-                    self._config.mode,
+                    self._mode_value,
                 )
                 should_cancel = self._state.should_cancel()
                 if result.metrics.status != "ok":
@@ -294,7 +306,7 @@ class ParallelAttemptExecutor:
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
             return [], None
-        if config.mode == "parallel-any":
+        if _is_parallel_any_mode(config.mode):
             coordinator: _ParallelCoordinatorBase = _ParallelAnyCoordinator(
                 self,
                 providers,
