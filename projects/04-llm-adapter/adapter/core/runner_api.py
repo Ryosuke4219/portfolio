@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
+from enum import Enum
 import inspect
 import logging
 from pathlib import Path
-from typing import cast, Literal, Protocol, TYPE_CHECKING
+from typing import cast, Protocol, TYPE_CHECKING
 
 from .budgets import BudgetManager
 from .config import (
@@ -34,18 +35,16 @@ class BackoffPolicy:
     timeout_next_provider: bool = False
     retryable_next_provider: bool = False
 
-Mode = Literal["sequential", "parallel-any", "parallel-all", "consensus"]
+class RunnerMode(str, Enum):
+    SEQUENTIAL = "sequential"
+    PARALLEL_ANY = "parallel-any"
+    PARALLEL_ALL = "parallel-all"
+    CONSENSUS = "consensus"
 
-_MODE_CHOICES: tuple[Mode, ...] = (
-    "sequential",
-    "parallel-any",
-    "parallel-all",
-    "consensus",
-)
 
-_MODE_ALIASES: dict[str, Mode] = {
-    "parallel": "parallel-any",
-    "serial": "sequential",
+_MODE_ALIASES: dict[str, RunnerMode] = {
+    "parallel": RunnerMode.PARALLEL_ANY,
+    "serial": RunnerMode.SEQUENTIAL,
 }
 
 
@@ -53,7 +52,7 @@ _MODE_ALIASES: dict[str, Mode] = {
 class RunnerConfig:
     """ランナーの制御パラメータ."""
 
-    mode: Mode
+    mode: RunnerMode | str
     aggregate: str | None = None
     quorum: int | None = None
     tie_breaker: str | None = None
@@ -67,6 +66,9 @@ class RunnerConfig:
     shadow_provider: ProviderSPI | None = None
     metrics_path: Path | None = None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "mode", _normalize_mode(self.mode))
+
 
 def default_budgets_path() -> Path:
     return Path(__file__).resolve().parent.parent / "config" / "budgets.yaml"
@@ -76,15 +78,17 @@ def default_metrics_path() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "data" / "runs-metrics.jsonl"
 
 
-def _normalize_mode(value: Mode | str) -> Mode:
-    candidate: str
-    if isinstance(value, str):
-        candidate = _MODE_ALIASES.get(value, value)
-    else:
-        candidate = value
-    if candidate not in _MODE_CHOICES:
-        raise ValueError(f"unknown mode: {value}")
-    return cast(Mode, candidate)
+def _normalize_mode(value: RunnerMode | str) -> RunnerMode:
+    if isinstance(value, RunnerMode):
+        return value
+    candidate = value.strip().lower().replace("_", "-")
+    alias = _MODE_ALIASES.get(candidate)
+    if alias is not None:
+        return alias
+    try:
+        return RunnerMode(candidate)
+    except ValueError as exc:  # pragma: no cover - defensive
+        raise ValueError(f"unknown mode: {value}") from exc
 
 
 def _sanitize_positive_int(value: int | None) -> int | None:
@@ -119,7 +123,7 @@ def run_compare(
     budgets_path: Path,
     metrics_path: Path,
     repeat: int = 1,
-    mode: Mode | str = "sequential",
+    mode: RunnerMode | str = RunnerMode.SEQUENTIAL,
     allow_overrun: bool = False,
     log_level: str = "INFO",
     aggregate: str | None = None,
@@ -252,7 +256,7 @@ def run_batch(provider_specs: Iterable[str], prompts_path: str) -> int:
         budgets_path=default_budgets_path(),
         metrics_path=default_metrics_path(),
         repeat=1,
-        mode="parallel-any",
+        mode=RunnerMode.PARALLEL_ANY,
         allow_overrun=False,
         log_level="INFO",
     )
@@ -260,7 +264,7 @@ def run_batch(provider_specs: Iterable[str], prompts_path: str) -> int:
 
 __all__ = [
     "BackoffPolicy",
-    "Mode",
+    "RunnerMode",
     "RunnerConfig",
     "default_budgets_path",
     "default_metrics_path",
