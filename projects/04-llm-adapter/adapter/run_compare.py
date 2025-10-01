@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from enum import Enum
 from pathlib import Path
 
 try:
@@ -13,6 +14,22 @@ except ImportError:  # pragma: no cover - 直接実行時のフォールバッ�
     if str(PACKAGE_ROOT) not in sys.path:
         sys.path.insert(0, str(PACKAGE_ROOT))
     from adapter.core import runner_api
+
+
+class RunnerMode(str, Enum):
+    """比較ランナーの実行モード."""
+
+    SEQUENTIAL = "sequential"
+    PARALLEL_ANY = "parallel-any"
+    PARALLEL_ALL = "parallel-all"
+    CONSENSUS = "consensus"
+
+    @classmethod
+    def from_raw(cls, raw: str) -> "RunnerMode":
+        """CLI から渡された値を RunnerMode に変換する."""
+
+        candidate = raw.strip().lower().replace("_", "-")
+        return cls(candidate)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -35,7 +52,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=["sequential", "parallel-any", "parallel-all", "consensus"],
+        choices=[mode.value for mode in RunnerMode],
         default="sequential",
         help="比較実行モード",
     )
@@ -187,13 +204,15 @@ def main() -> int:
     elif provider_weights is not None:
         raise SystemExit("--weights は aggregate=weighted_vote のときのみ利用できます")
 
+    mode = RunnerMode.from_raw(args.mode)
+
     return runner_api.run_compare(
         provider_paths,
         prompt_path,
         budgets_path=budgets_path,
         metrics_path=metrics_path,
         repeat=args.repeat,
-        mode=args.mode,
+        mode=mode,
         allow_overrun=args.allow_overrun,
         log_level=args.log_level,
         aggregate=aggregate_value,
