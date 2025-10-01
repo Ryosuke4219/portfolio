@@ -2,9 +2,9 @@ from __future__ import annotations
 
 # ruff: noqa: I001
 
+import sys
 import importlib
 from pathlib import Path
-import sys
 
 import pytest
 
@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+metrics_mod = importlib.import_module("adapter.core.metrics")
 data_mod = importlib.import_module("tools.report.metrics.data")
 regression_mod = importlib.import_module("tools.report.metrics.regression_summary")
 weekly_mod = importlib.import_module("tools.report.metrics.weekly_summary")
@@ -30,6 +31,7 @@ def test_compute_overview_and_comparison_table() -> None:
             "prompt_id": "p1",
             "latency_ms": 100,
             "cost_usd": 0.2,
+            "cost_estimate": 0.2,
             "status": "ok",
             "eval": {"diff_rate": 0.1},
         },
@@ -39,6 +41,7 @@ def test_compute_overview_and_comparison_table() -> None:
             "prompt_id": "p1",
             "latency_ms": 300,
             "cost_usd": 0.4,
+            "cost_estimate": 0.4,
             "status": "error",
             "eval": {"diff_rate": 0.3},
         },
@@ -143,3 +146,58 @@ def test_build_regression_summary_handles_missing_baseline(
     metrics: list[dict[str, object]] = []
     actual = regression_mod.build_regression_summary(metrics, golden_dir)
     assert expected in actual
+
+
+def test_run_metrics_to_json_dict_includes_cost_estimate() -> None:
+    run = metrics_mod.RunMetrics(
+        ts="2024-01-01T00:00:00Z",
+        run_id="run-1",
+        provider="openai",
+        model="gpt-4",
+        mode="chat",
+        prompt_id="prompt-1",
+        prompt_name="Sample",
+        seed=42,
+        temperature=0.1,
+        top_p=1.0,
+        max_tokens=256,
+        input_tokens=128,
+        output_tokens=64,
+        latency_ms=1234,
+        cost_usd=0.5,
+        status="ok",
+        failure_kind=None,
+        error_message=None,
+        output_text="Hello",
+        output_hash="deadbeef",
+    )
+    payload = run.to_json_dict()
+    assert payload["cost_usd"] == pytest.approx(0.5)
+    assert payload["cost_estimate"] == pytest.approx(0.5)
+
+    run_with_estimate = metrics_mod.RunMetrics(
+        ts="2024-01-01T00:00:00Z",
+        run_id="run-2",
+        provider="openai",
+        model="gpt-4",
+        mode="chat",
+        prompt_id="prompt-1",
+        prompt_name="Sample",
+        seed=42,
+        temperature=0.1,
+        top_p=1.0,
+        max_tokens=256,
+        input_tokens=128,
+        output_tokens=64,
+        latency_ms=1234,
+        cost_usd=0.5,
+        cost_estimate=0.75,
+        status="ok",
+        failure_kind=None,
+        error_message=None,
+        output_text="Hello",
+        output_hash="deadbeef",
+    )
+    payload_with_estimate = run_with_estimate.to_json_dict()
+    assert payload_with_estimate["cost_usd"] == pytest.approx(0.5)
+    assert payload_with_estimate["cost_estimate"] == pytest.approx(0.75)
