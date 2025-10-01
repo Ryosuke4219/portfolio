@@ -56,8 +56,19 @@ class FakeResponse:
 
 
 class FakeSession:
+    class _CallRecorder(list[tuple[str, dict[str, Any] | None, bool]]):
+        def __init__(self, session: "FakeSession") -> None:
+            super().__init__()
+            self._session = session
+
+        def append(self, call: tuple[str, dict[str, Any] | None, bool]) -> None:
+            _, _, stream = call
+            self._session.last_stream = stream
+            super().append(call)
+
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, Any] | None, bool]] = []
+        self.last_stream: bool | None = None
+        self.calls: list[tuple[str, dict[str, Any] | None, bool]] = self._CallRecorder(self)
         self._show_calls = 0
 
     def post(
