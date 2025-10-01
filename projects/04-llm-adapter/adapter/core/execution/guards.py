@@ -5,6 +5,10 @@ import json
 from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
+from typing import Any
+
+from jsonschema import exceptions as jsonschema_exceptions
+from jsonschema import validators
 
 
 class _TokenBucket:
@@ -35,23 +39,29 @@ class _TokenBucket:
 
 class _SchemaValidator:
     def __init__(self, schema_path: Path | None) -> None:
-        self.schema: dict[str, object] | None = None
+        self.schema: dict[str, Any] | None = None
+        self._validator: validators.Validator | None = None
         if schema_path and schema_path.exists():
             with schema_path.open("r", encoding="utf-8") as fp:
-                self.schema = json.load(fp)
+                loaded = json.load(fp)
+            if isinstance(loaded, dict):
+                self.schema = loaded
+                validator_cls = validators.validator_for(loaded)
+                validator_cls.check_schema(loaded)
+                self._validator = validator_cls(loaded)
 
     def validate(self, payload: str) -> None:
-        if self.schema is None or not payload.strip():
+        if self._validator is None or not payload.strip():
             return
         data = json.loads(payload)
-        required = self.schema.get("required") if isinstance(self.schema, dict) else None
-        if isinstance(required, list):
-            missing = [field for field in required if field not in data]
-            if missing:
-                raise ValueError(f"missing required fields: {', '.join(missing)}")
-        expected_type = self.schema.get("type") if isinstance(self.schema, dict) else None
-        if expected_type == "object" and not isinstance(data, dict):
-            raise ValueError("schema type mismatch: expected object")
+        try:
+            self._validator.validate(data)
+        except jsonschema_exceptions.ValidationError as exc:
+            path = " -> ".join(str(segment) for segment in exc.path)
+            message = exc.message if exc.message else str(exc)
+            if path:
+                message = f"{message} (at {path})"
+            raise ValueError(message) from None
 
 
 __all__ = ["_TokenBucket", "_SchemaValidator"]
