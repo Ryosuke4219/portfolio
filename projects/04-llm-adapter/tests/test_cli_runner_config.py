@@ -8,6 +8,7 @@ import pytest
 from adapter.cli import doctor
 from adapter.core import runner_api
 import adapter.run_compare as run_compare_module
+from adapter.run_compare import RunnerMode
 
 
 def test_parse_args_accepts_aggregate_alias(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -74,6 +75,7 @@ def test_cli_main_passes_parallel_flags(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert forwarded["aggregate"] == "weighted_vote"
     assert forwarded["tie_breaker"] == "min_cost"
     assert forwarded["provider_weights"] == {"openai": 1.5, "anthropic": 0.5}
+    assert forwarded["mode"] is RunnerMode.PARALLEL_ANY
 
 
 def test_run_compare_sanitizes_runner_config(
