@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import time
-from typing import TYPE_CHECKING, NoReturn, Protocol, cast
+from typing import cast, NoReturn, Protocol, TYPE_CHECKING
 
 from .errors import (
     AllFailedError,
@@ -175,7 +175,7 @@ class _SequentialRunTracker:
             }
         )
         if isinstance(error, FatalError):
-            if isinstance(error, (AuthError, ConfigError)):
+            if isinstance(error, AuthError | ConfigError):
                 if self._event_logger is not None:
                     self._event_logger.emit(
                         "provider_fallback",
@@ -202,7 +202,7 @@ class _SequentialRunTracker:
             if self._config.backoff.retryable_next_provider:
                 return
             raise error
-        if isinstance(error, (SkipError, ProviderSkip)):
+        if isinstance(error, SkipError | ProviderSkip):
             return
         raise error
 
