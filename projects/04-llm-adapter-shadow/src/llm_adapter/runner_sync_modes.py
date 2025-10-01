@@ -1,10 +1,9 @@
 """Synchronous runner strategy implementations."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import cast, Protocol, TYPE_CHECKING
 
 from .observability import EventLogger
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
@@ -12,11 +11,11 @@ from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .runner_config import RunnerMode
 from .runner_shared import MetricsPath
 from .runner_sync_parallel_any import (
-    ParallelAnyCallable,
-    ParallelAnyStrategy,
     _collect_parallel_failures,
     _limited_providers,
     _raise_no_attempts,
+    ParallelAnyCallable,
+    ParallelAnyStrategy,
 )
 from .runner_sync_sequential import SequentialStrategy
 
