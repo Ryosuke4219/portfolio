@@ -123,6 +123,7 @@ def test_ollama_provider_merges_request_options() -> None:
             timeout: float | None = None,
         ) -> FakeResponse:
             self.calls.append((url, json, stream))
+            self.last_stream = stream
             if url.endswith("/api/show"):
                 return FakeResponse(status_code=200, payload={})
             if url.endswith("/api/chat"):
@@ -157,6 +158,7 @@ def test_ollama_provider_merges_request_options() -> None:
     assert chat_payload is not None
     assert chat_payload["stream"] is True
     assert chat_payload["model"] == "gemma3"
+    assert getattr(session, "last_stream", None) is True
     options_payload = chat_payload["options"]
     assert options_payload["num_predict"] == 32
     assert options_payload["temperature"] == pytest.approx(0.4)

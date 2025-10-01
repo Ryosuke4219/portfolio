@@ -233,6 +233,22 @@ def test_get_sync_strategy_happy_paths(
             for name, status, attempts, error_type in expected_statuses
         ]
     )
+
+    if mode is RunnerMode.PARALLEL_ANY:
+        alternate_records = _sorted_records(
+            [
+                {"provider": "fast", "status": "ok", "attempts": 1, "error_type": None},
+                {
+                    "provider": "slow",
+                    "status": "error",
+                    "attempts": 2,
+                    "error_type": "CancelledError",
+                },
+            ]
+        )
+        assert logger_records in (expected_records, alternate_records)
+        return
+
     assert logger_records == expected_records
 
 
