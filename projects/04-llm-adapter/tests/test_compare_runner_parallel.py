@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from enum import Enum
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -40,11 +41,8 @@ from adapter.core.providers import (  # noqa: E402
     ProviderResponse,
 )
 from adapter.core.runner_api import RunnerConfig  # noqa: E402
-from adapter.core.runner_execution import (  # noqa: E402
-    ParallelExecutionError,
-    RunnerExecution,
-    SingleRunResult,
-)
+from adapter.core import errors  # noqa: E402
+from adapter.core.runner_execution import RunnerExecution, SingleRunResult  # noqa: E402
 from adapter.core.runner_execution_parallel import (  # noqa: E402
     ParallelAttemptExecutor,
     ProviderFailureSummary,
@@ -540,7 +538,7 @@ def test_parallel_any_failure_summary_includes_all_failures(
         tmp_path / "metrics_failure_summary.jsonl",
     )
 
-    with pytest.raises(ParallelExecutionError) as exc_info:
+    with pytest.raises(errors.ParallelExecutionError) as exc_info:
         runner.run(repeat=1, config=RunnerConfig(mode="parallel-any", max_concurrency=2))
 
     failures = getattr(exc_info.value, "failures", ())
@@ -1052,3 +1050,70 @@ def test_parallel_executor_parallel_modes(
         assert summaries[0].error_type == "RuntimeError"
     else:
         assert results[1].stop_reason == expected_stop
+class _RunnerMode(str, Enum):
+    SEQUENTIAL = "sequential"
+    PARALLEL_ANY = "parallel-any"
+    PARALLEL_ALL = "parallel-all"
+    CONSENSUS = "consensus"
+
+
+def test_compare_runner_normalizes_enum_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provider_config = _make_provider_config(
+        tmp_path, name="p1", provider="p1", model="m1"
+    )
+    runner = CompareRunner(
+        provider_configs=[provider_config],
+        tasks=[_make_task()],
+        budget_manager=_make_budget_manager(),
+        metrics_path=tmp_path / "metrics.jsonl",
+    )
+    config = RunnerConfig(mode=_RunnerMode.PARALLEL_ANY)
+    captured = SimpleNamespace(aggregation=[], logs=[])
+
+    def fake_apply(
+        *,
+        mode: str,
+        config: RunnerConfig,
+        batch: Sequence[tuple[int, SingleRunResult]],
+        default_judge_config: ProviderConfig | None,
+    ) -> None:
+        captured.aggregation.append(mode)
+
+    monkeypatch.setattr(runner._aggregation, "apply", fake_apply)
+
+    def fake_log(mode: str, failures: Sequence[object]) -> None:
+        captured.logs.append(mode)
+
+    monkeypatch.setattr(runner, "_log_attempt_failures", fake_log)
+
+    expected_error = getattr(errors, "ParallelExecutionError")
+
+    def fake_run_tasks(
+        *,
+        aggregation_apply: Callable[..., None],
+        record_failed_batch: Callable[..., None],
+        log_attempt_failures: Callable[[object, Sequence[object]], None],
+        parallel_execution_error: type[Exception],
+        **_: object,
+    ) -> list[RunMetrics]:
+        aggregation_apply(
+            mode=config.mode,
+            config=config,
+            batch=[],
+            default_judge_config=None,
+        )
+        record_failed_batch([], config, [[]])
+        log_attempt_failures(config.mode, [SimpleNamespace(status="error")])
+        assert parallel_execution_error is expected_error
+        return []
+
+    monkeypatch.setattr("adapter.core.runners.run_tasks", fake_run_tasks)
+
+    results = runner.run(repeat=1, config=config)
+
+    assert results == []
+    assert captured.aggregation == ["parallel-any", "parallel-any"]
+    assert captured.logs == ["parallel-any"]
+

@@ -2,22 +2,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from enum import Enum
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.parallel_exec import ParallelExecutionError
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.parallel_exec import (  # type: ignore[import-not-found]
-            ParallelExecutionError,
-        )
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-        class ParallelExecutionError(RuntimeError):
-            """並列実行失敗のフォールバック."""
-
-
+from . import errors as core_errors
 from .aggregation_controller import AggregationController
 from .budgets import BudgetManager
 from .compare_runner_finalizer import TaskFinalizer
@@ -34,10 +24,22 @@ from .providers import BaseProvider, ProviderResponse
 from .runner_execution import (
     _SchemaValidator,
     _TokenBucket,
+    ParallelExecutionError as ExecutionParallelExecutionError,
     run_parallel_any_sync,
     RunnerExecution,
     SingleRunResult,
 )
+
+ParallelExecutionError = cast(
+    type[Exception],
+    getattr(
+        core_errors,
+        "ParallelExecutionError",
+        ExecutionParallelExecutionError,
+    ),
+)
+if not hasattr(core_errors, "ParallelExecutionError"):
+    setattr(core_errors, "ParallelExecutionError", ParallelExecutionError)
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
@@ -137,11 +139,11 @@ class CompareRunner:
             repeat=repeat,
             config=config,
             execution=execution,
-            aggregation_apply=self._aggregation.apply,
+            aggregation_apply=self._apply_aggregation,
             finalize_task=self._task_finalizer.finalize_task,
             judge_provider_config=self._judge_provider_config,
             record_failed_batch=self._record_failed_batch,
-            log_attempt_failures=self._log_attempt_failures,
+            log_attempt_failures=self._log_attempt_failures_with_mode,
             parallel_execution_error=ParallelExecutionError,
         )
 
@@ -151,7 +153,7 @@ class CompareRunner:
         config: RunnerConfig,
         histories: list[list[SingleRunResult]],
     ) -> None:
-        self._aggregation.apply(
+        self._apply_aggregation(
             mode=config.mode,
             config=config,
             batch=batch,
@@ -159,6 +161,11 @@ class CompareRunner:
         )
         for index, result in batch:
             histories[index].append(result)
+
+    def _log_attempt_failures_with_mode(
+        self, mode: object, failures: Sequence[object]
+    ) -> None:
+        self._log_attempt_failures(self._mode_value(mode), failures)
 
     def _log_attempt_failures(self, mode: str, failures: Sequence[object]) -> None:
         if not failures:
@@ -200,6 +207,28 @@ class CompareRunner:
         if limit is None or limit <= 0:
             return total
         return max(1, min(total, limit))
+
+    @staticmethod
+    def _mode_value(mode: object) -> str:
+        if isinstance(mode, Enum):
+            return str(mode.value)
+        return str(mode)
+
+    def _apply_aggregation(
+        self,
+        *,
+        mode: object,
+        config: RunnerConfig,
+        batch: Sequence[tuple[int, SingleRunResult]],
+        default_judge_config: ProviderConfig | None,
+    ) -> None:
+        normalized = self._mode_value(mode)
+        self._aggregation.apply(
+            mode=normalized,
+            config=config,
+            batch=batch,
+            default_judge_config=default_judge_config,
+        )
 
 
 
