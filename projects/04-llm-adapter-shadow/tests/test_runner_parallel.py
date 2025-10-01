@@ -5,6 +5,7 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 import json
 from pathlib import Path
+import threading
 import time
 from typing import Any, cast
 
@@ -156,6 +157,53 @@ def _worker_for(
         return provider.invoke(request)
 
     return _invoke
+
+
+def test_run_parallel_any_sync_cancels_pending_futures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created = _install_recording_executor(monkeypatch)
+    assert created == []
+
+    cancelled_futures: set[Future[Any]] = set()
+    original_cancel = Future.cancel
+
+    def _tracking_cancel(self: Future[Any]) -> bool:
+        cancelled_futures.add(self)
+        return original_cancel(self)
+
+    monkeypatch.setattr(Future, "cancel", _tracking_cancel, raising=False)
+
+    slow_gate = threading.Event()
+
+    def _slow_worker(name: str) -> str:
+        slow_gate.wait(timeout=0.25)
+        return name
+
+    def _fast_worker() -> str:
+        return "fast"
+
+    cancelled_indices: list[Sequence[int]] = []
+
+    result = run_parallel_any_sync(
+        (
+            lambda: _slow_worker("slow-1"),
+            _fast_worker,
+            lambda: _slow_worker("slow-2"),
+        ),
+        on_cancelled=lambda indices: cancelled_indices.append(tuple(indices)),
+    )
+
+    assert result == "fast"
+    assert cancelled_indices == [tuple(sorted((0, 2)))]
+    assert len(created) == 1
+    executor = created[0]
+    assert len(executor.submitted) == 3
+    assert executor.submitted[0] in cancelled_futures
+    assert executor.submitted[1] not in cancelled_futures
+    assert executor.submitted[2] in cancelled_futures
+
+    slow_gate.set()
 
 
 def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
