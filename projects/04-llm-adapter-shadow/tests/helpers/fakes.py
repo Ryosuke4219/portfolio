@@ -57,7 +57,7 @@ class FakeResponse:
 
 class FakeSession:
     class _CallRecorder(list[tuple[str, dict[str, Any] | None, bool]]):
-        def __init__(self, session: "FakeSession") -> None:
+        def __init__(self, session: FakeSession) -> None:
             super().__init__()
             self._session = session
 
