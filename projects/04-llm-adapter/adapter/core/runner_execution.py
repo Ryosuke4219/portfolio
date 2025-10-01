@@ -1,4 +1,5 @@
 """CompareRunner の実行責務と実行戦略を提供するユーティリティ。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -6,7 +7,7 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 from time import perf_counter, sleep
-from typing import Literal, Protocol, TYPE_CHECKING, TypeVar
+from typing import Protocol, TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.parallel_exec import (
@@ -67,8 +68,8 @@ from .errors import (
     TimeoutError,
 )
 from .execution.guards import _SchemaValidator, _TokenBucket
-from .execution.shadow_runner import ShadowRunner, ShadowRunnerResult
-from .metrics import BudgetSnapshot, estimate_cost, RunMetrics
+from .execution.shadow_runner import ShadowRunner
+from .metrics import BudgetSnapshot, estimate_cost, finalize_run_metrics, RunMetrics
 from .providers import BaseProvider, ProviderResponse
 
 LOGGER = logging.getLogger(__name__)
@@ -259,17 +260,19 @@ class RunnerExecution:
             cost_usd,
         )
         shadow_result = shadow_runner.finalize()
-        self._finalize_run_metrics(
+        finalize_run_metrics(
             run_metrics,
-            attempt_index,
-            provider_result,
-            response,
-            status,
-            failure_kind,
-            error_message,
-            schema_error,
-            shadow_result,
-            shadow_runner.provider_id,
+            attempt_index=attempt_index,
+            provider_result=provider_result,
+            response=response,
+            status=status,
+            failure_kind=failure_kind,
+            error_message=error_message,
+            schema_error=schema_error,
+            shadow_result=shadow_result,
+            fallback_shadow_id=shadow_runner.provider_id,
+            active_provider_ids=self._active_provider_ids,
+            current_attempt_index=self._current_attempt_index,
         )
         return self._build_single_run_result(
             run_metrics,
@@ -300,68 +303,6 @@ class RunnerExecution:
                 f"{error_message} | {schema_error}" if error_message else schema_error
             )
         return status, failure_kind, error_message, schema_error
-
-    def _finalize_run_metrics(
-        self,
-        run_metrics: RunMetrics,
-        attempt_index: int,
-        provider_result: _ProviderCallResult,
-        response: ProviderResponse,
-        status: str,
-        failure_kind: str | None,
-        error_message: str | None,
-        schema_error: str | None,
-        shadow_result: ShadowRunnerResult | None,
-        fallback_shadow_id: str | None,
-    ) -> None:
-        provider_ids: list[str] = []
-        for provider_id in self._active_provider_ids:
-            if provider_id not in provider_ids:
-                provider_ids.append(provider_id)
-        run_metrics.providers = provider_ids
-        usage = response.token_usage
-        prompt_tokens = int(getattr(usage, "prompt", response.input_tokens))
-        completion_tokens = int(getattr(usage, "completion", response.output_tokens))
-        total_tokens = int(getattr(usage, "total", prompt_tokens + completion_tokens))
-        run_metrics.token_usage = {
-            "prompt": prompt_tokens,
-            "completion": completion_tokens,
-            "total": total_tokens,
-        }
-        run_metrics.attempts = attempt_index + 1
-        run_metrics.error_type = (
-            type(provider_result.error).__name__ if provider_result.error else None
-        )
-        run_metrics.retries = max(self._current_attempt_index, 0) + max(
-            provider_result.retries - 1, 0
-        )
-        if schema_error:
-            run_metrics.status = status
-            run_metrics.failure_kind = failure_kind
-            run_metrics.error_message = error_message
-        run_metrics.outcome = self._resolve_outcome(run_metrics.status)
-        self._apply_shadow_metrics(run_metrics, shadow_result, fallback_shadow_id)
-
-    def _apply_shadow_metrics(
-        self,
-        run_metrics: RunMetrics,
-        shadow_result: ShadowRunnerResult | None,
-        fallback_shadow_id: str | None,
-    ) -> None:
-        if shadow_result is None:
-            if fallback_shadow_id is not None:
-                run_metrics.shadow_provider_id = fallback_shadow_id
-            return
-        provider_id = shadow_result.provider_id or fallback_shadow_id
-        if provider_id is not None:
-            run_metrics.shadow_provider_id = provider_id
-        if shadow_result.latency_ms is not None:
-            run_metrics.shadow_latency_ms = int(shadow_result.latency_ms)
-        if shadow_result.status is not None:
-            run_metrics.shadow_status = shadow_result.status
-            run_metrics.shadow_outcome = self._resolve_outcome(shadow_result.status)
-        if shadow_result.error_message is not None:
-            run_metrics.shadow_error_message = shadow_result.error_message
 
     @staticmethod
     def _build_single_run_result(
@@ -570,15 +511,6 @@ class RunnerExecution:
             latency_ms=latency_ms,
             retries=1,
         )
-
-    @staticmethod
-    def _resolve_outcome(status: str) -> Literal["success", "skip", "error"]:
-        if status == "ok":
-            return "success"
-        if status == "skip":
-            return "skip"
-        return "error"
-
 
 __all__ = [
     "RunnerExecution",

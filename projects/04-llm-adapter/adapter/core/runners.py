@@ -29,7 +29,7 @@ from .compare_runner_support import (
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .execution.compare_task_runner import run_tasks
-from .metrics import RunMetrics
+from .metrics import BudgetSnapshot, RunMetrics
 from .providers import BaseProvider, ProviderResponse
 from .runner_execution import (
     _SchemaValidator,
@@ -190,8 +190,63 @@ class CompareRunner:
             evaluate_budget=self._budget_evaluator.evaluate,
             build_metrics=self._metrics_builder.build,
             normalize_concurrency=self._normalize_concurrency,
+            backoff=self._backoff,
+            shadow_provider=self._shadow_provider,
+            metrics_path=self.metrics_path,
+            provider_weights=self._provider_weights,
         )
-        return execution._run_provider_call(provider_config, provider, prompt)
+        result = execution._run_provider_call(provider_config, provider, prompt)
+        return (
+            result.response,
+            result.status,
+            result.failure_kind,
+            result.error_message,
+            result.latency_ms,
+        )
+
+    def _evaluate_budget(
+        self,
+        provider_config: ProviderConfig,
+        cost_usd: float,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+    ) -> tuple[BudgetSnapshot, str | None, str, str | None, str | None]:
+        return self._budget_evaluator.evaluate(
+            provider_config,
+            cost_usd,
+            status,
+            failure_kind,
+            error_message,
+        )
+
+    def _build_metrics(
+        self,
+        provider_config: ProviderConfig,
+        task: GoldenTask,
+        attempt_index: int,
+        mode: str,
+        response: ProviderResponse,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+        latency_ms: int,
+        budget_snapshot: BudgetSnapshot,
+        cost_usd: float,
+    ) -> tuple[RunMetrics, str]:
+        return self._metrics_builder.build(
+            provider_config,
+            task,
+            attempt_index,
+            mode,
+            response,
+            status,
+            failure_kind,
+            error_message,
+            latency_ms,
+            budget_snapshot,
+            cost_usd,
+        )
 
     @staticmethod
     def _normalize_concurrency(total: int, limit: int | None) -> int:
