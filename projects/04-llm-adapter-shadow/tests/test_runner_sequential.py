@@ -9,8 +9,7 @@ from src.llm_adapter.errors import AllFailedError, AuthError, TimeoutError
 from src.llm_adapter.observability import EventLogger
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.runner_config import RunnerConfig
-from src.llm_adapter.runner_sync import Runner
-from src.llm_adapter.runner_sync import ProviderInvocationResult
+from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 from src.llm_adapter.runner_sync_modes import SequentialStrategy, SyncRunContext
 
 
