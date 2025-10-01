@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-import logging
 from enum import Enum
+import logging
 from typing import Any, TYPE_CHECKING
 
 from ..config import ProviderConfig
