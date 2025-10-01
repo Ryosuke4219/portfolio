@@ -5,8 +5,16 @@ from __future__ import annotations
 import argparse
 from collections.abc import Iterable
 from pathlib import Path
+import sys
 
-from ci_metrics import load_run_history
+try:
+    from tools.ci_metrics import load_run_history
+except ModuleNotFoundError:  # pragma: no cover - fallback for direct execution
+    REPO_ROOT = Path(__file__).resolve().parents[1]
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+
+    from tools.ci_metrics import load_run_history
 
 WIDTH = 960
 HEIGHT = 540
