@@ -21,7 +21,7 @@ from adapter.core.aggregation import (  # noqa: E402
 from adapter.core.aggregation_controller import AggregationController  # noqa: E402
 from adapter.core.budgets import BudgetManager  # noqa: E402
 from adapter.core.datasets import GoldenTask  # noqa: E402
-from adapter.core.errors import ProviderSkip, TimeoutError  # noqa: E402
+from adapter.core.errors import ProviderSkip, RateLimitError, TimeoutError  # noqa: E402
 from adapter.core.metrics import BudgetSnapshot, RunMetrics  # noqa: E402
 from adapter.core.models import (  # noqa: E402
     BudgetBook,
@@ -37,7 +37,7 @@ from adapter.core.providers import (  # noqa: E402
     ProviderFactory,
     ProviderResponse,
 )
-from adapter.core.runner_api import RunnerConfig  # noqa: E402
+from adapter.core.runner_api import BackoffPolicy, RunnerConfig  # noqa: E402
 from adapter.core.runner_execution import (  # noqa: E402
     ParallelExecutionError,
     RunnerExecution,
@@ -145,6 +145,44 @@ def test_majority_vote_normalizes_text_variants() -> None:
     assert result.chosen.index == 0
     assert result.metadata == {"bucket_size": 2}
     assert result.tie_breaker_used == "first"
+
+
+def test_runner_execution_provider_backoff(tmp_path: Path) -> None:
+    provider_config = _make_provider_config(tmp_path, name="p", provider="p", model="m")
+    class DummyProvider(BaseProvider):
+        def __init__(self, config: ProviderConfig, outcomes: list[object]) -> None:
+            super().__init__(config)
+            self._outcomes = outcomes
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            outcome = self._outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+    provider = DummyProvider(provider_config, [RateLimitError("rl"), TimeoutError("to"), ProviderResponse(output_text="ok", input_tokens=1, output_tokens=1, latency_ms=5)])
+    runner = RunnerExecution(
+        token_bucket=None,
+        schema_validator=None,
+        evaluate_budget=lambda *a: (BudgetSnapshot(0.0, False), None, "ok", None, None),
+        build_metrics=lambda *a: (_make_run_metrics(provider="p", model="m", latency_ms=0, cost_usd=0.0), ""),
+        normalize_concurrency=lambda count, limit: count,
+        backoff=BackoffPolicy(rate_limit_sleep_s=0.0, timeout_next_provider=True),
+        shadow_provider=None,
+        metrics_path=None,
+        provider_weights=None,
+    )
+    invoker = runner._provider_invoker
+    results = [invoker.run(provider_config, provider, "prompt") for _ in range(3)]
+    assert [(r.status, r.failure_kind, r.backoff_next_provider) for r in results[:2]] == [
+        ("error", "rate_limit", True),
+        ("error", "timeout", True),
+    ]
+    assert (
+        results[2].status == "ok"
+        and results[2].failure_kind is None
+        and not results[2].backoff_next_provider
+    )
 
 
 def test_runner_execution_records_shadow_budget_and_schema(
