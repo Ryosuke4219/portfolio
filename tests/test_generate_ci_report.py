@@ -12,6 +12,7 @@ importlib.reload(importlib.import_module("tools.generate_ci_report"))
 
 from tools.ci_report.processing import compute_last_updated, normalize_flaky_rows
 from tools.ci_report.rendering import render_markdown
+from tools.weekly_summary import select_flaky_rows
 
 
 @pytest.fixture
@@ -81,3 +82,16 @@ def test_render_markdown_formats_numeric_strings() -> None:
 
     table_line = next(line for line in markdown if line.startswith("| 1 |"))
     assert table_line.endswith("| 3 | 0.25 | 0.50 |")
+
+
+def test_select_flaky_rows_includes_end_date() -> None:
+    start = dt.datetime(2024, 6, 2, tzinfo=dt.timezone.utc)
+    end = dt.datetime(2024, 6, 9, tzinfo=dt.timezone.utc)
+    rows = [
+        {"canonical_id": "kept", "as_of": "2024-06-09T10:00:00Z"},
+        {"canonical_id": "excluded", "as_of": "2024-06-10T00:00:00Z"},
+    ]
+
+    selected = select_flaky_rows(rows, start=start, end=end)
+
+    assert [row["canonical_id"] for row in selected] == ["kept"]

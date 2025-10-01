@@ -90,7 +90,7 @@ def select_flaky_rows(
         if as_of_dt is None:
             selected.append(row)
             continue
-        if start.date() <= as_of_dt.date() < end.date():
+        if start.date() <= as_of_dt.date() <= end.date():
             selected.append(row)
     return selected
 
