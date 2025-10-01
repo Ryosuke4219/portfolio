@@ -130,13 +130,13 @@ def run_parallel_any_sync(
                     continue
                 cancelled: tuple[int, ...] = ()
                 if on_cancelled is not None:
-                    pending = list(future_map.values())
+                    pending_indices = list(future_map.values())
                     if next_index < total_workers:
-                        pending.extend(range(next_index, total_workers))
-                    if pending:
-                        cancelled = tuple(sorted(pending))
-                for pending in list(future_map):
-                    pending.cancel()
+                        pending_indices.extend(range(next_index, total_workers))
+                    if pending_indices:
+                        cancelled = tuple(sorted(pending_indices))
+                for pending_future in list(future_map):
+                    pending_future.cancel()
                 if on_cancelled is not None and cancelled:
                     on_cancelled(cancelled)
                 return result

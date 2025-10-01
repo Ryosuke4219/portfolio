@@ -18,13 +18,17 @@ from src.llm_adapter.parallel_exec import (
     run_parallel_any_sync,
 )
 from src.llm_adapter.provider_spi import (
+    AsyncProviderSPI,
     ProviderRequest,
     ProviderResponse,
     ProviderSPI,
     TokenUsage,
+    ensure_async_provider,
 )
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
+from src.llm_adapter.runner_async_modes.context import AsyncRunContext
+from src.llm_adapter.runner_async_modes.parallel_any import ParallelAnyRunStrategy
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
     _normalize_candidate_text,
@@ -425,6 +429,50 @@ def test_runner_parallel_any_logs_cancelled_providers() -> None:
     assert run_metrics["fast"]["status"] == "ok"
     assert run_metrics["slow"]["status"] == "error"
     assert run_metrics["slow"]["error_type"] == "CancelledError"
+
+
+def test_parallel_any_emit_cancelled_metrics_logs_cancelled_error() -> None:
+    async def _never_invoke(
+        _index: int,
+        _provider: ProviderSPI | AsyncProviderSPI,
+        _async_provider: AsyncProviderSPI,
+        _is_shadow: bool,
+    ) -> tuple[ProviderResponse, None]:  # pragma: no cover - not called
+        raise AssertionError("invoke_provider should not be used in this test")
+
+    async def _sleep(_delay: float) -> None:  # pragma: no cover - not called
+        return None
+
+    provider = _StaticProvider("cancelled", "unused", latency_ms=1)
+    async_provider = ensure_async_provider(provider)
+    logger = RecordingLogger()
+    request = ProviderRequest(prompt="hi", model="parallel-any-cancelled")
+    metadata = {"mode": "parallel_any", "providers": [provider.name()]}
+    context = AsyncRunContext(
+        request=request,
+        providers=[(provider, async_provider)],
+        event_logger=logger,
+        metadata=metadata,
+        request_fingerprint="fingerprint",
+        run_started=time.time(),
+        shadow=None,
+        shadow_async=None,
+        metrics_path=None,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=1),
+        mode=RunnerMode.PARALLEL_ANY,
+        invoke_provider=_never_invoke,
+        sleep_fn=_sleep,
+    )
+    strategy = ParallelAnyRunStrategy()
+
+    strategy._emit_cancelled_metrics(context, (0,))
+
+    provider_call = logger.of_type("provider_call")[0]
+    assert provider_call["provider"] == provider.name()
+    assert provider_call["error_type"] == "CancelledError"
+    run_metric = logger.of_type("run_metric")[0]
+    assert run_metric["provider"] == provider.name()
+    assert run_metric["error_type"] == "CancelledError"
 
 
 def test_runner_parallel_any_retries_until_success(

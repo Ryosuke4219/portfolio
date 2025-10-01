@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 import json
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, cast
 
 from .parallel_exec import ParallelAllResult
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
@@ -97,7 +97,7 @@ def build_runner_config(args: argparse.Namespace) -> RunnerConfig:
     }
     if args.max_concurrency is not None:
         config_kwargs["max_concurrency"] = args.max_concurrency
-    return RunnerConfig(**config_kwargs)
+    return RunnerConfig(**cast(dict[str, Any], config_kwargs))
 
 
 def _resolve_model_name(spec: str, provider: ProviderSPI) -> str:
