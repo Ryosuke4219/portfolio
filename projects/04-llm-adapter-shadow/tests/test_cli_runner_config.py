@@ -54,6 +54,98 @@ def test_consensus_config_defaults() -> None:
     assert config.quorum == 2
 
 
+def test_build_runner_config_uses_defaults(tmp_path: Path) -> None:
+    prompt_path = tmp_path / "prompt.txt"
+    prompt_path.write_text("payload", encoding="utf-8")
+
+    args = cli.parse_args(
+        [
+            "--mode",
+            "sequential",
+            "--providers",
+            "mock:primary",
+            "--input",
+            str(prompt_path),
+        ]
+    )
+
+    config = cli.build_runner_config(args)
+
+    assert config == RunnerConfig(mode=RunnerMode.SEQUENTIAL)
+    assert config.max_concurrency == DEFAULT_MAX_CONCURRENCY
+    assert config.metrics_path == DEFAULT_METRICS_PATH
+
+
+def test_build_runner_config_with_overrides(tmp_path: Path) -> None:
+    prompt_path = tmp_path / "prompt.txt"
+    prompt_path.write_text("payload", encoding="utf-8")
+    metrics_path = tmp_path / "metrics.jsonl"
+
+    args = cli.parse_args(
+        [
+            "--mode",
+            "parallel-all",
+            "--providers",
+            "mock:one,mock:two",
+            "--input",
+            str(prompt_path),
+            "--max-concurrency",
+            "2",
+            "--rpm",
+            "90",
+            "--metrics",
+            str(metrics_path),
+        ]
+    )
+
+    config = cli.build_runner_config(args)
+
+    assert config == RunnerConfig(
+        mode=RunnerMode.PARALLEL_ALL,
+        max_concurrency=2,
+        rpm=90,
+        metrics_path=metrics_path,
+    )
+
+
+def test_build_runner_config_with_consensus(tmp_path: Path) -> None:
+    prompt_path = tmp_path / "prompt.txt"
+    prompt_path.write_text("payload", encoding="utf-8")
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text("{}", encoding="utf-8")
+
+    args = cli.parse_args(
+        [
+            "--mode",
+            "consensus",
+            "--providers",
+            "mock:alpha,mock:beta",
+            "--input",
+            str(prompt_path),
+            "--aggregate",
+            "weighted_vote",
+            "--quorum",
+            "3",
+            "--tie-breaker",
+            "min_latency",
+            "--schema",
+            str(schema_path),
+        ]
+    )
+
+    config = cli.build_runner_config(args)
+
+    assert config.mode is RunnerMode.CONSENSUS
+    assert config.max_concurrency == DEFAULT_MAX_CONCURRENCY
+    assert config.metrics_path == DEFAULT_METRICS_PATH
+    assert config.consensus == ConsensusConfig(
+        strategy="weighted_vote",
+        quorum=3,
+        tie_breaker="min_latency",
+        schema="{}",
+    )
+
+
 def test_cli_prepare_execution_with_consensus(tmp_path: Path) -> None:
     prompt_path = tmp_path / "prompt.txt"
     prompt_path.write_text("hello world\n", encoding="utf-8")
