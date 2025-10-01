@@ -3,7 +3,9 @@ from __future__ import annotations
 import importlib.machinery
 import importlib.util
 import sys
+from collections.abc import Sequence
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -20,10 +22,12 @@ def test_schema_validator_imports_without_jsonschema(monkeypatch: pytest.MonkeyP
 
     path_finder = importlib.machinery.PathFinder
 
-    def _fake_find_spec(name: str, *args: object, **kwargs: object):
+    def _fake_find_spec(
+        name: str, path: Sequence[str] | None = None, target: ModuleType | None = None
+    ) -> importlib.machinery.ModuleSpec | None:
         if name == "jsonschema":
             return None
-        return path_finder.find_spec(name, *args, **kwargs)
+        return path_finder.find_spec(name, path, target)
 
     monkeypatch.setattr(importlib.util, "find_spec", _fake_find_spec)
 
