@@ -31,6 +31,8 @@ class ConsensusConfig:
     judge: str | None = None
     max_rounds: int | None = None
     provider_weights: dict[str, float] | None = None
+    max_latency_ms: int | None = None
+    max_cost_usd: float | None = None
 
 
 @dataclass(frozen=True)
