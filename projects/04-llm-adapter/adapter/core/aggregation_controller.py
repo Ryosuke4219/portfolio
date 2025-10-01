@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
+from enum import Enum
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
@@ -34,13 +35,14 @@ class AggregationController:
     def apply(
         self,
         *,
-        mode: str,
+        mode: str | Enum,
         config: RunnerConfig,
         batch: Sequence[tuple[int, SingleRunResult]],
         default_judge_config: ProviderConfig | None,
     ) -> None:
+        resolved_mode = _resolve_mode(mode)
         selection = self._selector.select(
-            mode,
+            resolved_mode,
             config,
             batch,
             default_judge_config=default_judge_config,
@@ -48,7 +50,7 @@ class AggregationController:
         if selection is None:
             return
         fallback_kind: str | None = None
-        if mode == "consensus":
+        if resolved_mode == "consensus":
             votes = selection.votes if selection.votes is not None else 0
             quorum_setting = config.quorum
             quorum = quorum_setting if quorum_setting is not None else 2
@@ -57,7 +59,7 @@ class AggregationController:
                 if fallback_available and selection.decision.strategy != "judge":
                     judge_config = replace(config, aggregate="judge")
                     fallback_selection = self._selector.select(
-                        mode,
+                        resolved_mode,
                         judge_config,
                         batch,
                         default_judge_config=default_judge_config,
@@ -93,7 +95,7 @@ class AggregationController:
             selection.decision.metadata = metadata
         winner.aggregate_output = aggregate_output
         meta = dict(winner.metrics.ci_meta)
-        meta["aggregate_mode"] = mode
+        meta["aggregate_mode"] = resolved_mode
         meta["aggregate_strategy"] = selection.decision.strategy
         if selection.decision.reason:
             meta["aggregate_reason"] = selection.decision.reason
@@ -105,7 +107,7 @@ class AggregationController:
         meta["aggregate_hash"] = hash_text(aggregate_output)
         if selection.votes is not None:
             meta["aggregate_votes"] = selection.votes
-        if mode == "consensus":
+        if resolved_mode == "consensus":
             quorum_value = config.quorum if config.quorum is not None else 2
             meta["aggregate_quorum"] = quorum_value
             consensus_meta: dict[str, object] = {
@@ -135,21 +137,22 @@ class AggregationController:
 
     def _select_aggregation(
         self,
-        mode: str,
+        mode: str | Enum,
         config: RunnerConfig,
         batch: Sequence[tuple[int, SingleRunResult]],
         *,
         default_judge_config: ProviderConfig | None,
     ) -> AggregationDecision | None:
+        resolved_mode = _resolve_mode(mode)
         selection = self._selector.select(
-            mode,
+            resolved_mode,
             config,
             batch,
             default_judge_config=default_judge_config,
         )
         if selection is None:
             return None
-        if mode == "consensus":
+        if resolved_mode == "consensus":
             votes = selection.votes if selection.votes is not None else 0
             quorum_setting = config.quorum
             quorum = quorum_setting if quorum_setting is not None else 2
@@ -160,13 +163,14 @@ class AggregationController:
 
     def _resolve_aggregation_strategy(
         self,
-        mode: str,
+        mode: str | Enum,
         config: RunnerConfig,
         *,
         default_judge_config: ProviderConfig | None,
     ) -> AggregationStrategy | None:
+        resolved_mode = _resolve_mode(mode)
         return self._selector._resolve_aggregation_strategy(  # type: ignore[attr-defined]
-            mode,
+            resolved_mode,
             config,
             default_judge_config=default_judge_config,
         )
@@ -204,3 +208,9 @@ class AggregationController:
             meta["aggregate_quorum"] = quorum
             meta["aggregate_votes"] = votes
             metrics.ci_meta = meta
+
+
+def _resolve_mode(mode: str | Enum) -> str:
+    if isinstance(mode, Enum):
+        return str(mode.value)
+    return str(mode)
