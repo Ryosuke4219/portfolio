@@ -12,7 +12,7 @@ from .runner_execution import SingleRunResult
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .config import ProviderConfig
-    from .runner_api import RunnerConfig, RunnerMode
+    from .runner_api import RunnerConfig
 
 try:  # pragma: no cover - 実環境では src.* が存在する
     from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse  # type: ignore
