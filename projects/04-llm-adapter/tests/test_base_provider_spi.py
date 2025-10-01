@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,8 +10,8 @@ from adapter.core.config import (
     RateLimitConfig,
     RetryConfig,
 )
-from adapter.core.providers import BaseProvider
 from adapter.core.provider_spi import ProviderRequest, ProviderResponse
+from adapter.core.providers import BaseProvider
 
 
 def _provider_config(tmp_path: Path, provider: str) -> ProviderConfig:
