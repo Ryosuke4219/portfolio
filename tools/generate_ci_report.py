@@ -4,34 +4,41 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import importlib
 import json
 from pathlib import Path
 import sys
+from types import ModuleType
 
-try:
-    from tools.ci_metrics import compute_recent_deltas, compute_run_history
-    from tools import weekly_summary
 
-    from tools.ci_report.processing import (
-        compute_last_updated,
-        normalize_flaky_rows,
-        summarize_failure_kinds,
-    )
-    from tools.ci_report.rendering import build_json_payload, render_markdown
-except ModuleNotFoundError:  # pragma: no cover - fallback for direct execution
-    REPO_ROOT = Path(__file__).resolve().parents[1]
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
+def _ensure_repo_root_on_path() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    repo_root_str = str(repo_root)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
 
-    from tools.ci_metrics import compute_recent_deltas, compute_run_history
-    from tools import weekly_summary
 
-    from tools.ci_report.processing import (
-        compute_last_updated,
-        normalize_flaky_rows,
-        summarize_failure_kinds,
-    )
-    from tools.ci_report.rendering import build_json_payload, render_markdown
+def _import_module(name: str) -> ModuleType:
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError:  # pragma: no cover - fallback for direct execution
+        _ensure_repo_root_on_path()
+        return importlib.import_module(name)
+
+
+ci_metrics = _import_module("tools.ci_metrics")
+weekly_summary = _import_module("tools.weekly_summary")
+ci_processing = _import_module("tools.ci_report.processing")
+ci_rendering = _import_module("tools.ci_report.rendering")
+
+
+compute_recent_deltas = ci_metrics.compute_recent_deltas
+compute_run_history = ci_metrics.compute_run_history
+compute_last_updated = ci_processing.compute_last_updated
+normalize_flaky_rows = ci_processing.normalize_flaky_rows
+summarize_failure_kinds = ci_processing.summarize_failure_kinds
+build_json_payload = ci_rendering.build_json_payload
+render_markdown = ci_rendering.render_markdown
 
 
 
