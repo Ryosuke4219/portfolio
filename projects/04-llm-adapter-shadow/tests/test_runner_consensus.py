@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from typing import cast
+
 import pytest
 
 from src.llm_adapter.errors import RetriableError, TimeoutError
@@ -11,8 +14,9 @@ from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 import src.llm_adapter.runner_parallel as runner_parallel
 from src.llm_adapter.runner_parallel import (
-    compute_consensus,
+    ConsensusObservation,
     ConsensusResult,
+    compute_consensus,
 )
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 
@@ -49,10 +53,13 @@ def _observation(
     tokens_in: int = 1,
     tokens_out: int = 1,
     cost_estimate: float | None = None,
-) -> object:
-    observation_type = getattr(runner_parallel, "ConsensusObservation", None)
+) -> ConsensusObservation:
+    observation_type = cast(
+        type[ConsensusObservation],
+        getattr(runner_parallel, "ConsensusObservation", None),
+    )
     assert observation_type is not None, "ConsensusObservation must be defined"
-    annotations = getattr(observation_type, "__annotations__", {})
+    annotations = cast(dict[str, object], getattr(observation_type, "__annotations__", {}))
     response = _response(text, latency, tokens_in=tokens_in, tokens_out=tokens_out)
     token_usage = TokenUsage(prompt=tokens_in, completion=tokens_out)
     kwargs: dict[str, object] = {
@@ -81,7 +88,8 @@ def _observation(
         )
     if "error" in annotations:
         kwargs.setdefault("error", None)
-    return observation_type(**kwargs)
+    observation_factory = cast(Callable[..., ConsensusObservation], observation_type)
+    return observation_factory(**kwargs)
 
 
 def test_majority_with_latency_tie_breaker() -> None:
@@ -256,7 +264,9 @@ def test_default_tie_break_order() -> None:
         assert result.response.text == expected
         assert result.tie_break_applied is True
         assert result.tie_breaker_selected == tie_breaker
-        assert fragment in result.tie_break_reason
+        tie_break_reason = result.tie_break_reason
+        assert tie_break_reason is not None
+        assert fragment in tie_break_reason
 
 
 def test_stable_order_makes_tie_resolution_deterministic() -> None:
