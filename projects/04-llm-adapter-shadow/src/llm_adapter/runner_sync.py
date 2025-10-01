@@ -2,15 +2,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from concurrent.futures import CancelledError
-from dataclasses import dataclass
 import time
 from typing import cast
 
-from .errors import (
-    FatalError,
-    ProviderSkip,
-)
+from .errors import FatalError
 from .observability import EventLogger
 from .parallel_exec import (
     ParallelAllResult,
@@ -29,24 +24,15 @@ from .runner_shared import (
     resolve_event_logger,
     resolve_rate_limiter,
 )
+from .runner_sync_invocation import (
+    CancelledResultsBuilder,
+    ParallelResultLogger,
+    ProviderInvocationResult,
+    ProviderInvoker,
+)
 from .runner_sync_modes import get_sync_strategy, SyncRunContext
-from .shadow import DEFAULT_METRICS_PATH, run_with_shadow, ShadowMetrics
+from .shadow import DEFAULT_METRICS_PATH, run_with_shadow
 from .utils import content_hash, elapsed_ms
-
-
-@dataclass(slots=True)
-class ProviderInvocationResult:
-    provider: ProviderSPI
-    attempt: int
-    total_providers: int
-    response: ProviderResponse | None
-    error: Exception | None
-    latency_ms: int | None
-    tokens_in: int | None
-    tokens_out: int | None
-    shadow_metrics: ShadowMetrics | None
-    shadow_metrics_extra: dict[str, object] | None
-    provider_call_logged: bool
 
 
 class Runner:
@@ -65,6 +51,22 @@ class Runner:
         self._logger = logger
         self._config = config or RunnerConfig()
         self._rate_limiter: RateLimiter | None = resolve_rate_limiter(self._config.rpm)
+        self._time_fn = time.time
+        self._elapsed_ms = elapsed_ms
+        self._provider_invoker = ProviderInvoker(
+            rate_limiter=self._rate_limiter,
+            run_with_shadow=run_with_shadow,
+            log_provider_call=log_provider_call,
+            log_provider_skipped=log_provider_skipped,
+            time_fn=self._time_fn,
+            elapsed_ms=self._elapsed_ms,
+        )
+        self._parallel_logger = ParallelResultLogger(
+            log_provider_call=log_provider_call,
+            log_run_metric=log_run_metric,
+            estimate_cost=estimate_cost,
+            elapsed_ms=self._elapsed_ms,
+        )
 
     def _invoke_provider_sync(
         self,
@@ -80,109 +82,17 @@ class Runner:
         metrics_path: MetricsPath,
         capture_shadow_metrics: bool,
     ) -> ProviderInvocationResult:
-        if self._rate_limiter is not None:
-            self._rate_limiter.acquire()
-        attempt_started = time.time()
-        response: ProviderResponse | None = None
-        error: Exception | None = None
-        latency_ms: int
-        tokens_in: int | None = None
-        tokens_out: int | None = None
-        shadow_metrics: ShadowMetrics | None = None
-        try:
-            if capture_shadow_metrics:
-                response_with_metrics = run_with_shadow(
-                    provider,
-                    shadow,
-                    request,
-                    metrics_path=metrics_path,
-                    logger=event_logger,
-                    capture_metrics=True,
-                )
-                response, shadow_metrics = cast(
-                    tuple[ProviderResponse, ShadowMetrics | None],
-                    response_with_metrics,
-                )
-            else:
-                response_only = run_with_shadow(
-                    provider,
-                    shadow,
-                    request,
-                    metrics_path=metrics_path,
-                    logger=event_logger,
-                    capture_metrics=False,
-                )
-                response = cast(ProviderResponse, response_only)
-        except Exception as exc:  # noqa: BLE001
-            error = exc
-            latency_ms = elapsed_ms(attempt_started)
-            if isinstance(exc, ProviderSkip):
-                log_provider_skipped(
-                    event_logger,
-                    request_fingerprint=request_fingerprint,
-                    provider=provider,
-                    request=request,
-                    attempt=attempt,
-                    total_providers=total_providers,
-                    error=exc,
-                )
-        else:
-            latency_ms = response.latency_ms
-            usage = response.token_usage
-            tokens_in = usage.prompt
-            tokens_out = usage.completion
-        status = "ok" if error is None else "error"
-        log_provider_call(
-            event_logger,
+        return self._provider_invoker.invoke(
+            provider,
+            request,
+            attempt=attempt,
+            total_providers=total_providers,
+            event_logger=event_logger,
             request_fingerprint=request_fingerprint,
-            provider=provider,
-            request=request,
-            attempt=attempt,
-            total_providers=total_providers,
-            status=status,
-            latency_ms=latency_ms,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            error=error,
             metadata=metadata,
-            shadow_used=shadow is not None,
-        )
-        return ProviderInvocationResult(
-            provider=provider,
-            attempt=attempt,
-            total_providers=total_providers,
-            response=response,
-            error=error,
-            latency_ms=latency_ms,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            shadow_metrics=shadow_metrics,
-            shadow_metrics_extra=None,
-            provider_call_logged=True,
-        )
-
-    def _create_cancelled_result(
-        self,
-        *,
-        provider: ProviderSPI,
-        attempt: int,
-        total_providers: int,
-        run_started: float,
-    ) -> ProviderInvocationResult:
-        error = CancelledError()
-        latency_ms = elapsed_ms(run_started)
-        return ProviderInvocationResult(
-            provider=provider,
-            attempt=attempt,
-            total_providers=total_providers,
-            response=None,
-            error=error,
-            latency_ms=latency_ms,
-            tokens_in=None,
-            tokens_out=None,
-            shadow_metrics=None,
-            shadow_metrics_extra=None,
-            provider_call_logged=False,
+            shadow=shadow,
+            metrics_path=metrics_path,
+            capture_shadow_metrics=capture_shadow_metrics,
         )
 
     def _apply_cancelled_results(
@@ -194,18 +104,16 @@ class Runner:
         total_providers: int,
         run_started: float,
     ) -> None:
-        for index in cancelled_indices:
-            if index < 0 or index >= len(providers):
-                continue
-            if results[index] is not None:
-                continue
-            provider = providers[index]
-            results[index] = self._create_cancelled_result(
-                provider=provider,
-                attempt=index + 1,
-                total_providers=total_providers,
-                run_started=run_started,
-            )
+        builder = CancelledResultsBuilder(
+            run_started=run_started,
+            elapsed_ms=self._elapsed_ms,
+        )
+        builder.apply(
+            results,
+            providers=providers,
+            cancelled_indices=cancelled_indices,
+            total_providers=total_providers,
+        )
 
     def _log_parallel_results(
         self,
@@ -220,62 +128,17 @@ class Runner:
         skip: tuple[ProviderInvocationResult, ...] | None = None,
         attempts_override: Mapping[int, int] | None = None,
     ) -> None:
-        skipped = skip or ()
-        attempts_map = dict(attempts_override or {})
-        for result in results:
-            if result is None:
-                continue
-            if result.shadow_metrics is not None:
-                result.shadow_metrics.emit(result.shadow_metrics_extra)
-            if any(result is skipped_result for skipped_result in skipped):
-                continue
-            status = "ok" if result.response is not None else "error"
-            if status == "ok":
-                tokens_in = result.tokens_in if result.tokens_in is not None else 0
-                tokens_out = result.tokens_out if result.tokens_out is not None else 0
-                cost_usd = estimate_cost(result.provider, tokens_in, tokens_out)
-                error_for_metric: Exception | None = None
-            else:
-                tokens_in = None
-                tokens_out = None
-                cost_usd = 0.0
-                error_for_metric = result.error
-            latency_ms = result.latency_ms
-            if latency_ms is None:
-                latency_ms = elapsed_ms(run_started)
-            if not result.provider_call_logged:
-                log_provider_call(
-                    event_logger,
-                    request_fingerprint=request_fingerprint,
-                    provider=result.provider,
-                    request=request,
-                    attempt=result.attempt,
-                    total_providers=result.total_providers,
-                    status=status,
-                    latency_ms=latency_ms,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    error=error_for_metric,
-                    metadata=metadata,
-                    shadow_used=shadow_used,
-                )
-                result.provider_call_logged = True
-            attempts_value = attempts_map.get(result.attempt, result.attempt)
-            log_run_metric(
-                event_logger,
-                request_fingerprint=request_fingerprint,
-                request=request,
-                provider=result.provider,
-                status=status,
-                attempts=attempts_value,
-                latency_ms=latency_ms,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-                cost_usd=cost_usd,
-                error=error_for_metric,
-                metadata=metadata,
-                shadow_used=shadow_used,
-            )
+        self._parallel_logger.log_results(
+            results,
+            event_logger=event_logger,
+            request=request,
+            request_fingerprint=request_fingerprint,
+            metadata=metadata,
+            run_started=run_started,
+            shadow_used=shadow_used,
+            skip=skip,
+            attempts_override=attempts_override,
+        )
 
     def _extract_fatal_error(
         self, results: Sequence[ProviderInvocationResult | None]
@@ -342,4 +205,4 @@ class Runner:
         return strategy.execute(context)
 
 
-__all__ = ["Runner"]
+__all__ = ["Runner", "ProviderInvocationResult"]
