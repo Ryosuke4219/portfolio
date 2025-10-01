@@ -16,6 +16,14 @@ from adapter.core.models import (
     RetryConfig,
 )
 from adapter.core.runner_api import RunnerConfig
+
+try:
+    from adapter.core.runner_api import RunnerMode
+except ImportError:  # pragma: no cover - フォールバック
+    from enum import Enum
+
+    class RunnerMode(str, Enum):
+        CONSENSUS = "consensus"
 from adapter.core.runner_execution import SingleRunResult
 
 _BASE_METRICS = dict(
@@ -104,7 +112,7 @@ def test_max_score_propagates_judge_scores() -> None:
         return factory
 
     selector = AggregationSelector(judge_factory_builder=builder)
-    config = RunnerConfig(mode="consensus", aggregate="max")
+    config = RunnerConfig(mode=RunnerMode.CONSENSUS, aggregate="max")
     batch = [
         (0, SingleRunResult(metrics=_metrics("p1"), raw_output="Alpha")),
         (1, SingleRunResult(metrics=_metrics("p2"), raw_output="Beta")),
@@ -116,11 +124,12 @@ def test_max_score_propagates_judge_scores() -> None:
     scores = {candidate.provider: candidate.score for candidate in decision.decision.candidates}
     assert scores == {"p1": 0.4, "p2": 0.9}
     assert decision.decision.metadata == {"scores": {"p1": 0.4, "p2": 0.9}}
+    assert judge.requests[0]["mode"] == RunnerMode.CONSENSUS.value
 
 
 def test_tie_breaker_falls_back_to_latency_cost_stable_order() -> None:
     selector = AggregationSelector(judge_factory_builder=lambda config: _StubFactory(_StubJudge([])))
-    config = RunnerConfig(mode="consensus", aggregate="majority")
+    config = RunnerConfig(mode=RunnerMode.CONSENSUS, aggregate="majority")
     batch = [
         (
             0,
@@ -141,7 +150,7 @@ def test_tie_breaker_falls_back_to_latency_cost_stable_order() -> None:
 
 def test_invalid_tie_breaker_uses_first_strategy() -> None:
     selector = AggregationSelector(judge_factory_builder=lambda config: _StubFactory(_StubJudge([])))
-    config = RunnerConfig(mode="consensus", aggregate="majority", tie_breaker="invalid")
+    config = RunnerConfig(mode=RunnerMode.CONSENSUS, aggregate="majority", tie_breaker="invalid")
     batch = [
         (
             0,
@@ -164,7 +173,7 @@ def test_schema_cache_reads_schema_only_once(tmp_path: Path, monkeypatch: Monkey
     schema_path = tmp_path / "schema.json"
     schema_path.write_text("{}", encoding="utf-8")
     selector = AggregationSelector(judge_factory_builder=lambda config: _StubFactory(_StubJudge([])))
-    config = RunnerConfig(mode="consensus", aggregate="majority", schema=schema_path)
+    config = RunnerConfig(mode=RunnerMode.CONSENSUS, aggregate="majority", schema=schema_path)
     batch = [
         (0, SingleRunResult(metrics=_metrics("p1"), raw_output="One")),
         (1, SingleRunResult(metrics=_metrics("p2"), raw_output="Two")),
@@ -223,7 +232,7 @@ def test_schema_cache_resets_when_path_removed(tmp_path: Path, monkeypatch: Monk
 
 def test_tie_breaker_falls_back_to_cost_when_latency_equal() -> None:
     selector = AggregationSelector(judge_factory_builder=lambda config: _StubFactory(_StubJudge([])))
-    config = RunnerConfig(mode="consensus", aggregate="majority")
+    config = RunnerConfig(mode=RunnerMode.CONSENSUS, aggregate="majority")
     batch = [
         (
             0,

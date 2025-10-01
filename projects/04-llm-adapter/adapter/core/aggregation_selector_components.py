@@ -12,7 +12,7 @@ from .runner_execution import SingleRunResult
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .config import ProviderConfig
-    from .runner_api import RunnerConfig
+    from .runner_api import RunnerConfig, RunnerMode
 
 try:  # pragma: no cover - 実環境では src.* が存在する
     from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse  # type: ignore
@@ -88,9 +88,10 @@ class JudgeScorer:
         if not callable(invoke):
             raise ValueError("judge instance must expose invoke(request)")
         scores: dict[str, float] = {}
+        mode_value = _resolve_mode_value(getattr(config, "mode", ""))
         for candidate in candidates:
             request = {
-                "mode": getattr(config, "mode", ""),
+                "mode": mode_value,
                 "provider": candidate.provider,
                 "index": candidate.index,
                 "text": candidate.text if candidate.text is not None else candidate.response.text,
@@ -193,6 +194,15 @@ class TieBreakerFactory:
         if order[0][0] == "stable_order" and len(order) == 1:
             return FirstTieBreaker()
         return _CompositeTieBreaker(order)
+
+
+def _resolve_mode_value(mode: object) -> str:
+    if isinstance(mode, str):
+        return mode
+    value = getattr(mode, "value", mode)
+    if isinstance(value, str):
+        return value
+    return str(value)
 
 
 class SchemaCache:
