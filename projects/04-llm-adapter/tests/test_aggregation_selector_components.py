@@ -156,7 +156,7 @@ def test_invalid_tie_breaker_uses_first_strategy() -> None:
     decision = selector.select("consensus", config, batch, default_judge_config=None)
 
     assert decision is not None
-    assert decision.decision.tie_breaker_used == "first"
+    assert decision.decision.tie_breaker_used == "stable_order"
     assert decision.decision.chosen.provider == "p1"
 
 

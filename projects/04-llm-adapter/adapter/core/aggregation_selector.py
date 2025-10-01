@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, cast, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
-from .aggregation import AggregationResult, AggregationStrategy
+from .aggregation import AggregationResult, AggregationStrategy, TieBreaker
 from .aggregation_selector_components import (
     CandidateBuilder,
     JudgeProviderFactory,
@@ -127,6 +127,14 @@ class AggregationSelector:
             if votes is not None and not is_weighted:
                 votes = int(votes)
         return AggregationDecision(decision=decision, lookup=lookup, votes=votes)
+
+    @staticmethod
+    def _resolve_tie_breaker(
+        config: RunnerConfig,
+        lookup: Mapping[int, SingleRunResult],
+    ) -> TieBreaker | None:
+        factory = TieBreakerFactory()
+        return factory.create(config, lookup)
 
     def _resolve_aggregation_strategy(
         self,

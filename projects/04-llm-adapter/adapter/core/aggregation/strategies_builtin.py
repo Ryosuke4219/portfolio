@@ -26,7 +26,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 class FirstTieBreaker:
-    name = "first"
+    name = "stable_order"
 
     def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
         if not candidates:
@@ -238,16 +238,24 @@ def _build_weighted(**kwargs: Any) -> AggregationStrategy:
     return WeightedVoteStrategy(weights=weights, schema=schema)
 
 
+def _build_judge(**kwargs: Any) -> AggregationStrategy:
+    from .judge import JudgeStrategy
+
+    return JudgeStrategy(**kwargs)
+
+
 _STRATEGY_FACTORIES: dict[str, StrategyFactory] = {
     "majority": _build_majority,
     "max_score": _build_max_score,
     "weighted_vote": _build_weighted,
+    "judge": _build_judge,
 }
 
 _STRATEGY_ALIASES: dict[str, set[str]] = {
     "majority": {"majority", "majority_vote", "vote", "maj"},
     "max_score": {"max", "max_score", "score", "top"},
     "weighted_vote": {"weighted_vote", "weighted"},
+    "judge": {"judge", "llm_judge"},
 }
 
 
