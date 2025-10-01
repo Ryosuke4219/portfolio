@@ -53,7 +53,7 @@ def test_apply_records_string_mode_when_enum_input() -> None:
     decision = SimpleNamespace(
         chosen=candidate,
         candidates=[candidate],
-        strategy="majority",
+        strategy="majority_vote",
         reason=None,
         tie_breaker_used=None,
         metadata={"bucket_size": 1},
@@ -79,4 +79,4 @@ def test_apply_records_string_mode_when_enum_input() -> None:
     )
 
     assert result.metrics.ci_meta["aggregate_mode"] == "consensus"
-    assert result.metrics.ci_meta["consensus"]["strategy"] == "majority"
+    assert result.metrics.ci_meta["consensus"]["strategy"] == "majority_vote"
