@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 import logging
+from enum import Enum
 from typing import Any, TYPE_CHECKING
 
 from ..config import ProviderConfig
@@ -46,14 +47,16 @@ def run_tasks(
     if not providers:
         return results
 
+    mode_value = _mode_value(config.mode)
+
     stop_reason: str | None = None
     for task in tasks:
         histories: list[list[SingleRunResult]] = [[] for _ in providers]
         for attempt in range(repeat):
             try:
-                if config.mode == "sequential":
+                if _mode_equals(config.mode, "sequential"):
                     batch, stop_reason = execution.run_sequential_attempt(
-                        providers, task, attempt, config.mode
+                        providers, task, attempt, mode_value
                     )
                 else:
                     batch, stop_reason = execution.run_parallel_attempt(
@@ -81,7 +84,7 @@ def run_tasks(
                     )
                 raise
             aggregation_apply(
-                mode=config.mode,
+                mode=mode_value,
                 config=config,
                 batch=batch,
                 default_judge_config=judge_provider_config,
@@ -107,7 +110,24 @@ def _handle_failure(
 ) -> None:
     batch: Sequence[tuple[int, SingleRunResult]] | Any = getattr(exc, "batch", [])
     failures = getattr(exc, "failures", ())
-    log_attempt_failures(config.mode, failures)
+    log_attempt_failures(_mode_value(config.mode), failures)
     if batch:
         record_failed_batch(batch, config, histories)
     LOGGER.error(message, exc_info=exc)
+
+
+def _mode_equals(mode: object, expected: str) -> bool:
+    if isinstance(mode, Enum):
+        return mode.value == expected
+    return mode == expected
+
+
+def _mode_value(mode: object) -> str:
+    if isinstance(mode, Enum):
+        value = mode.value
+        if isinstance(value, str):
+            return value
+        return str(value)
+    if isinstance(mode, str):
+        return mode
+    return str(mode)
