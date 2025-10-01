@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from enum import Enum
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 from . import errors as core_errors
 from .aggregation_controller import AggregationController
@@ -39,7 +39,7 @@ ParallelExecutionError = cast(
     ),
 )
 if not hasattr(core_errors, "ParallelExecutionError"):
-    setattr(core_errors, "ParallelExecutionError", ParallelExecutionError)
+    core_errors.ParallelExecutionError = ParallelExecutionError
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
