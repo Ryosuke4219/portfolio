@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from enum import Enum
 from pathlib import Path
 from typing import cast
 
@@ -26,8 +27,6 @@ from adapter.core.runner_execution_parallel import (
 try:  # pragma: no cover - 型補完と後方互換用
     from adapter.core.runner_api import RunnerConfig, RunnerMode
 except ImportError:  # pragma: no cover - RunnerMode 未導入環境向け
-    from enum import Enum
-
     from adapter.core.runner_api import RunnerConfig
 
     class RunnerMode(str, Enum):
@@ -37,18 +36,19 @@ except ImportError:  # pragma: no cover - RunnerMode 未導入環境向け
         CONSENSUS = "consensus"
 
 
-PARALLEL_ANY_VALUE = RunnerMode.PARALLEL_ANY.value.replace("-", "_")
-
-
 from src.llm_adapter.errors import AllFailedError
 from src.llm_adapter.parallel_exec import run_parallel_all_sync, run_parallel_any_sync
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from src.llm_adapter.runner_config import RunnerConfig as SyncRunnerConfig
-from src.llm_adapter.runner_config import RunnerMode as SyncRunnerMode
+from src.llm_adapter.runner_config import (
+    RunnerConfig as SyncRunnerConfig,
+    RunnerMode as SyncRunnerMode,
+)
 from src.llm_adapter.runner_sync import Runner as SyncRunner
 from src.llm_adapter.runner_sync_modes import get_sync_strategy, SyncRunContext
 from src.llm_adapter.runner_sync_parallel_any import ParallelAnyStrategy
 from src.llm_adapter.utils import content_hash
+
+PARALLEL_ANY_VALUE = RunnerMode.PARALLEL_ANY.value.replace("-", "_")
 
 
 class FakeParallelExecutionError(RuntimeError):
