@@ -12,7 +12,12 @@ from .parallel_exec import ParallelAllResult
 from .provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from .providers.factory import create_provider_from_spec, parse_provider_spec, ProviderFactory
 from .runner import AsyncRunner, Runner
-from .runner_config import ConsensusConfig, RunnerConfig, RunnerMode
+from .runner_config import (
+    ConsensusConfig,
+    DEFAULT_MAX_CONCURRENCY,
+    RunnerConfig,
+    RunnerMode,
+)
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
 
@@ -89,15 +94,18 @@ def build_runner_config(args: argparse.Namespace) -> RunnerConfig:
         metrics_path = Path(args.metrics)
     else:
         metrics_path = DEFAULT_METRICS_PATH
-    config_kwargs: dict[str, object] = {
-        "mode": RunnerMode(args.mode.replace("-", "_")),
-        "rpm": args.rpm,
-        "consensus": _build_consensus_config(args),
-        "metrics_path": metrics_path,
-    }
-    if args.max_concurrency is not None:
-        config_kwargs["max_concurrency"] = args.max_concurrency
-    return RunnerConfig(**config_kwargs)
+    max_concurrency = (
+        args.max_concurrency
+        if args.max_concurrency is not None
+        else DEFAULT_MAX_CONCURRENCY
+    )
+    return RunnerConfig(
+        mode=RunnerMode(args.mode.replace("-", "_")),
+        rpm=args.rpm,
+        consensus=_build_consensus_config(args),
+        metrics_path=metrics_path,
+        max_concurrency=max_concurrency,
+    )
 
 
 def _resolve_model_name(spec: str, provider: ProviderSPI) -> str:
