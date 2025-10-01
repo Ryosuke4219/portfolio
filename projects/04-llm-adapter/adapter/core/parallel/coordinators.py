@@ -15,10 +15,10 @@ from ..parallel_state import (
     ParallelAnyState,
     ProviderFailureSummary,
 )
+from ..providers import BaseProvider
 
 _PARALLEL_ANY_SNAKE = "parallel_any"
 _PARALLEL_ANY_LEGACY = "parallel-any"
-from ..providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from ..runner_api import RunnerConfig
