@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from typing import cast
 
 from ..parallel_exec import run_parallel_any_async
 from ..runner_shared import estimate_cost, log_provider_call, log_run_metric
@@ -75,7 +76,7 @@ class ParallelAnyRunStrategy(ParallelStrategyBase):
                 continue
             attempt_index = context.attempt_labels[index]
             provider, _ = context.providers[index]
-            error = asyncio.CancelledError()
+            error = cast(Exception, asyncio.CancelledError())
             log_provider_call(
                 event_logger,
                 request_fingerprint=context.request_fingerprint,
