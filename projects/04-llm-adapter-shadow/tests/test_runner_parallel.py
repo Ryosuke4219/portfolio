@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
+from collections.abc import Sequence
+from concurrent.futures import CancelledError, Future
 import json
 from pathlib import Path
 import threading
@@ -40,128 +40,14 @@ from src.llm_adapter.runner_sync_invocation import (
 )
 from src.llm_adapter.shadow import run_with_shadow
 
-
-class RecordingLogger:
-    def __init__(self) -> None:
-        self.events: list[tuple[str, dict[str, Any]]] = []
-
-    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
-        self.events.append((event_type, dict(record)))
-
-    def of_type(self, event_type: str) -> list[dict[str, Any]]:
-        return [payload for kind, payload in self.events if kind == event_type]
-
-
-class _StaticProvider:
-    def __init__(self, name: str, text: str, latency_ms: int) -> None:
-        self._name = name
-        self._text = text
-        self.latency_ms = latency_ms
-
-    def name(self) -> str:
-        return self._name
-
-    def capabilities(self) -> set[str]:
-        return set()
-
-    def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        return ProviderResponse(
-            text=self._text,
-            latency_ms=self.latency_ms,
-            token_usage=TokenUsage(prompt=1, completion=1),
-            model=request.model,
-            finish_reason="stop",
-        )
-
-
-class _RetryProbeProvider:
-    def __init__(
-        self,
-        name: str,
-        outcomes: Sequence[object],
-        *,
-        latency_s: float = 0.0,
-    ) -> None:
-        if not outcomes:
-            raise ValueError("outcomes must not be empty")
-        self._name = name
-        self._outcomes = list(outcomes)
-        self._latency_s = latency_s
-        self.call_count = 0
-        self.outcome_log: list[str] = []
-
-    def name(self) -> str:
-        return self._name
-
-    def capabilities(self) -> set[str]:
-        return set()
-
-    def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        self.call_count += 1
-        if self._latency_s > 0:
-            time.sleep(self._latency_s)
-        index = self.call_count - 1
-        outcome = (
-            self._outcomes[index]
-            if index < len(self._outcomes)
-            else self._outcomes[-1]
-        )
-        if isinstance(outcome, Exception):
-            self.outcome_log.append(type(outcome).__name__)
-            raise outcome
-        self.outcome_log.append("ok")
-        if isinstance(outcome, ProviderResponse):
-            return outcome
-        text = str(outcome)
-        return ProviderResponse(
-            text=f"{self._name}:attempt{self.call_count}:{text}",
-            latency_ms=int(self._latency_s * 1000),
-            token_usage=TokenUsage(prompt=1, completion=1),
-            model=request.model,
-            finish_reason="stop",
-            raw={"attempt": self.call_count, "payload": text},
-        )
-
-
-class _RecordingThreadPoolExecutor(ThreadPoolExecutor):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.submitted: list[Future[Any]] = []
-
-    def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Future[Any]:
-        future = super().submit(fn, *args, **kwargs)
-        self.submitted.append(future)
-        return future
-
-
-def _install_recording_executor(
-    monkeypatch: pytest.MonkeyPatch,
-) -> list[_RecordingThreadPoolExecutor]:
-    created: list[_RecordingThreadPoolExecutor] = []
-
-    class _Factory(_RecordingThreadPoolExecutor):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            created.append(self)
-
-    monkeypatch.setattr(
-        "src.llm_adapter.parallel_exec.ThreadPoolExecutor",
-        _Factory,
-    )
-    return created
-
-
-def _read_metrics(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-
-
-def _worker_for(
-    provider: MockProvider, request: ProviderRequest
-) -> Callable[[], ProviderResponse]:
-    def _invoke() -> ProviderResponse:
-        return provider.invoke(request)
-
-    return _invoke
+from .parallel_helpers import (
+    _install_recording_executor,
+    _read_metrics,
+    _RetryProbeProvider,
+    _StaticProvider,
+    _worker_for,
+    RecordingLogger,
+)
 
 
 def test_run_parallel_any_sync_cancels_pending_futures(
@@ -369,7 +255,11 @@ def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
         tuple(_worker_for(provider, request) for provider in providers)
     )
     assert [res.text for res in collected] == ["echo(p1): hello", "echo(p2): hello"]
-    responses = [ProviderResponse("A", 0), ProviderResponse("A", 0), ProviderResponse("B", 0)]
+    responses = [
+        ProviderResponse("A", 0),
+        ProviderResponse("A", 0),
+        ProviderResponse("B", 0),
+    ]
     result = compute_consensus(responses, config=ConsensusConfig(quorum=2))
     assert result.response.text == "A"
     assert result.votes == 2
@@ -486,7 +376,9 @@ def test_async_runner_parallel_all_returns_full_result() -> None:
     asyncio.run(_run())
 
 
-def test_parallel_any_with_shadow_logs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parallel_any_with_shadow_logs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
     failing = MockProvider("fail", base_latency_ms=1, error_markers={"[TIMEOUT]"})
     primary = MockProvider("primary", base_latency_ms=1, error_markers=set())
@@ -511,7 +403,11 @@ def test_parallel_any_with_shadow_logs(tmp_path: Path, monkeypatch: pytest.Monke
 
     response = run_parallel_any_sync((fail_worker, success_worker))
     assert response.text.startswith("echo(primary):")
-    payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
+    payloads = [
+        json.loads(line)
+        for line in metrics_path.read_text().splitlines()
+        if line.strip()
+    ]
     shadow_event = next(item for item in payloads if item["event"] == "shadow_diff")
     assert shadow_event["shadow_provider"] == "shadow"
     assert shadow_event["shadow_ok"] is False
@@ -608,7 +504,8 @@ def test_runner_parallel_any_logs_cancelled_providers() -> None:
     assert provider_calls["slow"]["status"] == "error"
     assert provider_calls["slow"]["error_type"] == "CancelledError"
     run_metrics = {
-        event["provider"]: event for event in logger.of_type("run_metric")
+        event["provider"]: event
+        for event in logger.of_type("run_metric")
         if event["provider"] is not None
     }
     assert run_metrics["fast"]["status"] == "ok"
@@ -658,7 +555,9 @@ def test_runner_parallel_any_retries_until_success(
     assert provider_calls[0]["error_type"] == "RateLimitError"
     assert provider_calls[1]["status"] == "ok"
     run_metrics = [
-        event for event in events if event["event"] == "run_metric" and event["status"] == "ok"
+        event
+        for event in events
+        if event["event"] == "run_metric" and event["status"] == "ok"
     ]
     assert len(run_metrics) == 1
     assert run_metrics[0]["attempts"] == 2
@@ -788,7 +687,11 @@ def test_consensus_vote_event_and_shadow_delta(
     assert consensus_event["winner_latency_ms"] == response.latency_ms
     assert consensus_event["votes"][response.text] == 2
     summaries = consensus_event["candidate_summaries"]
-    assert {entry["provider"] for entry in summaries} == {"agree_a", "agree_b", "disagree"}
+    assert {entry["provider"] for entry in summaries} == {
+        "agree_a",
+        "agree_b",
+        "disagree",
+    }
 
     run_metric_events = {
         item["provider"]: item["latency_ms"]
