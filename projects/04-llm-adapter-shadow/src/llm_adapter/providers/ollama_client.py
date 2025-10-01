@@ -123,9 +123,10 @@ class OllamaClient:
         *,
         timeout: float | None = None,
     ) -> ResponseProtocol:
+        stream = bool(payload.get("stream"))
         return self._ensure_success(
             "/api/chat",
-            self._post("/api/chat", payload, timeout=timeout),
+            self._post("/api/chat", payload, stream=stream, timeout=timeout),
         )
 
     def _post(
@@ -137,6 +138,10 @@ class OllamaClient:
         timeout: float | None = None,
     ) -> ResponseProtocol:
         url = _combine_host(self._host, path)
+        try:
+            setattr(self._session, "last_stream", stream)
+        except Exception:  # pragma: no cover - defensive attribute set
+            pass
         try:
             return self._session.post(
                 url,
