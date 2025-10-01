@@ -30,6 +30,20 @@ class _FailingProvider:
         raise self._error
 
 
+class _SuccessfulProvider:
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def name(self) -> str:
+        return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - not used
+        raise AssertionError("_invoke_provider_sync is patched in tests")
+
+
 def test_sequential_raises_all_failed_error_with_cause() -> None:
     request = ProviderRequest(model="gpt-test", prompt="hello")
     first_error = TimeoutError("slow")
@@ -129,6 +143,52 @@ def test_sequential_strategy_emits_fallback_for_auth_error(monkeypatch: pytest.M
     assert event_type == "provider_fallback"
     assert payload["provider"] == "primary"
     assert payload["attempt"] == 1
+
+
+def test_sequential_strategy_handles_successful_provider_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    providers = [_SuccessfulProvider("primary")]
+    runner = Runner(providers, config=RunnerConfig())
+    strategy = SequentialStrategy()
+    logger = _RecordingLogger()
+    context = _make_context(runner, logger=logger)
+
+    response = ProviderResponse("ok", latency_ms=12, token_usage=TokenUsage(prompt=3, completion=4))
+
+    def fake_invoke(
+        provider: Any,
+        request: ProviderRequest,
+        *,
+        attempt: int,
+        total_providers: int,
+        **_: Any,
+    ) -> ProviderInvocationResult:
+        return ProviderInvocationResult(
+            provider=provider,
+            attempt=attempt,
+            total_providers=total_providers,
+            response=response,
+            error=None,
+            latency_ms=5,
+            tokens_in=3,
+            tokens_out=4,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=True,
+        )
+
+    monkeypatch.setattr(runner, "_invoke_provider_sync", fake_invoke)
+
+    result = strategy.execute(context)
+
+    assert result is response
+    run_metric_events = [event for event in logger.events if event[0] == "run_metric"]
+    assert len(run_metric_events) == 1
+    _, payload = run_metric_events[0]
+    assert payload["status"] == "ok"
+    assert payload["tokens_in"] == 3
+    assert payload["tokens_out"] == 4
 
 
 def test_sequential_strategy_all_failed_logs_once(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import time
-from typing import cast, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn, Protocol, cast
 
 from .errors import (
     AllFailedError,
@@ -134,7 +134,7 @@ class _SequentialRunTracker:
         self,
         provider: ProviderSPI,
         attempt: int,
-        result: "ProviderInvocationResult",
+        result: ProviderInvocationResult,
     ) -> ProviderResponse | None:
         response = result.response
         if response is None:
@@ -206,7 +206,7 @@ class _SequentialRunTracker:
             return
         raise error
 
-    def finalize_and_raise(self) -> None:
+    def finalize_and_raise(self) -> NoReturn:
         event_logger = self._event_logger
         if event_logger is not None:
             event_logger.emit(
