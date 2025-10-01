@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -71,13 +72,16 @@ def _provider_config(tmp_path_factory: pytest.TempPathFactory) -> ProviderConfig
         raw={},
     )
 
+class _RunnerMode(Enum):
+    PARALLEL_ANY = "parallel-any"
+
 
 @pytest.fixture(name="runner_config")
 def _runner_config(tmp_path_factory: pytest.TempPathFactory) -> RunnerConfig:
     metrics_dir = tmp_path_factory.mktemp("metrics")
     metrics_path = metrics_dir / "runs.jsonl"
     return RunnerConfig(
-        mode="parallel-any",
+        mode=_RunnerMode.PARALLEL_ANY,
         metrics_path=metrics_path,
         backoff=BackoffPolicy(),
     )
@@ -128,6 +132,10 @@ def test_compare_runner_orchestrates_aggregation_and_finalization(
     results = runner.run(repeat=2, config=runner_config)
 
     assert aggregation_calls.call_count == 4
+    assert all(
+        call.kwargs["mode"] == runner_config.mode.value
+        for call in aggregation_calls.call_args_list
+    )
     assert finalize_calls.call_count == 2
     assert [call.args[0] for call in finalize_calls.call_args_list] == tasks[:2]
     assert results == []
