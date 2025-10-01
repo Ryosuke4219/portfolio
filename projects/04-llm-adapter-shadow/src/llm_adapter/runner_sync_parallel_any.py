@@ -159,6 +159,13 @@ class ParallelAnyStrategy:
                     failures=failures or None,
                 )
             attempts_final = sum(1 for item in results if item is not None)
+            if cancelled_slots:
+                cancelled_count = sum(
+                    1
+                    for index in cancelled_slots
+                    if 0 <= index < len(results) and results[index] is None
+                )
+                attempts_final += cancelled_count
             if attempts_final == 0:
                 attempts_final = winner.attempt
             attempts_override = {winner.attempt: attempts_final}
