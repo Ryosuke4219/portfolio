@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, cast, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
-from .aggregation import AggregationCandidate, AggregationResult, AggregationStrategy
+from .aggregation import AggregationResult, AggregationStrategy
 from .aggregation_selector_components import (
     CandidateBuilder,
     JudgeProviderFactory,
