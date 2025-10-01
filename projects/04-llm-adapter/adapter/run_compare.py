@@ -25,7 +25,7 @@ class RunnerMode(str, Enum):
     CONSENSUS = "consensus"
 
     @classmethod
-    def from_raw(cls, raw: str) -> "RunnerMode":
+    def from_raw(cls, raw: str) -> RunnerMode:
         """CLI から渡された値を RunnerMode に変換する."""
 
         candidate = raw.strip().lower().replace("-", "_")
