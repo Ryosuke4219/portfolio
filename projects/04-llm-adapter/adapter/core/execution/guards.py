@@ -37,7 +37,10 @@ if _jsonschema_spec is None:
     jsonschema_exceptions = SimpleNamespace(ValidationError=_MissingValidationError)
     validators = SimpleNamespace(validator_for=_validator_for)
 else:
-    from jsonschema import exceptions as jsonschema_exceptions, validators
+    from jsonschema import (
+        exceptions as jsonschema_exceptions,
+        validators,
+    )
 
 
 class _TokenBucket:
