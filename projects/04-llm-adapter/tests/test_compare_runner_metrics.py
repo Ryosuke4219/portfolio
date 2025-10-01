@@ -100,6 +100,34 @@ def test_run_metrics_builder_merges_eval_failures(
     assert output_text == provider_response.output_text
 
 
+def test_run_metrics_builder_sets_cost_estimate(
+    provider_config: ProviderConfig,
+    golden_task: GoldenTask,
+    provider_response: ProviderResponse,
+) -> None:
+    builder = RunMetricsBuilder()
+    snapshot = BudgetSnapshot(run_budget_usd=1.0, hit_stop=False)
+
+    run_metrics, _ = builder.build(
+        provider_config=provider_config,
+        task=golden_task,
+        attempt_index=0,
+        mode="parallel-any",
+        response=provider_response,
+        status="ok",
+        failure_kind=None,
+        error_message=None,
+        latency_ms=provider_response.latency_ms,
+        budget_snapshot=snapshot,
+        cost_usd=0.5,
+    )
+
+    assert run_metrics.cost_estimate == pytest.approx(run_metrics.cost_usd)
+
+    payload = run_metrics.to_json_dict()
+    assert payload["cost_estimate"] == pytest.approx(payload["cost_usd"])
+
+
 def test_budget_evaluator_flags_budget_exceed(
     provider_config: ProviderConfig,
     budget_manager: BudgetManager,
