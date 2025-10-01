@@ -39,6 +39,7 @@ if _jsonschema_spec is None:
 else:
     from jsonschema import exceptions as jsonschema_exceptions, validators
 
+
 class _TokenBucket:
     def __init__(self, rpm: int | None) -> None:
         self.capacity = rpm or 0
