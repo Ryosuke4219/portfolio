@@ -16,7 +16,17 @@ from adapter.core.models import (
     RetryConfig,
 )
 from adapter.core.providers import BaseProvider
-from adapter.core.runner_api import RunnerConfig
+try:  # pragma: no cover - 型補完と後方互換用
+    from adapter.core.runner_api import RunnerConfig, RunnerMode
+except ImportError:  # pragma: no cover - RunnerMode 未導入環境向け
+    from enum import Enum
+    from adapter.core.runner_api import RunnerConfig
+
+    class RunnerMode(str, Enum):
+        SEQUENTIAL = "sequential"
+        PARALLEL_ANY = "parallel-any"
+        PARALLEL_ALL = "parallel-all"
+        CONSENSUS = "consensus"
 from adapter.core.runner_execution import SingleRunResult
 from adapter.core.runner_execution_parallel import (
     _ParallelCoordinatorBase,
@@ -101,7 +111,7 @@ def _make_metrics(provider: ProviderConfig, *, status: str, failure_kind: str | 
         run_id=f"run-{provider.provider}",
         provider=provider.provider,
         model=provider.model,
-        mode="parallel-any",
+        mode=RunnerMode.PARALLEL_ANY.value,
         prompt_id="prompt",
         prompt_name="prompt",
         seed=provider.seed,
@@ -132,7 +142,14 @@ def test_parallel_any_success_marks_failures_and_cancellations(tmp_path: Path) -
     ]
     failure_error = RuntimeError("boom")
 
-    def run_single(config: ProviderConfig, _provider: object, _task: GoldenTask, _attempt: int, _mode: str) -> SingleRunResult:
+    def run_single(
+        config: ProviderConfig,
+        _provider: object,
+        _task: GoldenTask,
+        _attempt: int,
+        _mode: str,
+    ) -> SingleRunResult:
+        assert _mode == RunnerMode.PARALLEL_ANY.value
         if config.provider == "failure":
             metrics = _make_metrics(
                 config,
@@ -162,7 +179,7 @@ def test_parallel_any_success_marks_failures_and_cancellations(tmp_path: Path) -
 
     executor = _make_executor(run_single)
     provider_pairs = [(cfg, cast(BaseProvider, object())) for cfg in providers]
-    config = RunnerConfig(mode="parallel-any")
+    config = RunnerConfig(mode=RunnerMode.PARALLEL_ANY)
 
     batch, stop_reason = executor.run(provider_pairs, task, attempt_index=0, config=config)
 
@@ -195,7 +212,14 @@ def test_parallel_any_all_failures_raise_parallel_error(tmp_path: Path) -> None:
         _make_provider_config(tmp_path, "second"),
     ]
 
-    def run_single(config: ProviderConfig, _provider: object, _task: GoldenTask, _attempt: int, _mode: str) -> SingleRunResult:
+    def run_single(
+        config: ProviderConfig,
+        _provider: object,
+        _task: GoldenTask,
+        _attempt: int,
+        _mode: str,
+    ) -> SingleRunResult:
+        assert _mode == RunnerMode.PARALLEL_ANY.value
         metrics = _make_metrics(
             config,
             status="error",
@@ -211,7 +235,7 @@ def test_parallel_any_all_failures_raise_parallel_error(tmp_path: Path) -> None:
 
     executor = _make_executor(run_single)
     provider_pairs = [(cfg, cast(BaseProvider, object())) for cfg in providers]
-    config = RunnerConfig(mode="parallel-any")
+    config = RunnerConfig(mode=RunnerMode.PARALLEL_ANY)
 
     with pytest.raises(FakeParallelExecutionError) as excinfo:
         executor.run(provider_pairs, task, attempt_index=0, config=config)
