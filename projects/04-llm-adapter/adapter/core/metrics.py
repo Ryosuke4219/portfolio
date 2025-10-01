@@ -113,8 +113,15 @@ class RunMetrics:
     ci_meta: Mapping[str, Any] = field(default_factory=dict)
     cost_estimate: float | None = None
 
+    def __post_init__(self) -> None:
+        if self.cost_estimate is None:
+            self.cost_estimate = self.cost_usd
+
     def to_json_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = asdict(self)
+        payload["cost_estimate"] = (
+            self.cost_estimate if self.cost_estimate is not None else self.cost_usd
+        )
         payload["eval"] = {k: v for k, v in payload["eval"].items() if v is not None}
         return payload
 
