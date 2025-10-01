@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from enum import Enum
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -72,16 +71,12 @@ def _provider_config(tmp_path_factory: pytest.TempPathFactory) -> ProviderConfig
         raw={},
     )
 
-class _RunnerMode(Enum):
-    PARALLEL_ANY = "parallel-any"
-
-
 @pytest.fixture(name="runner_config")
 def _runner_config(tmp_path_factory: pytest.TempPathFactory) -> RunnerConfig:
     metrics_dir = tmp_path_factory.mktemp("metrics")
     metrics_path = metrics_dir / "runs.jsonl"
     return RunnerConfig(
-        mode=_RunnerMode.PARALLEL_ANY,
+        mode="parallel_any",
         metrics_path=metrics_path,
         backoff=BackoffPolicy(),
     )
