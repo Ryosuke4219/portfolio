@@ -16,10 +16,18 @@ from adapter.core.models import (
     RetryConfig,
 )
 from adapter.core.providers import BaseProvider
+from adapter.core.runner_execution import SingleRunResult
+from adapter.core.runner_execution_parallel import (
+    _ParallelCoordinatorBase,
+    ParallelAttemptExecutor,
+    ProviderFailureSummary,
+)
+
 try:  # pragma: no cover - 型補完と後方互換用
     from adapter.core.runner_api import RunnerConfig, RunnerMode
 except ImportError:  # pragma: no cover - RunnerMode 未導入環境向け
     from enum import Enum
+
     from adapter.core.runner_api import RunnerConfig
 
     class RunnerMode(str, Enum):
@@ -27,12 +35,6 @@ except ImportError:  # pragma: no cover - RunnerMode 未導入環境向け
         PARALLEL_ANY = "parallel-any"
         PARALLEL_ALL = "parallel-all"
         CONSENSUS = "consensus"
-from adapter.core.runner_execution import SingleRunResult
-from adapter.core.runner_execution_parallel import (
-    _ParallelCoordinatorBase,
-    ParallelAttemptExecutor,
-    ProviderFailureSummary,
-)
 
 
 class FakeParallelExecutionError(RuntimeError):
