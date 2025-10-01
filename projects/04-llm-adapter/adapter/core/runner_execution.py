@@ -6,14 +6,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol, TYPE_CHECKING
 
 from ._parallel_shim import (
     ParallelExecutionError,
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
-from ._provider_execution import ProviderCallExecutor, _ProviderCallResult
+from ._provider_execution import _ProviderCallResult, ProviderCallExecutor
 from ._shadow_helpers import finalize_shadow_session, start_shadow_session
 from .config import ProviderConfig
 from .datasets import GoldenTask
@@ -28,6 +28,7 @@ from .runner_execution_attempts import (
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
+
     from .runner_api import BackoffPolicy, RunnerConfig
 else:  # pragma: no cover - 実行時フォールバック
     try:
