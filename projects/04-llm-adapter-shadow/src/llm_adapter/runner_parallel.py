@@ -108,6 +108,51 @@ def compute_consensus(
         observations, config.schema
     )
 
+    max_latency_ms = getattr(config, "max_latency_ms", None)
+    max_cost_usd = getattr(config, "max_cost_usd", None)
+    if max_latency_ms is not None or max_cost_usd is not None:
+        filtered_entries: list[tuple[int, ConsensusObservation]] = []
+        constraint_failures: list[dict[str, str]] = []
+        for index, entry in valid_entries:
+            reasons: list[str] = []
+            latency = entry.latency_ms
+            if (
+                max_latency_ms is not None
+                and latency is not None
+                and latency > max_latency_ms
+            ):
+                reasons.append(
+                    f"latency {latency}ms exceeds max {max_latency_ms}ms"
+                )
+            cost = entry.cost_estimate
+            if (
+                max_cost_usd is not None
+                and cost is not None
+                and cost > max_cost_usd
+            ):
+                reasons.append(
+                    f"cost {cost} exceeds max {max_cost_usd}"
+                )
+            if reasons:
+                detail: dict[str, str] = {
+                    "provider": entry.provider_id,
+                    "summary": "; ".join(reasons),
+                }
+                detail["index"] = str(index)
+                if latency is not None:
+                    detail["latency_ms"] = str(latency)
+                if cost is not None:
+                    detail["cost_usd"] = str(cost)
+                constraint_failures.append(detail)
+                continue
+            filtered_entries.append((index, entry))
+        valid_entries = filtered_entries
+        if not valid_entries:
+            raise ParallelExecutionError(
+                "no responses satisfied consensus constraints",
+                failures=constraint_failures or None,
+            )
+
     if not valid_entries:
         raise ParallelExecutionError("all responses failed schema validation")
 
