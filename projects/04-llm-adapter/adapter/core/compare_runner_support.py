@@ -101,6 +101,7 @@ class RunMetricsBuilder:
             output_tokens=response.output_tokens,
             latency_ms=latency_ms,
             cost_usd=cost_usd,
+            cost_estimate=cost_usd,
             status=status,
             failure_kind=failure_kind,
             error_message=error_message,
