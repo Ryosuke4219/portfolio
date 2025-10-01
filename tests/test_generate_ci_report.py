@@ -2,9 +2,13 @@ import datetime as dt
 from pathlib import Path
 import sys
 
+import importlib
+
 import pytest
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+importlib.reload(importlib.import_module("tools.generate_ci_report"))
 
 from tools.ci_report.processing import compute_last_updated, normalize_flaky_rows
 from tools.ci_report.rendering import render_markdown

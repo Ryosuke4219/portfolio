@@ -7,8 +7,8 @@ from dataclasses import dataclass
 import datetime as dt
 from pathlib import Path
 
-import weekly_summary
-from weekly_summary import coerce_str, load_runs
+from tools import weekly_summary
+from tools.weekly_summary import coerce_str, load_runs
 
 PASS_STATUSES = {"pass", "passed"}
 FAIL_STATUSES = {"fail", "failed"}

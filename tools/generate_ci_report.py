@@ -9,14 +9,8 @@ from pathlib import Path
 import sys
 
 try:
-    from ci_metrics import compute_recent_deltas, compute_run_history
-    from weekly_summary import (
-        aggregate_status,
-        filter_by_window,
-        load_flaky,
-        load_runs,
-        select_flaky_rows,
-    )
+    from tools.ci_metrics import compute_recent_deltas, compute_run_history
+    from tools import weekly_summary
 
     from tools.ci_report.processing import (
         compute_last_updated,
@@ -29,14 +23,8 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for direct execution
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
 
-    from ci_metrics import compute_recent_deltas, compute_run_history
-    from weekly_summary import (
-        aggregate_status,
-        filter_by_window,
-        load_flaky,
-        load_runs,
-        select_flaky_rows,
-    )
+    from tools.ci_metrics import compute_recent_deltas, compute_run_history
+    from tools import weekly_summary
 
     from tools.ci_report.processing import (
         compute_last_updated,
@@ -103,16 +91,16 @@ def main() -> None:
     window = dt.timedelta(days=max(args.days, 1))
     start = now - window
 
-    runs = load_runs(args.runs) if args.runs.exists() else []
-    flaky_rows = load_flaky(args.flaky) if args.flaky.exists() else []
+    runs = weekly_summary.load_runs(args.runs) if args.runs.exists() else []
+    flaky_rows = weekly_summary.load_flaky(args.flaky) if args.flaky.exists() else []
 
-    filtered_runs = filter_by_window(runs, start, now)
+    filtered_runs = weekly_summary.filter_by_window(runs, start, now)
     run_history = compute_run_history(runs)
     recent_runs = compute_recent_deltas(run_history, limit=3)
-    passes, fails, errors = aggregate_status(filtered_runs)
+    passes, fails, errors = weekly_summary.aggregate_status(filtered_runs)
     failure_kinds = summarize_failure_kinds(filtered_runs)
 
-    selected_flaky = select_flaky_rows(flaky_rows, start, now)
+    selected_flaky = weekly_summary.select_flaky_rows(flaky_rows, start, now)
     normalized_flaky = normalize_flaky_rows(selected_flaky)
 
     last_updated = compute_last_updated(filtered_runs)
