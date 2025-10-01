@@ -26,7 +26,7 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 class FirstTieBreaker:
-    name = "first"
+    name = "stable_order"
 
     def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
         if not candidates:

@@ -119,7 +119,11 @@ class JudgeScorer:
 
 
 class _CompositeTieBreaker(TieBreaker):
-    _DISPLAY_NAMES = {"latency": "latency", "cost": "cost", "stable_order": "first"}
+    _DISPLAY_NAMES = {
+        "latency": "latency",
+        "cost": "cost",
+        "stable_order": "stable_order",
+    }
 
     def __init__(
         self,
@@ -161,7 +165,9 @@ class TieBreakerFactory:
         config: RunnerConfig,
         lookup: Mapping[int, SingleRunResult],
     ) -> TieBreaker | None:
-        tie_name = (config.tie_breaker or "").strip().lower()
+        raw_name = (config.tie_breaker or "").strip()
+        normalized = raw_name.lower().replace("-", "_").replace(" ", "_")
+        tie_name = "_".join(part for part in normalized.split("_") if part)
         alias = {
             "latency": "latency",
             "min_latency": "latency",
@@ -171,7 +177,7 @@ class TieBreakerFactory:
             "stable_order": "stable_order",
         }
         preferred = alias.get(tie_name) if tie_name else None
-        if preferred == "stable_order" and tie_name:
+        if preferred == "stable_order":
             return FirstTieBreaker()
         if tie_name and preferred is None:
             return None

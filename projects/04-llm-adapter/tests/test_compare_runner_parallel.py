@@ -150,7 +150,7 @@ def test_majority_vote_normalizes_text_variants() -> None:
 
     assert result.chosen.index == 0
     assert result.metadata == {"bucket_size": 2}
-    assert result.tie_breaker_used == "first"
+    assert result.tie_breaker_used == "stable_order"
 
 
 def test_runner_execution_records_shadow_budget_and_schema(
@@ -354,7 +354,7 @@ def test_auto_tie_breaker_applies_latency_cost_and_order() -> None:
     assert order_breaker is not None
     chosen_order = order_breaker.break_tie(base_candidates)
     assert chosen_order.index == 0
-    assert order_breaker.name == "first"
+    assert order_breaker.name == "stable_order"
 
 
 def test_parallel_any_stops_after_first_success(
