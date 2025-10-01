@@ -15,6 +15,9 @@ from ..parallel_state import (
     ParallelAnyState,
     ProviderFailureSummary,
 )
+
+_PARALLEL_ANY_SNAKE = "parallel_any"
+_PARALLEL_ANY_LEGACY = "parallel-any"
 from ..providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
@@ -41,16 +44,24 @@ else:
 
 def _normalize_mode_value(mode: object) -> str:
     if isinstance(mode, Enum):
-        return cast(str, mode.value)
-    return cast(str, mode)
+        value = cast(str, mode.value)
+    else:
+        value = cast(str, mode)
+    if value == _PARALLEL_ANY_LEGACY:
+        return _PARALLEL_ANY_SNAKE
+    if value == _PARALLEL_ANY_SNAKE:
+        return _PARALLEL_ANY_SNAKE
+    return value
 
 
 def _is_parallel_any_mode(mode: object) -> bool:
-    return _normalize_mode_value(mode) == "parallel-any"
+    normalized = _normalize_mode_value(mode)
+    return normalized in {_PARALLEL_ANY_SNAKE, _PARALLEL_ANY_LEGACY}
 
 
 class _ParallelCoordinatorBase:
-    CANCEL_MESSAGE = "parallel-any cancelled after winner"
+    CANCEL_MESSAGE = "parallel_any cancelled after winner"
+    LEGACY_CANCEL_MESSAGE = "parallel-any cancelled after winner"
 
     def __init__(
         self,
@@ -87,7 +98,10 @@ class _ParallelCoordinatorBase:
             metrics.status = "skip"
             if not metrics.failure_kind:
                 metrics.failure_kind = "cancelled"
-            metrics.error_message = self.CANCEL_MESSAGE
+            if metrics.error_message == self.LEGACY_CANCEL_MESSAGE:
+                metrics.error_message = self.CANCEL_MESSAGE
+            elif metrics.error_message != self.CANCEL_MESSAGE:
+                metrics.error_message = self.CANCEL_MESSAGE
             result.stop_reason = result.stop_reason or "cancelled"
             return
         provider_config, _ = self._providers[index]
@@ -226,7 +240,7 @@ class _ParallelAnyCoordinator(_ParallelCoordinatorBase):
                         index, provider_config, result
                     )
                     self._state.register_failure(index, summary)
-                    raise RuntimeError("parallel-any failure")
+                    raise RuntimeError("parallel_any failure")
                 should_cancel = self._state.register_success(index) or should_cancel
                 self._results[index] = result
                 if should_cancel:
