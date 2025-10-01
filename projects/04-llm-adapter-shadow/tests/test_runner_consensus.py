@@ -14,9 +14,9 @@ from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 import src.llm_adapter.runner_parallel as runner_parallel
 from src.llm_adapter.runner_parallel import (
+    compute_consensus,
     ConsensusObservation,
     ConsensusResult,
-    compute_consensus,
 )
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 
