@@ -122,10 +122,12 @@ class OllamaClient:
         payload: Mapping[str, object],
         *,
         timeout: float | None = None,
+        stream: bool | None = None,
     ) -> ResponseProtocol:
+        stream_flag = bool(payload.get("stream")) if stream is None else bool(stream)
         return self._ensure_success(
             "/api/chat",
-            self._post("/api/chat", payload, timeout=timeout),
+            self._post("/api/chat", payload, timeout=timeout, stream=stream_flag),
         )
 
     def _post(
