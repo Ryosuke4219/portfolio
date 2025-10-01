@@ -16,6 +16,7 @@ from adapter.core.models import (
 )
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runner_execution import SingleRunResult
+from adapter.core.aggregation_selector_components import SchemaCache
 
 
 _BASE_METRICS = dict(
@@ -165,3 +166,57 @@ def test_schema_cache_reads_schema_only_once(tmp_path: Path, monkeypatch: Monkey
     assert decision1 is not None
     assert decision2 is not None
     assert calls == [None]
+
+
+def test_schema_cache_resets_when_path_removed(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text("{}", encoding="utf-8")
+    cache = SchemaCache()
+    calls: list[str] = []
+
+    def fake_json_load(fp: object) -> dict[str, object]:
+        calls.append("initial")
+        return {}
+
+    monkeypatch.setattr(
+        "adapter.core.aggregation_selector_components.json.load",
+        fake_json_load,
+    )
+
+    assert cache.load(schema_path) == {}
+    assert cache.load(None) is None
+
+    schema_path.write_text("{\n  \"key\": 1\n}", encoding="utf-8")
+
+    def fake_json_load_updated(fp: object) -> dict[str, object]:
+        calls.append("updated")
+        return {"key": 1}
+
+    monkeypatch.setattr(
+        "adapter.core.aggregation_selector_components.json.load",
+        fake_json_load_updated,
+    )
+
+    assert cache.load(schema_path) == {"key": 1}
+    assert calls == ["initial", "updated"]
+
+
+def test_tie_breaker_falls_back_to_cost_when_latency_equal() -> None:
+    selector = AggregationSelector(judge_factory_builder=lambda config: _StubFactory(_StubJudge([])))
+    config = RunnerConfig(mode="consensus", aggregate="majority")
+    batch = [
+        (
+            0,
+            SingleRunResult(metrics=_metrics("p1", latency_ms=10, cost_usd=5.0), raw_output="Same"),
+        ),
+        (
+            1,
+            SingleRunResult(metrics=_metrics("p2", latency_ms=10, cost_usd=1.0), raw_output="Same"),
+        ),
+    ]
+
+    decision = selector.select("consensus", config, batch, default_judge_config=None)
+
+    assert decision is not None
+    assert decision.decision.tie_breaker_used == "cost"
+    assert decision.decision.chosen.provider == "p2"
