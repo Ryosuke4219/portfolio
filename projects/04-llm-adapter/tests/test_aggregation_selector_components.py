@@ -17,7 +17,6 @@ from adapter.core.models import (
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runner_execution import SingleRunResult
 
-
 _BASE_METRICS = dict(
     ts="2024-01-01T00:00:00Z",
     run_id="run",
@@ -137,6 +136,27 @@ def test_tie_breaker_falls_back_to_latency_cost_stable_order() -> None:
     assert decision is not None
     assert decision.decision.tie_breaker_used == "latency"
     assert decision.decision.chosen.provider == "p2"
+
+
+def test_invalid_tie_breaker_uses_first_strategy() -> None:
+    selector = AggregationSelector(judge_factory_builder=lambda config: _StubFactory(_StubJudge([])))
+    config = RunnerConfig(mode="consensus", aggregate="majority", tie_breaker="invalid")
+    batch = [
+        (
+            0,
+            SingleRunResult(metrics=_metrics("p1", latency_ms=20, cost_usd=1.0), raw_output="Same"),
+        ),
+        (
+            1,
+            SingleRunResult(metrics=_metrics("p2", latency_ms=10, cost_usd=5.0), raw_output="Same"),
+        ),
+    ]
+
+    decision = selector.select("consensus", config, batch, default_judge_config=None)
+
+    assert decision is not None
+    assert decision.decision.tie_breaker_used == "first"
+    assert decision.decision.chosen.provider == "p1"
 
 
 def test_schema_cache_reads_schema_only_once(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
