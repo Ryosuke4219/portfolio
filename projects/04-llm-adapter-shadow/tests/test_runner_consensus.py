@@ -256,7 +256,9 @@ def test_default_tie_break_order() -> None:
         assert result.response.text == expected
         assert result.tie_break_applied is True
         assert result.tie_breaker_selected == tie_breaker
-        assert fragment in result.tie_break_reason
+        tie_break_reason = result.tie_break_reason
+        assert tie_break_reason is not None
+        assert fragment in tie_break_reason
 
 
 def test_stable_order_makes_tie_resolution_deterministic() -> None:
