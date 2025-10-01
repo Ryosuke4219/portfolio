@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from pytest import MonkeyPatch
 
 from adapter.core.aggregation_selector import AggregationSelector
+from adapter.core.aggregation_selector_components import SchemaCache
 from adapter.core.metrics import RunMetrics
 from adapter.core.models import (
     PricingConfig,
@@ -16,7 +17,6 @@ from adapter.core.models import (
 )
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runner_execution import SingleRunResult
-from adapter.core.aggregation_selector_components import SchemaCache
 
 _BASE_METRICS = dict(
     ts="2024-01-01T00:00:00Z",
