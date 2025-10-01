@@ -78,6 +78,52 @@ class _DummyFactory:
         return self._judge
 
 
+def test_select_accepts_cli_aggregate_aliases() -> None:
+    judge_config = _judge_config()
+    judge = _DummyJudge()
+    factory = _DummyFactory(judge)
+    builder_calls: list[ProviderConfig] = []
+
+    def builder(config: ProviderConfig) -> _DummyFactory:
+        builder_calls.append(config)
+        return factory
+
+    selector = AggregationSelector(judge_factory_builder=builder)
+    batch = [
+        (0, SingleRunResult(metrics=_metrics("p1", "Alpha"), raw_output="Alpha")),
+        (1, SingleRunResult(metrics=_metrics("p2", "Beta"), raw_output="Beta")),
+        (2, SingleRunResult(metrics=_metrics("p3", "Alpha"), raw_output="Alpha")),
+    ]
+
+    majority_config = RunnerConfig(mode="consensus", aggregate="majority_vote")
+    majority_decision = selector.select(
+        "consensus",
+        majority_config,
+        batch,
+        default_judge_config=judge_config,
+    )
+
+    assert majority_decision is not None
+    assert majority_decision.decision.strategy == "majority"
+    assert majority_decision.decision.chosen.provider == "p1"
+    assert majority_decision.votes == 2
+
+    max_score_config = RunnerConfig(mode="consensus", aggregate="max_score")
+    max_score_decision = selector.select(
+        "consensus",
+        max_score_config,
+        batch,
+        default_judge_config=judge_config,
+    )
+
+    assert max_score_decision is not None
+    assert builder_calls == [judge_config]
+    assert factory.create_calls == ["judge-model"]
+    assert [call["provider"] for call in judge.calls] == ["p1", "p2", "p3"]
+    assert max_score_decision.decision.strategy == "max_score"
+    assert max_score_decision.decision.chosen.provider == "p2"
+
+
 def test_max_score_selects_highest_quality() -> None:
     judge_config = _judge_config()
     judge = _DummyJudge()

@@ -245,8 +245,8 @@ _STRATEGY_FACTORIES: dict[str, StrategyFactory] = {
 }
 
 _STRATEGY_ALIASES: dict[str, set[str]] = {
-    "majority": {"majority", "vote", "maj"},
-    "max_score": {"max", "score", "top"},
+    "majority": {"majority", "majority_vote", "vote", "maj"},
+    "max_score": {"max", "max_score", "score", "top"},
     "weighted_vote": {"weighted_vote", "weighted"},
 }
 
