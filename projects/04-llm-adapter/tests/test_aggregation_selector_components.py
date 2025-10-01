@@ -144,7 +144,7 @@ def test_tie_breaker_falls_back_to_latency_cost_stable_order() -> None:
     decision = selector.select("consensus", config, batch, default_judge_config=None)
 
     assert decision is not None
-    assert decision.decision.tie_breaker_used == "latency"
+    assert decision.decision.tie_breaker_used == "min_latency"
     assert decision.decision.chosen.provider == "p2"
 
 
@@ -247,5 +247,5 @@ def test_tie_breaker_falls_back_to_cost_when_latency_equal() -> None:
     decision = selector.select("consensus", config, batch, default_judge_config=None)
 
     assert decision is not None
-    assert decision.decision.tie_breaker_used == "cost"
+    assert decision.decision.tie_breaker_used == "min_cost"
     assert decision.decision.chosen.provider == "p2"
