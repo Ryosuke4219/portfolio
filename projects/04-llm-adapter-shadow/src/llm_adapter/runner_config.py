@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping, NamedTuple
 
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
@@ -20,8 +20,7 @@ class RunnerMode(str, Enum):
     CONSENSUS = "consensus"
 
 
-@dataclass(frozen=True)
-class ConsensusConfig:
+class ConsensusConfig(NamedTuple):
     """Configuration for consensus style orchestrations."""
 
     strategy: str = "majority_vote"
@@ -30,7 +29,7 @@ class ConsensusConfig:
     schema: str | None = None
     judge: str | None = None
     max_rounds: int | None = None
-    provider_weights: dict[str, float] | None = None
+    provider_weights: Mapping[str, float] | None = None
     max_latency_ms: int | None = None
     max_cost_usd: float | None = None
 
