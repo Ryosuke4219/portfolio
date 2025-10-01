@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
-from typing import Any
 from types import SimpleNamespace
+from typing import Any
 
 _jsonschema_spec = importlib.util.find_spec("jsonschema")
 if _jsonschema_spec is None:
@@ -37,8 +37,7 @@ if _jsonschema_spec is None:
     jsonschema_exceptions = SimpleNamespace(ValidationError=_MissingValidationError)
     validators = SimpleNamespace(validator_for=_validator_for)
 else:
-    from jsonschema import exceptions as jsonschema_exceptions
-    from jsonschema import validators
+    from jsonschema import exceptions as jsonschema_exceptions, validators
 
 
 class _TokenBucket:
