@@ -4,93 +4,38 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-import logging
 from pathlib import Path
-from time import perf_counter, sleep
-from typing import Protocol, TYPE_CHECKING, TypeVar
+from time import sleep
+from typing import TYPE_CHECKING, Protocol
 
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.parallel_exec import (
-        ParallelExecutionError,
-        run_parallel_all_sync,
-        run_parallel_any_sync,
-    )
-
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.parallel_exec import (
-            ParallelExecutionError,
-            run_parallel_all_sync,
-            run_parallel_any_sync,
-        )
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-        T = TypeVar("T")
-
-        class ParallelExecutionError(RuntimeError):
-            """並列実行時エラーのフォールバック。"""
-
-        def run_parallel_all_sync(
-            workers: Sequence[Callable[[], T]], *, max_concurrency: int | None = None
-        ) -> list[T]:
-            return [worker() for worker in workers]
-
-        def run_parallel_any_sync(
-            workers: Sequence[Callable[[], T]], *, max_concurrency: int | None = None
-        ) -> T:
-            last_error: Exception | None = None
-            for worker in workers:
-                try:
-                    return worker()
-                except Exception as exc:  # pragma: no cover - テスト環境でのみ到達
-                    last_error = exc
-            if last_error is not None:
-                raise ParallelExecutionError(str(last_error)) from last_error
-            raise ParallelExecutionError("no worker executed successfully")
-
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderSPI
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-        class ProviderSPI(Protocol):
-            """プロバイダ SPI フォールバック."""
-
+from ._parallel_shim import (
+    ParallelExecutionError,
+    run_parallel_all_sync,
+    run_parallel_any_sync,
+)
+from ._provider_execution import ProviderCallExecutor, _ProviderCallResult
+from ._shadow_helpers import finalize_shadow_session, start_shadow_session
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .errors import (
-    AuthError,
-    ConfigError,
-    ProviderSkip,
-    RateLimitError,
-    RetriableError,
-    RetryableError,
-    TimeoutError,
-)
+from .errors import RateLimitError, RetryableError
 from .execution.guards import _SchemaValidator, _TokenBucket
-from .execution.shadow_runner import ShadowRunner
 from .metrics import BudgetSnapshot, estimate_cost, finalize_run_metrics, RunMetrics
 from .providers import BaseProvider, ProviderResponse
-
-LOGGER = logging.getLogger(__name__)
-
-@dataclass(slots=True)
-class SingleRunResult:
-    metrics: RunMetrics
-    raw_output: str
-    stop_reason: str | None = None
-    aggregate_output: str | None = None
-    error: Exception | None = None
-    backoff_next_provider: bool = False
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from .runner_api import BackoffPolicy, RunnerConfig
-
-
-from .runner_execution_attempts import (  # noqa: E402  # isort: skip
+from .runner_execution_attempts import (
     ParallelAttemptExecutor,
     SequentialAttemptExecutor,
 )
 
+if TYPE_CHECKING:  # pragma: no cover - 型補完用
+    from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
+    from .runner_api import BackoffPolicy, RunnerConfig
+else:  # pragma: no cover - 実行時フォールバック
+    try:
+        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
+    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
+
+        class ProviderSPI(Protocol):
+            """プロバイダ SPI フォールバック."""
 
 _EvaluateBudget = Callable[
     [ProviderConfig, float, str, str | None, str | None],
@@ -113,6 +58,16 @@ _BuildMetrics = Callable[
     tuple[RunMetrics, str],
 ]
 _NormalizeConcurrency = Callable[[int, int | None], int]
+
+
+@dataclass(slots=True)
+class SingleRunResult:
+    metrics: RunMetrics
+    raw_output: str
+    stop_reason: str | None = None
+    aggregate_output: str | None = None
+    error: Exception | None = None
+    backoff_next_provider: bool = False
 
 
 class RunnerExecution:
@@ -146,6 +101,7 @@ class RunnerExecution:
             run_parallel_any_sync=run_parallel_any_sync,
             parallel_execution_error=ParallelExecutionError,
         )
+        self._provider_executor = ProviderCallExecutor(backoff)
         self._active_provider_ids: tuple[str, ...] = ()
         self._current_attempt_index = 0
 
@@ -192,19 +148,14 @@ class RunnerExecution:
         if self._token_bucket:
             self._token_bucket.acquire()
         prompt = task.render_prompt()
-        shadow_runner = ShadowRunner(self._shadow_provider)
-        shadow_runner.start(provider_config, prompt)
+        shadow_session = start_shadow_session(self._shadow_provider, provider_config, prompt)
         retries_config = provider_config.retries
         max_attempts = max(0, retries_config.max) + 1
         attempt = 0
         provider_result: _ProviderCallResult | None = None
         while attempt < max_attempts:
             attempt += 1
-            provider_result = self._run_provider_call(
-                provider_config,
-                provider,
-                prompt,
-            )
+            provider_result = self._provider_executor.execute(provider_config, provider, prompt)
             provider_result.retries = attempt
             if provider_result.status == "ok":
                 break
@@ -259,7 +210,7 @@ class RunnerExecution:
             budget_snapshot,
             cost_usd,
         )
-        shadow_result = shadow_runner.finalize()
+        shadow_result, fallback_shadow_id = finalize_shadow_session(shadow_session)
         finalize_run_metrics(
             run_metrics,
             attempt_index=attempt_index,
@@ -270,7 +221,7 @@ class RunnerExecution:
             error_message=error_message,
             schema_error=schema_error,
             shadow_result=shadow_result,
-            fallback_shadow_id=shadow_runner.provider_id,
+            fallback_shadow_id=fallback_shadow_id,
             active_provider_ids=self._active_provider_ids,
             current_attempt_index=self._current_attempt_index,
         )
@@ -319,198 +270,6 @@ class RunnerExecution:
             backoff_next_provider=provider_result.backoff_next_provider,
         )
 
-    def _run_provider_call(
-        self,
-        provider_config: ProviderConfig,
-        provider: BaseProvider,
-        prompt: str,
-    ) -> _ProviderCallResult:
-        result = self._invoke_provider(provider, prompt)
-        status, failure_kind = self._check_timeout(
-            provider_config, result.latency_ms, result.status, result.failure_kind
-        )
-        status, failure_kind = self._enforce_output_guard(
-            result.response.output_text, status, failure_kind
-        )
-        result.status = status
-        result.failure_kind = failure_kind
-        return result
-
-    def _build_error_result(
-        self,
-        prompt: str,
-        started_at: float,
-        error: Exception,
-        *,
-        status: str,
-        failure_kind: str,
-        advance: bool,
-    ) -> _ProviderCallResult:
-        latency_ms = int((perf_counter() - started_at) * 1000)
-        response = self._build_error_response(prompt, latency_ms)
-        return _ProviderCallResult(
-            response=response,
-            status=status,
-            failure_kind=failure_kind,
-            error_message=str(error),
-            latency_ms=latency_ms,
-            retries=1,
-            error=error,
-            backoff_next_provider=advance,
-        )
-
-    def _handle_backoff_error(
-        self,
-        prompt: str,
-        started_at: float,
-        error: Exception,
-        *,
-        status: str,
-        failure_kind: str,
-        default_advance: bool,
-    ) -> _ProviderCallResult:
-        advance = self._apply_backoff(error)
-        if not advance:
-            advance = default_advance
-        return self._build_error_result(
-            prompt,
-            started_at,
-            error,
-            status=status,
-            failure_kind=failure_kind,
-            advance=advance,
-        )
-
-    def _build_error_response(self, prompt: str, latency_ms: int) -> ProviderResponse:
-        return ProviderResponse(
-            output_text="",
-            input_tokens=len(prompt.split()),
-            output_tokens=0,
-            latency_ms=latency_ms,
-        )
-
-    def _apply_backoff(self, error: Exception) -> bool:
-        policy = self._backoff
-        if policy is None:
-            return False
-        should_advance = False
-        delay = 0.0
-        if isinstance(error, RateLimitError):
-            delay = float(policy.rate_limit_sleep_s or 0.0)
-            should_advance = True
-        elif isinstance(error, TimeoutError):
-            should_advance = bool(policy.timeout_next_provider)
-        elif isinstance(error, RetriableError):
-            should_advance = bool(policy.retryable_next_provider)
-        if delay > 0.0:
-            sleep(delay)
-        return should_advance
-
-    @staticmethod
-    def _check_timeout(
-        provider_config: ProviderConfig,
-        latency_ms: int,
-        status: str,
-        failure_kind: str | None,
-    ) -> tuple[str, str | None]:
-        if (
-            provider_config.timeout_s > 0
-            and latency_ms > provider_config.timeout_s * 1000
-            and status == "ok"
-        ):
-            return "error", "timeout"
-        return status, failure_kind
-
-    @staticmethod
-    def _enforce_output_guard(
-        output_text: str | None, status: str, failure_kind: str | None
-    ) -> tuple[str, str | None]:
-        if (output_text is None or not output_text.strip()) and status == "ok":
-            return "error", failure_kind or "guard_violation"
-        return status, failure_kind
-
-    def _invoke_provider(
-        self, provider: BaseProvider, prompt: str
-    ) -> _ProviderCallResult:
-        start = perf_counter()
-        try:
-            response = provider.generate(prompt)
-        except ProviderSkip as exc:
-            latency_ms = int((perf_counter() - start) * 1000)
-            response = self._build_error_response(prompt, latency_ms)
-            return _ProviderCallResult(
-                response=response,
-                status="skip",
-                failure_kind="skip",
-                error_message=str(exc),
-                latency_ms=latency_ms,
-                retries=1,
-                error=exc,
-                backoff_next_provider=True,
-            )
-        except AuthError as exc:
-            return self._build_error_result(
-                prompt,
-                start,
-                exc,
-                status="error",
-                failure_kind="auth",
-                advance=True,
-            )
-        except ConfigError as exc:
-            return self._build_error_result(
-                prompt,
-                start,
-                exc,
-                status="error",
-                failure_kind="config",
-                advance=True,
-            )
-        except RateLimitError as exc:
-            return self._handle_backoff_error(
-                prompt,
-                start,
-                exc,
-                status="error",
-                failure_kind="rate_limit",
-                default_advance=True,
-            )
-        except TimeoutError as exc:
-            return self._handle_backoff_error(
-                prompt,
-                start,
-                exc,
-                status="error",
-                failure_kind="timeout",
-                default_advance=False,
-            )
-        except RetriableError as exc:
-            return self._handle_backoff_error(
-                prompt,
-                start,
-                exc,
-                status="error",
-                failure_kind="retryable",
-                default_advance=False,
-            )
-        except Exception as exc:  # pragma: no cover - 実プロバイダ利用時の防御
-            return self._build_error_result(
-                prompt,
-                start,
-                exc,
-                status="error",
-                failure_kind="provider_error",
-                advance=False,
-            )
-        latency_ms = response.latency_ms
-        return _ProviderCallResult(
-            response=response,
-            status="ok",
-            failure_kind=None,
-            error_message=None,
-            latency_ms=latency_ms,
-            retries=1,
-        )
 
 __all__ = [
     "RunnerExecution",
@@ -520,13 +279,3 @@ __all__ = [
     "_SchemaValidator",
     "_TokenBucket",
 ]
-@dataclass(slots=True)
-class _ProviderCallResult:
-    response: ProviderResponse
-    status: str
-    failure_kind: str | None
-    error_message: str | None
-    latency_ms: int
-    retries: int
-    error: Exception | None = None
-    backoff_next_provider: bool = False
