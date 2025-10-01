@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from threading import Event, Lock
-from typing import Any, TYPE_CHECKING, cast
+from typing import Any, cast, TYPE_CHECKING
 from uuid import uuid4
 
 from .config import ProviderConfig
