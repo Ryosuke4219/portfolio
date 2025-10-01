@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -42,6 +43,22 @@ class _SuccessProvider(BaseProvider):
             latency_ms=3,
             token_usage=TokenUsage(prompt=1, completion=1),
         )
+
+
+class _TrackingProvider(BaseProvider):
+    def __init__(self, config: ProviderConfig, response: ProviderResponse) -> None:
+        super().__init__(config)
+        self._response = response
+        self.calls = 0
+
+    def generate(self, prompt: str) -> ProviderResponse:
+        self.calls += 1
+        return self._response
+
+
+class _UnusedProvider(BaseProvider):
+    def generate(self, prompt: str) -> ProviderResponse:  # pragma: no cover - defensive
+        raise AssertionError("unused provider should not be invoked")
 
 
 def _make_provider_config(tmp_path: Path, name: str, *, retries: RetryConfig | None = None) -> ProviderConfig:
@@ -165,3 +182,114 @@ def test_rate_limit_retry_advances_after_max(monkeypatch: pytest.MonkeyPatch, tm
     second_result = batch[1][1]
     assert second_result.metrics.status == "ok"
     assert second_result.metrics.retries == 0
+
+
+def test_run_sequential_attempt_updates_metrics_and_shadow(tmp_path: Path) -> None:
+    primary_config = _make_provider_config(tmp_path, "primary")
+    backup_config = _make_provider_config(tmp_path, "backup")
+    task = _make_task()
+    provider_response = ProviderResponse(
+        output_text="primary-response",
+        input_tokens=3,
+        output_tokens=2,
+        latency_ms=17,
+        token_usage=TokenUsage(prompt=3, completion=2),
+    )
+    primary_provider = _TrackingProvider(primary_config, provider_response)
+    backup_provider = _UnusedProvider(backup_config)
+    shadow_latency = 9
+
+    class _ShadowProvider:
+        def name(self) -> str:
+            return "shadow-test"
+
+        def capabilities(self) -> set[str]:
+            return set()
+
+        def invoke(self, request: object) -> SimpleNamespace:
+            return SimpleNamespace(latency_ms=shadow_latency)
+
+    def evaluate_budget(
+        provider_config: ProviderConfig,
+        cost_usd: float,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+    ) -> tuple[BudgetSnapshot, str | None, str, str | None, str | None]:
+        return BudgetSnapshot(0.0, False), None, status, failure_kind, error_message
+
+    def build_metrics(
+        provider_config: ProviderConfig,
+        task_obj: GoldenTask,
+        attempt_index: int,
+        mode: str,
+        response: ProviderResponse,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+        latency_ms: int,
+        budget_snapshot: BudgetSnapshot,
+        cost_usd: float,
+    ) -> tuple[RunMetrics, str]:
+        metrics = RunMetrics(
+            ts="2024-01-01T00:00:00Z",
+            run_id="run-primary",
+            provider=provider_config.provider,
+            model=provider_config.model,
+            mode=mode,
+            prompt_id=task_obj.task_id,
+            prompt_name=task_obj.name,
+            seed=provider_config.seed,
+            temperature=provider_config.temperature,
+            top_p=provider_config.top_p,
+            max_tokens=provider_config.max_tokens,
+            input_tokens=int(response.input_tokens),
+            output_tokens=int(response.output_tokens),
+            latency_ms=latency_ms,
+            cost_usd=cost_usd,
+            status=status,
+            failure_kind=failure_kind,
+            error_message=error_message,
+            output_text=response.output_text,
+            output_hash=None,
+            budget=budget_snapshot,
+        )
+        return metrics, response.output_text or ""
+
+    execution = RunnerExecution(
+        token_bucket=None,
+        schema_validator=None,
+        evaluate_budget=evaluate_budget,
+        build_metrics=build_metrics,
+        normalize_concurrency=lambda count, limit: count,
+        backoff=None,
+        shadow_provider=_ShadowProvider(),
+        metrics_path=None,
+        provider_weights=None,
+    )
+
+    batch, stop_reason = execution.run_sequential_attempt(
+        [
+            (primary_config, primary_provider),
+            (backup_config, backup_provider),
+        ],
+        task,
+        attempt_index=1,
+        mode="sequential",
+    )
+
+    assert stop_reason is None
+    assert len(batch) == 1
+    assert primary_provider.calls == 1
+
+    metrics = batch[0][1].metrics
+    assert metrics.providers == ["primary", "backup"]
+    assert metrics.token_usage == {"prompt": 3, "completion": 2, "total": 5}
+    assert metrics.attempts == 2
+    assert metrics.retries == 1
+    assert metrics.outcome == "success"
+    assert metrics.shadow_provider_id == "shadow-test"
+    assert metrics.shadow_latency_ms == shadow_latency
+    assert metrics.shadow_status == "ok"
+    assert metrics.shadow_outcome == "success"
+    assert metrics.shadow_error_message is None
