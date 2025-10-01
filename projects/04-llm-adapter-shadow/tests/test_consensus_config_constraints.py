@@ -23,5 +23,5 @@ def test_consensus_config_equality_accounts_for_constraints() -> None:
 def test_consensus_config_is_frozen() -> None:
     config = ConsensusConfig()
 
-    with pytest.raises(dataclasses.FrozenInstanceError):
+    with pytest.raises((dataclasses.FrozenInstanceError, AttributeError)):
         object.__setattr__(config, "max_latency_ms", 1)

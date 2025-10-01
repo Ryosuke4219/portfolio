@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import Mapping, NamedTuple, TYPE_CHECKING
 
 from .shadow import DEFAULT_METRICS_PATH, MetricsPath
 
