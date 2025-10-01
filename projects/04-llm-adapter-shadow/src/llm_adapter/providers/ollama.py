@@ -161,8 +161,8 @@ class OllamaProvider(BaseProvider):
         payload: dict[str, Any] = {
             "model": model_name,
             "messages": messages_payload,
-            "stream": False,
         }
+        stream: bool = False
 
         # --- options 統合（新SPI + 互換） ---
         options_payload: dict[str, Any] = {}
@@ -182,6 +182,11 @@ class OllamaProvider(BaseProvider):
 
         if request.options and isinstance(request.options, Mapping):
             opt_items = dict(request.options.items())
+
+            if "stream" in opt_items:
+                raw_stream = opt_items.pop("stream")
+                if raw_stream is not None:
+                    stream = bool(raw_stream)
 
             # timeout 上書き (options 側)
             for key in ("request_timeout_s", "REQUEST_TIMEOUT_S"):
@@ -213,7 +218,7 @@ class OllamaProvider(BaseProvider):
             payload["options"] = {**options_payload, **payload.get("options", {})}
 
         ts0 = time.time()
-        response = self._client.chat(payload, timeout=timeout_override)
+        response = self._client.chat(payload, timeout=timeout_override, stream=stream)
 
         try:
             payload_json = response.json()
