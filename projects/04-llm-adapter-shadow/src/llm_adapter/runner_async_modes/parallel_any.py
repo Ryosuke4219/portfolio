@@ -5,11 +5,11 @@ import asyncio
 from collections.abc import Sequence
 from typing import cast
 
-from ..parallel_exec import run_parallel_any_async
+from ..parallel_exec import ParallelExecutionError, run_parallel_any_async
 from ..runner_shared import estimate_cost, log_provider_call, log_run_metric
 from ..utils import elapsed_ms
 from .base import ParallelStrategyBase
-from .context import AsyncRunContext, StrategyResult
+from .context import AsyncRunContext, collect_failure_details, StrategyResult
 
 
 class ParallelAnyRunStrategy(ParallelStrategyBase):
@@ -37,7 +37,16 @@ class ParallelAnyRunStrategy(ParallelStrategyBase):
             )
         except Exception as err:  # noqa: BLE001
             context.last_error = err
-            return StrategyResult(None, context.attempt_count, context.last_error)
+            failure_details: list[dict[str, str]] | None = None
+            if isinstance(err, ParallelExecutionError):
+                failure_details = collect_failure_details(context) or None
+                err.failures = failure_details
+            return StrategyResult(
+                None,
+                context.attempt_count,
+                context.last_error,
+                failure_details=failure_details,
+            )
 
         if cancelled_workers:
             self._emit_cancelled_metrics(context, cancelled_workers)

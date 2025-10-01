@@ -18,6 +18,7 @@ from src.llm_adapter.provider_spi import (
 )
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult, Runner
+from src.llm_adapter.runner_async import AllFailedError
 import src.llm_adapter.runner_async_modes as runner_async_modes
 from src.llm_adapter.runner_config import (
     BackoffPolicy,
@@ -500,6 +501,44 @@ def test_async_parallel_any_rate_limit_does_not_retry() -> None:
     assert [provider.invocations for provider in providers] == [1, 1]
     retries = logger.of_type("retry")
     assert all(record["error_type"] != "RateLimitError" for record in retries)
+
+
+def test_async_parallel_any_failure_details() -> None:
+    failing_providers = [
+        _AsyncProbeProvider(
+            "first",
+            delay=0.0,
+            failures=[RuntimeError("simulated failure A")],
+        ),
+        _AsyncProbeProvider(
+            "second",
+            delay=0.0,
+            failures=[RuntimeError("simulated failure B")],
+        ),
+    ]
+    runner = AsyncRunner(
+        failing_providers,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="parallel-any-fail", model="parallel-any")
+
+    with pytest.raises(AllFailedError) as exc_info:
+        asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+
+    cause = exc_info.value.__cause__
+    assert isinstance(cause, ParallelExecutionError)
+    assert cause.failures == [
+        {
+            "provider": "first",
+            "attempt": "1",
+            "summary": "RuntimeError: simulated failure A",
+        },
+        {
+            "provider": "second",
+            "attempt": "2",
+            "summary": "RuntimeError: simulated failure B",
+        },
+    ]
 
 
 def test_async_consensus_quorum_failure() -> None:
