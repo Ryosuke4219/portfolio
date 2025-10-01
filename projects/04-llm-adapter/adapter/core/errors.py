@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any, Iterable
 
 
 class AdapterError(Exception):
@@ -76,6 +77,21 @@ class AllFailedError(FatalError):
     """Raised when all providers fail to produce a result."""
 
 
+class ParallelExecutionError(FatalError):
+    """Raised when a parallel execution encounters multiple failures."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        failures: Iterable[Any] | None = None,
+        batch: Any | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.failures = list(failures) if failures is not None else None
+        self.batch = batch
+
+
 __all__ = [
     "AdapterError",
     "RetryableError",
@@ -89,4 +105,5 @@ __all__ = [
     "SkipReason",
     "ConfigError",
     "AllFailedError",
+    "ParallelExecutionError",
 ]
