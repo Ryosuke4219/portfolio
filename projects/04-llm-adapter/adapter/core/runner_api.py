@@ -35,11 +35,58 @@ class BackoffPolicy:
     timeout_next_provider: bool = False
     retryable_next_provider: bool = False
 
+class _ModeValue(str):
+    """RunnerMode が保持する正規化済み値."""
+
+    __slots__ = ("_alias",)
+
+    def __new__(cls, canonical: str, alias: str | None = None) -> "_ModeValue":
+        obj = cast("_ModeValue", str.__new__(cls, canonical))
+        obj._alias = alias or canonical.replace("_", "-")
+        return obj
+
+    @property
+    def canonical(self) -> str:
+        return super().__str__()
+
+    @property
+    def alias(self) -> str:
+        return self._alias
+
+    def __str__(self) -> str:  # pragma: no cover - ロギング向け表記
+        return self._alias
+
+    def __hash__(self) -> int:
+        return hash(self.canonical)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            normalized = other.strip().lower().replace("-", "_")
+            return super().__eq__(normalized)
+        return super().__eq__(other)
+
+
 class RunnerMode(str, Enum):
-    SEQUENTIAL = "sequential"
-    PARALLEL_ANY = "parallel-any"
-    PARALLEL_ALL = "parallel-all"
-    CONSENSUS = "consensus"
+    def __new__(cls, canonical: str, alias: str | None = None) -> "RunnerMode":
+        mode_value = _ModeValue(canonical, alias)
+        obj = cast("RunnerMode", str.__new__(cls, mode_value))
+        obj._value_ = mode_value
+        obj._canonical = mode_value.canonical
+        obj._alias = mode_value.alias
+        return obj
+
+    SEQUENTIAL = ("sequential", None)
+    PARALLEL_ANY = ("parallel_any", "parallel-any")
+    PARALLEL_ALL = ("parallel_all", "parallel-all")
+    CONSENSUS = ("consensus", None)
+
+    @property
+    def canonical(self) -> str:
+        return self._canonical
+
+    @property
+    def alias(self) -> str:
+        return self._alias
 
 
 _MODE_ALIASES: dict[str, RunnerMode] = {
@@ -81,7 +128,8 @@ def default_metrics_path() -> Path:
 def _normalize_mode(value: RunnerMode | str) -> RunnerMode:
     if isinstance(value, RunnerMode):
         return value
-    candidate = value.strip().lower().replace("_", "-")
+    candidate = value.strip().lower().replace("-", "_")
+    candidate = candidate.replace(" ", "_")
     alias = _MODE_ALIASES.get(candidate)
     if alias is not None:
         return alias

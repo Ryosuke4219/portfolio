@@ -6,8 +6,8 @@ from adapter.core.runner_api import RunnerConfig, RunnerMode, _normalize_mode
 def test_runner_mode_values_and_aliases() -> None:
     assert [mode.value for mode in RunnerMode] == [
         "sequential",
-        "parallel-any",
-        "parallel-all",
+        "parallel_any",
+        "parallel_all",
         "consensus",
     ]
     assert _normalize_mode("parallel") is RunnerMode.PARALLEL_ANY
@@ -28,6 +28,7 @@ def test_runner_config_keeps_enum() -> None:
         (RunnerMode.SEQUENTIAL, RunnerMode.SEQUENTIAL),
         ("sequential", RunnerMode.SEQUENTIAL),
         ("parallel-any", RunnerMode.PARALLEL_ANY),
+        ("parallel-all", RunnerMode.PARALLEL_ALL),
         ("parallel_all", RunnerMode.PARALLEL_ALL),
         ("consensus", RunnerMode.CONSENSUS),
     ],
