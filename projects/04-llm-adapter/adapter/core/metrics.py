@@ -111,6 +111,7 @@ class RunMetrics:
     eval: EvalMetrics = field(default_factory=EvalMetrics)
     budget: BudgetSnapshot = field(default_factory=lambda: BudgetSnapshot(0.0, False))
     ci_meta: Mapping[str, Any] = field(default_factory=dict)
+    cost_estimate: float | None = None
 
     def to_json_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = asdict(self)
