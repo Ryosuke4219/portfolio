@@ -51,3 +51,35 @@ def test_weighted_vote_respects_weights_and_tiebreaker() -> None:
         "bucket_size": 2,
         "weighted_votes": {"foo": 3.0, "bar": 1.0},
     }
+
+
+def test_majority_vote_prefers_complete_bucket_when_tied() -> None:
+    schema = {"type": "object", "required": ["foo", "bar"]}
+    strategy = MajorityVoteStrategy(schema=schema)
+    cands = [
+        _candidate(0, "a", "{\"foo\":1}"),
+        _candidate(1, "b", "{\"foo\":1,\"bar\":2}"),
+    ]
+
+    result = strategy.aggregate(cands)
+
+    assert result.chosen == cands[1]
+    assert result.metadata == {"bucket_size": 1}
+
+
+def test_weighted_vote_prefers_complete_bucket_when_weight_tied() -> None:
+    schema = {"type": "object", "required": ["foo", "bar"]}
+    strategy = WeightedVoteStrategy(weights={"a": 1.0, "b": 1.0}, schema=schema)
+    cands = [
+        _candidate(0, "a", "{\"foo\":1}"),
+        _candidate(1, "b", "{\"foo\":1,\"bar\":2}"),
+    ]
+
+    result = strategy.aggregate(cands)
+
+    assert result.chosen == cands[1]
+    assert result.metadata == {
+        "bucket_weight": 1.0,
+        "bucket_size": 1,
+        "weighted_votes": {"{\"foo\":1}": 1.0, "{\"foo\":1,\"bar\":2}": 1.0},
+    }

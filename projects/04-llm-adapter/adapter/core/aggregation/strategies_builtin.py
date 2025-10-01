@@ -53,6 +53,16 @@ class MajorityVoteStrategy:
 
     def __init__(self, *, schema: Mapping[str, Any] | None = None) -> None:
         self._schema = schema
+        self._required_keys = self._extract_required_keys(schema)
+
+    def _extract_required_keys(self, schema: Mapping[str, Any] | None) -> frozenset[str]:
+        if not isinstance(schema, Mapping):
+            return frozenset()
+        required = schema.get("required")
+        if isinstance(required, Sequence) and not isinstance(required, (str, bytes)):
+            keys = [key for key in required if isinstance(key, str)]
+            return frozenset(keys)
+        return frozenset()
 
     def _normalize_text(self, value: str | None) -> str:
         normalized = (value or "").strip()
@@ -78,6 +88,18 @@ class MajorityVoteStrategy:
             return json_key
         return self._normalize_text(raw)
 
+    def _bucket_is_complete(self, key: str, candidate: AggregationCandidate) -> bool:
+        if not self._required_keys or not key.startswith("json:"):
+            return False
+        raw = (candidate.text if candidate.text is not None else candidate.response.text) or ""
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(payload, dict):
+            return False
+        return all(required_key in payload for required_key in self._required_keys)
+
     def aggregate(
         self, candidates: Sequence[AggregationCandidate], *, tiebreaker: TieBreaker | None = None
     ) -> AggregationResult:
@@ -85,16 +107,26 @@ class MajorityVoteStrategy:
             raise ValueError("majority_vote: candidates must be non-empty")
 
         buckets: dict[str, list[AggregationCandidate]] = {}
+        completeness: dict[str, bool] = {}
         for candidate in candidates:
             key = self._bucket_key(candidate)
             buckets.setdefault(key, []).append(candidate)
+            if key not in completeness:
+                completeness[key] = self._bucket_is_complete(key, candidate)
 
         max_bucket: list[AggregationCandidate] = []
         max_count = -1
-        for bucket in buckets.values():
-            if len(bucket) > max_count:
+        max_complete = False
+        for key, bucket in buckets.items():
+            count = len(bucket)
+            bucket_complete = completeness.get(key, False)
+            if count > max_count:
                 max_bucket = bucket
-                max_count = len(bucket)
+                max_count = count
+                max_complete = bucket_complete
+            elif count == max_count and bucket_complete and not max_complete:
+                max_bucket = bucket
+                max_complete = True
 
         breaker = tiebreaker or FirstTieBreaker()
         chosen = max_bucket[0] if len(max_bucket) == 1 else breaker.break_tie(max_bucket)
@@ -173,26 +205,29 @@ class WeightedVoteStrategy:
         buckets: dict[str, dict[str, Any]] = {}
         for candidate in candidates:
             key = self._majority._bucket_key(candidate)  # noqa: SLF001
-            entry = buckets.setdefault(
-                key,
-                {
+            if key not in buckets:
+                buckets[key] = {
                     "candidates": [],
                     "weight": 0.0,
                     "text": (candidate.text if candidate.text is not None else candidate.response.text) or "",
-                },
-            )
+                    "complete": self._majority._bucket_is_complete(key, candidate),  # noqa: SLF001
+                }
+            entry = buckets[key]
             entry["candidates"].append(candidate)
             entry["weight"] += self._resolve_weight(candidate.provider)
 
         max_bucket_key = next(iter(buckets))
         max_bucket = buckets[max_bucket_key]
         max_weight = float(max_bucket["weight"])
+        max_complete = bool(max_bucket.get("complete"))
         for key, bucket in buckets.items():
             weight = float(bucket["weight"])
-            if weight > max_weight:
+            complete = bool(bucket.get("complete"))
+            if weight > max_weight or (weight == max_weight and complete and not max_complete):
                 max_bucket_key = key
                 max_bucket = bucket
                 max_weight = weight
+                max_complete = complete
 
         bucket_candidates: Sequence[AggregationCandidate] = max_bucket["candidates"]
         breaker = tiebreaker or FirstTieBreaker()
