@@ -149,7 +149,7 @@ class AggregationSelector:
             if decision.metadata:
                 key = "bucket_weight" if is_weighted else "bucket_size"
                 raw_votes = decision.metadata.get(key)
-                if isinstance(raw_votes, (int, float)):
+                if isinstance(raw_votes, int | float):
                     votes = float(raw_votes)
             metadata = dict(decision.metadata or {})
             if is_weighted:
@@ -228,7 +228,7 @@ class AggregationSelector:
         raw = getattr(response, "raw", None)
         if isinstance(raw, Mapping):
             value = raw.get("quality_score")
-            if isinstance(value, (int, float)):
+            if isinstance(value, int | float):
                 return float(value)
         text = getattr(response, "text", None)
         if isinstance(text, str):
