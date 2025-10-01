@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import importlib.machinery
 import importlib.util
-import sys
 from collections.abc import Sequence
 from pathlib import Path
+import sys
 from types import ModuleType
 
-import pytest
 
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 ADAPTER_PATH = PROJECT_ROOT / "04-llm-adapter"
