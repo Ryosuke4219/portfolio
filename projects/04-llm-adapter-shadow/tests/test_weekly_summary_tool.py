@@ -5,7 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
-from typing import cast, Protocol
+from typing import Protocol, runtime_checkable
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
@@ -17,6 +17,7 @@ def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
 MainFunc = Callable[[Sequence[str] | None], None]
 
 
+@runtime_checkable
 class _MainModule(Protocol):
     main: MainFunc
 
@@ -30,9 +31,8 @@ def _load_main() -> MainFunc:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    main = module.main
-    assert callable(main)
-    return main
+    assert isinstance(module, _MainModule)
+    return module.main
 
 
 def test_weekly_summary_generates_expected_markdown(tmp_path: Path) -> None:
