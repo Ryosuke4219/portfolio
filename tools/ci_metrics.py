@@ -91,7 +91,6 @@ def compute_run_history(
             or run.timestamp
             or dt.datetime.min.replace(tzinfo=dt.UTC),
         ):
-            total += 1
             status = normalize_status(coerce_str(record.get("status")))
             if status == "pass":
                 passes += 1
