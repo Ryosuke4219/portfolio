@@ -120,6 +120,7 @@ def compute_run_history(
             elif previous_flag and not is_flaky:
                 current_flaky_total = max(0, current_flaky_total - 1)
 
+        total = passes + fails + errors
         pass_rate = (passes / total) if total else None
         metrics.append(
             RunMetrics(
