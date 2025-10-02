@@ -39,7 +39,7 @@ def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
         if status_raw is None:
             continue
         status = status_raw.lower()
-        if status == "pass":
+        if status in {"pass", "passed"}:
             passes += 1
         elif status in {"fail", "failed"}:
             fails += 1
