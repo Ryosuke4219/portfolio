@@ -148,3 +148,77 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
 
     response = runner.run(request)
     assert response.text == "A"
+
+
+def test_runner_consensus_weighted_vote_prefers_weight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    providers = [
+        MockProvider("alpha", base_latency_ms=1, error_markers=set()),
+        MockProvider("bravo", base_latency_ms=1, error_markers=set()),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=2,
+            consensus=ConsensusConfig(
+                strategy="weighted_vote",
+                provider_weights={"alpha": 3.0, "bravo": 0.5},
+                tie_breaker="min_latency",
+                quorum=1,
+            ),
+        ),
+    )
+    request = ProviderRequest(prompt="weighted", model="weighted-consensus")
+
+    response_alpha = ProviderResponse(
+        text="alpha answer",
+        latency_ms=120,
+        token_usage=TokenUsage(prompt=1, completion=1),
+    )
+    response_bravo = ProviderResponse(
+        text="bravo answer",
+        latency_ms=20,
+        token_usage=TokenUsage(prompt=1, completion=1),
+    )
+
+    invocations = [
+        ProviderInvocationResult(
+            provider=providers[0],
+            attempt=1,
+            total_providers=len(providers),
+            response=response_alpha,
+            error=None,
+            latency_ms=response_alpha.latency_ms,
+            tokens_in=1,
+            tokens_out=1,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=True,
+        ),
+        ProviderInvocationResult(
+            provider=providers[1],
+            attempt=2,
+            total_providers=len(providers),
+            response=response_bravo,
+            error=None,
+            latency_ms=response_bravo.latency_ms,
+            tokens_in=1,
+            tokens_out=1,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=True,
+        ),
+    ]
+
+    def _fake_run_parallel_all_sync(workers, *, max_concurrency=None):  # noqa: ANN001
+        return invocations
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        _fake_run_parallel_all_sync,
+    )
+
+    response = runner.run(request)
+    assert response.text == "alpha answer"

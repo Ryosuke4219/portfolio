@@ -151,3 +151,47 @@ def test_async_consensus_failure_details() -> None:
 
 def test_async_consensus_error_details() -> None:
     test_async_consensus_failure_details()
+
+
+def test_async_consensus_weighted_vote_prefers_weight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    alpha = _StaticProvider("alpha", "alpha answer", latency_ms=120)
+    bravo = _StaticProvider("bravo", "bravo answer", latency_ms=20)
+    runner = AsyncRunner(
+        [alpha, bravo],
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=2,
+            consensus=ConsensusConfig(
+                strategy="weighted_vote",
+                provider_weights={"alpha": 3.0, "bravo": 0.5},
+                tie_breaker="min_latency",
+                quorum=1,
+            ),
+        ),
+    )
+    request = ProviderRequest(prompt="weighted", model="weighted-consensus")
+
+    response_alpha = alpha.invoke(request)
+    response_bravo = bravo.invoke(request)
+
+    async def _fake_run_parallel_all_async(  # noqa: ANN001
+        workers,
+        *,
+        max_concurrency=None,
+        max_attempts=None,
+        on_retry=None,
+    ):
+        return [
+            (1, alpha, response_alpha, None),
+            (2, bravo, response_bravo, None),
+        ]
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_async_modes.consensus.run_parallel_all_async",
+        _fake_run_parallel_all_async,
+    )
+
+    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+    assert response.text == "alpha answer"
