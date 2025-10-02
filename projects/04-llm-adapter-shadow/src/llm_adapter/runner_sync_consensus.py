@@ -146,6 +146,7 @@ class ConsensusStrategy:
                     "consensus_vote",
                     {
                         "request_fingerprint": context.request_fingerprint,
+                        "reason": consensus.reason,
                         "strategy": consensus.strategy,
                         "tie_breaker": consensus.tie_breaker,
                         "quorum": consensus.min_votes,
@@ -186,6 +187,7 @@ class ConsensusStrategy:
                         "tie_breaker_selected": consensus.tie_breaker_selected,
                         "judge": consensus.judge_name,
                         "judge_score": consensus.judge_score,
+                        "reason": consensus.reason,
                     }
                 }
                 if not shadow_payload.get("shadow_ok", True):

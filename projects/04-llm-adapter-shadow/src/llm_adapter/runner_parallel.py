@@ -34,6 +34,7 @@ class ConsensusResult:
     votes: int
     tally: dict[str, int]
     total_voters: int
+    reason: str
     strategy: str
     min_votes: int | None
     score_threshold: float | None
@@ -219,11 +220,29 @@ def compute_consensus(
     if votes < quorum:
         raise ParallelExecutionError("consensus quorum not reached")
 
+    total_valid_voters = len(valid_entries)
+    quorum_required = config.quorum if config.quorum is not None else total_valid_voters
+
+    reason_parts = [strategy]
+    reason_parts.append(f"quorum={quorum_required}/{total_valid_voters}")
+    if tie_break_applied:
+        tie_detail = tie_breaker_selected or tie_breaker or "tie"
+        reason_parts.append(f"tie_breaker={tie_detail}")
+        if tie_break_reason:
+            reason_parts.append(f"tie_break_reason={tie_break_reason}")
+    if judge_name:
+        reason_parts.append(f"judge={judge_name}")
+        if judge_score is not None:
+            reason_parts.append(f"judge_score={judge_score:g}")
+
+    reason = " ".join(reason_parts)
+
     return ConsensusResult(
         response=winner.primary,
         votes=votes,
         tally=tally,
         total_voters=len(observations),
+        reason=reason,
         strategy=config.strategy,
         min_votes=config.quorum,
         score_threshold=None,
