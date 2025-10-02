@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import { XMLParser } from '../packages/fast-xml-parser/index.js';
 
@@ -49,7 +50,7 @@ function extractText(node) {
   return '';
 }
 
-function summariseJUnit(inputPath, outputDir) {
+export function summariseJUnit(inputPath, outputDir) {
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', textNodeName: '#text' });
   const xml = fs.readFileSync(inputPath, 'utf8');
   const parsed = parser.parse(xml) ?? {};
@@ -71,7 +72,8 @@ function summariseJUnit(inputPath, outputDir) {
       const className = testCase['@_classname'] ?? suiteName;
       const name = testCase['@_name'] ?? 'Unnamed test';
       const timeSeconds = Number.parseFloat(testCase['@_time'] ?? '0') || 0;
-      let status = 'passed';
+      const rawStatus = typeof testCase['@_status'] === 'string' ? testCase['@_status'].toLowerCase() : '';
+      let status = rawStatus && rawStatus !== 'run' ? rawStatus : 'passed';
       let detail = '';
       if (testCase.failure !== undefined) {
         status = 'failed';
@@ -87,11 +89,13 @@ function summariseJUnit(inputPath, outputDir) {
     }
   }
 
+  const errorStatuses = new Set(['error', 'errored']);
+
   const summary = {
     suites: suiteNodes.length,
     tests: tests.length,
     failures: tests.filter((item) => item.status === 'failed').length,
-    errors: tests.filter((item) => item.status === 'error').length,
+    errors: tests.filter((item) => errorStatuses.has(item.status)).length,
     skipped: tests.filter((item) => item.status === 'skipped').length,
     passed: tests.filter((item) => item.status === 'passed').length,
     duration_seconds: Number.parseFloat(
@@ -199,4 +203,16 @@ function main() {
   renderIndex(reportsDir, sections);
 }
 
-main();
+const isDirectExecution = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return pathToFileURL(entry).href === import.meta.url;
+  } catch {
+    return false;
+  }
+};
+
+if (isDirectExecution()) {
+  main();
+}
