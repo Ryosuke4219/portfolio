@@ -44,6 +44,26 @@ def _parse_weights(value: str) -> dict[str, float]:
     return weights
 
 
+def _parse_non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:  # pragma: no cover - argparse reports error
+        raise argparse.ArgumentTypeError("value must be an integer") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be non-negative")
+    return parsed
+
+
+def _parse_non_negative_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:  # pragma: no cover - argparse reports error
+        raise argparse.ArgumentTypeError("value must be numeric") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be non-negative")
+    return parsed
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="llm-adapter")
     parser.add_argument("--mode", required=True, choices=("sequential", "parallel-any", "parallel-all", "consensus"))
@@ -56,6 +76,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--schema")
     parser.add_argument("--judge")
     parser.add_argument("--weights", type=_parse_weights)
+    parser.add_argument(
+        "--max-latency-ms",
+        dest="max_latency_ms",
+        type=_parse_non_negative_int,
+        help="Maximum provider latency allowed during consensus (milliseconds)",
+    )
+    parser.add_argument(
+        "--max-cost-usd",
+        dest="max_cost_usd",
+        type=_parse_non_negative_float,
+        help="Maximum cumulative provider cost allowed during consensus (USD)",
+    )
     parser.add_argument("--input", required=True)
     parser.add_argument("--out-format", dest="out_format", default="text", choices=("text", "json", "jsonl"))
     parser.add_argument("--metrics")
@@ -71,7 +103,18 @@ def _load_optional_text(path_text: str | None) -> str | None:
 
 def _build_consensus_config(args: argparse.Namespace) -> ConsensusConfig | None:
     schema_text = _load_optional_text(args.schema)
-    if not any((args.aggregate, args.quorum, args.tie_breaker, schema_text, args.judge, args.weights)):
+    if not any(
+        (
+            args.aggregate,
+            args.quorum,
+            args.tie_breaker,
+            schema_text,
+            args.judge,
+            args.weights,
+            args.max_latency_ms is not None,
+            args.max_cost_usd is not None,
+        )
+    ):
         return None
     payload: dict[str, Any] = {}
     if args.aggregate:
@@ -86,6 +129,10 @@ def _build_consensus_config(args: argparse.Namespace) -> ConsensusConfig | None:
         payload["judge"] = args.judge
     if args.weights is not None:
         payload["provider_weights"] = dict(args.weights)
+    if args.max_latency_ms is not None:
+        payload["max_latency_ms"] = args.max_latency_ms
+    if args.max_cost_usd is not None:
+        payload["max_cost_usd"] = args.max_cost_usd
     return ConsensusConfig(**payload)
 
 

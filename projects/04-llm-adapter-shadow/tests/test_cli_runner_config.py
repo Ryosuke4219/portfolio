@@ -146,6 +146,33 @@ def test_build_runner_config_with_consensus(tmp_path: Path) -> None:
     )
 
 
+def test_build_runner_config_with_consensus_constraints(tmp_path: Path) -> None:
+    prompt_path = tmp_path / "prompt.txt"
+    prompt_path.write_text("payload", encoding="utf-8")
+
+    args = cli.parse_args(
+        [
+            "--mode",
+            "consensus",
+            "--providers",
+            "mock:alpha,mock:beta",
+            "--input",
+            str(prompt_path),
+            "--max-latency-ms",
+            "250",
+            "--max-cost-usd",
+            "1.75",
+        ]
+    )
+
+    config = cli.build_runner_config(args)
+
+    assert config.consensus == ConsensusConfig(
+        max_latency_ms=250,
+        max_cost_usd=1.75,
+    )
+
+
 def test_cli_prepare_execution_with_consensus(tmp_path: Path) -> None:
     prompt_path = tmp_path / "prompt.txt"
     prompt_path.write_text("hello world\n", encoding="utf-8")
