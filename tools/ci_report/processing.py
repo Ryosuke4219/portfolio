@@ -5,6 +5,7 @@ from collections import Counter
 from collections.abc import Iterable
 import datetime as dt
 
+from tools.ci_metrics import normalize_status
 from tools.weekly_summary import coerce_str, parse_iso8601, to_float
 
 
@@ -27,10 +28,8 @@ def summarize_failure_kinds(
     counter: Counter[str] = Counter()
     for run in runs:
         status_raw = coerce_str(run.get("status"))
-        if status_raw is None:
-            continue
-        status = status_raw.lower()
-        if status not in {"fail", "failed", "error"}:
+        status = normalize_status(status_raw)
+        if status not in {"fail", "error"}:
             continue
         kind = coerce_str(run.get("failure_kind")) or "unknown"
         counter[kind] += 1
