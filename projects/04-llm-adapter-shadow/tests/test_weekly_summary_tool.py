@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+from typing import cast, Protocol
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
@@ -16,6 +17,10 @@ def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
 MainFunc = Callable[[Sequence[str] | None], None]
 
 
+class _MainModule(Protocol):
+    main: MainFunc
+
+
 def _load_main() -> MainFunc:
     module_path = (
         Path(__file__).resolve().parent.parent / "tools" / "weekly_summary.py"
@@ -25,7 +30,8 @@ def _load_main() -> MainFunc:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    main = getattr(module, "main")
+    module_with_main = cast(_MainModule, module)
+    main = module_with_main.main
     assert callable(main)
     return main
 
