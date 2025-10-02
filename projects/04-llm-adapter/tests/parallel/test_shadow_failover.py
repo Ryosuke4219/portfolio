@@ -7,9 +7,10 @@ from src.llm_adapter.parallel_exec import run_parallel_all_sync, run_parallel_an
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner_config import RunnerConfig as SyncRunnerConfig, RunnerMode as SyncRunnerMode
 from src.llm_adapter.runner_sync import Runner as SyncRunner
-from src.llm_adapter.runner_sync_modes import SyncRunContext, get_sync_strategy
+from src.llm_adapter.runner_sync_modes import get_sync_strategy, SyncRunContext
 from src.llm_adapter.runner_sync_parallel_any import ParallelAnyStrategy
 from src.llm_adapter.utils import content_hash
+
 
 # シャドウ挙動
 def test_get_sync_strategy_parallel_any_propagates_all_failed(
