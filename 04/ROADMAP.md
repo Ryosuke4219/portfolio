@@ -10,9 +10,9 @@
 | **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / 直列Runner / 最小UT | ✅ 完了（SPI型定義確定・直列Runner/例外UTマージ済） |
 | **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `run_with_shadow` / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（影実行APIとJSONLスキーマv1安定化） |
 | **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | OpenAI互換/Ollama/OpenRouter / ストリーミング透過 / 契約テスト | ✅ 完了（OpenRouter統合と共通例外マップ反映済、契約テストCI緑） |
-| **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | 🟡 進行中（並列Runner/Consensus骨格完成、評価シナリオ整備中） |
-| **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ⚪ 未着手（CI連携と自動更新スクリプト設計段階） |
-| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ⚪ 未着手（CLI整理とリリース手順これから） |
+| **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（parallel_all/consensusで多数決・タイブレーク・shadow差分記録を実装し、合議イベント検証も通過） |
+| **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ自動生成ツールを`just report`に統合） |
+| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（CLI実行パスと`llm-adapter`エントリ追加済、バージョン/リリースノートの整備とタグ準備が未完） |
 
 ---
 
@@ -33,16 +33,16 @@
 **成果物**: `providers/`配下にOpenAI互換・Ollama・OpenRouter、ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト。 **Exit Criteria**: 同一SPIで3種動作、ストリーミング指定を下層へ伝播(アサート)、429/5xx/ネットワークを共通例外へ正規化。 **タスク**: 共通リトライポリシーの閾値調整 / OpenRouter差分ログ出力整備 / 429バックオフベンチ継続。
 
 ## M4 — Parallel & Consensus
-**進捗**: 🟡 `runner_parallel`/`runner_sync_consensus`を追加済。性能ベンチと差分メトリクス記録の自動化が残課題。
-**成果物**: `runner_parallel`・`compute_consensus`・`ConsensusConfig`(多数決/スコア重み/低遅延TB/コスト上限)・合議テスト。 **Exit Criteria**: N並列勝者決定が決定的(seed固定)、多数決/スコア/低遅延TBを設定切替、影実行併用で差分メトリクスJSONL記録。 **タスク**: 合議アルゴリズム(majority/score/tie-break) / 勝者決定後の残ジョブ中断 / コスト&遅延制約設定。
+**進捗**: ✅ `runner_parallel`/`runner_sync_consensus`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定と`consensus_vote`イベント記録を実装。影勝者へshadow差分を反映するテストもCIで緑。
+**成果物**: `runner_parallel`・`compute_consensus`・`ConsensusConfig`(多数決/スコア重み/低遅延TB/コスト上限)・合議テスト。 **Exit Criteria**: N並列勝者決定が決定的(seed固定)、多数決/スコア/低遅延TBを設定切替、影実行併用で差分メトリクスJSONL記録。 **タスク**: 完了（合議アルゴリズム／制約評価／残ジョブ中断を網羅）。
 
 ## M5 — Telemetry & QA Integration
-**進捗**: ⚪ OTLP/CI連携は未着手。`docs/weekly-summary.md`試作版の手動更新のみ。
-**成果物**: メトリクス→OTLP/JSON変換、`tools/`による`docs/weekly-summary.md`自動生成、Evidence更新。 **Exit Criteria**: ローカル/CIでメトリクスがダッシュボード(または静的HTML)へ反映、Evidence/Weekly Summaryリンク整合、CI緑＋`just report`でレポート生成。 **タスク**: OTLP/JSON変換器 / `weekly-summary`スクリプト(失敗率・遅延分布・差分) / Evidence更新(スクショ・リンク検査)。
+**進捗**: ✅ `OtlpJsonExporter`で`provider_call`/`run_metric`イベントをOTLP JSONへ変換し、`weekly_summary.py`が`runs-metrics.jsonl`から週次サマリを生成。`just report`でテレメトリ集計とMarkdown更新まで自動化。
+**成果物**: メトリクス→OTLP/JSON変換、`tools/`による`docs/weekly-summary.md`自動生成、Evidence更新。 **Exit Criteria**: ローカル/CIでメトリクスがダッシュボード(または静的HTML)へ反映、Evidence/Weekly Summaryリンク整合、CI緑＋`just report`でレポート生成。 **タスク**: 完了（OTLPエクスポータと週次サマリ自動化を導入済）。
 
 ## M6 — CLI/Docs/Release 0.1.0
-**進捗**: ⚪ `cli.py`骨格は存在するが、コマンド束ねとリリース手順は未着手。v0.1.0向けCHANGELOG草案なし。
-**成果物**: `just`/CLI(`setup|test|demo|report|bench`)、README(JP/EN)・サンプル・トラブルシュート、セマンティックバージョン・CHANGELOG・`pyproject.toml`。 **Exit Criteria**: `pip install -e . && just demo`で影実行→JSONL→週次サマリを一気通貫、v0.1.0タグと公開API安定宣言、CI緑＋リリースノートにKnown Issues/Next Steps。 **タスク**: CLI Help/例/Exit Code設計 / JP-EN README同期(生成タスク) / ReleaseノートとCHANGELOG生成。
+**進捗**: 🟡 `llm-adapter` CLIはJSON/JSONL入力対応やasync runner切替まで整備され、`pyproject.toml`にエントリポイントを登録。READMEと`just`レシピでデモ〜レポート動線も構築済だが、バージョンは`0.0.1`のままでリリースノート／タグ付け準備が未完。
+**成果物**: `just`/CLI(`setup|test|demo|report|bench`)、README(JP/EN)・サンプル・トラブルシュート、セマンティックバージョン・CHANGELOG・`pyproject.toml`。 **Exit Criteria**: `pip install -e . && just demo`で影実行→JSONL→週次サマリを一気通貫、v0.1.0タグと公開API安定宣言、CI緑＋リリースノートにKnown Issues/Next Steps。 **タスク**: v0.1.0バージョン／CHANGELOG確定 / リリースタグ準備 / README多言語差分の最終同期。
 
 ## Stretch (Week46-47 任意)
 コスト計測&予算内選択(token単価×速度×品質)、プロバイダ健全性ヘルスチェック(プローブ/自動フェイルアウト)、影差分可視化UIと回帰検知。
