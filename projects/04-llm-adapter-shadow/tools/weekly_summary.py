@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from statistics import mean, median
 from typing import Any
@@ -61,7 +61,7 @@ def _collect(path: Path) -> Summary:
             if outcome == "success":
                 success += 1
             latency = record.get("latency_ms")
-            if isinstance(latency, (int, float)) and latency >= 0:
+            if isinstance(latency, (int | float)) and latency >= 0:
                 latencies.append(float(latency))
         elif event == "shadow_diff":
             diff_kind = record.get("diff_kind")
