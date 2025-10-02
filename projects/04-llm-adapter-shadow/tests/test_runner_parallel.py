@@ -714,10 +714,12 @@ def test_consensus_vote_event_and_shadow_delta(
         item for item in payloads if item.get("event") == "consensus_vote"
     )
     assert consensus_event["strategy"] == "majority_vote"
+    assert consensus_event["quorum"] == 2
     assert consensus_event["voters_total"] == 3
     assert consensus_event["votes_for"] == 2
     assert consensus_event["votes_against"] == 1
     assert consensus_event["winner_provider"] == "agree_a"
+    assert consensus_event["chosen_provider"] == "agree_a"
     assert consensus_event["winner_latency_ms"] == response.latency_ms
     assert consensus_event["votes"][response.text] == 2
     summaries = consensus_event["candidate_summaries"]
