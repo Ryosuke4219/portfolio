@@ -56,7 +56,7 @@ def test_sequential_run_metric_contains_required_fields(tmp_path: Path) -> None:
     assert event["providers"] == ["primary"]
     assert event["provider_id"] == event["provider"]
     cost_usd = event["cost_usd"]
-    assert isinstance(cost_usd, int | float)
+    assert isinstance(cost_usd, (int, float))  # noqa: UP038
     assert event["cost_estimate"] == pytest.approx(float(cost_usd))
 
     attempts = event["attempts"]
