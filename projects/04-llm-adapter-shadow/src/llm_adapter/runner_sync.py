@@ -1,7 +1,7 @@
 """Synchronous runner implementation."""
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 import time
 from typing import cast
 
@@ -34,6 +34,10 @@ from .runner_sync_invocation import (
 from .runner_sync_modes import get_sync_strategy, SyncRunContext
 from .shadow import DEFAULT_METRICS_PATH
 from .utils import content_hash, elapsed_ms
+
+
+_CANCELLED_RESULT_WAIT_S = 0.05
+_CANCELLED_RESULT_POLL_S = 0.001
 
 
 class Runner:
@@ -104,7 +108,27 @@ class Runner:
         cancelled_indices: Sequence[int],
         total_providers: int,
         run_started: float,
+        started_indices: Collection[int] | None = None,
     ) -> None:
+        if not cancelled_indices:
+            return
+        started = set(started_indices or ())
+        pending = [
+            index
+            for index in cancelled_indices
+            if 0 <= index < len(results)
+            and index in started
+            and results[index] is None
+        ]
+        if pending:
+            deadline = self._time_fn() + _CANCELLED_RESULT_WAIT_S
+            while pending and self._time_fn() < deadline:
+                if all(results[index] is not None for index in pending):
+                    break
+                time.sleep(_CANCELLED_RESULT_POLL_S)
+                pending = [
+                    index for index in pending if results[index] is None
+                ]
         builder = CancelledResultsBuilder(
             run_started=run_started,
             elapsed_ms=self._elapsed_ms,

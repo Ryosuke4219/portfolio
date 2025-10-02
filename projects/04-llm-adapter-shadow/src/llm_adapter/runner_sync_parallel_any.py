@@ -99,11 +99,13 @@ class ParallelAnyStrategy:
         results: list[ProviderInvocationResult | None] = [None] * total_providers
         max_attempts = runner._config.max_attempts
         providers = _limited_providers(runner.providers, max_attempts)
+        started_indices: set[int] = set()
 
         def make_worker(
             index: int, provider: ProviderSPI
         ) -> Callable[[], ProviderInvocationResult]:
             def worker() -> ProviderInvocationResult:
+                started_indices.add(index - 1)
                 result = runner._invoke_provider_sync(
                     provider,
                     context.request,
@@ -185,6 +187,7 @@ class ParallelAnyStrategy:
                     cancelled_indices=cancelled_slots,
                     total_providers=total_providers,
                     run_started=context.run_started,
+                    started_indices=started_indices,
                 )
             runner._log_parallel_results(
                 results,
