@@ -6,6 +6,9 @@ from typing import Any, cast, NoReturn
 
 import pytest
 
+pytest.importorskip("adapter.core.errors")
+pytest.importorskip("adapter.core.providers.gemini_support")
+
 from adapter.core.errors import RateLimitError as CoreRateLimitError
 from adapter.core.providers import gemini_support
 from src.llm_adapter.errors import (

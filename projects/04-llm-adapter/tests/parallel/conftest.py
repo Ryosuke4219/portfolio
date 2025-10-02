@@ -22,9 +22,8 @@ from adapter.core.runner_execution_parallel import (
 )
 
 try:  # pragma: no cover - 型補完と後方互換用
-    from adapter.core.runner_api import RunnerConfig, RunnerMode
+    from adapter.core.runner_api import RunnerMode
 except ImportError:  # pragma: no cover - RunnerMode 未導入環境向け
-    from adapter.core.runner_api import RunnerConfig
 
     class RunnerMode(str, Enum):  # type: ignore[misc]
         PARALLEL_ANY = "parallel_any"

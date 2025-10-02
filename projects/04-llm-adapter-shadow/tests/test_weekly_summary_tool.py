@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+from typing import cast, Protocol
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
@@ -14,6 +15,10 @@ def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
 
 
 MainFunc = Callable[[Sequence[str] | None], None]
+
+
+class _MainModule(Protocol):
+    main: MainFunc
 
 
 def _load_main() -> MainFunc:
