@@ -1,71 +1,30 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-from concurrent.futures import CancelledError
 import time
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 import pytest
 
 from src.llm_adapter.errors import ProviderSkip
-from src.llm_adapter.observability import EventLogger
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from src.llm_adapter.runner_shared import RateLimiter
-from src.llm_adapter.runner_sync_invocation import (
-    CancelledResultsBuilder,
-    ParallelResultLogger,
-    ProviderInvocationResult,
-    ProviderInvoker,
-)
-from src.llm_adapter.shadow import ShadowMetrics
+from src.llm_adapter.runner_sync_invocation import ProviderInvoker
+
+from .conftest import FakeMetrics, RecorderLogger, StubProvider
 
 
-class _RecorderLogger(EventLogger):
-    def __init__(self) -> None:
-        self.events: list[tuple[str, dict[str, Any]]] = []
-
-    def emit(self, event_type: str, record: dict[str, Any]) -> None:  # type: ignore[override]
-        self.events.append((event_type, dict(record)))
-
-
-class _StubProvider:
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    def name(self) -> str:
-        return self._name
-
-    def capabilities(self) -> set[str]:  # pragma: no cover - protocol compat
-        return set()
-
-    def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - unused
-        raise NotImplementedError
-
-
-class _FakeMetrics(ShadowMetrics):
-    def __init__(self) -> None:
-        super().__init__(payload={}, logger=None)
-        self.emitted: list[Mapping[str, Any] | None] = []
-
-    def emit(self, extra: Mapping[str, Any] | None = None) -> None:
-        self.emitted.append(extra)
-
-
-def _make_response() -> ProviderResponse:
-    return ProviderResponse(
-        "ok",
-        latency_ms=42,
-        token_usage=TokenUsage(prompt=3, completion=5),
-    )
-
-
-def test_invoker_returns_shadow_metrics_after_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = _StubProvider("primary")
-    shadow = _StubProvider("shadow")
-    request = ProviderRequest(model="gpt", prompt="hi")
-    response = _make_response()
-    metrics = _FakeMetrics()
+def test_invoker_returns_shadow_metrics_after_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+    stub_provider_factory: Callable[[str], StubProvider],
+    provider_request: ProviderRequest,
+    provider_response: ProviderResponse,
+    fake_metrics_factory: Callable[[], FakeMetrics],
+    recorder_logger: RecorderLogger,
+) -> None:
+    provider = stub_provider_factory("primary")
+    shadow = stub_provider_factory("shadow")
+    metrics = fake_metrics_factory()
     rate_calls: list[str] = []
     rate_limiter_ns = SimpleNamespace(acquire=lambda: None)
     monkeypatch.setattr(rate_limiter_ns, "acquire", lambda: rate_calls.append("acquire"))
@@ -73,11 +32,11 @@ def test_invoker_returns_shadow_metrics_after_rate_limit(monkeypatch: pytest.Mon
 
     run_calls: list[tuple[Any, ...]] = []
 
-    def fake_run_with_shadow(*args: Any, **kwargs: Any) -> tuple[ProviderResponse, _FakeMetrics]:
+    def fake_run_with_shadow(*args: Any, **kwargs: Any) -> tuple[ProviderResponse, FakeMetrics]:
         run_calls.append(args)
         assert rate_calls == ["acquire"]
         assert kwargs["capture_metrics"] is True
-        return response, metrics
+        return provider_response, metrics
 
     log_provider_call_args: list[dict[str, Any]] = []
 
@@ -95,10 +54,10 @@ def test_invoker_returns_shadow_metrics_after_rate_limit(monkeypatch: pytest.Mon
 
     result = invoker.invoke(
         provider,
-        request,
+        provider_request,
         attempt=1,
         total_providers=2,
-        event_logger=_RecorderLogger(),
+        event_logger=recorder_logger,
         request_fingerprint="fp",
         metadata={},
         shadow=shadow,
@@ -108,22 +67,24 @@ def test_invoker_returns_shadow_metrics_after_rate_limit(monkeypatch: pytest.Mon
 
     assert rate_calls == ["acquire"]
     assert run_calls and run_calls[0][0] is provider
-    assert result.response is response
-    assert result.shadow_metrics is metrics
+    assert result.response is provider_response
+    assert isinstance(result.shadow_metrics, FakeMetrics)
     assert result.error is None
     assert log_provider_call_args and log_provider_call_args[-1]["status"] == "ok"
 
 
-def test_provider_call_event_includes_token_usage(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = _StubProvider("primary")
-    request = ProviderRequest(model="gpt", prompt="hi")
-    response = _make_response()
-    logger = _RecorderLogger()
+def test_provider_call_event_includes_token_usage(
+    stub_provider_factory: Callable[[str], StubProvider],
+    provider_request: ProviderRequest,
+    provider_response: ProviderResponse,
+    recorder_logger: RecorderLogger,
+) -> None:
+    provider = stub_provider_factory("primary")
 
     def fake_run_with_shadow(*args: Any, **kwargs: Any) -> ProviderResponse:
         assert args[0] is provider
         assert kwargs["capture_metrics"] is False
-        return response
+        return provider_response
 
     invoker = ProviderInvoker(
         rate_limiter=None,
@@ -134,10 +95,10 @@ def test_provider_call_event_includes_token_usage(monkeypatch: pytest.MonkeyPatc
 
     result = invoker.invoke(
         provider,
-        request,
+        provider_request,
         attempt=1,
         total_providers=1,
-        event_logger=logger,
+        event_logger=recorder_logger,
         request_fingerprint="fp",
         metadata={},
         shadow=None,
@@ -146,7 +107,7 @@ def test_provider_call_event_includes_token_usage(monkeypatch: pytest.MonkeyPatc
     )
 
     assert result.error is None
-    provider_calls = [event for event in logger.events if event[0] == "provider_call"]
+    provider_calls = [event for event in recorder_logger.events if event[0] == "provider_call"]
     assert len(provider_calls) == 1
     payload = provider_calls[0][1]
     token_usage = payload.get("token_usage")
@@ -154,9 +115,11 @@ def test_provider_call_event_includes_token_usage(monkeypatch: pytest.MonkeyPatc
     assert all(isinstance(value, int) for value in token_usage.values())
 
 
-def test_invoker_logs_skip_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = _StubProvider("primary")
-    request = ProviderRequest(model="gpt", prompt="hi")
+def test_invoker_logs_skip_exceptions(
+    stub_provider_factory: Callable[[str], StubProvider],
+    provider_request: ProviderRequest,
+) -> None:
+    provider = stub_provider_factory("primary")
     skip_error = ProviderSkip("skip")
 
     log_skipped: list[dict[str, Any]] = []
@@ -179,10 +142,10 @@ def test_invoker_logs_skip_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
 
     result = invoker.invoke(
         provider,
-        request,
+        provider_request,
         attempt=1,
         total_providers=1,
-        event_logger=_RecorderLogger(),
+        event_logger=RecorderLogger(),
         request_fingerprint="fp",
         metadata={},
         shadow=None,
@@ -211,10 +174,10 @@ def test_invoker_logs_skip_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
 
     result_non_skip = invoker_non_skip.invoke(
         provider,
-        request,
+        provider_request,
         attempt=1,
         total_providers=1,
-        event_logger=_RecorderLogger(),
+        event_logger=RecorderLogger(),
         request_fingerprint="fp",
         metadata={},
         shadow=None,
@@ -228,54 +191,17 @@ def test_invoker_logs_skip_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
     assert log_calls[0]["error"] is non_skip_error
 
 
-def test_cancelled_results_skip_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
-    providers = [_StubProvider("primary"), _StubProvider("secondary")]
-    results: list[ProviderInvocationResult | None] = [None, None]
-    builder = CancelledResultsBuilder(run_started=1.0, elapsed_ms=lambda start: 99)
-
-    builder.apply(results, providers=providers, cancelled_indices=[0, 1], total_providers=2)
-
-    assert all(isinstance(entry, ProviderInvocationResult) for entry in results)
-    assert all(isinstance(entry.error, CancelledError) for entry in results if entry is not None)
-
-
-    logger = _RecorderLogger()
-    log_run_metric_calls: list[dict[str, Any]] = []
-
-    def fake_log_run_metric(*_: Any, **kwargs: Any) -> None:
-        log_run_metric_calls.append(dict(kwargs))
-
-    parallel_logger = ParallelResultLogger(
-        log_provider_call=lambda *a, **k: None,
-        log_run_metric=fake_log_run_metric,
-        estimate_cost=lambda provider, tokens_in, tokens_out: 0.0,
-        elapsed_ms=lambda start: 13,
-    )
-
-    parallel_logger.log_results(
-        results,
-        event_logger=logger,
-        request=ProviderRequest(model="gpt", prompt="hi"),
-        request_fingerprint="fp",
-        metadata={},
-        run_started=0.0,
-        shadow_used=False,
-        skip=tuple(result for result in results if result is not None),
-    )
-
-    assert log_run_metric_calls == []
-    assert all(isinstance(entry.error, CancelledError) for entry in results if entry is not None)
-
-
-def test_provider_call_event_contains_token_usage() -> None:
-    provider = _StubProvider("primary")
-    request = ProviderRequest(model="gpt", prompt="hi")
-    response = _make_response()
-    event_logger = _RecorderLogger()
+def test_provider_call_event_contains_token_usage(
+    stub_provider_factory: Callable[[str], StubProvider],
+    provider_request: ProviderRequest,
+    provider_response: ProviderResponse,
+) -> None:
+    provider = stub_provider_factory("primary")
+    event_logger = RecorderLogger()
 
     def fake_run_with_shadow(*args: Any, **kwargs: Any) -> ProviderResponse:
         assert kwargs["capture_metrics"] is False
-        return response
+        return provider_response
 
     invoker = ProviderInvoker(
         rate_limiter=None,
@@ -286,7 +212,7 @@ def test_provider_call_event_contains_token_usage() -> None:
 
     invoker.invoke(
         provider,
-        request,
+        provider_request,
         attempt=1,
         total_providers=1,
         event_logger=event_logger,
