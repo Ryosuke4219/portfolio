@@ -9,7 +9,7 @@ from tools.ci_report.processing import (
     summarize_failure_kinds,
 )
 from tools.ci_report.rendering import render_markdown
-from tools.weekly_summary import select_flaky_rows
+from tools.weekly_summary import aggregate_status, select_flaky_rows
 
 
 @pytest.fixture
@@ -19,6 +19,16 @@ def sample_runs() -> list[dict[str, object]]:
         {"ts": "2024-06-02T09:00:00Z", "status": "fail"},
         {"ts": None, "status": "error"},
     ]
+
+
+def test_aggregate_status_counts_errored_as_error() -> None:
+    runs = [
+        {"status": "pass"},
+        {"status": "fail"},
+        {"status": "errored"},
+    ]
+
+    assert aggregate_status(runs) == (1, 1, 1)
 
 
 def test_compute_last_updated(sample_runs: list[dict[str, object]]) -> None:
