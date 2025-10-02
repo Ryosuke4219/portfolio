@@ -20,7 +20,9 @@ from .prompts import run_prompts
 def _cli_namespace() -> ModuleType:
     return import_module(__name__.rsplit(".", 1)[0])
 
+
 T = TypeVar("T")
+
 
 def _with_cli_namespace(accessor: Callable[[ModuleType], T]) -> T:
     namespace = _cli_namespace()
@@ -57,7 +59,9 @@ def _run_prompts_from_iterable(args: Iterable[str]) -> int:
 
 
 def _run_doctor_from_iterable(args: Iterable[str]) -> int:
-    return run_doctor(list(args), socket_module=_socket_module(), http_module=_http_module())
+    return run_doctor(
+        list(args), socket_module=_socket_module(), http_module=_http_module()
+    )
 
 
 if typer is not None:  # pragma: no branch - import-time decision
@@ -116,5 +120,5 @@ else:  # pragma: no cover - exercised when Typer is unavailable
             return doctor(args[1:])
         return run(args)
 
-__all__ = ["app", "doctor", "main", "run"]
 
+__all__ = ["app", "doctor", "main", "run"]
