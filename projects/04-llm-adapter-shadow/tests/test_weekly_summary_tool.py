@@ -30,8 +30,7 @@ def _load_main() -> MainFunc:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    module_with_main = cast(_MainModule, module)
-    main = module_with_main.main
+    main = module.main
     assert callable(main)
     return main
 
