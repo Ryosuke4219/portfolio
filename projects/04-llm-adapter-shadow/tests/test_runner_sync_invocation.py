@@ -114,6 +114,46 @@ def test_invoker_returns_shadow_metrics_after_rate_limit(monkeypatch: pytest.Mon
     assert log_provider_call_args and log_provider_call_args[-1]["status"] == "ok"
 
 
+def test_provider_call_event_includes_token_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _StubProvider("primary")
+    request = ProviderRequest(model="gpt", prompt="hi")
+    response = _make_response()
+    logger = _RecorderLogger()
+
+    def fake_run_with_shadow(*args: Any, **kwargs: Any) -> ProviderResponse:
+        assert args[0] is provider
+        assert kwargs["capture_metrics"] is False
+        return response
+
+    invoker = ProviderInvoker(
+        rate_limiter=None,
+        run_with_shadow=cast(Any, fake_run_with_shadow),
+        time_fn=lambda: 1.0,
+        elapsed_ms=lambda start: 5,
+    )
+
+    result = invoker.invoke(
+        provider,
+        request,
+        attempt=1,
+        total_providers=1,
+        event_logger=logger,
+        request_fingerprint="fp",
+        metadata={},
+        shadow=None,
+        metrics_path=None,
+        capture_shadow_metrics=False,
+    )
+
+    assert result.error is None
+    provider_calls = [event for event in logger.events if event[0] == "provider_call"]
+    assert len(provider_calls) == 1
+    payload = provider_calls[0][1]
+    token_usage = payload.get("token_usage")
+    assert token_usage == {"prompt": 3, "completion": 5, "total": 8}
+    assert all(isinstance(value, int) for value in token_usage.values())
+
+
 def test_invoker_logs_skip_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = _StubProvider("primary")
     request = ProviderRequest(model="gpt", prompt="hi")
