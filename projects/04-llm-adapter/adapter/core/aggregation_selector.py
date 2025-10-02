@@ -95,7 +95,7 @@ class AggregationSelector:
             if decision.metadata:
                 key = "bucket_weight" if is_weighted else "bucket_size"
                 raw_votes = decision.metadata.get(key)
-                if isinstance(raw_votes, int | float):
+                if isinstance(raw_votes, (int, float)):  # noqa: UP038
                     votes = float(raw_votes)
             metadata = dict(decision.metadata or {})
             if is_weighted:
