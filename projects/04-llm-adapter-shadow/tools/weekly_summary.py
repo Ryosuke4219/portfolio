@@ -61,7 +61,7 @@ def _collect(path: Path) -> Summary:
             if outcome == "success":
                 success += 1
             latency = record.get("latency_ms")
-            if isinstance(latency, int | float) and latency >= 0:
+            if isinstance(latency, (int | float)) and latency >= 0:
                 latencies.append(float(latency))
         elif event == "shadow_diff":
             diff_kind = record.get("diff_kind")
