@@ -1,3 +1,5 @@
+__version__ = "0.1.0"
+
 from .errors import (
     AuthError as AuthError,
     FatalError as FatalError,
@@ -14,6 +16,7 @@ from .runner import Runner as Runner
 from .shadow import run_with_shadow as run_with_shadow
 
 __all__ = [
+    "__version__",
     "AuthError",
     "FatalError",
     "ProviderRequest",
