@@ -68,6 +68,27 @@ def _build_shadow_record(
     request_fingerprint = content_hash("runner", *request_inputs)
     shadow_provider = payload.get("provider", shadow_name)
     shadow_outcome = _resolve_shadow_outcome(payload)
+    diff_kind = "unknown"
+    shadow_ok = payload.get("ok") if isinstance(payload, Mapping) else None
+    if shadow_outcome in {"error", "timeout"} or shadow_ok is False:
+        diff_kind = "shadow_error"
+    elif shadow_outcome == "success" or shadow_ok is True:
+        comparisons: list[bool] = []
+        shadow_text = payload.get("text")
+        if isinstance(shadow_text, str):
+            comparisons.append(shadow_text == primary_response.text)
+        shadow_text_len = payload.get("text_len")
+        if isinstance(shadow_text_len, int):
+            comparisons.append(shadow_text_len == len(primary_response.text))
+        shadow_tokens_total = payload.get("token_usage_total")
+        if isinstance(shadow_tokens_total, int):
+            comparisons.append(
+                shadow_tokens_total == primary_response.token_usage.total
+            )
+        if any(match is False for match in comparisons):
+            diff_kind = "mismatch"
+        elif comparisons:
+            diff_kind = "match"
     record: dict[str, Any] = {
         "request_hash": content_hash(primary_provider_name, *request_inputs),
         "request_fingerprint": request_fingerprint,
@@ -82,6 +103,7 @@ def _build_shadow_record(
         "shadow_latency_ms": payload.get("latency_ms"),
         "shadow_duration_ms": payload.get("duration_ms"),
         "shadow_error": payload.get("error"),
+        "diff_kind": diff_kind,
     }
     if payload.get("latency_ms") is not None:
         record["latency_gap_ms"] = payload["latency_ms"] - primary_response.latency_ms
