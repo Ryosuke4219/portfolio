@@ -5,7 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
-from typing import cast, Protocol
+from typing import Protocol
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
