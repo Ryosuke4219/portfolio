@@ -154,6 +154,13 @@ def log_provider_call(
         return
 
     provider_name = _provider_name(provider)
+    prompt_tokens = int(tokens_in) if tokens_in is not None else 0
+    completion_tokens = int(tokens_out) if tokens_out is not None else 0
+    token_usage = {
+        "prompt": prompt_tokens,
+        "completion": completion_tokens,
+        "total": prompt_tokens + completion_tokens,
+    }
     event_logger.emit(
         "provider_call",
         {
@@ -170,6 +177,7 @@ def log_provider_call(
             "latency_ms": latency_ms,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
+            "token_usage": token_usage,
             "error_type": type(error).__name__ if error is not None else None,
             "error_message": str(error) if error is not None else None,
             "error_family": error_family(error),

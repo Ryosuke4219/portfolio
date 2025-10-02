@@ -198,6 +198,7 @@ def test_cancelled_results_skip_metrics(monkeypatch: pytest.MonkeyPatch) -> None
     assert all(isinstance(entry, ProviderInvocationResult) for entry in results)
     assert all(isinstance(entry.error, CancelledError) for entry in results if entry is not None)
 
+
     logger = _RecorderLogger()
     log_run_metric_calls: list[dict[str, Any]] = []
 
@@ -224,3 +225,43 @@ def test_cancelled_results_skip_metrics(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert log_run_metric_calls == []
     assert all(isinstance(entry.error, CancelledError) for entry in results if entry is not None)
+
+
+def test_provider_call_event_contains_token_usage() -> None:
+    provider = _StubProvider("primary")
+    request = ProviderRequest(model="gpt", prompt="hi")
+    response = _make_response()
+    event_logger = _RecorderLogger()
+
+    def fake_run_with_shadow(*args: Any, **kwargs: Any) -> ProviderResponse:
+        assert kwargs["capture_metrics"] is False
+        return response
+
+    invoker = ProviderInvoker(
+        rate_limiter=None,
+        run_with_shadow=cast(Any, fake_run_with_shadow),
+        time_fn=lambda: 0.0,
+        elapsed_ms=lambda start: 1,
+    )
+
+    invoker.invoke(
+        provider,
+        request,
+        attempt=1,
+        total_providers=1,
+        event_logger=event_logger,
+        request_fingerprint="fp",
+        metadata={},
+        shadow=None,
+        metrics_path=None,
+        capture_shadow_metrics=False,
+    )
+
+    provider_call_events = [record for event, record in event_logger.events if event == "provider_call"]
+    assert provider_call_events, "provider_call event not emitted"
+    latest = provider_call_events[-1]
+    token_usage = latest.get("token_usage")
+    assert isinstance(token_usage, dict)
+    assert token_usage == {"prompt": 3, "completion": 5, "total": 8}
+    for key in ("prompt", "completion", "total"):
+        assert isinstance(token_usage[key], int)
