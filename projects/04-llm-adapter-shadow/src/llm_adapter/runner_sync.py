@@ -35,7 +35,6 @@ from .runner_sync_modes import get_sync_strategy, SyncRunContext
 from .shadow import DEFAULT_METRICS_PATH
 from .utils import content_hash, elapsed_ms
 
-
 _CANCELLED_RESULT_WAIT_S = 0.05
 _CANCELLED_RESULT_POLL_S = 0.001
 
