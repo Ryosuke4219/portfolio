@@ -23,7 +23,7 @@ from src.llm_adapter.runner_sync_invocation import ProviderInvocationResult
 from src.llm_adapter.runner_sync_modes import get_sync_strategy, SyncRunContext
 from src.llm_adapter.utils import content_hash
 
-from .test_runner_parallel import _read_metrics, _StaticProvider, RecordingLogger
+from .parallel_helpers import RecordingLogger, _StaticProvider, _read_metrics
 
 
 class _DelayedProvider(_StaticProvider):
