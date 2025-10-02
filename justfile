@@ -46,7 +46,14 @@ lint:
 	fi
 	./.venv/bin/python -m compileall projects/04-llm-adapter-shadow
 
+# 週次サマリ生成
+weekly-summary:
+        set -euo pipefail
+        python -m projects.04-llm-adapter-shadow.tools.weekly_summary --input artifacts/runs-metrics.jsonl --output docs/weekly-summary.md
+
 # Python プロジェクトのカバレッジ付きレポート生成
 report:
-	set -euo pipefail
-	./.venv/bin/pytest --cov=projects/04-llm-adapter-shadow --cov-report=xml --cov-report=term-missing projects/04-llm-adapter-shadow/tests
+        set -euo pipefail
+        just test
+        ./.venv/bin/pytest --cov=projects/04-llm-adapter-shadow --cov-report=xml --cov-report=term-missing projects/04-llm-adapter-shadow/tests
+        just weekly-summary
