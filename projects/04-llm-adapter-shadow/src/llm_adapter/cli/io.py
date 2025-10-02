@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
+import json
 from json import JSONDecodeError
 from typing import Any
 
