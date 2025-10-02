@@ -147,21 +147,41 @@ max_concurrency = 4              # 同時実行上限（parallel_* / consensus �
 rpm = 120                        # 1分あたりの合計呼び出し上限
 
 [runner.consensus]
-strategy = "majority"            # "majority" | "weighted"
-min_votes = 2                    # 採択に必要な最小同意数
-score_threshold = 0.6            # weighted 時のスコア閾値
-tie_breaker = "latency"          # "latency" | "priority"
+strategy = "majority_vote"       # "majority_vote" | "max_score" | "weighted_vote"
+quorum = 2                       # 採択に必要な最小同意数
+tie_breaker = "min_latency"      # "min_latency" | "min_cost" | "stable_order"
+schema = "{\"type\":\"object\"}"   # JSON Schema（CLI の --schema はファイル読込）
+judge = "pkg.module:call"        # judge 実装（module:callable 形式）
+provider_weights = { "mock:fast" = 1.0, "mock:slow" = 0.5 }
+max_latency_ms = 2500            # レイテンシ上限（ミリ秒）
+max_cost_usd = 0.25              # 推定コスト上限（USD）
 ```
 
 | RunnerConfig フィールド | CLI オプション | 説明 |
 | --- | --- | --- |
-| `mode` | `--mode {fallback,parallel_any,parallel_all,consensus}` | 実行モードの切替 |
-| `max_concurrency` | `--max-concurrency <int>` | 並列呼び出し数の上限 |
-| `rpm` | `--rpm <int>` | 1分あたりのプロバイダ呼び出し上限 |
-| `consensus.strategy` | `--consensus-strategy {majority,weighted}` | 投票方式の選択 |
-| `consensus.min_votes` | `--consensus-min-votes <int>` | 採択に必要な最小票数 |
-| `consensus.score_threshold` | `--consensus-score-threshold <float>` | weighted でのスコア合格ライン |
-| `consensus.tie_breaker` | `--consensus-tie-breaker {latency,priority}` | 票同数時のタイブレーク規則 |
+| `mode` | `--mode {sequential,parallel-any,parallel-all,consensus}` | **JP:** 実行モードを選択。<br>**EN:** Selects the orchestration mode. |
+| `max_concurrency` | `--max-concurrency <int>` | **JP:** 並列呼び出し数の上限。<br>**EN:** Limits concurrent provider calls. |
+| `rpm` | `--rpm <int>` | **JP:** 1分あたりの合計呼び出し上限。<br>**EN:** Caps total requests per minute. |
+| `metrics_path` | `--metrics <path>` | **JP:** メトリクス出力先を上書き。<br>**EN:** Overrides the metrics sink path. |
+| `consensus.strategy` | `--aggregate {majority_vote,max_score,weighted_vote}` | **JP:** 多数決アルゴリズム。<br>**EN:** Consensus aggregation strategy. |
+| `consensus.quorum` | `--quorum <int>` | **JP:** 採択に必要な票数。<br>**EN:** Minimum votes required to accept a candidate. |
+| `consensus.tie_breaker` | `--tie-breaker {min_latency,min_cost,stable_order}` | **JP:** 票同数時の裁定。<br>**EN:** Tie-breaker policy. |
+| `consensus.schema` | `--schema <path>` | **JP:** JSON Schema をファイルから読込み。<br>**EN:** Loads JSON Schema from the given file path. |
+| `consensus.judge` | `--judge <module:callable>` | **JP:** 追加判定ロジックを呼び出す。<br>**EN:** Invokes custom judge callable for final arbitration. |
+| `consensus.provider_weights` | `--weights provider=weight,...` | **JP:** プロバイダごとの重み付け。<br>**EN:** Applies per-provider weights. |
+| `consensus.max_latency_ms` | `--max-latency-ms <int>` | **JP:** レイテンシが閾値を超えた候補を除外。<br>**EN:** Filters out responses exceeding the latency ceiling (ms). |
+| `consensus.max_cost_usd` | `--max-cost-usd <float>` | **JP:** 推定コストが上限を超えた候補を除外。<br>**EN:** Drops responses beyond the USD cost guardrail. |
+
+#### CLI オプション補足 / Additional notes
+
+- **JP:** `--schema` は JSON ファイルを読み込み、内容をそのまま `ConsensusConfig.schema` に設定します。`--judge` は `pkg.module:callable` 形式で指定し、タイブレーク後も同票なら審級判定を行います。<br>**EN:** `--schema` reads a JSON document from disk into `ConsensusConfig.schema`, while `--judge` expects a `pkg.module:callable` string that is invoked if a tie persists after tie-breaking.
+- **JP:** `--weights` は CSV 形式（例: `provider-a=1.0,provider-b=0.5`）で、指定がないプロバイダは重み 1.0 で扱われます。<br>**EN:** `--weights` accepts CSV values such as `provider-a=1.0,provider-b=0.5`; providers without entries default to weight 1.0.
+- **JP:** `--max-latency-ms` と `--max-cost-usd` は制約に違反した候補を除外し、全候補が不合格の場合は `ParallelExecutionError` を送出します。<br>**EN:** `--max-latency-ms` and `--max-cost-usd` drop candidates violating the thresholds and raise `ParallelExecutionError` if none survive.
+
+#### just コマンドによる補助 / Using `just` helpers
+
+- **JP:** `just python-test` — Python テストスイートで CLI と RunnerConfig の整合性を検証します。<br>**EN:** `just python-test` runs the Python suite to verify CLI and RunnerConfig alignment.
+- **JP:** `just lint` — CLI 追加オプションを含むモジュールが構文エラーなく読み込めるかを手早く確認します。<br>**EN:** `just lint` performs a quick syntax check to ensure CLI modules import cleanly with the new options.
 
 ### Run the tests
 
