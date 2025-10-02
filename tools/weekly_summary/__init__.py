@@ -43,7 +43,7 @@ def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
             passes += 1
         elif status in {"fail", "failed"}:
             fails += 1
-        elif status == "error":
+        elif status in {"error", "errored"}:
             errors += 1
     return passes, fails, errors
 
