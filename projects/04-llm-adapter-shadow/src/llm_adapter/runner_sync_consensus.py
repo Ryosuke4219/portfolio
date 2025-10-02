@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
-from .provider_spi import ProviderResponse, ProviderSPI
-from .runner_parallel import compute_consensus
+from .provider_spi import ProviderResponse, ProviderSPI, TokenUsage
+from .runner_parallel import ConsensusObservation, compute_consensus
 from .runner_sync_modes import _limited_providers, _raise_no_attempts
 from .shadow import ShadowMetrics
+from .runner_shared import estimate_cost
 from .utils import content_hash
 
 if TYPE_CHECKING:
@@ -73,20 +74,42 @@ class ConsensusStrategy:
             candidates: list[
                 tuple[str, ProviderResponse, dict[str, object]]
             ] = []
+            observations: list[ConsensusObservation] = []
             for invocation in invocations:
                 response = invocation.response
                 if response is None:
                     continue
+                provider_name = invocation.provider.name()
+                tokens_in = invocation.tokens_in
+                tokens_out = invocation.tokens_out
+                tokens: TokenUsage | None = None
+                if tokens_in is not None and tokens_out is not None:
+                    tokens = TokenUsage(prompt=tokens_in, completion=tokens_out)
+                    cost_estimate = estimate_cost(
+                        invocation.provider, tokens_in, tokens_out
+                    )
+                else:
+                    cost_estimate = None
+                latency_ms = invocation.latency_ms
+                if latency_ms is None:
+                    latency_ms = response.latency_ms
+                observations.append(
+                    ConsensusObservation(
+                        provider_id=provider_name,
+                        response=response,
+                        latency_ms=latency_ms,
+                        tokens=tokens,
+                        cost_estimate=cost_estimate,
+                    )
+                )
                 metadata: dict[str, object] = {
                     "invocation": invocation,
                     "attempt": invocation.attempt,
-                    "latency_ms": response.latency_ms,
+                    "latency_ms": latency_ms,
                     "tokens_in": invocation.tokens_in,
                     "tokens_out": invocation.tokens_out,
                 }
-                candidates.append(
-                    (invocation.provider.name(), response, metadata)
-                )
+                candidates.append((provider_name, response, metadata))
             if not candidates:
                 failure_details: list[dict[str, str]] = []
                 for invocation in invocations:
@@ -114,9 +137,8 @@ class ConsensusStrategy:
                     message = f"{message}: {detail_text}"
                 error = ParallelExecutionError(message, failures=failure_details)
                 raise error
-            responses_for_consensus = [response for _, response, _ in candidates]
             consensus = compute_consensus(
-                responses_for_consensus,
+                observations,
                 config=runner._config.consensus,
             )
             winner_name, _, winner_metadata = next(
