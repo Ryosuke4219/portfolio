@@ -7,6 +7,8 @@ from collections.abc import Iterable
 import datetime as dt
 from pathlib import Path
 
+from tools.ci_metrics import normalize_status
+
 from . import (
     aggregate_status,
     build_front_matter,
@@ -48,6 +50,19 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     return _parse_args_impl(argv)
 
 
+def _collect_failure_kinds(
+    runs: Iterable[dict[str, object]]
+) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    for run in runs:
+        status = normalize_status(coerce_str(run.get("status")))
+        if status not in {"fail", "error"}:
+            continue
+        kind = coerce_str(run.get("failure_kind")) or "unknown"
+        counter[kind] += 1
+    return counter
+
+
 def _main_impl() -> None:
     args = _parse_args_impl()
     out_path: Path = args.out
@@ -78,16 +93,7 @@ def _main_impl() -> None:
     pass_rate = (passes / total_tests) if total_tests else None
     prev_pass_rate = (prev_passes / prev_total) if prev_total else None
 
-    failure_counter: Counter[str] = Counter()
-    for run in current_runs:
-        status_raw = coerce_str(run.get("status"))
-        if status_raw is None:
-            continue
-        status = status_raw.lower()
-        if status not in {"fail", "failed", "error"}:
-            continue
-        kind = coerce_str(run.get("failure_kind")) or "unknown"
-        failure_counter[kind] += 1
+    failure_counter = _collect_failure_kinds(current_runs)
 
     top_failure = compute_failure_top(failure_counter)
     new_defects = count_new_defects(defect_dates, current_start.date())
