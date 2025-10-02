@@ -16,6 +16,5 @@ def test_compute_run_history_excludes_other_statuses_from_pass_rate():
     ]
 
     history = compute_run_history(runs)
-
     assert len(history) == 1
     assert history[0].pass_rate == 1.0
