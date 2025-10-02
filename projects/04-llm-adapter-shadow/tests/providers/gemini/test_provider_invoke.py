@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from types import SimpleNamespace
-from typing import Any, NoReturn, cast
+from typing import Any, cast, NoReturn
 
 import pytest
 
