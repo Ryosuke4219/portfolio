@@ -21,8 +21,8 @@ from .utils import elapsed_ms
 
 if TYPE_CHECKING:
     from .runner_sync_parallel_logging import (
-        CancelledResultsBuilder as _CancelledResultsBuilderType,
-        ParallelResultLogger as _ParallelResultLoggerType,
+        CancelledResultsBuilder,
+        ParallelResultLogger,
     )
 
 
@@ -192,8 +192,8 @@ class ProviderInvoker:
 
 
 def _load_parallel_logging() -> tuple[
-    type[_CancelledResultsBuilderType],
-    type[_ParallelResultLoggerType],
+    type["CancelledResultsBuilder"],
+    type["ParallelResultLogger"],
 ]:
     from .runner_sync_parallel_logging import (
         CancelledResultsBuilder as _CancelledResultsBuilder,
@@ -203,9 +203,8 @@ def _load_parallel_logging() -> tuple[
     return _CancelledResultsBuilder, _ParallelResultLogger
 
 
-CancelledResultsBuilder: type[_CancelledResultsBuilderType]
-ParallelResultLogger: type[_ParallelResultLoggerType]
-CancelledResultsBuilder, ParallelResultLogger = _load_parallel_logging()
+if not TYPE_CHECKING:
+    CancelledResultsBuilder, ParallelResultLogger = _load_parallel_logging()
 
 
 __all__ = [
