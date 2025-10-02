@@ -4,10 +4,10 @@ from typing import cast
 
 import pytest
 
-import src.llm_adapter.runner_parallel as runner_parallel
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import ProviderResponse, TokenUsage
 from src.llm_adapter.runner_config import ConsensusConfig
+import src.llm_adapter.runner_parallel as runner_parallel
 from src.llm_adapter.runner_parallel import (
     compute_consensus,
     ConsensusObservation,
