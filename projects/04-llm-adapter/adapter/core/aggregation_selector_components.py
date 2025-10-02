@@ -108,7 +108,7 @@ class JudgeScorer:
         raw = getattr(response, "raw", None)
         if isinstance(raw, Mapping):
             value = raw.get("quality_score")
-            if isinstance(value, int | float):
+            if isinstance(value, (int, float)):  # noqa: UP038
                 return float(value)
         text = getattr(response, "text", None)
         if isinstance(text, str):
