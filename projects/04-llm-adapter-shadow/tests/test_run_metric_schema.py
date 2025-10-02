@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import CancelledError
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.runner import Runner, RunnerConfig
 from src.llm_adapter.runner_config import RunnerMode
+from src.llm_adapter.runner_shared import log_run_metric
 
 from .shadow._runner_test_helpers import _SuccessProvider, FakeLogger
 
@@ -38,6 +40,13 @@ def test_sequential_run_metric_contains_required_fields(tmp_path: Path) -> None:
     assert event["mode"] == RunnerMode.SEQUENTIAL.value
     assert event["providers"] == ["primary"]
     assert event["provider_id"] == event["provider"]
+    tokens_in = event["tokens_in"]
+    tokens_out = event["tokens_out"]
+    assert event["token_usage"] == {
+        "prompt": tokens_in,
+        "completion": tokens_out,
+        "total": tokens_in + tokens_out,
+    }
     cost_usd = event["cost_usd"]
     assert isinstance(cost_usd, int | float)
     assert event["cost_estimate"] == pytest.approx(float(cost_usd))
@@ -67,6 +76,53 @@ def test_parallel_run_metric_uses_shadow_default(tmp_path: Path) -> None:
         assert event["mode"] == RunnerMode.PARALLEL_ALL.value
         assert event["providers"] == ["primary", "secondary"]
         assert event["provider_id"] == event["provider"]
+        tokens_in = event["tokens_in"]
+        tokens_out = event["tokens_out"]
+        assert event["token_usage"] == {
+            "prompt": tokens_in,
+            "completion": tokens_out,
+            "total": tokens_in + tokens_out,
+        }
         assert event["outcome"] == "success"
         assert event["shadow_used"] is True
         assert event["shadow_provider_id"] == "shadow"
+
+
+def test_run_metric_cancellation_reports_success(tmp_path: Path) -> None:
+    provider = _SuccessProvider("primary")
+    logger = FakeLogger()
+    request = ProviderRequest(prompt="hello", model="demo-cancelled")
+    metadata = {
+        "mode": RunnerMode.SEQUENTIAL.value,
+        "providers": [provider.name()],
+        "shadow_provider_id": None,
+        "trace_id": None,
+        "project_id": None,
+    }
+
+    log_run_metric(
+        logger,
+        request_fingerprint="fingerprint",
+        request=request,
+        provider=provider,
+        status="error",
+        attempts=1,
+        latency_ms=5,
+        tokens_in=None,
+        tokens_out=None,
+        cost_usd=0.0,
+        error=CancelledError(),
+        metadata=metadata,
+        shadow_used=False,
+    )
+
+    events = logger.of_type("run_metric")
+    assert len(events) == 1
+    event = events[0]
+    assert event["status"] == "ok"
+    assert event["error_type"] is None
+    assert event["token_usage"] == {
+        "prompt": 0,
+        "completion": 0,
+        "total": 0,
+    }

@@ -249,8 +249,8 @@ def test_async_runner_parallel_any_logs_cancelled_providers() -> None:
         if event["provider"] is not None
     }
     assert run_metrics["fast"]["status"] == "ok"
-    assert run_metrics["slow"]["status"] == "error"
-    assert run_metrics["slow"]["error_type"] == "CancelledError"
+    assert run_metrics["slow"]["status"] == "ok"
+    assert run_metrics["slow"]["error_type"] is None
 
 
 def test_async_shadow_exec_uses_injected_logger(tmp_path: Path) -> None:
