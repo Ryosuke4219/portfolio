@@ -1,5 +1,7 @@
 import { listJsonlFiles, readJsonl } from './fs-utils.js';
 
+const FAILURE_STATUSES = new Set(['fail', 'error', 'errored']);
+
 function calculateImpact(avgDuration, baseline) {
   if (!avgDuration || !baseline) return 0;
   return Math.min(1, Math.log1p(avgDuration) / Math.log1p(baseline));
@@ -20,7 +22,8 @@ function calculateRecency(perRunStats, runOrderLength, lambda) {
 }
 
 export function isFailureStatus(status) {
-  return status?.status === 'fail' || status?.status === 'error';
+  const value = typeof status === 'string' ? status : status?.status;
+  return FAILURE_STATUSES.has(value);
 }
 
 class AggregatedEntry {
@@ -63,7 +66,7 @@ class AggregatedEntry {
     this.attempts += 1;
     this.durationTotal += attempt.duration_ms || 0;
     if (attempt.status === 'pass') this.passes += 1;
-    else if (attempt.status === 'fail' || attempt.status === 'error') this.fails += 1;
+    else if (isFailureStatus(attempt)) this.fails += 1;
 
     if (attempt.failure_kind) {
       const next = (this.failureKinds.get(attempt.failure_kind) || 0) + 1;
@@ -77,7 +80,7 @@ class AggregatedEntry {
       this.failureSignatures.set(attempt.failure_signature, sig);
     }
 
-    if (attempt.status === 'fail' || attempt.status === 'error') {
+    if (isFailureStatus(attempt)) {
       const current = this.latestFailure;
       if (!current || current.runIndex <= runIndex) {
         this.latestFailure = {
@@ -95,7 +98,7 @@ class AggregatedEntry {
 
     const perRun = this.perRun.get(runIndex) || { attempts: 0, fails: 0, passes: 0 };
     perRun.attempts += 1;
-    if (attempt.status === 'fail' || attempt.status === 'error') perRun.fails += 1;
+    if (isFailureStatus(attempt)) perRun.fails += 1;
     if (attempt.status === 'pass') perRun.passes += 1;
     this.perRun.set(runIndex, perRun);
   }
