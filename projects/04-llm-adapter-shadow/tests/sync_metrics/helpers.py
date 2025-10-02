@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 import time
-from typing import Any, NamedTuple, cast
+from typing import Any, cast, NamedTuple
 
 from src.llm_adapter.observability import CompositeLogger, EventLogger, JsonlLogger
 from src.llm_adapter.parallel_exec import (
@@ -16,10 +16,10 @@ from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
 from src.llm_adapter.runner_shared import MetricsPath
 from src.llm_adapter.runner_sync import Runner
 from src.llm_adapter.runner_sync_invocation import ProviderInvocationResult
-from src.llm_adapter.runner_sync_modes import SyncRunContext, get_sync_strategy
+from src.llm_adapter.runner_sync_modes import get_sync_strategy, SyncRunContext
 from src.llm_adapter.utils import content_hash
 
-from ..parallel_helpers import RecordingLogger, _read_metrics
+from ..parallel_helpers import _read_metrics, RecordingLogger
 
 
 class ExecutionResult(NamedTuple):
