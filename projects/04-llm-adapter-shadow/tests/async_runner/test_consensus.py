@@ -67,6 +67,7 @@ def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert consensus_event["winner_provider"] == "agree_a"
     assert consensus_event["quorum"] == 2
     assert consensus_event["chosen_provider"] == "agree_a"
+    assert consensus_event["reason"] == "majority_vote quorum=2/3"
 
     winner_diff = next(
         item
@@ -75,6 +76,10 @@ def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         and item.get("primary_provider") == "agree_a"
     )
     assert winner_diff["shadow_consensus_delta"]["votes_total"] == 3
+    assert (
+        winner_diff["shadow_consensus_delta"]["reason"]
+        == "majority_vote quorum=2/3"
+    )
 
 
 def test_async_consensus_quorum_failure() -> None:

@@ -766,6 +766,7 @@ def test_consensus_vote_event_and_shadow_delta(
     )
     assert consensus_event["strategy"] == "majority_vote"
     assert consensus_event["quorum"] == 2
+    assert consensus_event["reason"] == "majority_vote quorum=2/3"
     assert consensus_event["voters_total"] == 3
     assert consensus_event["votes_for"] == 2
     assert consensus_event["votes_against"] == 1
@@ -800,3 +801,7 @@ def test_consensus_vote_event_and_shadow_delta(
     )
     assert winner_diff["shadow_consensus_delta"]["votes_for"] == 2
     assert winner_diff["shadow_consensus_delta"]["votes_total"] == 3
+    assert (
+        winner_diff["shadow_consensus_delta"]["reason"]
+        == "majority_vote quorum=2/3"
+    )
