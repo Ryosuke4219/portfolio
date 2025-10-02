@@ -9,6 +9,26 @@ from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 from tests.shadow._runner_test_helpers import _SuccessProvider
 
 
+def test_runner_consensus_all_candidates_exceed_cost_limit() -> None:
+    providers = [
+        _SuccessProvider("alpha", cost_usd=1.0),
+        _SuccessProvider("bravo", cost_usd=2.0),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            consensus=ConsensusConfig(strategy="majority", quorum=1, max_cost_usd=0.5),
+        ),
+    )
+    request = ProviderRequest(prompt="cost filter", model="demo-model")
+
+    with pytest.raises(ParallelExecutionError) as exc_info:
+        runner.run(request)
+
+    assert str(exc_info.value) == "no responses satisfied consensus constraints"
+
+
 def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> None:
     providers = [
         MockProvider("timeout", base_latency_ms=1, error_markers=set()),
