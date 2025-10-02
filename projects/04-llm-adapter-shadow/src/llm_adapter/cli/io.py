@@ -14,7 +14,6 @@ from ..runner import AsyncRunner, Runner
 from ..shadow import MetricsPath
 from .config import build_runner_config
 
-
 def _read_structured_payload(text: str, *, jsonl: bool = False) -> dict[str, Any] | None:
     if jsonl:
         for line in text.splitlines():

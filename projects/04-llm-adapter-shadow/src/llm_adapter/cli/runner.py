@@ -41,7 +41,7 @@ def _format_output(response: ProviderResponse, fmt: str) -> str:
         payload["finish_reason"] = response.finish_reason
     if isinstance(raw_payload, Mapping):
         payload["raw"] = raw_payload
-    return json.dumps(payload, ensure_ascii=False)
+    return json.dumps(payload, ensure_ascii=False
 
 
 def _coerce_response(
