@@ -33,17 +33,19 @@ __all__ = [
 
 
 def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
+    from tools.ci_metrics import normalize_status  # local import to avoid cycle
+
     passes = fails = errors = 0
     for run in runs:
         status_raw = coerce_str(run.get("status"))
         if status_raw is None:
             continue
-        status = status_raw.lower()
+        status = normalize_status(status_raw)
         if status == "pass":
             passes += 1
-        elif status in {"fail", "failed"}:
+        elif status == "fail":
             fails += 1
-        elif status in {"error", "errored"}:
+        elif status == "error":
             errors += 1
     return passes, fails, errors
 

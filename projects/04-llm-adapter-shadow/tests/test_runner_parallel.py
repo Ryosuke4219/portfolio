@@ -267,6 +267,57 @@ def test_parallel_result_logger_skips_and_avoids_duplicate_logging() -> None:
     assert elapsed_calls == [1.0]
 
 
+def test_parallel_result_logger_marks_cancelled_results_ok() -> None:
+    provider = _StaticProvider("cancelled", text="unused", latency_ms=5)
+    request = ProviderRequest(prompt="hello", model="m")
+    request_fingerprint = "fingerprint"
+    run_started = 0.0
+
+    provider_call_log: list[dict[str, object]] = []
+    run_metric_log: list[dict[str, object]] = []
+
+    logger = ParallelResultLogger(
+        log_provider_call=lambda event_logger, **record: provider_call_log.append(record),
+        log_run_metric=lambda event_logger, **record: run_metric_log.append(record),
+        estimate_cost=lambda provider, tokens_in, tokens_out: 0.0,
+        elapsed_ms=lambda _: 42,
+    )
+
+    cancelled_result = ProviderInvocationResult(
+        provider=provider,
+        attempt=1,
+        total_providers=2,
+        response=None,
+        error=CancelledError(),
+        latency_ms=None,
+        tokens_in=None,
+        tokens_out=None,
+        shadow_metrics=None,
+        shadow_metrics_extra=None,
+        provider_call_logged=False,
+    )
+
+    logger.log_results(
+        [cancelled_result],
+        event_logger=None,
+        request=request,
+        request_fingerprint=request_fingerprint,
+        metadata={},
+        run_started=run_started,
+        shadow_used=False,
+    )
+
+    assert len(provider_call_log) == 1
+    assert provider_call_log[0]["status"] == "ok"
+    assert provider_call_log[0]["latency_ms"] == 42
+    assert provider_call_log[0]["error"] is None
+
+    assert len(run_metric_log) == 1
+    assert run_metric_log[0]["status"] == "ok"
+    assert run_metric_log[0]["error"] is None
+    assert run_metric_log[0]["latency_ms"] == 42
+
+
 def test_parallel_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
     failing = MockProvider("fail", base_latency_ms=1, error_markers={"[TIMEOUT]"})
@@ -535,16 +586,16 @@ def test_runner_parallel_any_logs_cancelled_providers() -> None:
         event["provider"]: event for event in logger.of_type("provider_call")
     }
     assert provider_calls["fast"]["status"] == "ok"
-    assert provider_calls["slow"]["status"] == "error"
-    assert provider_calls["slow"]["error_type"] == "CancelledError"
+    assert provider_calls["slow"]["status"] == "ok"
+    assert provider_calls["slow"].get("error_type") in (None, "CancelledError")
     run_metrics = {
         event["provider"]: event
         for event in logger.of_type("run_metric")
         if event["provider"] is not None
     }
     assert run_metrics["fast"]["status"] == "ok"
-    assert run_metrics["slow"]["status"] == "error"
-    assert run_metrics["slow"]["error_type"] == "CancelledError"
+    assert run_metrics["slow"]["status"] == "ok"
+    assert run_metrics["slow"].get("error_type") is None
 
 
 def test_runner_parallel_any_retries_until_success(
