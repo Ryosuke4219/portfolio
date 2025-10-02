@@ -108,13 +108,20 @@ class ParallelResultLogger:
                 result.shadow_metrics.emit(result.shadow_metrics_extra)
             if any(result is skipped_result for skipped_result in skipped):
                 continue
-            status = "ok" if result.response is not None else "error"
-            if status == "ok":
+            if result.response is not None:
+                status = "ok"
                 tokens_in = result.tokens_in if result.tokens_in is not None else 0
                 tokens_out = result.tokens_out if result.tokens_out is not None else 0
                 cost_usd = self._estimate_cost(result.provider, tokens_in, tokens_out)
                 error_for_metric: Exception | None = None
+            elif isinstance(result.error, CancelledError):
+                status = "ok"
+                tokens_in = 0
+                tokens_out = 0
+                cost_usd = 0.0
+                error_for_metric = None
             else:
+                status = "error"
                 tokens_in = None
                 tokens_out = None
                 cost_usd = 0.0
