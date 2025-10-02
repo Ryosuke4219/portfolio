@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+import importlib.abc
 import importlib.util
 import json
 from pathlib import Path
 import sys
-from typing import Protocol, runtime_checkable
+from typing import Protocol, cast, runtime_checkable
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
@@ -30,9 +31,11 @@ def _load_main() -> MainFunc:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
-    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+    loader = cast(importlib.abc.Loader, spec.loader)
+    loader.exec_module(module)
     assert isinstance(module, _MainModule)
-    return module.main
+    main_module = cast(_MainModule, module)
+    return main_module.main
 
 
 def test_weekly_summary_generates_expected_markdown(tmp_path: Path) -> None:
