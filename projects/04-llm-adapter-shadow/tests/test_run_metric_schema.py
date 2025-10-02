@@ -25,6 +25,23 @@ def _run_and_fetch_event(
     return events
 
 
+def test_run_metric_includes_token_usage(tmp_path: Path) -> None:
+    provider = _SuccessProvider("primary")
+    logger = FakeLogger()
+    runner = Runner([provider], logger=logger)
+    request = ProviderRequest(prompt="hello", model="demo-token-usage")
+
+    events = _run_and_fetch_event(runner, request, metrics_path=tmp_path / "usage.jsonl")
+    event = events[0]
+
+    token_usage = event.get("token_usage")
+    assert isinstance(token_usage, dict)
+    assert set(token_usage) == {"prompt", "completion", "total"}
+    for key in ("prompt", "completion", "total"):
+        value = token_usage[key]
+        assert isinstance(value, int)
+
+
 def test_sequential_run_metric_contains_required_fields(tmp_path: Path) -> None:
     provider = _SuccessProvider("primary")
     logger = FakeLogger()
