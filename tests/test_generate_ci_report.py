@@ -3,7 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from tools.ci_report.processing import compute_last_updated, normalize_flaky_rows
+from tools.ci_report.processing import (
+    compute_last_updated,
+    normalize_flaky_rows,
+    summarize_failure_kinds,
+)
 from tools.ci_report.rendering import render_markdown
 from tools.weekly_summary import select_flaky_rows
 
@@ -33,6 +37,17 @@ def test_normalize_flaky_rows_sorts_and_limits() -> None:
     assert [row["canonical_id"] for row in normalized] == ["b", "a"]
     assert normalized[0]["rank"] == 1
     assert normalized[1]["attempts"] == 2
+
+
+def test_summarize_failure_kinds_counts_errored() -> None:
+    runs = [
+        {"status": "fail", "failure_kind": "infra"},
+        {"status": "errored", "failure_kind": "infra"},
+    ]
+
+    summary = summarize_failure_kinds(runs)
+
+    assert {"kind": "infra", "count": 2} in summary
 
 
 def test_render_markdown_includes_summary(sample_runs: list[dict[str, object]]) -> None:
