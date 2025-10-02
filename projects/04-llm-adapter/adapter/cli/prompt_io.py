@@ -35,11 +35,15 @@ def read_jsonl_prompts(path: Path, lang: str) -> list[str]:
                             _msg(lang, "jsonl_invalid_object", path=path, line=line_no)
                         )
                     continue
-                raise ValueError(_msg(lang, "jsonl_unsupported", path=path, line=line_no))
+                raise ValueError(
+                    _msg(lang, "jsonl_unsupported", path=path, line=line_no)
+                )
     except FileNotFoundError as exc:
         raise SystemExit(_msg(lang, "jsonl_missing", path=path)) from exc
     except json.JSONDecodeError as exc:
-        raise SystemExit(_msg(lang, "jsonl_decode_error", path=path, line=exc.lineno)) from exc
+        raise SystemExit(
+            _msg(lang, "jsonl_decode_error", path=path, line=exc.lineno)
+        ) from exc
     return prompts
 
 
