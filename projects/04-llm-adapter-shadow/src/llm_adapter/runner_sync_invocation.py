@@ -192,8 +192,8 @@ class ProviderInvoker:
 
 
 def _load_parallel_logging() -> tuple[
-    type["CancelledResultsBuilder"],
-    type["ParallelResultLogger"],
+    type[CancelledResultsBuilder],
+    type[ParallelResultLogger],
 ]:
     from .runner_sync_parallel_logging import (
         CancelledResultsBuilder as _CancelledResultsBuilder,
