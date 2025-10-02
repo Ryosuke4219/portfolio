@@ -101,7 +101,7 @@ def coerce_str(value: object | None) -> str | None:
     if isinstance(value, str):
         stripped = value.strip()
         return stripped or None
-    if isinstance(value, bool | int | float):
+    if isinstance(value, (bool, int, float)):  # noqa: UP038
         return str(value)
     return None
 
@@ -110,7 +110,7 @@ def to_float(value: object) -> float | None:
         return None
     if isinstance(value, bool):
         return float(value)
-    if isinstance(value, int | float):
+    if isinstance(value, (int, float)):  # noqa: UP038
         return float(value)
     if isinstance(value, str):
         s = value.strip()
