@@ -9,7 +9,7 @@ from typing import Any
 
 from ..parallel_exec import ParallelAllResult
 from ..provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from ..providers.factory import ProviderFactory, create_provider_from_spec, parse_provider_spec
+from ..providers.factory import create_provider_from_spec, parse_provider_spec, ProviderFactory
 from ..runner import AsyncRunner, Runner
 from ..shadow import MetricsPath
 from .args import parse_args
