@@ -209,6 +209,19 @@ def log_run_metric(
     retries = attempts - 1 if attempts > 0 else 0
     outcome = _normalize_outcome(status)
     cost_estimate = float(cost_usd)
+    if tokens_in is None and tokens_out is None:
+        token_usage: dict[str, int | None] | None = None
+    else:
+        total_tokens = 0
+        if tokens_in is not None:
+            total_tokens += tokens_in
+        if tokens_out is not None:
+            total_tokens += tokens_out
+        token_usage = {
+            "prompt": tokens_in,
+            "completion": tokens_out,
+            "total": total_tokens,
+        }
     event_logger.emit(
         "run_metric",
         {
@@ -224,6 +237,7 @@ def log_run_metric(
             "latency_ms": latency_ms,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
+            "token_usage": token_usage,
             "cost_usd": cost_estimate,
             "cost_estimate": cost_estimate,
             "error_type": type(error).__name__ if error is not None else None,

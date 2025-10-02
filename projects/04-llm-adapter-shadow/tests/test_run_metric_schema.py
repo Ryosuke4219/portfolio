@@ -38,6 +38,13 @@ def test_sequential_run_metric_contains_required_fields(tmp_path: Path) -> None:
     assert event["mode"] == RunnerMode.SEQUENTIAL.value
     assert event["providers"] == ["primary"]
     assert event["provider_id"] == event["provider"]
+    tokens_in = event["tokens_in"]
+    tokens_out = event["tokens_out"]
+    assert event["token_usage"] == {
+        "prompt": tokens_in,
+        "completion": tokens_out,
+        "total": tokens_in + tokens_out,
+    }
     cost_usd = event["cost_usd"]
     assert isinstance(cost_usd, int | float)
     assert event["cost_estimate"] == pytest.approx(float(cost_usd))
@@ -67,6 +74,13 @@ def test_parallel_run_metric_uses_shadow_default(tmp_path: Path) -> None:
         assert event["mode"] == RunnerMode.PARALLEL_ALL.value
         assert event["providers"] == ["primary", "secondary"]
         assert event["provider_id"] == event["provider"]
+        tokens_in = event["tokens_in"]
+        tokens_out = event["tokens_out"]
+        assert event["token_usage"] == {
+            "prompt": tokens_in,
+            "completion": tokens_out,
+            "total": tokens_in + tokens_out,
+        }
         assert event["outcome"] == "success"
         assert event["shadow_used"] is True
         assert event["shadow_provider_id"] == "shadow"
