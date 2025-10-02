@@ -6,7 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
-from typing import Protocol, cast, runtime_checkable
+from typing import cast, Protocol, runtime_checkable
 
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
