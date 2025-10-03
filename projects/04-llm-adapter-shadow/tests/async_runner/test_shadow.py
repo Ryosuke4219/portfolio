@@ -99,6 +99,10 @@ def test_async_shadow_exec_records_metrics(tmp_path: Path) -> None:
 
     assert call_event["shadow_provider_id"] == "shadow"
     assert run_metric_event["shadow_provider_id"] == "shadow"
+    assert call_event["shadow_latency_ms"] >= 0
+    assert call_event["shadow_outcome"] == "ok"
+    assert run_metric_event["shadow_latency_ms"] == call_event["shadow_latency_ms"]
+    assert run_metric_event["shadow_outcome"] == call_event["shadow_outcome"]
 
     assert diff_event["primary_provider"] == "primary"
     assert diff_event["shadow_provider"] == "shadow"
