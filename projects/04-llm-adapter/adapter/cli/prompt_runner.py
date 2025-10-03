@@ -79,7 +79,9 @@ async def _process_prompt(
                 output_tokens=0,
                 latency_ms=latency_ms,
             )
-            metric = RunMetric.from_resp(config, stub, prompt, cost_usd=0.0, error=friendly)
+            metric = RunMetric.from_resp(
+                config, stub, prompt, cost_usd=0.0, error=friendly
+            )
             return PromptResult(
                 index=index,
                 prompt=prompt,
@@ -143,7 +145,9 @@ async def execute_prompts(
     semaphore = asyncio.Semaphore(max(1, concurrency))
     tasks = [
         asyncio.create_task(
-            _process_prompt(idx, prompt, provider, config, limiter, semaphore, lang, classify_error)
+            _process_prompt(
+                idx, prompt, provider, config, limiter, semaphore, lang, classify_error
+            )
         )
         for idx, prompt in enumerate(prompts)
     ]
