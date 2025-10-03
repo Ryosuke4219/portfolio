@@ -95,7 +95,7 @@ def test_auto_tie_breaker_applies_latency_cost_and_order(
     }
     latency_breaker = AggregationController._resolve_tie_breaker(config, latency_lookup)
     assert latency_breaker and latency_breaker.break_tie(candidates).index == 0
-    assert latency_breaker.name in {"latency", "min_latency"}
+    assert latency_breaker.name == "min_latency"
 
     cost_lookup = {
         0: SingleRunResult(
@@ -109,7 +109,7 @@ def test_auto_tie_breaker_applies_latency_cost_and_order(
     }
     cost_breaker = AggregationController._resolve_tie_breaker(config, cost_lookup)
     assert cost_breaker and cost_breaker.break_tie(candidates).index == 1
-    assert cost_breaker.name in {"cost", "min_cost"}
+    assert cost_breaker.name == "min_cost"
 
     order_lookup = {
         0: SingleRunResult(
