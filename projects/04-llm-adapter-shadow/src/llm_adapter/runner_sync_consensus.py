@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
 from .provider_spi import ProviderResponse, ProviderSPI, TokenUsage
-from .runner_parallel import ConsensusObservation, compute_consensus
+from .runner_parallel import compute_consensus, ConsensusObservation
+from .runner_shared import estimate_cost
 from .runner_sync_modes import _limited_providers, _raise_no_attempts
 from .shadow import ShadowMetrics
-from .runner_shared import estimate_cost
 from .utils import content_hash
 
 if TYPE_CHECKING:
