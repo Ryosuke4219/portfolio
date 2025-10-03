@@ -48,14 +48,42 @@ def error_family(error: Exception | None) -> str | None:
     return "unknown"
 
 
+_COST_CACHE_ATTR = "_llm_adapter_cost_cache"
+
+
+def _get_cached_cost(
+    provider: object, tokens_in: int, tokens_out: int
+) -> float | None:
+    try:
+        cached_tokens, cached_value = getattr(provider, _COST_CACHE_ATTR)
+    except AttributeError:
+        return None
+    except Exception:  # pragma: no cover - defensive guard
+        return None
+    if cached_tokens == (tokens_in, tokens_out):
+        try:
+            return float(cached_value)
+        except (TypeError, ValueError):  # pragma: no cover - defensive guard
+            return None
+    return None
+
+
 def estimate_cost(provider: object, tokens_in: int, tokens_out: int) -> float:
+    cached = _get_cached_cost(provider, tokens_in, tokens_out)
+    if cached is not None:
+        return cached
     if hasattr(provider, "estimate_cost"):
         estimator = provider.estimate_cost
         if callable(estimator):
             try:
-                return float(estimator(tokens_in, tokens_out))
+                value = float(estimator(tokens_in, tokens_out))
             except Exception:  # pragma: no cover - defensive guard
                 return 0.0
+            try:
+                setattr(provider, _COST_CACHE_ATTR, ((tokens_in, tokens_out), value))
+            except Exception:  # pragma: no cover - defensive guard
+                pass
+            return value
     return 0.0
 
 
@@ -156,6 +184,10 @@ def log_provider_call(
     provider_name = _provider_name(provider)
     prompt_tokens = int(tokens_in) if tokens_in is not None else 0
     completion_tokens = int(tokens_out) if tokens_out is not None else 0
+    if tokens_in is None or tokens_out is None:
+        cost_estimate = 0.0
+    else:
+        cost_estimate = estimate_cost(provider, prompt_tokens, completion_tokens)
     token_usage = {
         "prompt": prompt_tokens,
         "completion": completion_tokens,
@@ -178,6 +210,7 @@ def log_provider_call(
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
             "token_usage": token_usage,
+            "cost_estimate": cost_estimate,
             "error_type": type(error).__name__ if error is not None else None,
             "error_message": str(error) if error is not None else None,
             "error_family": error_family(error),
