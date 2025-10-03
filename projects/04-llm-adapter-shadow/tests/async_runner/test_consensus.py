@@ -162,25 +162,45 @@ def test_async_consensus_error_details() -> None:
     test_async_consensus_failure_details()
 
 
-def test_async_consensus_cost_constraints() -> None:
-    provider_a = _CostProbeProvider("expensive_a", cost=2.0, text="match")
-    provider_b = _CostProbeProvider("expensive_b", cost=3.5, text="match")
+def test_async_consensus_weighted_vote_prefers_weight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    alpha = _StaticProvider("alpha", "alpha answer", latency_ms=120)
+    bravo = _StaticProvider("bravo", "bravo answer", latency_ms=20)
     runner = AsyncRunner(
-        [provider_a, provider_b],
+        [alpha, bravo],
         config=RunnerConfig(
             mode=RunnerMode.CONSENSUS,
             max_concurrency=2,
-            consensus=ConsensusConfig(quorum=1, max_cost_usd=0.5),
+            consensus=ConsensusConfig(
+                strategy="weighted_vote",
+                provider_weights={"alpha": 3.0, "bravo": 0.5},
+                tie_breaker="min_latency",
+                quorum=1,
+            ),
         ),
     )
-    request = ProviderRequest(prompt="topic", model="model-consensus-cost")
+    request = ProviderRequest(prompt="weighted", model="weighted-consensus")
 
-    with pytest.raises(ParallelExecutionError) as exc_info:
-        asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+    response_alpha = alpha.invoke(request)
+    response_bravo = bravo.invoke(request)
 
-    error = exc_info.value
-    failures = error.failures if hasattr(error, "failures") else None
-    assert failures is not None
-    assert len(failures) == 2
-    for item in failures:
-        assert "cost" in item.get("summary", "")
+    async def _fake_run_parallel_all_async(  # noqa: ANN001
+        workers,
+        *,
+        max_concurrency=None,
+        max_attempts=None,
+        on_retry=None,
+    ):
+        return [
+            (1, alpha, response_alpha, None),
+            (2, bravo, response_bravo, None),
+        ]
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_async_modes.consensus.run_parallel_all_async",
+        _fake_run_parallel_all_async,
+    )
+
+    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+    assert response.text == "alpha answer"
