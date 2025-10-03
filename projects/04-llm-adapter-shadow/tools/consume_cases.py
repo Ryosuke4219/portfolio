@@ -56,6 +56,14 @@ def _attempt_case_id(attempt: Mapping[str, Any]) -> str | None:
     return prefix.strip() or None
 
 
+def _normalize_status(raw_status: str) -> str:
+    normalized = raw_status.strip().lower()
+    alias_map = {
+        "errored": "error",
+    }
+    return alias_map.get(normalized, normalized)
+
+
 def _build_metrics(
     cases: Mapping[str, Any], attempts: list[Mapping[str, Any]]
 ) -> MutableMapping[str, Any]:
@@ -70,7 +78,8 @@ def _build_metrics(
     failed_ids: list[str] = []
 
     for attempt in attempts:
-        status = str(attempt.get("status", "unknown")).lower()
+        raw_status = str(attempt.get("status", "unknown"))
+        status = _normalize_status(raw_status)
         statuses[status] += 1
         case_id = _attempt_case_id(attempt)
         if case_id:
