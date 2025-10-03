@@ -21,6 +21,15 @@ class Summary:
     diff_kinds: Counter[str]
 
 
+_ERROR_OUTCOME_VALUES = {
+    "error",
+    "errored",
+    "failed",
+    "failure",
+    "exception",
+}
+
+
 def _load_records(path: Path) -> Iterable[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
@@ -36,12 +45,16 @@ def _load_records(path: Path) -> Iterable[dict[str, Any]]:
 
 
 def _normalize_outcome(record: Mapping[str, Any]) -> str:
-    outcome = record.get("outcome")
-    if isinstance(outcome, str) and outcome.strip():
-        return outcome.strip().lower()
-    status = record.get("status")
-    if isinstance(status, str) and status.strip():
-        return status.strip().lower()
+    for field in ("outcome", "status"):
+        value = record.get(field)
+        if not isinstance(value, str):
+            continue
+        normalized = value.strip().lower()
+        if not normalized:
+            continue
+        if normalized in _ERROR_OUTCOME_VALUES:
+            return "error"
+        return normalized
     return "unknown"
 
 
