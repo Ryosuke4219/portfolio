@@ -150,15 +150,16 @@ def log_provider_skipped(
 
 def _normalize_outcome(status: str) -> str:
     normalized = status.lower()
-    mapping = {
-        "ok": "success",
-        "success": "success",
-        "error": "error",
-        "failure": "error",
-        "skip": "skipped",
-        "skipped": "skipped",
-    }
-    return mapping.get(normalized, normalized)
+    success_values = {"ok", "success"}
+    error_values = {"error", "errored", "failure"}
+    skipped_values = {"skip", "skipped"}
+    if normalized in success_values:
+        return "success"
+    if normalized in error_values:
+        return "error"
+    if normalized in skipped_values:
+        return "skipped"
+    return normalized
 
 
 def log_provider_call(
