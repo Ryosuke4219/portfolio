@@ -2,8 +2,8 @@ import assert from 'node:assert';
 import { Readable } from 'node:stream';
 import { test } from 'node:test';
 
-import { parseJUnitStream } from '../../projects/03-ci-flaky/src/junit-parser.js';
 import { isFailureStatus } from '../../projects/03-ci-flaky/src/analyzer.js';
+import { parseJUnitStream } from '../../projects/03-ci-flaky/src/junit-parser.js';
 
 test('parseJUnitStream treats errored status attribute as a failure', async () => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
