@@ -173,10 +173,15 @@ def run_batch(provider_specs: Iterable[str], prompts_path: str) -> int:
     )
 
 
+def _normalize_mode(value: RunnerMode | str) -> RunnerMode:
+    return RunnerConfigBuilder._normalize_mode(value)
+
+
 __all__ = [
     "BackoffPolicy",
     "RunnerMode",
     "RunnerConfig",
+    "_normalize_mode",
     "default_budgets_path",
     "default_metrics_path",
     "run_batch",

@@ -72,6 +72,26 @@ class ConsensusRunStrategy(ParallelStrategyBase):
             )
 
         try:
+            observations: list[ConsensusObservation] = []
+            for _attempt, provider, response, _ in successful_entries:
+                provider_name: str
+                name_attr = getattr(provider, "name", None)
+                if callable(name_attr):
+                    provider_name = str(name_attr())
+                else:
+                    provider_name = type(provider).__name__
+                tokens = response.token_usage
+                tokens_in = int(tokens.prompt or 0) if tokens is not None else 0
+                tokens_out = int(tokens.completion or 0) if tokens is not None else 0
+                observations.append(
+                    ConsensusObservation(
+                        provider_id=provider_name,
+                        response=response,
+                        latency_ms=int(response.latency_ms or 0),
+                        tokens=tokens,
+                        cost_estimate=estimate_cost(provider, tokens_in, tokens_out),
+                    )
+                )
             consensus = compute_consensus(
                 observations,
                 config=context.config.consensus,

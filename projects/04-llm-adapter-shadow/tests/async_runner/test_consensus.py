@@ -21,6 +21,15 @@ from src.llm_adapter.runner_config import (
 from .conftest import _AsyncProbeProvider, _StaticProvider
 
 
+class _CostProbeProvider(_AsyncProbeProvider):
+    def __init__(self, name: str, *, cost: float, text: str) -> None:
+        super().__init__(name, delay=0.0, text=text)
+        self._cost = cost
+
+    def estimate_cost(self, tokens_in: int, tokens_out: int) -> float:  # noqa: ARG002
+        return self._cost
+
+
 def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
 
