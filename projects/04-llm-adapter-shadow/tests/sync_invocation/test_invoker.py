@@ -199,6 +199,13 @@ def test_provider_call_event_contains_token_usage(
 ) -> None:
     provider = stub_provider_factory("primary")
     event_logger = RecorderLogger()
+    cost_calls: list[tuple[int, int]] = []
+
+    def fake_estimate_cost(tokens_in: int, tokens_out: int) -> float:
+        cost_calls.append((tokens_in, tokens_out))
+        return 12.34
+
+    setattr(provider, "estimate_cost", fake_estimate_cost)
 
     def fake_run_with_shadow(*args: Any, **kwargs: Any) -> ProviderResponse:
         assert kwargs["capture_metrics"] is False
@@ -232,3 +239,5 @@ def test_provider_call_event_contains_token_usage(
     assert token_usage == {"prompt": 3, "completion": 5, "total": 8}
     for key in ("prompt", "completion", "total"):
         assert isinstance(token_usage[key], int)
+    assert cost_calls == [(3, 5)]
+    assert latest.get("cost_estimate") == pytest.approx(12.34)

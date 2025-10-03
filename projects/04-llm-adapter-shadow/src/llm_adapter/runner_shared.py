@@ -156,6 +156,10 @@ def log_provider_call(
     provider_name = _provider_name(provider)
     prompt_tokens = int(tokens_in) if tokens_in is not None else 0
     completion_tokens = int(tokens_out) if tokens_out is not None else 0
+    if tokens_in is None or tokens_out is None:
+        cost_estimate = 0.0
+    else:
+        cost_estimate = estimate_cost(provider, prompt_tokens, completion_tokens)
     token_usage = {
         "prompt": prompt_tokens,
         "completion": completion_tokens,
@@ -178,6 +182,7 @@ def log_provider_call(
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
             "token_usage": token_usage,
+            "cost_estimate": cost_estimate,
             "error_type": type(error).__name__ if error is not None else None,
             "error_message": str(error) if error is not None else None,
             "error_family": error_family(error),
