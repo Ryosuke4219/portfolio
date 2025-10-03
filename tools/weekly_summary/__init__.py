@@ -31,7 +31,6 @@ __all__ = [
 ]
 
 
-
 def aggregate_status(runs: Iterable[dict[str, object]]) -> tuple[int, int, int]:
     from tools.ci_metrics import normalize_status  # local import to avoid cycle
 
@@ -123,7 +122,6 @@ def to_float(value: object) -> float | None:
         except ValueError:
             return None
     return None
-
 
 
 def format_percentage(value: float | None) -> str:
