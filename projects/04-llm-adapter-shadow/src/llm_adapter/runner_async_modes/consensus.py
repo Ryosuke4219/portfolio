@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ..parallel_exec import ParallelExecutionError, run_parallel_all_async
-from ..runner_parallel import compute_consensus
+from ..runner_parallel import ConsensusObservation, compute_consensus
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import content_hash, elapsed_ms
 from .base import ParallelStrategyBase
@@ -54,8 +54,28 @@ class ConsensusRunStrategy(ParallelStrategyBase):
             )
 
         try:
+            observations: list[ConsensusObservation] = []
+            for _attempt, provider, response, _ in successful_entries:
+                provider_name: str
+                name_attr = getattr(provider, "name", None)
+                if callable(name_attr):
+                    provider_name = str(name_attr())
+                else:
+                    provider_name = type(provider).__name__
+                tokens = response.token_usage
+                tokens_in = int(tokens.prompt or 0) if tokens is not None else 0
+                tokens_out = int(tokens.completion or 0) if tokens is not None else 0
+                observations.append(
+                    ConsensusObservation(
+                        provider_id=provider_name,
+                        response=response,
+                        latency_ms=int(response.latency_ms or 0),
+                        tokens=tokens,
+                        cost_estimate=estimate_cost(provider, tokens_in, tokens_out),
+                    )
+                )
             consensus = compute_consensus(
-                [response for _, _, response, _ in successful_entries],
+                observations,
                 config=context.config.consensus,
             )
         except ParallelExecutionError as err:
