@@ -115,11 +115,11 @@ class ParallelResultLogger:
                 cost_usd = self._estimate_cost(result.provider, tokens_in, tokens_out)
                 error_for_metric: Exception | None = None
             elif isinstance(result.error, CancelledError):
-                status = "ok"
-                tokens_in = 0
-                tokens_out = 0
+                status = "error"
+                tokens_in = None
+                tokens_out = None
                 cost_usd = 0.0
-                error_for_metric = None
+                error_for_metric = result.error
             else:
                 status = "error"
                 tokens_in = None
