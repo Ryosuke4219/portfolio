@@ -41,7 +41,6 @@ build_json_payload = ci_rendering.build_json_payload
 render_markdown = ci_rendering.render_markdown
 
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate CI reliability snapshot")
     parser.add_argument("--runs", type=Path, required=True, help="Path to runs.jsonl")
