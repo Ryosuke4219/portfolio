@@ -308,13 +308,13 @@ def test_parallel_result_logger_marks_cancelled_results_ok() -> None:
     )
 
     assert len(provider_call_log) == 1
-    assert provider_call_log[0]["status"] == "ok"
+    assert provider_call_log[0]["status"] == "error"
     assert provider_call_log[0]["latency_ms"] == 42
-    assert provider_call_log[0]["error"] is None
+    assert isinstance(provider_call_log[0]["error"], CancelledError)
 
     assert len(run_metric_log) == 1
-    assert run_metric_log[0]["status"] == "ok"
-    assert run_metric_log[0]["error"] is None
+    assert run_metric_log[0]["status"] == "error"
+    assert isinstance(run_metric_log[0]["error"], CancelledError)
     assert run_metric_log[0]["latency_ms"] == 42
 
 
