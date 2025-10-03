@@ -123,9 +123,11 @@ class ProviderInvoker:
         tokens_in: int | None = None
         tokens_out: int | None = None
         shadow_metrics: ShadowMetrics | None = None
+        should_capture_shadow = shadow is not None or capture_shadow_metrics
+        shadow_metadata: dict[str, object] | None = None
         try:
-            if capture_shadow_metrics:
-                response, shadow_metrics = self._run_with_shadow(
+            if should_capture_shadow:
+                run_result = self._run_with_shadow(
                     provider,
                     shadow,
                     request,
@@ -133,14 +135,19 @@ class ProviderInvoker:
                     logger=event_logger,
                     capture_metrics=True,
                 )
+                response = cast(ProviderResponse, run_result[0])
+                shadow_metrics = cast(ShadowMetrics | None, run_result[1])
             else:
-                response = self._run_with_shadow(
-                    provider,
-                    shadow,
-                    request,
-                    metrics_path=metrics_path,
-                    logger=event_logger,
-                    capture_metrics=False,
+                response = cast(
+                    ProviderResponse,
+                    self._run_with_shadow(
+                        provider,
+                        shadow,
+                        request,
+                        metrics_path=metrics_path,
+                        logger=event_logger,
+                        capture_metrics=False,
+                    ),
                 )
         except Exception as exc:  # noqa: BLE001
             error = exc
@@ -160,7 +167,23 @@ class ProviderInvoker:
             usage = response.token_usage
             tokens_in = usage.prompt
             tokens_out = usage.completion
+            if shadow_metrics is not None:
+                shadow_payload = dict(shadow_metrics.payload)
+                shadow_metadata = {
+                    "shadow_latency_ms": shadow_payload.get("shadow_latency_ms"),
+                    "shadow_outcome": shadow_payload.get("shadow_outcome"),
+                }
+                if not capture_shadow_metrics:
+                    shadow_metrics.emit()
+                    shadow_metrics = None
         status = "ok" if error is None else "error"
+        metadata_for_logging: Mapping[str, object]
+        if shadow_metadata:
+            merged_metadata = dict(metadata)
+            merged_metadata.update(shadow_metadata)
+            metadata_for_logging = merged_metadata
+        else:
+            metadata_for_logging = metadata
         self._log_provider_call(
             event_logger,
             request_fingerprint=request_fingerprint,
@@ -173,7 +196,7 @@ class ProviderInvoker:
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             error=error,
-            metadata=metadata,
+            metadata=metadata_for_logging,
             shadow_used=shadow is not None,
         )
         return ProviderInvocationResult(
@@ -186,7 +209,7 @@ class ProviderInvoker:
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             shadow_metrics=shadow_metrics,
-            shadow_metrics_extra=None,
+            shadow_metrics_extra=shadow_metadata,
             provider_call_logged=True,
         )
 

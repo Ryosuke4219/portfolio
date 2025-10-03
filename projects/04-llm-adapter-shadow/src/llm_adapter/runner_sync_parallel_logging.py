@@ -106,6 +106,13 @@ class ParallelResultLogger:
                 continue
             if result.shadow_metrics is not None:
                 result.shadow_metrics.emit(result.shadow_metrics_extra)
+            metadata_with_shadow: Mapping[str, object]
+            if result.shadow_metrics_extra:
+                merged_metadata = dict(metadata)
+                merged_metadata.update(result.shadow_metrics_extra)
+                metadata_with_shadow = merged_metadata
+            else:
+                metadata_with_shadow = metadata
             if any(result is skipped_result for skipped_result in skipped):
                 continue
             if result.response is not None:
@@ -142,7 +149,7 @@ class ParallelResultLogger:
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
                     error=error_for_metric,
-                    metadata=metadata,
+                    metadata=metadata_with_shadow,
                     shadow_used=shadow_used,
                 )
                 result.provider_call_logged = True
@@ -163,7 +170,7 @@ class ParallelResultLogger:
                 tokens_out=tokens_out,
                 cost_usd=cost_usd,
                 error=error_for_metric,
-                metadata=metadata,
+                metadata=metadata_with_shadow,
                 shadow_used=shadow_used,
             )
 

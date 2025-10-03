@@ -46,6 +46,7 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
     payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
     diff_event = next(item for item in payloads if item["event"] == "shadow_diff")
     call_event = next(item for item in payloads if item["event"] == "provider_call")
+    run_metric_event = next(item for item in payloads if item["event"] == "run_metric")
 
     assert diff_event["primary_provider"] == "primary"
     assert diff_event["shadow_provider"] == "shadow"
@@ -68,10 +69,14 @@ def test_shadow_exec_records_metrics(tmp_path: Path) -> None:
     assert call_event["project_id"] == metadata["project_id"]
     # メトリクスに model は記録しない設計（プライバシー配慮）
     assert call_event.get("model") is None
+    assert call_event["shadow_latency_ms"] == diff_event["shadow_latency_ms"]
+    assert call_event["shadow_outcome"] == diff_event["shadow_outcome"]
 
     expected_tokens = max(1, len("hello") // 4) + 16
     assert diff_event["shadow_token_usage_total"] == expected_tokens
     assert diff_event["shadow_text_len"] == len("echo(shadow): hello")
+    assert run_metric_event["shadow_latency_ms"] == diff_event["shadow_latency_ms"]
+    assert run_metric_event["shadow_outcome"] == diff_event["shadow_outcome"]
 
 
 def test_shadow_exec_uses_injected_logger(tmp_path: Path) -> None:
