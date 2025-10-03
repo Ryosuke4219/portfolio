@@ -25,7 +25,11 @@ def _doctor_check_python(lang: str) -> tuple[str, str, str]:
     if version >= required:
         detail = f"Python {platform.python_version()}"
         return "doctor_name_python", "ok", detail
-    return "doctor_name_python", "fail", _msg(lang, "doctor_fix_python", required="3.10")
+    return (
+        "doctor_name_python",
+        "fail",
+        _msg(lang, "doctor_fix_python", required="3.10"),
+    )
 
 
 def _doctor_check_os(lang: str) -> tuple[str, str, str]:
