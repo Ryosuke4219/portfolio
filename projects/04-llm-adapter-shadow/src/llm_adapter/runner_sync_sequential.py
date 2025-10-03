@@ -51,6 +51,11 @@ class _SequentialRunTracker:
         tokens_in = result.tokens_in if result.tokens_in is not None else 0
         tokens_out = result.tokens_out if result.tokens_out is not None else 0
         cost_usd = estimate_cost(provider, tokens_in, tokens_out)
+        latency_ms = (
+            result.latency_ms
+            if result.latency_ms is not None
+            else response.latency_ms
+        )
         log_run_metric(
             self._event_logger,
             request_fingerprint=self._context.request_fingerprint,
@@ -58,7 +63,7 @@ class _SequentialRunTracker:
             provider=provider,
             status="ok",
             attempts=attempt,
-            latency_ms=elapsed_ms(self._context.run_started),
+            latency_ms=latency_ms,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             cost_usd=cost_usd,
