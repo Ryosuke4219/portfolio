@@ -88,6 +88,8 @@ class AsyncRunner:
 
         shadow = shadow or getattr(self._config, "shadow_provider", None)
         shadow_async = ensure_async_provider(shadow) if shadow is not None else None
+        shadow_used = shadow is not None
+        shadow_provider_id = shadow.name() if shadow is not None else None
 
         max_attempts = self._config.max_attempts
         providers: Sequence[tuple[ProviderSPI | AsyncProviderSPI, AsyncProviderSPI]]
@@ -100,6 +102,8 @@ class AsyncRunner:
         metadata.setdefault("run_id", metadata.get("trace_id") or request_fingerprint)
         metadata["mode"] = mode.value
         metadata["providers"] = [provider.name() for provider, _ in providers]
+        metadata["shadow_used"] = shadow_used
+        metadata["shadow_provider_id"] = shadow_provider_id
 
         async def _invoke(
             attempt_index: int,
@@ -194,7 +198,7 @@ class AsyncRunner:
             cost_usd=0.0,
             error=failure_error,
             metadata=metadata,
-            shadow_used=shadow is not None,
+            shadow_used=shadow_used,
         )
         if last_err is not None:
             if mode == RunnerMode.CONSENSUS or total_providers <= 1:
