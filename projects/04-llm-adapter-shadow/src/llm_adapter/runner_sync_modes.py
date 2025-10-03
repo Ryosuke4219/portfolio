@@ -126,7 +126,7 @@ class ParallelAllStrategy:
                 raise fatal from None
             failures = _collect_parallel_failures(results)
             exc.failures = failures if failures else None
-            raise exc
+            raise
         finally:
             runner._log_parallel_results(
                 results,
