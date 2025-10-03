@@ -162,6 +162,35 @@ def _normalize_outcome(status: str) -> str:
     return normalized
 
 
+def _extract_shadow_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    direct_latency = metadata.get("shadow_latency_ms")
+    direct_duration = metadata.get("shadow_duration_ms")
+    direct_outcome = metadata.get("shadow_outcome")
+
+    if direct_latency is not None:
+        result["shadow_latency_ms"] = direct_latency
+    if direct_duration is not None:
+        result["shadow_duration_ms"] = direct_duration
+    if direct_outcome is not None:
+        result["shadow_outcome"] = direct_outcome
+
+    shadow_metadata = metadata.get("shadow")
+    if isinstance(shadow_metadata, Mapping):
+        latency = shadow_metadata.get("latency_ms")
+        duration = shadow_metadata.get("duration_ms")
+        outcome = shadow_metadata.get("outcome")
+
+        if "shadow_latency_ms" not in result and latency is not None:
+            result["shadow_latency_ms"] = latency
+        if "shadow_duration_ms" not in result and duration is not None:
+            result["shadow_duration_ms"] = duration
+        if "shadow_outcome" not in result and outcome is not None:
+            result["shadow_outcome"] = outcome
+
+    return result
+
+
 def log_provider_call(
     event_logger: EventLogger | None,
     *,
@@ -194,6 +223,8 @@ def log_provider_call(
         "completion": completion_tokens,
         "total": prompt_tokens + completion_tokens,
     }
+    shadow_metadata = _extract_shadow_metadata(metadata)
+
     event_logger.emit(
         "provider_call",
         {
@@ -223,6 +254,7 @@ def log_provider_call(
             "providers": metadata.get("providers"),
             "trace_id": metadata.get("trace_id"),
             "project_id": metadata.get("project_id"),
+            **shadow_metadata,
         },
     )
 
@@ -260,6 +292,8 @@ def log_run_metric(
         "completion": completion_tokens,
         "total": prompt_tokens + completion_tokens,
     }
+    shadow_metadata = _extract_shadow_metadata(metadata)
+
     event_logger.emit(
         "run_metric",
         {
@@ -289,6 +323,7 @@ def log_run_metric(
             "providers": providers,
             "trace_id": metadata.get("trace_id"),
             "project_id": metadata.get("project_id"),
+            **shadow_metadata,
         },
     )
 
