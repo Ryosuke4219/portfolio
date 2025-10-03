@@ -54,7 +54,7 @@ class ConsensusRunStrategy(ParallelStrategyBase):
             )
 
         observations: list[ConsensusObservation] = []
-        for attempt, provider, response, _ in successful_entries:
+        for _attempt, provider, response, _ in successful_entries:
             usage = response.token_usage
             tokens_in = usage.prompt
             tokens_out = usage.completion
