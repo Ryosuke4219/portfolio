@@ -1,17 +1,79 @@
 """Consensus run strategy."""
 from __future__ import annotations
 
+from ..errors import FatalError, RetryableError
 from ..parallel_exec import ParallelExecutionError, run_parallel_all_async
+from ..provider_spi import AsyncProviderSPI, ProviderResponse, ProviderSPI
 from ..runner_parallel import ConsensusObservation, compute_consensus
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import content_hash, elapsed_ms
+from ..shadow import ShadowMetrics
 from .base import ParallelStrategyBase
-from .context import AsyncRunContext, collect_failure_details, StrategyResult
+from .context import AsyncRunContext, StrategyResult, WorkerFactory, collect_failure_details
 
 
 class ConsensusRunStrategy(ParallelStrategyBase):
     def __init__(self) -> None:
         super().__init__(capture_shadow_metrics=True, is_parallel_any=False)
+
+    def _create_workers(self, context: AsyncRunContext) -> list[WorkerFactory]:
+        return [
+            self._build_consensus_worker(context, index, provider, async_provider)
+            for index, (provider, async_provider) in enumerate(context.providers)
+        ]
+
+    def _build_consensus_worker(
+        self,
+        context: AsyncRunContext,
+        worker_index: int,
+        provider: ProviderSPI | AsyncProviderSPI,
+        async_provider: AsyncProviderSPI,
+    ) -> WorkerFactory:
+        async def _worker() -> WorkerResult:
+            attempt_index = context.attempt_labels[worker_index]
+            if context.event_logger is not None:
+                pending_payload = context.pending_retry_events.pop(worker_index, None)
+                if (
+                    pending_payload is not None
+                    and pending_payload.get("next_attempt") == attempt_index
+                ):
+                    context.event_logger.emit("retry", pending_payload)
+                elif pending_payload is not None:
+                    context.pending_retry_events[worker_index] = pending_payload
+            context.attempted[worker_index] = True
+            try:
+                response, shadow_metrics = await context.invoke_provider(
+                    attempt_index,
+                    provider,
+                    async_provider,
+                    self._capture_shadow_metrics,
+                )
+            except FatalError as exc:
+                context.failure_records[worker_index] = {
+                    "provider": provider.name(),
+                    "attempt": str(attempt_index),
+                    "summary": f"{type(exc).__name__}: {exc}",
+                }
+                context.last_error = exc
+                raise
+            except RetryableError as exc:
+                context.failure_records[worker_index] = {
+                    "provider": provider.name(),
+                    "attempt": str(attempt_index),
+                    "summary": f"{type(exc).__name__}: {exc}",
+                }
+                return attempt_index, provider, None, None
+            except Exception as exc:  # noqa: BLE001
+                context.failure_records[worker_index] = {
+                    "provider": provider.name(),
+                    "attempt": str(attempt_index),
+                    "summary": f"{type(exc).__name__}: {exc}",
+                }
+                raise
+            context.failure_records[worker_index] = None
+            return attempt_index, provider, response, shadow_metrics
+
+        return _worker
 
     async def run(self, context: AsyncRunContext) -> StrategyResult:
         self._reset_context(context)

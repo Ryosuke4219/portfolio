@@ -6,7 +6,7 @@ from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, Toke
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
-from tests.shadow._runner_test_helpers import _SuccessProvider
+from tests.shadow._runner_test_helpers import _ErrorProvider, _SuccessProvider
 
 
 def test_runner_consensus_all_candidates_exceed_cost_limit() -> None:
@@ -169,3 +169,23 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
 
     response = runner.run(request)
     assert response.text == "A"
+
+
+def test_runner_consensus_timeout_error_is_not_re_raised() -> None:
+    providers = [
+        _SuccessProvider("agree"),
+        _SuccessProvider("agree"),
+        _ErrorProvider("charlie", TimeoutError("too slow")),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            consensus=ConsensusConfig(strategy="majority", quorum=2),
+        ),
+    )
+    request = ProviderRequest(prompt="consensus timeout", model="demo-model")
+
+    response = runner.run(request)
+
+    assert response.text == "agree:ok"
