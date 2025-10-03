@@ -184,7 +184,6 @@ class CompareRunner:
                 error_message,
             )
 
-
     def _run_provider_call(
         self,
         provider_config: ProviderConfig,
@@ -284,6 +283,4 @@ class CompareRunner:
             batch=batch,
             default_judge_config=default_judge_config,
         )
-
-
 
