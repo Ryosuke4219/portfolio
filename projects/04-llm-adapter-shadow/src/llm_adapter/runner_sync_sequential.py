@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import time
 from typing import NoReturn, TYPE_CHECKING
 
@@ -56,6 +57,13 @@ class _SequentialRunTracker:
             if result.latency_ms is not None
             else response.latency_ms
         )
+        metadata_with_shadow: Mapping[str, object]
+        if result.shadow_metrics_extra:
+            merged_metadata = dict(self._context.metadata)
+            merged_metadata.update(result.shadow_metrics_extra)
+            metadata_with_shadow = merged_metadata
+        else:
+            metadata_with_shadow = self._context.metadata
         log_run_metric(
             self._event_logger,
             request_fingerprint=self._context.request_fingerprint,
@@ -68,7 +76,7 @@ class _SequentialRunTracker:
             tokens_out=tokens_out,
             cost_usd=cost_usd,
             error=None,
-            metadata=self._context.metadata,
+            metadata=metadata_with_shadow,
             shadow_used=self._context.shadow_used,
         )
         return response
