@@ -91,6 +91,52 @@ def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     )
 
 
+def test_async_consensus_run_metric_latency_matches_winner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+
+    agree_text = "agree: async"
+    fast = _StaticProvider("fast", agree_text, latency_ms=3)
+    slow = _StaticProvider("slow", agree_text, latency_ms=45)
+    disagree = _StaticProvider("disagree", "disagree: async", latency_ms=90)
+    shadow = MockProvider("shadow", base_latency_ms=1, error_markers=set())
+
+    runner = AsyncRunner(
+        [fast, slow, disagree],
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=3,
+            consensus=ConsensusConfig(quorum=2),
+        ),
+    )
+
+    request = ProviderRequest(prompt="async hello", model="m-async-consensus")
+    metrics_path = tmp_path / "async-consensus-latency.jsonl"
+
+    response = asyncio.run(
+        asyncio.wait_for(
+            runner.run_async(
+                request,
+                shadow=shadow,
+                shadow_metrics_path=metrics_path,
+            ),
+            timeout=0.5,
+        )
+    )
+
+    assert response.text == agree_text
+    payloads = [
+        json.loads(line)
+        for line in metrics_path.read_text().splitlines()
+        if line.strip()
+    ]
+    run_metric = next(item for item in payloads if item.get("event") == "run_metric")
+
+    assert run_metric["provider"] == "fast"
+    assert run_metric["latency_ms"] == int(response.latency_ms)
+
+
 def test_async_consensus_quorum_failure() -> None:
     provider_a = _AsyncProbeProvider("pa", delay=0.01, text="A")
     provider_b = _AsyncProbeProvider("pb", delay=0.01, text="B")

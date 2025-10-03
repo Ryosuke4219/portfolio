@@ -171,6 +171,11 @@ class ConsensusRunStrategy(ParallelStrategyBase):
         tokens_in = usage.prompt
         tokens_out = usage.completion
         cost_usd = estimate_cost(provider, tokens_in, tokens_out)
+        response_latency_ms = (
+            int(response.latency_ms)
+            if getattr(response, "latency_ms", None) is not None
+            else elapsed_ms(context.run_started)
+        )
         log_run_metric(
             context.event_logger,
             request_fingerprint=context.request_fingerprint,
@@ -178,7 +183,7 @@ class ConsensusRunStrategy(ParallelStrategyBase):
             provider=provider,
             status="ok",
             attempts=context.attempt_count,
-            latency_ms=elapsed_ms(context.run_started),
+            latency_ms=response_latency_ms,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             cost_usd=cost_usd,
