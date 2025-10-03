@@ -4,6 +4,9 @@ import path from 'node:path';
 import { classifyFailureByMessage, createFailureSignature, applyTimeoutClassification } from './classification.js';
 import { JUnitStreamParser } from './junit/stream-parser.js';
 
+const ERROR_ATTR_STATUSES = new Set(['error', 'errored']);
+const FAILURE_ATTR_STATUSES = new Set(['fail', 'failed', 'failure']);
+
 function buildSuiteName(stack) {
   const names = stack.map((entry) => entry.fullName).filter(Boolean);
   if (names.length === 0) return 'unknown-suite';
@@ -166,18 +169,28 @@ class JUnitAttemptBuilder {
     const testName = node.attrs.name || node.attrs.id || 'unknown-test';
     const canonicalId = buildCanonicalId({ suite: suiteName, className, testName, params });
     const durationMs = node.attrs.time ? Number(node.attrs.time) * 1000 : 0;
+    const rawStatus = (node.attrs.status ?? node.attrs.result ?? '').toLowerCase();
+    const derivedStatus = ERROR_ATTR_STATUSES.has(rawStatus)
+      ? rawStatus
+      : FAILURE_ATTR_STATUSES.has(rawStatus)
+        ? 'fail'
+        : null;
     const status = node.skipped
       ? 'skipped'
       : node.errors.length
         ? 'error'
         : node.failures.length
           ? 'fail'
-          : 'pass';
+          : derivedStatus || 'pass';
 
     if (!this.suiteDurations.has(suiteName)) this.suiteDurations.set(suiteName, []);
     if (status !== 'skipped') this.suiteDurations.get(suiteName).push(durationMs);
 
-    const failureNodes = status === 'fail' ? node.failures : status === 'error' ? node.errors : [];
+    const failureNodes = ERROR_ATTR_STATUSES.has(status) || (derivedStatus && ERROR_ATTR_STATUSES.has(derivedStatus))
+      ? node.errors
+      : status === 'fail' || (derivedStatus && derivedStatus === 'fail')
+        ? node.failures
+        : [];
     let failureMessage = null;
     let failureDetails = null;
     if (failureNodes.length) {
