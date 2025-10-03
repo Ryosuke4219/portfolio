@@ -586,16 +586,18 @@ def test_runner_parallel_any_logs_cancelled_providers() -> None:
         event["provider"]: event for event in logger.of_type("provider_call")
     }
     assert provider_calls["fast"]["status"] == "ok"
-    assert provider_calls["slow"]["status"] == "ok"
-    assert provider_calls["slow"].get("error_type") in (None, "CancelledError")
+    assert provider_calls["slow"]["status"] == "error"
+    assert provider_calls["slow"]["outcome"] == "error"
+    assert provider_calls["slow"].get("error_type") == "CancelledError"
     run_metrics = {
         event["provider"]: event
         for event in logger.of_type("run_metric")
         if event["provider"] is not None
     }
     assert run_metrics["fast"]["status"] == "ok"
-    assert run_metrics["slow"]["status"] == "ok"
-    assert run_metrics["slow"].get("error_type") is None
+    assert run_metrics["slow"]["status"] == "error"
+    assert run_metrics["slow"]["outcome"] == "error"
+    assert run_metrics["slow"].get("error_type") == "CancelledError"
 
 
 def test_runner_parallel_any_retries_until_success(
