@@ -51,7 +51,13 @@ def test_parallel_any_stops_after_first_success(
         budget_manager_factory(),
         tmp_path / "metrics_any.jsonl",
     )
-    results = runner.run(repeat=1, config=RunnerConfig(mode="parallel_any", max_concurrency=2))
+    try:
+        results = runner.run(
+            repeat=1,
+            config=RunnerConfig(mode="parallel_any", max_concurrency=2),
+        )
+    except (errors.ParallelExecutionError, _parallel_shim.ParallelExecutionError) as exc:
+        pytest.fail(f"ParallelExecutionError was raised unexpectedly: {exc}")
     assert {metric.model: metric.status for metric in results} == {"fast": "ok", "slow": "skip"}
     assert calls == ["fast"]
 
@@ -86,7 +92,13 @@ def test_parallel_any_cancels_pending_workers(
         budget_manager_factory(),
         tmp_path / "metrics_cancel.jsonl",
     )
-    results = runner.run(repeat=1, config=RunnerConfig(mode="parallel_any", max_concurrency=2))
+    try:
+        results = runner.run(
+            repeat=1,
+            config=RunnerConfig(mode="parallel_any", max_concurrency=2),
+        )
+    except (errors.ParallelExecutionError, _parallel_shim.ParallelExecutionError) as exc:
+        pytest.fail(f"ParallelExecutionError was raised unexpectedly: {exc}")
 
     assert {metric.model: metric.status for metric in results} == {"fast": "ok", "slow": "skip"}
     slow_metric = next(metric for metric in results if metric.model == "slow")
@@ -134,7 +146,13 @@ def test_parallel_any_populates_metrics_for_unscheduled_workers(
         budget_manager_factory(),
         tmp_path / "metrics_unscheduled.jsonl",
     )
-    results = runner.run(repeat=1, config=RunnerConfig(mode="parallel_any", max_concurrency=2))
+    try:
+        results = runner.run(
+            repeat=1,
+            config=RunnerConfig(mode="parallel_any", max_concurrency=2),
+        )
+    except (errors.ParallelExecutionError, _parallel_shim.ParallelExecutionError) as exc:
+        pytest.fail(f"ParallelExecutionError was raised unexpectedly: {exc}")
 
     metrics_by_model = {metric.model: metric for metric in results}
     assert WinnerProvider.calls == 1

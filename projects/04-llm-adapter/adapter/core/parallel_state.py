@@ -95,8 +95,14 @@ class ParallelAnyState:
         build_summary: _BuildSummary,
         error_factory: Callable[[str], Exception],
     ) -> None:
+        if self._winner_index is not None:
+            return
         success_found = any(
-            result is not None and getattr(result.metrics, "status", None) == "ok"
+            result is not None
+            and (
+                getattr(result.metrics, "status", None) == "ok"
+                or getattr(result.metrics, "outcome", None) == "success"
+            )
             for result in results
         )
         if success_found:
