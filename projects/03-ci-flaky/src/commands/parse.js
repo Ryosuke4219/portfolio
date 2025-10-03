@@ -3,6 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { createFailureSignature } from '../classification.js';
+import { isFailureStatus } from '../analyzer.js';
 import { loadConfig, resolveConfigPaths } from '../config.js';
 import { ensureDir } from '../fs-utils.js';
 import { parseJUnitFile, parseJUnitStream } from '../junit-parser.js';
@@ -91,10 +92,20 @@ function createParseErrorAttempt({
   };
 }
 
-export async function runParse(args) {
-  const configPath = resolveConfigPath(args.config);
-  const { config } = loadConfig(configPath);
-  const resolvedConfig = resolveConfigPaths(config, process.cwd());
+export async function runParse(args, overrides = {}) {
+  const {
+    resolveConfigPath: resolveConfigPathImpl = resolveConfigPath,
+    loadConfig: loadConfigImpl = loadConfig,
+    resolveConfigPaths: resolveConfigPathsImpl = resolveConfigPaths,
+    ensureDir: ensureDirImpl = ensureDir,
+    parseJUnitStream: parseJUnitStreamImpl = parseJUnitStream,
+    parseJUnitFile: parseJUnitFileImpl = parseJUnitFile,
+    appendAttempts: appendAttemptsImpl = appendAttempts,
+  } = overrides;
+
+  const configPath = resolveConfigPathImpl(args.config);
+  const { config } = loadConfigImpl(configPath);
+  const resolvedConfig = resolveConfigPathsImpl(config, process.cwd());
 
   const inputTarget = args.input ? path.resolve(process.cwd(), args.input) : resolvedConfig.paths.input;
   const runId = args.run_id || `run_${Date.now()}`;
@@ -110,7 +121,7 @@ export async function runParse(args) {
   const parseErrors = [];
   if (args.input === '-' || args.stdin) {
     try {
-      const { attempts: parsed } = await parseJUnitStream(process.stdin, { filename: '<stdin>', timeoutFactor });
+      const { attempts: parsed } = await parseJUnitStreamImpl(process.stdin, { filename: '<stdin>', timeoutFactor });
       for (const attempt of parsed) {
         attempts.push({ ...attempt, source: '<stdin>' });
       }
@@ -124,7 +135,7 @@ export async function runParse(args) {
     }
     for (const file of files) {
       try {
-        const { attempts: parsed } = await parseJUnitFile(file, { timeoutFactor });
+        const { attempts: parsed } = await parseJUnitFileImpl(file, { timeoutFactor });
         for (const attempt of parsed) {
           attempts.push({ ...attempt, source: file });
         }
@@ -178,10 +189,10 @@ export async function runParse(args) {
     source: attempt.source,
   }));
 
-  ensureDir(path.dirname(resolvedConfig.paths.store));
-  appendAttempts(resolvedConfig.paths.store, enrichedAttempts);
+  ensureDirImpl(path.dirname(resolvedConfig.paths.store));
+  appendAttemptsImpl(resolvedConfig.paths.store, enrichedAttempts);
 
-  const failCount = enrichedAttempts.filter((a) => a.status === 'fail' || a.status === 'error').length;
+  const failCount = enrichedAttempts.filter((attempt) => isFailureStatus(attempt)).length;
   const parseErrorCount = parseErrors.length;
   const parseSuffix = parseErrorCount ? `, parse_errors=${parseErrorCount}` : '';
   console.log(`Stored ${enrichedAttempts.length} attempts (fails=${failCount}${parseSuffix}).`);
