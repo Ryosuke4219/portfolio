@@ -21,6 +21,15 @@ from src.llm_adapter.runner_config import (
 from .conftest import _AsyncProbeProvider, _StaticProvider
 
 
+class _CostProbeProvider(_AsyncProbeProvider):
+    def __init__(self, name: str, *, cost: float, text: str) -> None:
+        super().__init__(name, delay=0.0, text=text)
+        self._cost = cost
+
+    def estimate_cost(self, tokens_in: int, tokens_out: int) -> float:  # noqa: ARG002
+        return self._cost
+
+
 def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
 
@@ -195,3 +204,25 @@ def test_async_consensus_weighted_vote_prefers_weight(
 
     response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
     assert response.text == "alpha answer"
+def test_async_consensus_cost_constraints() -> None:
+    provider_a = _CostProbeProvider("expensive_a", cost=2.0, text="match")
+    provider_b = _CostProbeProvider("expensive_b", cost=3.5, text="match")
+    runner = AsyncRunner(
+        [provider_a, provider_b],
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=2,
+            consensus=ConsensusConfig(quorum=1, max_cost_usd=0.5),
+        ),
+    )
+    request = ProviderRequest(prompt="topic", model="model-consensus-cost")
+
+    with pytest.raises(ParallelExecutionError) as exc_info:
+        asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+
+    error = exc_info.value
+    failures = error.failures if hasattr(error, "failures") else None
+    assert failures is not None
+    assert len(failures) == 2
+    for item in failures:
+        assert "cost" in item.get("summary", "")
