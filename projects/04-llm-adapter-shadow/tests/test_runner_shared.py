@@ -85,3 +85,67 @@ def test_log_run_metric_normalizes_errored_outcome(
     assert event_type == "run_metric"
     assert payload["status"] == "errored"
     assert payload["outcome"] == "error"
+
+
+def test_log_provider_call_includes_shadow_metadata(
+    logger: _RecordingLogger, provider_request: ProviderRequest
+) -> None:
+    provider = _DummyProvider("dummy")
+
+    log_provider_call(
+        logger,
+        request_fingerprint="fingerprint",
+        provider=provider,
+        request=provider_request,
+        attempt=1,
+        total_providers=1,
+        status="ok",
+        latency_ms=123,
+        tokens_in=10,
+        tokens_out=20,
+        error=None,
+        metadata={
+            "shadow": {
+                "latency_ms": 456,
+                "duration_ms": 789,
+                "outcome": "success",
+            }
+        },
+        shadow_used=True,
+    )
+
+    _, payload = logger.events[-1]
+    assert payload["shadow_latency_ms"] == 456
+    assert payload["shadow_duration_ms"] == 789
+    assert payload["shadow_outcome"] == "success"
+
+
+def test_log_run_metric_includes_shadow_metadata(
+    logger: _RecordingLogger, provider_request: ProviderRequest
+) -> None:
+    log_run_metric(
+        logger,
+        request_fingerprint="fingerprint",
+        request=provider_request,
+        provider=_DummyProvider("dummy"),
+        status="ok",
+        attempts=1,
+        latency_ms=123,
+        tokens_in=10,
+        tokens_out=20,
+        cost_usd=0.5,
+        error=None,
+        metadata={
+            "shadow": {
+                "latency_ms": 456,
+                "duration_ms": 789,
+                "outcome": "success",
+            }
+        },
+        shadow_used=True,
+    )
+
+    _, payload = logger.events[-1]
+    assert payload["shadow_latency_ms"] == 456
+    assert payload["shadow_duration_ms"] == 789
+    assert payload["shadow_outcome"] == "success"
