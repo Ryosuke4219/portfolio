@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import time
-from typing import Any, cast
+from typing import Any, Mapping as TypingMapping, cast
 
 from .errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger
@@ -18,6 +18,33 @@ from .runner_async_modes import AsyncRunContext, collect_failure_details, Worker
 from .runner_shared import log_provider_call, log_provider_skipped, RateLimiter
 from .shadow import run_with_shadow_async, ShadowMetrics
 from .utils import elapsed_ms
+
+
+def build_shadow_log_metadata(shadow_metrics: ShadowMetrics | None) -> dict[str, Any]:
+    if shadow_metrics is None:
+        return {}
+    payload: TypingMapping[str, Any] = shadow_metrics.payload
+    metadata: dict[str, Any] = {}
+    latency = payload.get("shadow_latency_ms")
+    if isinstance(latency, (int, float)):
+        metadata["shadow_latency_ms"] = int(latency)
+    outcome_value: Any = payload.get("shadow_outcome")
+    mapped_outcome: str | None = None
+    if isinstance(outcome_value, str):
+        normalized = outcome_value.lower()
+        if normalized == "success":
+            mapped_outcome = "ok"
+        elif normalized in {"error", "timeout"}:
+            mapped_outcome = normalized
+        else:
+            mapped_outcome = outcome_value
+    elif payload.get("shadow_ok") is True:
+        mapped_outcome = "ok"
+    elif payload.get("shadow_ok") is False:
+        mapped_outcome = "error"
+    if mapped_outcome is not None:
+        metadata["shadow_outcome"] = mapped_outcome
+    return metadata
 
 
 class AsyncProviderInvoker:
@@ -46,9 +73,11 @@ class AsyncProviderInvoker:
             await self._rate_limiter.acquire_async()
         attempt_started = time.time()
         shadow_metrics: ShadowMetrics | None = None
+        shadow_log_metadata: dict[str, Any] = {}
         response: ProviderResponse
         try:
-            if capture_shadow_metrics:
+            should_capture = shadow_async is not None
+            if should_capture:
                 response_with_metrics = await run_with_shadow_async(
                     async_provider,
                     shadow_async,
@@ -61,6 +90,10 @@ class AsyncProviderInvoker:
                     tuple[ProviderResponse, ShadowMetrics | None],
                     response_with_metrics,
                 )
+                shadow_log_metadata = build_shadow_log_metadata(shadow_metrics)
+                if not capture_shadow_metrics and shadow_metrics is not None:
+                    shadow_metrics.emit()
+                    shadow_metrics = None
             else:
                 response_only = await run_with_shadow_async(
                     async_provider,
@@ -154,6 +187,11 @@ class AsyncProviderInvoker:
             )
             raise
         token_usage = response.token_usage
+        if shadow_log_metadata:
+            enriched_metadata = dict(metadata)
+            enriched_metadata.update(shadow_log_metadata)
+        else:
+            enriched_metadata = metadata
         log_provider_call(
             event_logger,
             request_fingerprint=request_fingerprint,
@@ -166,7 +204,7 @@ class AsyncProviderInvoker:
             tokens_in=token_usage.prompt,
             tokens_out=token_usage.completion,
             error=None,
-            metadata=metadata,
+            metadata=enriched_metadata,
             shadow_used=shadow is not None,
             allow_private_model=True,
         )
@@ -209,4 +247,8 @@ def emit_consensus_failure(
     return updated_details, updated_error
 
 
-__all__ = ["AsyncProviderInvoker", "emit_consensus_failure"]
+__all__ = [
+    "AsyncProviderInvoker",
+    "build_shadow_log_metadata",
+    "emit_consensus_failure",
+]

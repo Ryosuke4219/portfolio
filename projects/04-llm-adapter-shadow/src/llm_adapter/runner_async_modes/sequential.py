@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..errors import FatalError, RateLimitError, RetryableError, SkipError, TimeoutError
+from ..runner_async_support import build_shadow_log_metadata
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import elapsed_ms
 from .context import AsyncRunContext, StrategyResult
@@ -12,11 +13,11 @@ class SequentialRunStrategy:
         for attempt_index, (provider, async_provider) in enumerate(context.providers, start=1):
             context.attempt_count = attempt_index
             try:
-                response, _ = await context.invoke_provider(
+                response, shadow_metrics = await context.invoke_provider(
                     attempt_index,
                     provider,
                     async_provider,
-                    False,
+                    context.shadow is not None,
                 )
             except RateLimitError as err:
                 context.last_error = err
@@ -44,6 +45,12 @@ class SequentialRunStrategy:
                 tokens_in = usage.prompt
                 tokens_out = usage.completion
                 cost_usd = estimate_cost(provider, tokens_in, tokens_out)
+                shadow_metadata = build_shadow_log_metadata(shadow_metrics)
+                metric_metadata = (
+                    context.metadata
+                    if not shadow_metadata
+                    else dict(context.metadata, **shadow_metadata)
+                )
                 log_run_metric(
                     context.event_logger,
                     request_fingerprint=context.request_fingerprint,
@@ -56,8 +63,10 @@ class SequentialRunStrategy:
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
                     error=None,
-                    metadata=context.metadata,
+                    metadata=metric_metadata,
                     shadow_used=context.shadow is not None,
                 )
+                if shadow_metrics is not None:
+                    shadow_metrics.emit()
                 return StrategyResult(response, attempt_index, None)
         return StrategyResult(None, context.attempt_count, context.last_error)
