@@ -55,8 +55,6 @@ class SyncRunStrategy(Protocol):
     ): ...
 
 
-
-
 class ParallelAllStrategy:
     def execute(
         self, context: SyncRunContext
