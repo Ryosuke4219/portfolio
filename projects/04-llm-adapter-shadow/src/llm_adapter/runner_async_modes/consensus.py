@@ -53,6 +53,24 @@ class ConsensusRunStrategy(ParallelStrategyBase):
                 failure_details=failure_details,
             )
 
+        observations: list[ConsensusObservation] = []
+        for attempt, provider, response, _ in successful_entries:
+            usage = response.token_usage
+            tokens_in = usage.prompt
+            tokens_out = usage.completion
+            cost_estimate: float | None = None
+            if tokens_in is not None and tokens_out is not None:
+                cost_estimate = estimate_cost(provider, tokens_in, tokens_out)
+            observations.append(
+                ConsensusObservation(
+                    provider_id=provider.name(),
+                    response=response,
+                    latency_ms=int(response.latency_ms),
+                    tokens=usage,
+                    cost_estimate=cost_estimate,
+                )
+            )
+
         try:
             observations: list[ConsensusObservation] = []
             for _attempt, provider, response, _ in successful_entries:
