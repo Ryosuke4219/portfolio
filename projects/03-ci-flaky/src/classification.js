@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 
+import { isFailureStatus } from './analyzer.js';
+
 const MESSAGE_PATTERNS = {
   timeout: /timeout|timed out|Exceeded.*time|Time limit/i,
   parsing: /syntax error|unexpected token|parse error|JSON\.parse|invalid json|xml parse/i,
@@ -36,7 +38,7 @@ export function applyTimeoutClassification(attempts, suiteDurations, factor) {
     thresholds.set(suite, pct95 * factor);
   }
   for (const attempt of attempts) {
-    if (!['fail', 'error', 'errored'].includes(attempt.status)) continue;
+    if (!isFailureStatus(attempt)) continue;
     if (attempt.failure_kind && attempt.failure_kind !== 'nondeterministic') continue;
     const threshold = thresholds.get(attempt.suite);
     if (!threshold) continue;

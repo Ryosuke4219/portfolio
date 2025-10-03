@@ -1,23 +1,22 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import assert from 'node:assert';
+import { test } from 'node:test';
 
 import { applyTimeoutClassification } from '../../projects/03-ci-flaky/src/classification.js';
 
-test('applyTimeoutClassification marks errored attempts as timeout when exceeding threshold', () => {
+test('timeout classification upgrades errored attempts', () => {
   const attempts = [
     {
+      suite: 'suite-a',
       status: 'errored',
-      suite: 'ci-suite',
-      duration_ms: 5_000,
+      duration_ms: 5000,
       failure_kind: 'nondeterministic',
     },
   ];
-
   const suiteDurations = new Map([
-    ['ci-suite', [1_000, 1_100, 1_200, 1_300, 1_400]],
+    ['suite-a', [1000, 2000, 3000, 4000, 4500]],
   ]);
 
-  applyTimeoutClassification(attempts, suiteDurations, 2);
+  applyTimeoutClassification(attempts, suiteDurations, 1.1);
 
-  assert.equal(attempts[0].failure_kind, 'timeout');
+  assert.strictEqual(attempts[0].failure_kind, 'timeout');
 });
