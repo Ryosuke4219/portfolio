@@ -125,24 +125,14 @@ LANG_MESSAGES: dict[str, dict[str, str]] = {
         "doctor_name_rpm": "RPM limit",
         "doctor_info_os": "OS={os}, venv={venv}",
         "doctor_fix_python": "Install Python {required}+.",
-        "doctor_fix_api": (
-            "Set API keys such as OPENAI_API_KEY in your environment."
-        ),
+        "doctor_fix_api": ("Set API keys such as OPENAI_API_KEY in your environment."),
         "doctor_fix_dns": (
             "Ensure DNS/HTTPS access to api.openai.com (proxy/firewall)."
         ),
-        "doctor_fix_encoding": (
-            "Set PYTHONIOENCODING=utf-8 before running the CLI."
-        ),
-        "doctor_fix_windows": (
-            "Configure [Console]::OutputEncoding to UTF-8."
-        ),
-        "doctor_fix_env_file": (
-            "Install python-dotenv or create a .env file."
-        ),
-        "doctor_fix_rpm": (
-            "Consider configuring a safe limit via LLM_ADAPTER_RPM."
-        ),
+        "doctor_fix_encoding": ("Set PYTHONIOENCODING=utf-8 before running the CLI."),
+        "doctor_fix_windows": ("Configure [Console]::OutputEncoding to UTF-8."),
+        "doctor_fix_env_file": ("Install python-dotenv or create a .env file."),
+        "doctor_fix_rpm": ("Consider configuring a safe limit via LLM_ADAPTER_RPM."),
         "doctor_info_rpm": "Current limit: {rpm}",
     },
 }
@@ -189,7 +179,9 @@ def _sanitize_message(text: str) -> str:
         upper_name = name.upper()
         if any(pattern in upper_name for pattern in _SENSITIVE_ENV_PATTERNS):
             sanitized = sanitized.replace(value, "***")
-    sanitized = re.sub(r"(Authorization\s*:\s*)([^\s]+)", r"\1***", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(
+        r"(Authorization\s*:\s*)([^\s]+)", r"\1***", sanitized, flags=re.IGNORECASE
+    )
     sanitized = re.sub(r"([?&][^=]+=)([^&#\s]+)", r"\1***", sanitized)
     return sanitized
 
