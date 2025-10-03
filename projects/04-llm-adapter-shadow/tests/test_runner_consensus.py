@@ -6,6 +6,7 @@ from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, Toke
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
+from tests.shadow._runner_test_helpers import _SuccessProvider
 
 
 def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,3 +149,56 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
 
     response = runner.run(request)
     assert response.text == "A"
+
+
+def test_runner_consensus_max_cost_rejections(monkeypatch: pytest.MonkeyPatch) -> None:
+    providers = [
+        _SuccessProvider("alpha", cost_usd=0.5),
+        _SuccessProvider("bravo", cost_usd=0.6),
+    ]
+    runner = Runner(
+        providers,
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=2,
+            consensus=ConsensusConfig(max_cost_usd=0.4),
+        ),
+    )
+    request = ProviderRequest(prompt="consensus max cost", model="consensus-max-cost")
+
+    responses = [provider.invoke(request) for provider in providers]
+    invocations = [
+        ProviderInvocationResult(
+            provider=provider,
+            attempt=index,
+            total_providers=len(providers),
+            response=response,
+            error=None,
+            latency_ms=response.latency_ms,
+            tokens_in=response.tokens_in,
+            tokens_out=response.tokens_out,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=True,
+        )
+        for index, (provider, response) in enumerate(
+            zip(providers, responses, strict=True),
+            start=1,
+        )
+    ]
+
+    def _fake_run_parallel_all_sync(workers, *, max_concurrency=None):
+        return invocations
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        _fake_run_parallel_all_sync,
+    )
+
+    with pytest.raises(ParallelExecutionError) as exc_info:
+        runner.run(request)
+
+    assert str(exc_info.value) == "no responses satisfied consensus constraints"
+    expected_tokens = [(response.tokens_in, response.tokens_out) for response in responses]
+    for provider, expected in zip(providers, expected_tokens, strict=True):
+        assert provider.cost_calls == [expected]

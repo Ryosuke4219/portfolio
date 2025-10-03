@@ -6,8 +6,9 @@ from typing import cast, TYPE_CHECKING
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
 from .provider_spi import ProviderResponse, ProviderSPI
-from .runner_parallel import compute_consensus
+from .runner_parallel import ConsensusObservation, compute_consensus
 from .runner_sync_modes import _limited_providers, _raise_no_attempts
+from .runner_shared import estimate_cost
 from .shadow import ShadowMetrics
 from .utils import content_hash
 
@@ -73,10 +74,37 @@ class ConsensusStrategy:
             candidates: list[
                 tuple[str, ProviderResponse, dict[str, object]]
             ] = []
+            observations: list[ConsensusObservation] = []
             for invocation in invocations:
                 response = invocation.response
                 if response is None:
                     continue
+                tokens_usage = response.token_usage
+                tokens_in = (
+                    invocation.tokens_in
+                    if invocation.tokens_in is not None
+                    else tokens_usage.prompt
+                )
+                tokens_out = (
+                    invocation.tokens_out
+                    if invocation.tokens_out is not None
+                    else tokens_usage.completion
+                )
+                cost_estimate = None
+                if tokens_in is not None and tokens_out is not None:
+                    cost_estimate = estimate_cost(
+                        invocation.provider,
+                        int(tokens_in),
+                        int(tokens_out),
+                    )
+                observation = ConsensusObservation(
+                    provider_id=invocation.provider.name(),
+                    response=response,
+                    latency_ms=response.latency_ms,
+                    tokens=response.token_usage,
+                    cost_estimate=cost_estimate,
+                )
+                observations.append(observation)
                 metadata: dict[str, object] = {
                     "invocation": invocation,
                     "attempt": invocation.attempt,
@@ -114,9 +142,8 @@ class ConsensusStrategy:
                     message = f"{message}: {detail_text}"
                 error = ParallelExecutionError(message, failures=failure_details)
                 raise error
-            responses_for_consensus = [response for _, response, _ in candidates]
             consensus = compute_consensus(
-                responses_for_consensus,
+                observations,
                 config=runner._config.consensus,
             )
             winner_name, _, winner_metadata = next(
