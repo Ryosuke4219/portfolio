@@ -14,7 +14,7 @@ from ..shadow import ShadowMetrics
 WorkerResult = tuple[
     int,
     ProviderSPI | AsyncProviderSPI,
-    ProviderResponse,
+    ProviderResponse | None,
     ShadowMetrics | None,
 ]
 WorkerFactory = Callable[[], Awaitable[WorkerResult]]

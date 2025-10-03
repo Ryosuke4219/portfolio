@@ -162,15 +162,45 @@ def test_async_consensus_error_details() -> None:
     test_async_consensus_failure_details()
 
 
-def test_async_consensus_cost_constraints() -> None:
-    provider_a = _CostProbeProvider("expensive_a", cost=2.0, text="match")
-    provider_b = _CostProbeProvider("expensive_b", cost=3.5, text="match")
+def test_async_consensus_timeout_error_is_not_re_raised() -> None:
+    agree_a = _AsyncProbeProvider("agree_a", delay=0.0, text="agree")
+    agree_b = _AsyncProbeProvider("agree_b", delay=0.0, text="agree")
+    timeout_provider = _AsyncProbeProvider(
+        "timeout",
+        delay=0.0,
+        text="timeout",
+        failures=[TimeoutError("too slow")],
+    )
     runner = AsyncRunner(
-        [provider_a, provider_b],
+        [agree_a, agree_b, timeout_provider],
+        config=RunnerConfig(
+            mode=RunnerMode.CONSENSUS,
+            max_concurrency=3,
+            consensus=ConsensusConfig(quorum=2),
+        ),
+    )
+    request = ProviderRequest(prompt="topic", model="model-consensus")
+
+    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+
+    assert response.text.startswith("agree")
+
+
+def test_async_consensus_cost_constraints() -> None:
+    alpha = _CostProbeProvider("alpha", cost=2.0, text="match")
+    bravo = _CostProbeProvider("bravo", cost=3.5, text="match")
+    runner = AsyncRunner(
+        [alpha, bravo],
         config=RunnerConfig(
             mode=RunnerMode.CONSENSUS,
             max_concurrency=2,
-            consensus=ConsensusConfig(quorum=1, max_cost_usd=0.5),
+            consensus=ConsensusConfig(
+                quorum=1,
+                max_cost_usd=0.5,
+                strategy="weighted_vote",
+                provider_weights={"alpha": 3.0, "bravo": 0.5},
+                tie_breaker="min_latency",
+            ),
         ),
     )
     request = ProviderRequest(prompt="topic", model="model-consensus-cost")

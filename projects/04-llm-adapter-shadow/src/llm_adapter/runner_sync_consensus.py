@@ -49,10 +49,10 @@ class ConsensusStrategy:
                 if result.response is None:
                     error = result.error
                     if error is not None:
-                        raise error
+                        return result
                     error = ParallelExecutionError("provider returned no response")
                     result.error = error
-                    raise error
+                    return result
                 return result
 
             return worker
