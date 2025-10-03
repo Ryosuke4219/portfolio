@@ -67,7 +67,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-
 def update_index(index_path: Path, *, today: dt.date) -> None:
     index_lines = [
         "---",
