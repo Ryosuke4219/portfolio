@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import { createFailureSignature } from '../classification.js';
 import { isFailureStatus } from '../analyzer.js';
+import { createFailureSignature } from '../classification.js';
 import { loadConfig, resolveConfigPaths } from '../config.js';
 import { ensureDir } from '../fs-utils.js';
 import { parseJUnitFile, parseJUnitStream } from '../junit-parser.js';
