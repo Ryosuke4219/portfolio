@@ -106,6 +106,7 @@ def coerce_str(value: object | None) -> str | None:
         return str(value)
     return None
 
+
 def to_float(value: object) -> float | None:
     if value is None:
         return None

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from pathlib import Path
 
 import pytest
@@ -14,13 +13,12 @@ from src.llm_adapter.runner import AsyncRunner, ParallelAllResult, Runner
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 
 from ..parallel_helpers import (
-    _RetryProbeProvider,
-    _StaticProvider,
     _install_recording_executor,
     _read_metrics,
+    _RetryProbeProvider,
+    _StaticProvider,
     _worker_for,
 )
-
 
 # --- ALL モードの戻り値 ---
 
