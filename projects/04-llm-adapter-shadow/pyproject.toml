@@ -1,6 +1,6 @@
 [project]
 name = "portfolio-llm-adapter-shadow"
-version = "0.0.1"
+version = "0.1.0"
 description = "Minimal shadow-execution + error-cases PoC for portfolio"
 requires-python = ">=3.10"
 dependencies = ["PyYAML>=6.0"]
