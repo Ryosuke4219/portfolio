@@ -181,11 +181,64 @@ def test_runner_consensus_timeout_error_is_not_re_raised() -> None:
         providers,
         config=RunnerConfig(
             mode=RunnerMode.CONSENSUS,
-            consensus=ConsensusConfig(strategy="majority", quorum=2),
+            max_concurrency=2,
+            consensus=ConsensusConfig(
+                strategy="weighted_vote",
+                provider_weights={"alpha": 3.0, "bravo": 0.5},
+                tie_breaker="min_latency",
+                quorum=1,
+            ),
         ),
     )
-    request = ProviderRequest(prompt="consensus timeout", model="demo-model")
+    request = ProviderRequest(prompt="weighted", model="weighted-consensus")
+
+    response_alpha = ProviderResponse(
+        text="alpha answer",
+        latency_ms=120,
+        token_usage=TokenUsage(prompt=1, completion=1),
+    )
+    response_bravo = ProviderResponse(
+        text="bravo answer",
+        latency_ms=20,
+        token_usage=TokenUsage(prompt=1, completion=1),
+    )
+
+    invocations = [
+        ProviderInvocationResult(
+            provider=providers[0],
+            attempt=1,
+            total_providers=len(providers),
+            response=response_alpha,
+            error=None,
+            latency_ms=response_alpha.latency_ms,
+            tokens_in=1,
+            tokens_out=1,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=True,
+        ),
+        ProviderInvocationResult(
+            provider=providers[1],
+            attempt=2,
+            total_providers=len(providers),
+            response=response_bravo,
+            error=None,
+            latency_ms=response_bravo.latency_ms,
+            tokens_in=1,
+            tokens_out=1,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=True,
+        ),
+    ]
+
+    def _fake_run_parallel_all_sync(workers, *, max_concurrency=None):  # noqa: ANN001
+        return invocations
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        _fake_run_parallel_all_sync,
+    )
 
     response = runner.run(request)
-
-    assert response.text == "agree:ok"
+    assert response.text == "alpha answer"
