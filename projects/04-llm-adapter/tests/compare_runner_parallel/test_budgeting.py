@@ -6,10 +6,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from adapter.core.errors import TimeoutError
 from adapter.core.metrics import BudgetSnapshot
 from adapter.core.models import ProviderConfig
-from adapter.core.providers import ProviderResponse
+from adapter.core.providers import BaseProvider, ProviderFactory, ProviderResponse
+from adapter.core.runner_api import RunnerConfig
 from adapter.core.runner_execution import RunnerExecution
+from adapter.core.runners import CompareRunner
 
 if TYPE_CHECKING:
     from adapter.core.datasets import GoldenTask
@@ -132,3 +135,110 @@ def test_runner_execution_records_shadow_budget_and_schema(
     assert metrics.status == "error"
     assert metrics.failure_kind == "schema_violation"
     assert metrics.error_message and "schema mismatch" in metrics.error_message
+
+
+def test_runner_config_dataclass_initializes_helpers(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    provider_config_factory: "ProviderConfigFactory",
+    task_factory: "TaskFactory",
+    budget_manager_factory,
+) -> None:
+    token_bucket_args: list[int | None] = []
+    schema_args: list[Path | None] = []
+
+    class RecordingTokenBucket:
+        def __init__(self, rpm: int | None) -> None:
+            token_bucket_args.append(rpm)
+
+        def acquire(self) -> None:
+            return None
+
+    class RecordingSchemaValidator:
+        def __init__(self, schema: Path | None) -> None:
+            schema_args.append(schema)
+
+        def validate(self, payload: str) -> None:
+            return None
+
+    from adapter.core import runners as runners_module
+
+    monkeypatch.setattr(runners_module, "_TokenBucket", RecordingTokenBucket)
+    monkeypatch.setattr(runners_module, "_SchemaValidator", RecordingSchemaValidator)
+
+    class SingleCallProvider(BaseProvider):
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(output_text="ok", input_tokens=1, output_tokens=1, latency_ms=1)
+
+    monkeypatch.setitem(ProviderFactory._registry, "single", SingleCallProvider)
+
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text("{}", encoding="utf-8")
+
+    runner = CompareRunner(
+        [provider_config_factory(tmp_path, name="single", provider="single", model="model")],
+        [task_factory()],
+        budget_manager_factory(),
+        tmp_path / "metrics_helpers.jsonl",
+    )
+    config = RunnerConfig(mode="sequential", rpm=3, schema=schema_path)
+
+    runner.run(repeat=1, config=config)
+
+    assert token_bucket_args == [3]
+    assert schema_args == [schema_path]
+
+
+def test_run_metrics_records_error_type_and_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    provider_config_factory: "ProviderConfigFactory",
+    task_factory: "TaskFactory",
+    budget_manager_factory,
+) -> None:
+    class FlakyProvider(BaseProvider):
+        def __init__(self, config: ProviderConfig) -> None:
+            super().__init__(config)
+            self.calls = 0
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("boom")
+            return ProviderResponse(output_text="flaky-ok", input_tokens=1, output_tokens=1, latency_ms=5)
+
+    class StableProvider(BaseProvider):
+        def __init__(self, config: ProviderConfig) -> None:
+            super().__init__(config)
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(output_text="stable-ok", input_tokens=1, output_tokens=1, latency_ms=2)
+
+    monkeypatch.setitem(ProviderFactory._registry, "flaky", FlakyProvider)
+    monkeypatch.setitem(ProviderFactory._registry, "stable", StableProvider)
+
+    runner = CompareRunner(
+        [
+            provider_config_factory(tmp_path, name="flaky", provider="flaky", model="F"),
+            provider_config_factory(tmp_path, name="stable", provider="stable", model="S"),
+        ],
+        [task_factory()],
+        budget_manager_factory(),
+        tmp_path / "metrics_attempts.jsonl",
+    )
+    results = runner.run(repeat=2, config=RunnerConfig(mode="parallel_all"))
+
+    flaky_attempts = {
+        metric.attempts: metric for metric in results if metric.provider == "flaky"
+    }
+    stable_attempts = sorted(
+        (metric.attempts, metric.error_type)
+        for metric in results
+        if metric.provider == "stable"
+    )
+
+    assert flaky_attempts[1].status == "error"
+    assert flaky_attempts[1].error_type == "TimeoutError"
+    assert flaky_attempts[2].status == "ok"
+    assert flaky_attempts[2].error_type is None
+    assert stable_attempts == [(1, None), (2, None)]
