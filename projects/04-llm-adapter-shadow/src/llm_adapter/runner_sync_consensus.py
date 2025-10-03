@@ -6,7 +6,7 @@ from typing import cast, TYPE_CHECKING
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
 from .provider_spi import ProviderResponse, ProviderSPI, TokenUsage
-from .runner_parallel import ConsensusObservation, compute_consensus
+from .runner_parallel import compute_consensus, ConsensusObservation
 from .runner_shared import estimate_cost
 from .runner_sync_modes import _limited_providers, _raise_no_attempts
 from .shadow import ShadowMetrics
@@ -81,7 +81,7 @@ class ConsensusStrategy:
                     continue
                 tokens_in = invocation.tokens_in
                 tokens_out = invocation.tokens_out
-                usage = response.token_usage
+                usage: TokenUsage | None = response.token_usage
                 if tokens_in is None and usage is not None:
                     tokens_in = usage.prompt
                 if tokens_out is None and usage is not None:
@@ -232,11 +232,11 @@ class ConsensusStrategy:
                         extra["shadow_consensus_error"] = error
                 winner_invocation.shadow_metrics_extra = extra
             return consensus.response
-        except ParallelExecutionError as exc:
+        except ParallelExecutionError:
             fatal = runner._extract_fatal_error(results)
             if fatal is not None:
                 raise fatal from None
-            raise exc
+            raise
         finally:
             runner._log_parallel_results(
                 results,
