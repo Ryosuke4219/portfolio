@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from src.llm_adapter.errors import AllFailedError, TimeoutError
+from src.llm_adapter.errors import AllFailedError, FatalError, TimeoutError
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner_config import RunnerMode
+from src.llm_adapter.runner_shared.logging import error_family
 
 from ..parallel_helpers import _StaticProvider
 from .helpers import (
@@ -32,6 +33,14 @@ class _FailingProvider:
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         raise self._error
+
+
+
+
+def test_parallel_execution_error_is_fatal() -> None:
+    error = ParallelExecutionError("parallel boom")
+    assert isinstance(error, FatalError)
+    assert error_family(error) == "fatal"
 
 
 @pytest.mark.parametrize(
