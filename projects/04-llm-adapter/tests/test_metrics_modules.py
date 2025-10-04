@@ -70,6 +70,36 @@ def test_compute_overview_and_comparison_table() -> None:
     ]
 
 
+def test_compute_overview_handles_success_status() -> None:
+    metrics = [
+        {
+            "provider": "openai",
+            "model": "gpt",
+            "prompt_id": "p2",
+            "latency_ms": 150,
+            "cost_usd": 0.1,
+            "status": "success",
+        }
+    ]
+
+    overview = data_mod.compute_overview(metrics)
+    assert overview["success_rate"] == 100.0
+
+    table = data_mod.build_comparison_table(metrics)
+    assert table == [
+        {
+            "provider": "openai",
+            "model": "gpt",
+            "prompt_id": "p2",
+            "attempts": 1,
+            "ok_rate": 100.0,
+            "avg_latency": 150.0,
+            "avg_cost": 0.1,
+            "avg_diff_rate": None,
+        }
+    ]
+
+
 def test_failure_summary_and_alerts() -> None:
     metrics = [
         {"failure_kind": "timeout"},

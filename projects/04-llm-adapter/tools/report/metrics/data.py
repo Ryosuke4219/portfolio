@@ -10,6 +10,9 @@ from statistics import mean, median
 from .utils import coerce_optional_float
 
 
+SUCCESS_STATUSES = {"ok", "success"}
+
+
 def load_metrics(path: Path) -> list[Mapping[str, object]]:
     """Load metrics from a JSON Lines file if it exists."""
 
@@ -40,7 +43,11 @@ def compute_overview(metrics: Sequence[Mapping[str, object]]) -> dict[str, objec
         }
     latencies = [float(m.get("latency_ms", 0)) for m in metrics]
     costs = [float(m.get("cost_usd", 0.0)) for m in metrics]
-    successes = sum(1 for m in metrics if m.get("status") == "ok")
+    successes = sum(
+        1
+        for m in metrics
+        if str(m.get("status", "")).lower() in SUCCESS_STATUSES
+    )
     return {
         "total": total,
         "success_rate": round(successes / total * 100, 2),
@@ -63,7 +70,11 @@ def build_comparison_table(
     table: list[dict[str, object]] = []
     for (provider, model, prompt_id), rows in sorted(groups.items()):
         attempts = len(rows)
-        ok_count = sum(1 for row in rows if row.get("status") == "ok")
+        ok_count = sum(
+            1
+            for row in rows
+            if str(row.get("status", "")).lower() in SUCCESS_STATUSES
+        )
         avg_latency = mean(float(row.get("latency_ms", 0)) for row in rows)
         avg_cost = mean(float(row.get("cost_usd", 0.0)) for row in rows)
         diff_rates: list[float] = []
