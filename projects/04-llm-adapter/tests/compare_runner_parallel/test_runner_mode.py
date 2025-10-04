@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -30,8 +31,8 @@ class _RunnerMode(str, Enum):
 def test_compare_runner_normalizes_enum_mode(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     provider_config = provider_config_factory(tmp_path, name="p1", provider="p1", model="m1")
