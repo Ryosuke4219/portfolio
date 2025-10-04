@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 import html
 from pathlib import Path
 
-from .data import load_baseline_expectations
+from .data import SUCCESS_STATUSES, load_baseline_expectations
 from .utils import coerce_optional_float, latest_metrics_by_key
 
 
@@ -59,9 +59,11 @@ def build_regression_summary(
         result = "MISSING"
         detail = "最新結果がありません。"
         if latest is not None:
-            latest_status = str(latest.get("status", "-"))
+            latest_status_value = str(latest.get("status", "-"))
+            latest_status = latest_status_value
             latest_diff = _extract_diff_rate(latest)
-            if latest_status != "ok":
+            status_normalized = latest_status_value.lower()
+            if status_normalized not in SUCCESS_STATUSES:
                 result = "FAIL"
                 detail = f"最新ステータス: {latest_status}"
             elif latest_diff is None:
