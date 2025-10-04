@@ -9,10 +9,10 @@
 | **M0 — SRS確定 & 骨子固定** | Week40: 2025-09-29〜10-05 | SRS最終化 | `04/llm-adapter-srs.md`最終版 / 参照アーキ図 / M1〜M6 Exit Criteria | ✅ 完了（2025-10-04 SRS v1.0確定・用語集統合完了） |
 | **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / 直列Runner / 最小UT | ✅ 完了（SPI型定義確定・直列Runner/例外UTマージ済） |
 | **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `run_with_shadow` / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（影実行APIとJSONLスキーマv1安定化） |
-| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | OpenAI互換/Ollama/OpenRouter / ストリーミング透過 / 契約テスト | ✅ 完了（OpenRouter統合と共通例外マップ反映済、契約テストCI緑） |
+| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | OpenAI互換/Ollama/OpenRouter / ストリーミング透過 / 契約テスト | 🟡 進行中（OpenAI/Gemini/Ollamaは完了。OpenRouter統合と例外マップ更新が残タスク） |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（parallel_all/consensusで多数決・タイブレーク・shadow差分記録を実装し、合議イベント検証も通過） |
 | **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ自動生成ツールを`just report`に統合） |
-| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（`projects/04-llm-adapter`系を`0.1.0`へ揃え、CHANGELOG v0.1.0を公開。`v0.1.0`タグ発行が残タスク） |
+| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（コードとドキュメントは`0.1.0`へ更新済。`v0.1.0`タグ発行とOpenRouterガイド追補が残タスク） |
 
 ---
 
