@@ -1,4 +1,5 @@
 """Tests for Prometheus metrics exporter status normalization."""
+
 from __future__ import annotations
 
 import sys
