@@ -120,6 +120,31 @@ def test_log_provider_call_includes_shadow_metadata(
     assert payload["shadow_outcome"] == "success"
 
 
+def test_log_provider_call_records_retries(
+    logger: _RecordingLogger, provider_request: ProviderRequest
+) -> None:
+    provider = _DummyProvider("dummy")
+
+    log_provider_call(
+        logger,
+        request_fingerprint="fingerprint",
+        provider=provider,
+        request=provider_request,
+        attempt=3,
+        total_providers=1,
+        status="ok",
+        latency_ms=123,
+        tokens_in=10,
+        tokens_out=20,
+        error=None,
+        metadata={},
+        shadow_used=False,
+    )
+
+    _, payload = logger.events[-1]
+    assert payload["retries"] == 2
+
+
 def test_log_run_metric_includes_shadow_metadata(
     logger: _RecordingLogger, provider_request: ProviderRequest
 ) -> None:
