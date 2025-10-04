@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,6 +13,7 @@ from adapter.core.providers import BaseProvider, ProviderFactory, ProviderRespon
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runner_execution import RunnerExecution
 from adapter.core.runners import CompareRunner
+from ._sys_path import BudgetManager
 from .conftest import ProviderConfigFactory, RunMetricsFactory, TaskFactory
 
 
@@ -132,7 +134,7 @@ def test_runner_config_dataclass_initializes_helpers(
     tmp_path: Path,
     provider_config_factory: ProviderConfigFactory,
     task_factory: TaskFactory,
-    budget_manager_factory,
+    budget_manager_factory: Callable[[], BudgetManager],
 ) -> None:
     token_bucket_args: list[int | None] = []
     schema_args: list[Path | None] = []
@@ -184,7 +186,7 @@ def test_run_metrics_records_error_type_and_attempts(
     tmp_path: Path,
     provider_config_factory: ProviderConfigFactory,
     task_factory: TaskFactory,
-    budget_manager_factory,
+    budget_manager_factory: Callable[[], BudgetManager],
 ) -> None:
     class FlakyProvider(BaseProvider):
         def __init__(self, config: ProviderConfig) -> None:
