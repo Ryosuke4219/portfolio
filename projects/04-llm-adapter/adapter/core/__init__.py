@@ -26,10 +26,10 @@ from .metrics.diff import compute_diff_rate  # noqa: F401
 from .metrics.models import (  # noqa: F401
     BudgetSnapshot,
     EvalMetrics,
-    RunMetric,
-    RunMetrics,
     hash_text,
     now_ts,
+    RunMetric,
+    RunMetrics,
 )
 from .providers import ProviderFactory  # noqa: F401
 from .runners import CompareRunner  # noqa: F401
