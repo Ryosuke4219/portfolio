@@ -168,6 +168,7 @@ def log_provider_call(
         "completion": completion_tokens,
         "total": prompt_tokens + completion_tokens,
     }
+    retries = max(0, attempt - 1)
     shadow_metadata = _extract_shadow_metadata(metadata)
 
     event_logger.emit(
@@ -180,6 +181,7 @@ def log_provider_call(
             "provider_id": provider_name,
             "model": provider_model(provider, allow_private=allow_private_model),
             "attempt": attempt,
+            "retries": retries,
             "total_providers": total_providers,
             "status": status,
             "outcome": _normalize_outcome(status),
