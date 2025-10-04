@@ -3,7 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { loadWindowRuns, computeAggregates, determineFlaky, summarise } from '../analyzer.js';
-import { loadConfig, resolveConfigPaths } from '../config.js';
+import { loadConfig, resolveConfigPaths } from '../config/index.js';
 import { ensureDir } from '../fs-utils.js';
 import { writeCsv, writeJson, generateHtmlReport } from '../report.js';
 import { determineFormats, resolveConfigPath } from './utils.js';

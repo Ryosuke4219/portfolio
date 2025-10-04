@@ -4,7 +4,7 @@ import process from 'node:process';
 
 import { isFailureStatus } from '../analyzer.js';
 import { createFailureSignature } from '../classification.js';
-import { loadConfig, resolveConfigPaths } from '../config.js';
+import { loadConfig, resolveConfigPaths } from '../config/index.js';
 import { ensureDir } from '../fs-utils.js';
 import { parseJUnitFile, parseJUnitStream } from '../junit-parser.js';
 import { appendAttempts } from '../store.js';
