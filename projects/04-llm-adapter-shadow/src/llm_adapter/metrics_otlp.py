@@ -14,6 +14,20 @@ def _timestamp_ns(value: Any) -> str:
     )
 
 
+def _normalized_status(record: Mapping[str, Any]) -> str | None:
+    raw = record.get("outcome") or record.get("status")
+    if raw is None:
+        return None
+    normalized = str(raw).lower()
+    if normalized in {"ok", "success"}:
+        return "success"
+    if normalized in {"error", "errored", "failure"}:
+        return "error"
+    if normalized in {"skip", "skipped"}:
+        return "skipped"
+    return normalized
+
+
 def _encode_attrs(values: Mapping[str, Any]) -> ScopeAttrs:
     attrs: ScopeAttrs = []
     for key, raw in values.items():
@@ -57,7 +71,11 @@ class OtlpJsonExporter:
         if event_type not in {"provider_call", "run_metric"}:
             return
         timestamp = _timestamp_ns(record.get("ts"))
-        attrs = _encode_attrs({k: v for k, v in record.items() if k not in {"ts", "event"}})
+        attr_values = {k: v for k, v in record.items() if k not in {"ts", "event"}}
+        normalized_status = _normalized_status(record)
+        if normalized_status is not None:
+            attr_values["status"] = normalized_status
+        attrs = _encode_attrs(attr_values)
         log_record = {
             "timeUnixNano": timestamp,
             "observedTimeUnixNano": timestamp,
