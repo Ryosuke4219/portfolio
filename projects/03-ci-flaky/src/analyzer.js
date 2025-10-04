@@ -1,6 +1,6 @@
 import { listJsonlFiles, readJsonl } from './fs-utils.js';
 
-const FAILURE_STATUSES = new Set(['fail', 'error', 'errored']);
+const FAILURE_STATUSES = new Set(['fail', 'error', 'errored', 'failure']);
 
 function calculateImpact(avgDuration, baseline) {
   if (!avgDuration || !baseline) return 0;
@@ -23,7 +23,8 @@ function calculateRecency(perRunStats, runOrderLength, lambda) {
 
 export function isFailureStatus(status) {
   const value = typeof status === 'string' ? status : status?.status;
-  return FAILURE_STATUSES.has(value);
+  if (!value) return false;
+  return FAILURE_STATUSES.has(value.toLowerCase());
 }
 
 class AggregatedEntry {
