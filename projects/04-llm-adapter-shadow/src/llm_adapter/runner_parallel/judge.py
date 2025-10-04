@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib
 from typing import Any, Callable, cast, Mapping, Sequence
 
+# Local imports (alphabetical)
 from ..consensus_candidates import _Candidate
 from ..provider_spi import ProviderResponse
 
