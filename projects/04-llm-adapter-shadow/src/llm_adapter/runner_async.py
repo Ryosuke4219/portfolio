@@ -7,9 +7,9 @@ import time
 from typing import Any
 
 from ._event_loop import ensure_socket_free_event_loop_policy
-from .errors import FatalError
+from .errors import AllFailedError
 from .observability import EventLogger
-from .parallel_exec import ParallelAllResult
+from .parallel_exec import ParallelAllResult, ParallelExecutionError
 from .provider_spi import (
     AsyncProviderSPI,
     ensure_async_provider,
@@ -40,10 +40,6 @@ from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics
 from .utils import content_hash, elapsed_ms
 
 ensure_socket_free_event_loop_policy()
-
-
-class AllFailedError(FatalError):
-    """Raised when all providers fail to produce a response."""
 
 
 class AsyncRunner:
@@ -201,7 +197,7 @@ class AsyncRunner:
             shadow_used=shadow_used,
         )
         if last_err is not None:
-            if mode == RunnerMode.CONSENSUS or total_providers <= 1:
+            if isinstance(last_err, ParallelExecutionError):
                 raise last_err
             raise failure_error from last_err
         raise failure_error
