@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -10,9 +7,7 @@ from adapter.core.errors import ProviderSkip, TimeoutError
 from adapter.core.providers import BaseProvider, ProviderFactory, ProviderResponse
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runners import CompareRunner
-
-if TYPE_CHECKING:
-    from tests.compare_runner_parallel.conftest import ProviderConfigFactory, TaskFactory
+from tests.compare_runner_parallel.conftest import ProviderConfigFactory, TaskFactory
 
 
 def _normalize_mode(value: str) -> str:
@@ -22,8 +17,8 @@ def _normalize_mode(value: str) -> str:
 def test_parallel_any_stops_after_first_success(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     calls: list[str] = []
@@ -65,8 +60,8 @@ def test_parallel_any_stops_after_first_success(
 def test_parallel_any_cancels_pending_workers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     import time
@@ -109,8 +104,8 @@ def test_parallel_any_cancels_pending_workers(
 def test_parallel_any_populates_metrics_for_unscheduled_workers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class WinnerProvider(BaseProvider):
