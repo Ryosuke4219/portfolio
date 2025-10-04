@@ -2,23 +2,21 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-import sys
 from typing import Protocol
 
 import pytest
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SHADOW_ROOT = PROJECT_ROOT.parent / "04-llm-adapter-shadow"
-
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-if SHADOW_ROOT.exists() and str(SHADOW_ROOT) not in sys.path:
-    sys.path.insert(0, str(SHADOW_ROOT))
-
-from adapter.core.budgets import BudgetManager
-from adapter.core.datasets import GoldenTask
-from adapter.core.metrics import RunMetrics
-from adapter.core.models import ProviderConfig, PricingConfig, QualityGatesConfig, RateLimitConfig, RetryConfig
+# isort: split
+from ._sys_path import (
+    BudgetManager,
+    GoldenTask,
+    PricingConfig,
+    ProviderConfig,
+    QualityGatesConfig,
+    RateLimitConfig,
+    RetryConfig,
+    RunMetrics,
+)
 
 
 class ProviderConfigFactory(Protocol):
