@@ -62,3 +62,26 @@ def test_build_metrics_normalizes_failed_status() -> None:
 
     text = _format_text(metrics)
     assert "fail: 1" in text
+
+
+def test_build_metrics_normalizes_failure_status() -> None:
+    cases = {
+        "suite": "demo-suite",
+        "cases": [
+            {"id": "case-1"},
+        ],
+    }
+    attempts = [
+        {
+            "name": "case-1 first attempt",
+            "status": "failure",
+        }
+    ]
+
+    metrics = _build_metrics(cases, attempts)
+
+    assert metrics["status_breakdown"].get("fail") == 1
+    assert "failure" not in metrics["status_breakdown"]
+
+    text = _format_text(metrics)
+    assert "fail: 1" in text
