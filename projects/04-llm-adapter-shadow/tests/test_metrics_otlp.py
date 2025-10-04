@@ -80,3 +80,29 @@ def test_status_values_are_normalized_for_errored_status(event_type: str) -> Non
     metric = _metric(payload, f"llm_adapter.{event_type}.count")
     metric_attrs = metric["gauge"]["dataPoints"][0]["attributes"]
     assert _attr(metric_attrs, "status")["stringValue"] == "error"
+
+
+@pytest.mark.parametrize("event_type", ("provider_call", "run_metric"))
+@pytest.mark.parametrize("status", ("failed",))
+def test_status_values_are_normalized_for_failed_status(
+    event_type: str, status: str
+) -> None:
+    record: dict[str, Any] = {
+        "ts": 1_700_000_002_000,
+        "provider": "primary",
+        "status": status,
+        "latency_ms": 10,
+        "tokens_in": 1,
+        "tokens_out": 2,
+        "shadow_used": False,
+    }
+    if event_type == "run_metric":
+        record["cost_usd"] = 0.01
+
+    payload = _collect(event_type, record)
+    log_attrs = payload["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["attributes"]
+    assert _attr(log_attrs, "status")["stringValue"] == "error"
+
+    metric = _metric(payload, f"llm_adapter.{event_type}.count")
+    metric_attrs = metric["gauge"]["dataPoints"][0]["attributes"]
+    assert _attr(metric_attrs, "status")["stringValue"] == "error"

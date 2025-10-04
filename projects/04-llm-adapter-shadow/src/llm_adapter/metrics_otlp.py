@@ -21,7 +21,7 @@ def _normalized_status(record: Mapping[str, Any]) -> str | None:
     normalized = str(raw).lower()
     if normalized in {"ok", "success"}:
         return "success"
-    if normalized in {"error", "errored", "failure"}:
+    if normalized in {"error", "errored", "failure", "failed", "fail"}:
         return "error"
     if normalized in {"skip", "skipped"}:
         return "skipped"
