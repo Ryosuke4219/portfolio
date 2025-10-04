@@ -1,10 +1,12 @@
+# ruff: noqa: I001
 from __future__ import annotations
+
+import threading
+import time
 
 from collections.abc import Sequence
 from concurrent.futures import Future
 from pathlib import Path
-import threading
-import time
 from typing import Any
 
 import pytest
