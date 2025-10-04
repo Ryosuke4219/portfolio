@@ -100,7 +100,7 @@ def test_async_shadow_exec_records_metrics(tmp_path: Path) -> None:
     assert call_event["shadow_provider_id"] == "shadow"
     assert run_metric_event["shadow_provider_id"] == "shadow"
     assert call_event["shadow_latency_ms"] >= 0
-    assert call_event["shadow_outcome"] == "ok"
+    assert call_event["shadow_outcome"] == "success"
     assert run_metric_event["shadow_latency_ms"] == call_event["shadow_latency_ms"]
     assert run_metric_event["shadow_outcome"] == call_event["shadow_outcome"]
 
@@ -149,3 +149,32 @@ def test_async_shadow_error_records_metrics(tmp_path: Path) -> None:
     assert diff_event["shadow_error"] == "TimeoutError"
     assert diff_event["shadow_error_message"] == "simulated timeout"
     assert diff_event["shadow_duration_ms"] >= 0
+
+
+def test_shadow_outcome_success_is_logged(tmp_path: Path) -> None:
+    primary = MockProvider("primary", base_latency_ms=5, error_markers=set())
+    shadow = MockProvider("shadow", base_latency_ms=5, error_markers=set())
+    runner = AsyncRunner([primary])
+
+    metrics_path = tmp_path / "metrics-success.jsonl"
+    request = ProviderRequest(prompt="hello", model="primary-model")
+
+    _run_without_warnings(
+        lambda: asyncio.run(
+            asyncio.wait_for(
+                runner.run_async(
+                    request,
+                    shadow=shadow,
+                    shadow_metrics_path=metrics_path,
+                ),
+                timeout=0.5,
+            )
+        )
+    )
+
+    payloads = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
+    call_event = next(item for item in payloads if item["event"] == "provider_call")
+    run_metric_event = next(item for item in payloads if item.get("event") == "run_metric")
+
+    assert call_event["shadow_outcome"] == "success"
+    assert run_metric_event["shadow_outcome"] == "success"
