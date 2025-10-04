@@ -6,12 +6,9 @@ import contextlib
 from dataclasses import replace
 import logging
 from pathlib import Path
-import sys
 from types import SimpleNamespace
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "projects" / "04-llm-adapter"))
 
 from adapter.core.errors import RateLimitError
 from adapter.core.metrics import RunMetrics
