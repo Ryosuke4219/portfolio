@@ -1,25 +1,20 @@
-"""Shared helpers for runner modules."""
+"""Event logging helpers shared across runners."""
 from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-from . import rate_limiter as _rate_limiter
-from .errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
-from .observability import EventLogger, JsonlLogger
-from .utils import content_hash
+from ..errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
+from ..observability import EventLogger, JsonlLogger
+from ..utils import content_hash
+from .costs import estimate_cost, provider_model
 
 if TYPE_CHECKING:
-    from .provider_spi import AsyncProviderSPI, ProviderRequest, ProviderSPI
+    from ..provider_spi import AsyncProviderSPI, ProviderRequest, ProviderSPI
 
 MetricsPath = str | Path | None
 
-RateLimiter = _rate_limiter.RateLimiter
-resolve_rate_limiter = _rate_limiter.resolve_rate_limiter
-time = _rate_limiter.time
-asyncio = _rate_limiter.asyncio
-threading = _rate_limiter.threading
 
 def resolve_event_logger(
     logger: EventLogger | None,
@@ -48,61 +43,11 @@ def error_family(error: Exception | None) -> str | None:
     return "unknown"
 
 
-_COST_CACHE_ATTR = "_llm_adapter_cost_cache"
-
-
-def _get_cached_cost(
-    provider: object, tokens_in: int, tokens_out: int
-) -> float | None:
-    try:
-        cached_tokens, cached_value = getattr(provider, _COST_CACHE_ATTR)
-    except AttributeError:
-        return None
-    except Exception:  # pragma: no cover - defensive guard
-        return None
-    if cached_tokens == (tokens_in, tokens_out):
-        try:
-            return float(cached_value)
-        except (TypeError, ValueError):  # pragma: no cover - defensive guard
-            return None
-    return None
-
-
-def estimate_cost(provider: object, tokens_in: int, tokens_out: int) -> float:
-    cached = _get_cached_cost(provider, tokens_in, tokens_out)
-    if cached is not None:
-        return cached
-    if hasattr(provider, "estimate_cost"):
-        estimator = provider.estimate_cost
-        if callable(estimator):
-            try:
-                value = float(estimator(tokens_in, tokens_out))
-            except Exception:  # pragma: no cover - defensive guard
-                return 0.0
-            try:
-                setattr(provider, _COST_CACHE_ATTR, ((tokens_in, tokens_out), value))
-            except Exception:  # pragma: no cover - defensive guard
-                pass
-            return value
-    return 0.0
-
-
-def provider_model(provider: object, *, allow_private: bool = False) -> str | None:
-    attrs = ["model"]
-    if allow_private:
-        attrs.append("_model")
-    for attr in attrs:
-        value = getattr(provider, attr, None)
-        if isinstance(value, str) and value:
-            return value
-    return None
-
-
 def _provider_name(provider: ProviderSPI | AsyncProviderSPI | None) -> str | None:
     if provider is None:
         return None
     if hasattr(provider, "name"):
-        name = provider.name
+        name = provider.name  # type: ignore[attr-defined]
         if callable(name):
             return str(name())
     return None
@@ -332,8 +277,6 @@ __all__ = [
     "MetricsPath",
     "resolve_event_logger",
     "error_family",
-    "estimate_cost",
-    "provider_model",
     "log_provider_skipped",
     "log_provider_call",
     "log_run_metric",
