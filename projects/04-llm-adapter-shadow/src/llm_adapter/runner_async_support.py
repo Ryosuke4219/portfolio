@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import time
-from typing import Any, Mapping as TypingMapping, cast
+from typing import Any, cast
 
 from .errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
 from .observability import EventLogger
@@ -23,7 +23,7 @@ from .utils import elapsed_ms
 def build_shadow_log_metadata(shadow_metrics: ShadowMetrics | None) -> dict[str, Any]:
     if shadow_metrics is None:
         return {}
-    payload: TypingMapping[str, Any] = shadow_metrics.payload
+    payload: Mapping[str, Any] = shadow_metrics.payload
     metadata: dict[str, Any] = {}
     latency = payload.get("shadow_latency_ms")
     if isinstance(latency, (int, float)):
