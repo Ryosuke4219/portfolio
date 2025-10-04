@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from enum import Enum
 from threading import Event
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 from ...config import ProviderConfig
 from ...datasets import GoldenTask
