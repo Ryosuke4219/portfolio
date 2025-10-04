@@ -9,6 +9,7 @@ from .conftest import (
     _AsyncProbeProvider,
     _CapturingLogger,
 )
+from .parallel import *  # noqa: F401,F403
 
 
 def test_async_parallel_any_run_metric_uses_response_latency() -> None:
@@ -128,10 +129,8 @@ def test_async_parallel_any_returns_first_completion() -> None:
         assert isinstance(result, ProviderResponse)
         return result
 
-    response = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
+    _ = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
 # チェックリスト:
 # - [ ] 新規テストは ``projects/04-llm-adapter-shadow/tests/async_runner/parallel`` に追加する
 # - [ ] 互換性が不要になったらこのシムを削除する
-
-from .parallel import *  # noqa: F401,F403
