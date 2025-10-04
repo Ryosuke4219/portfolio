@@ -45,6 +45,20 @@ def test_aggregate_status_counts_passed_status() -> None:
     assert errors == 0
 
 
+def test_aggregate_status_counts_failure_status() -> None:
+    runs = [
+        {"status": "fail"},
+        {"status": "failure"},
+        {"status": "pass"},
+    ]
+
+    passes, fails, errors = aggregate_status(runs)
+
+    assert passes == 1
+    assert fails == 2
+    assert errors == 0
+
+
 def test_compute_last_updated(sample_runs: list[dict[str, object]]) -> None:
     assert compute_last_updated(sample_runs) == "2024-06-02T09:00:00Z"
 
