@@ -8,7 +8,7 @@ import typing
 from ..config import ProviderConfig
 from ..datasets import GoldenTask
 from ..errors import AllFailedError
-from ..metrics import RunMetrics
+from ..metrics.models import RunMetrics
 from ..providers import BaseProvider, ProviderFactory
 from ..runner_execution import RunnerExecution, SingleRunResult
 

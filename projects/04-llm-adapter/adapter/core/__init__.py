@@ -21,16 +21,15 @@ from .config import (  # noqa: F401
     ProviderConfig,
 )
 from .datasets import GoldenTask, load_golden_tasks  # noqa: F401
-from .metrics import (  # noqa: F401
+from .metrics.costs import compute_cost_usd, estimate_cost  # noqa: F401
+from .metrics.diff import compute_diff_rate  # noqa: F401
+from .metrics.models import (  # noqa: F401
     BudgetSnapshot,
-    compute_cost_usd,
-    compute_diff_rate,
-    estimate_cost,
     EvalMetrics,
-    hash_text,
-    now_ts,
     RunMetric,
     RunMetrics,
+    hash_text,
+    now_ts,
 )
 from .providers import ProviderFactory  # noqa: F401
 from .runners import CompareRunner  # noqa: F401

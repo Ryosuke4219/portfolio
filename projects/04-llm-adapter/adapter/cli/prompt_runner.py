@@ -9,7 +9,8 @@ from typing import cast
 
 from adapter.core import providers as provider_module
 from adapter.core.config import ProviderConfig
-from adapter.core.metrics import estimate_cost, RunMetric
+from adapter.core.metrics.costs import estimate_cost
+from adapter.core.metrics.models import RunMetric
 
 from .utils import _sanitize_message, LOGGER
 

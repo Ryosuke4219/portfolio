@@ -19,7 +19,9 @@ from .config import ProviderConfig
 from .datasets import GoldenTask
 from .errors import RateLimitError, RetryableError
 from .execution.guards import _SchemaValidator, _TokenBucket
-from .metrics import BudgetSnapshot, estimate_cost, finalize_run_metrics, RunMetrics
+from .metrics.costs import estimate_cost
+from .metrics.models import BudgetSnapshot, RunMetrics
+from .metrics.update import finalize_run_metrics
 from .providers import BaseProvider, ProviderResponse
 from .runner_execution_attempts import (
     ParallelAttemptExecutor,

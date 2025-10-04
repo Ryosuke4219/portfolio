@@ -14,7 +14,7 @@ from .aggregation_selector import (
     AggregationSelector,
     JudgeProviderFactory,
 )
-from .metrics import hash_text
+from .metrics.models import hash_text
 from .runner_execution import SingleRunResult
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用

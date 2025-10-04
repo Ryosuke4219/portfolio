@@ -13,6 +13,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 metrics_mod = importlib.import_module("adapter.core.metrics")
+metrics_models_mod = importlib.import_module("adapter.core.metrics.models")
+metrics_update_mod = importlib.import_module("adapter.core.metrics.update")
+metrics_costs_mod = importlib.import_module("adapter.core.metrics.costs")
+metrics_diff_mod = importlib.import_module("adapter.core.metrics.diff")
 data_mod = importlib.import_module("tools.report.metrics.data")
 regression_mod = importlib.import_module("tools.report.metrics.regression_summary")
 weekly_mod = importlib.import_module("tools.report.metrics.weekly_summary")
@@ -231,3 +235,15 @@ def test_run_metrics_to_json_dict_includes_cost_estimate() -> None:
     payload_with_estimate = run_with_estimate.to_json_dict()
     assert payload_with_estimate["cost_usd"] == pytest.approx(0.5)
     assert payload_with_estimate["cost_estimate"] == pytest.approx(0.75)
+
+
+def test_metrics_module_reexports_public_api() -> None:
+    assert metrics_mod.RunMetric is metrics_models_mod.RunMetric
+    assert metrics_mod.RunMetrics is metrics_models_mod.RunMetrics
+    assert metrics_mod.EvalMetrics is metrics_models_mod.EvalMetrics
+    assert metrics_mod.finalize_run_metrics is metrics_update_mod.finalize_run_metrics
+    assert metrics_mod.apply_shadow_metrics is metrics_update_mod.apply_shadow_metrics
+    assert metrics_mod.compute_cost_usd is metrics_costs_mod.compute_cost_usd
+    assert metrics_mod.estimate_cost is metrics_costs_mod.estimate_cost
+    assert metrics_mod.tokenize is metrics_diff_mod.tokenize
+    assert metrics_mod.compute_diff_rate is metrics_diff_mod.compute_diff_rate
