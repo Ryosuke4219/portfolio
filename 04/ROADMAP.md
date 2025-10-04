@@ -12,7 +12,7 @@
 | **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | OpenAI互換/Ollama/OpenRouter / ストリーミング透過 / 契約テスト | ✅ 完了（OpenRouter統合と共通例外マップ反映済、契約テストCI緑） |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（parallel_all/consensusで多数決・タイブレーク・shadow差分記録を実装し、合議イベント検証も通過） |
 | **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ自動生成ツールを`just report`に統合） |
-| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（CLI実行パスと`llm-adapter`エントリ追加済、バージョン/リリースノートの整備とタグ準備が未完） |
+| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（`projects/04-llm-adapter`系を`0.1.0`へ揃え、CHANGELOG v0.1.0を公開。`v0.1.0`タグ発行が残タスク） |
 
 ---
 
@@ -41,8 +41,8 @@
 **成果物**: メトリクス→OTLP/JSON変換、`tools/`による`docs/weekly-summary.md`自動生成、Evidence更新。 **Exit Criteria**: ローカル/CIでメトリクスがダッシュボード(または静的HTML)へ反映、Evidence/Weekly Summaryリンク整合、CI緑＋`just report`でレポート生成。 **タスク**: 完了（OTLPエクスポータと週次サマリ自動化を導入済）。
 
 ## M6 — CLI/Docs/Release 0.1.0
-**進捗**: 🟡 `llm-adapter` CLIはJSON/JSONL入力対応やasync runner切替まで整備され、`pyproject.toml`にエントリポイントを登録。READMEと`just`レシピでデモ〜レポート動線も構築済だが、バージョンは`0.0.1`のままでリリースノート／タグ付け準備が未完。
-**成果物**: `just`/CLI(`setup|test|demo|report|bench`)、README(JP/EN)・サンプル・トラブルシュート、セマンティックバージョン・CHANGELOG・`pyproject.toml`。 **Exit Criteria**: `pip install -e . && just demo`で影実行→JSONL→週次サマリを一気通貫、v0.1.0タグと公開API安定宣言、CI緑＋リリースノートにKnown Issues/Next Steps。 **タスク**: v0.1.0バージョン／CHANGELOG確定 / リリースタグ準備 / README多言語差分の最終同期。
+**進捗**: 🟢 `projects/04-llm-adapter(-shadow)`の`pyproject.toml`と`llm_adapter.__init__`を`0.1.0`へ引き上げ、`CHANGELOG.md`にv0.1.0リリースノートを反映。README/justコマンドのCLI導線を整理し、日本語/英語ドキュメントの差分同期まで完了。
+**成果物**: `just`/CLI(`setup|test|demo|report|bench`)、README(JP/EN)・サンプル・トラブルシュート、セマンティックバージョン・CHANGELOG・`pyproject.toml`。 **Exit Criteria**: `pip install -e . && just demo`で影実行→JSONL→週次サマリを一気通貫、v0.1.0タグと公開API安定宣言、CI緑＋リリースノートにKnown Issues/Next Steps。 **タスク**: v0.1.0タグ発行 / リリースノートEvidence添付最終確認。
 
 ## Stretch (Week46-47 任意)
 コスト計測&予算内選択(token単価×速度×品質)、プロバイダ健全性ヘルスチェック(プローブ/自動フェイルアウト)、影差分可視化UIと回帰検知。
