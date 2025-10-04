@@ -4,8 +4,12 @@ from __future__ import annotations
 import importlib
 from typing import Any, Callable, cast, Mapping, Sequence
 
-from ..consensus_candidates import _Candidate
-from ..provider_spi import ProviderResponse
+from ..consensus_candidates import (
+    _Candidate,
+)
+from ..provider_spi import (
+    ProviderResponse,
+)
 
 
 def _load_judge(path: str) -> Callable[[Sequence[ProviderResponse]], Any]:
