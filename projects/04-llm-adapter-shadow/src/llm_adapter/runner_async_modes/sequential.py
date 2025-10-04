@@ -51,6 +51,10 @@ class SequentialRunStrategy:
                     if not shadow_metadata
                     else dict(context.metadata, **shadow_metadata)
                 )
+                latency_ms = getattr(response, "latency_ms", None)
+                if latency_ms is None:
+                    latency_ms = elapsed_ms(context.run_started)
+
                 log_run_metric(
                     context.event_logger,
                     request_fingerprint=context.request_fingerprint,
@@ -58,7 +62,7 @@ class SequentialRunStrategy:
                     provider=provider,
                     status="ok",
                     attempts=attempt_index,
-                    latency_ms=elapsed_ms(context.run_started),
+                    latency_ms=latency_ms,
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
                     cost_usd=cost_usd,
