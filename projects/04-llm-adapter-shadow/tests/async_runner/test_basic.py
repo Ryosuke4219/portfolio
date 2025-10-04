@@ -152,9 +152,11 @@ def test_async_runner_emits_failure_event() -> None:
     assert event["last_error_type"] == "TimeoutError"
 
     run_metric_events = logger.of_type("run_metric")
-    assert len(run_metric_events) == 1
-    run_metric = run_metric_events[0]
-    assert run_metric["error_type"] == "TimeoutError"
+    assert len(run_metric_events) == 2
+    failure_metric, final_metric = run_metric_events
+    assert failure_metric["provider_id"] == "flaky"
+    assert failure_metric["error_type"] == "TimeoutError"
+    assert final_metric["provider_id"] is None
 
 def test_async_runner_run_metric_uses_response_latency(
     monkeypatch: pytest.MonkeyPatch,
@@ -179,3 +181,29 @@ def test_async_runner_run_metric_uses_response_latency(
     assert len(events) == 1
     event = events[0]
     assert event["latency_ms"] == response.latency_ms
+
+
+def test_async_sequential_logs_error_metric_before_success() -> None:
+    logger = _CapturingLogger()
+    failing = _AsyncProbeProvider(
+        "primary",
+        delay=0.0,
+        text="fail",
+        failures=[TimeoutError("boom")],
+    )
+    succeeding = _AsyncProbeProvider("secondary", delay=0.0, text="ok")
+    runner = AsyncRunner(
+        [failing, succeeding],
+        logger=logger,
+        config=RunnerConfig(mode=RunnerMode.SEQUENTIAL),
+    )
+    request = ProviderRequest(model="gpt-test", prompt="hello")
+
+    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+
+    assert response.text.startswith("ok")
+    events = logger.of_type("run_metric")
+    assert len(events) == 2
+    failure_event = events[0]
+    assert failure_event["provider_id"] == "primary"
+    assert failure_event["outcome"] == "error"
