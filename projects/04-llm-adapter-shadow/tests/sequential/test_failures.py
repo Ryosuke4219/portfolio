@@ -90,3 +90,63 @@ def test_sequential_strategy_all_failed_logs_once(monkeypatch: pytest.MonkeyPatc
     assert "secondary (attempt 2)" in message
     assert len(log_calls) == 1
     assert log_calls[0][1]["status"] == "error"
+
+
+def test_sequential_strategy_all_failed_logs_each_provider_if_missing_metric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    providers = [
+        _FailingProvider("primary", TimeoutError("slow")),
+        _FailingProvider("secondary", TimeoutError("boom")),
+    ]
+    runner = Runner(providers, config=RunnerConfig())
+    strategy = SequentialStrategy()
+    logger = _RecordingLogger()
+    context = _make_context(runner, logger=logger)
+
+    errors = {
+        "primary": TimeoutError("slow"),
+        "secondary": TimeoutError("boom"),
+    }
+
+    def fake_invoke(
+        provider: Any,
+        request: Any,
+        *,
+        attempt: int,
+        total_providers: int,
+        **_: Any,
+    ) -> ProviderInvocationResult:
+        error = errors[provider.name()]
+        return ProviderInvocationResult(
+            provider=provider,
+            attempt=attempt,
+            total_providers=total_providers,
+            response=None,
+            error=error,
+            latency_ms=5,
+            tokens_in=None,
+            tokens_out=None,
+            shadow_metrics=None,
+            shadow_metrics_extra=None,
+            provider_call_logged=False,
+        )
+
+    monkeypatch.setattr(runner, "_invoke_provider_sync", fake_invoke)
+
+    log_calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    def fake_log_run_metric(*args: Any, **kwargs: Any) -> None:
+        log_calls.append((args, kwargs))
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_sync_sequential.log_run_metric",
+        fake_log_run_metric,
+    )
+
+    with pytest.raises(AllFailedError):
+        strategy.execute(context)
+
+    assert len(log_calls) == 3
+    per_provider = [call_kwargs["provider"] for _, call_kwargs in log_calls[:2]]
+    assert per_provider == [providers[0], providers[1]]
