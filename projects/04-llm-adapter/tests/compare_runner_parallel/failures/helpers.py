@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 import pytest
 
