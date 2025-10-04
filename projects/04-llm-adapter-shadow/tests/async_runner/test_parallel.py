@@ -80,6 +80,40 @@ def test_async_runner_parallel_any_logs_cancelled_providers() -> None:
     assert run_metrics["fast"]["status"] == "ok"
     assert run_metrics["slow"]["status"] == "error"
     assert run_metrics["slow"]["error_type"] == "CancelledError"
+
+
+def test_async_parallel_all_emits_run_metric_per_provider() -> None:
+    fast = _AsyncProbeProvider("fast", delay=0.01, text="fast")
+    slow = _AsyncProbeProvider("slow", delay=0.02, text="slow")
+    logger = _CapturingLogger()
+    runner = AsyncRunner(
+        [fast, slow],
+        logger=logger,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ALL, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="hi", model="async-parallel-all-run-metric")
+
+    result = asyncio.run(runner.run_async(request))
+
+    assert isinstance(result, ParallelAllResult)
+    run_metrics = [
+        event
+        for event in logger.of_type("run_metric")
+        if event.get("provider") in {fast.name(), slow.name()}
+    ]
+    assert len(run_metrics) == 2
+    providers_logged = {event["provider"] for event in run_metrics}
+    assert providers_logged == {fast.name(), slow.name()}
+    expected_latency = {
+        provider.name(): response.latency_ms for _, provider, response, _ in result
+    }
+    expected_attempts = {
+        provider.name(): attempt_index for attempt_index, provider, *_ in result
+    }
+    for event in run_metrics:
+        provider_name = event["provider"]
+        assert event["latency_ms"] == expected_latency[provider_name]
+        assert event["attempts"] == expected_attempts[provider_name]
 def test_async_parallel_any_returns_first_completion() -> None:
     slow = _AsyncProbeProvider("slow", delay=0.1, text="slow")
     fast = _AsyncProbeProvider("fast", delay=0.01, text="fast")
