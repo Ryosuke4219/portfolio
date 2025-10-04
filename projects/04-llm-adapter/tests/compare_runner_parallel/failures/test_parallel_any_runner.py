@@ -168,8 +168,8 @@ def test_parallel_any_populates_metrics_for_unscheduled_workers(
 def test_parallel_any_failure_summary_includes_all_failures(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class SkipProvider(BaseProvider):
