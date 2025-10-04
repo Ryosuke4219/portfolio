@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 import sys
@@ -47,7 +49,7 @@ def test_prometheus_exporter_accepts_numeric_metrics(monkeypatch: pytest.MonkeyP
             self.label_args: list[dict[str, str]] = []
             self.inc_values: list[float] = []
 
-        def labels(self, **kwargs: str) -> "DummyCounter":
+        def labels(self, **kwargs: str) -> DummyCounter:
             self.label_args.append(kwargs)
             return self
 
