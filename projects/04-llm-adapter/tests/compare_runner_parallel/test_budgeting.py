@@ -1,28 +1,18 @@
-from __future__ import annotations
-
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
 
 import pytest
 
 from adapter.core.errors import TimeoutError
+from adapter.core.datasets import GoldenTask
 from adapter.core.metrics import BudgetSnapshot
+from adapter.core.metrics import RunMetrics
 from adapter.core.models import ProviderConfig
 from adapter.core.providers import BaseProvider, ProviderFactory, ProviderResponse
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runner_execution import RunnerExecution
 from adapter.core.runners import CompareRunner
-
-if TYPE_CHECKING:
-    from adapter.core.datasets import GoldenTask
-    from adapter.core.metrics import RunMetrics
-
-    from .conftest import (
-        ProviderConfigFactory,
-        RunMetricsFactory,
-        TaskFactory,
-    )
+from .conftest import ProviderConfigFactory, RunMetricsFactory, TaskFactory
 
 
 def test_runner_execution_records_shadow_budget_and_schema(
