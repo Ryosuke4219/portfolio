@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 import html
 from pathlib import Path
 
-from .data import SUCCESS_STATUSES, load_baseline_expectations
+from .data import load_baseline_expectations, SUCCESS_STATUSES
 from .utils import coerce_optional_float, latest_metrics_by_key
 
 
