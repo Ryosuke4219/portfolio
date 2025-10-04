@@ -1,4 +1,5 @@
 """Data loading and aggregation helpers for metrics reports."""
+
 from __future__ import annotations
 
 from collections import Counter
