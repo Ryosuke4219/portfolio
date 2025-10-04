@@ -85,8 +85,11 @@ class _SequentialRunTracker:
         self,
         provider: ProviderSPI,
         attempt: int,
-        error: Exception,
+        result: ProviderInvocationResult,
     ) -> None:
+        error = result.error
+        if error is None:
+            return
         self._last_error = error
         summary = f"{type(error).__name__}: {error}"
         self._failure_details.append(
@@ -95,6 +98,35 @@ class _SequentialRunTracker:
                 "attempt": str(attempt),
                 "summary": summary,
             }
+        )
+        tokens_in = result.tokens_in
+        tokens_out = result.tokens_out
+        latency_ms = (
+            result.latency_ms
+            if result.latency_ms is not None
+            else elapsed_ms(self._context.run_started)
+        )
+        metadata_with_shadow: Mapping[str, object]
+        if result.shadow_metrics_extra:
+            merged_metadata = dict(self._context.metadata)
+            merged_metadata.update(result.shadow_metrics_extra)
+            metadata_with_shadow = merged_metadata
+        else:
+            metadata_with_shadow = self._context.metadata
+        log_run_metric(
+            self._event_logger,
+            request_fingerprint=self._context.request_fingerprint,
+            request=self._context.request,
+            provider=provider,
+            status="error",
+            attempts=attempt,
+            latency_ms=latency_ms,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=0.0,
+            error=error,
+            metadata=metadata_with_shadow,
+            shadow_used=self._context.shadow_used,
         )
         if isinstance(error, FatalError):
             if isinstance(error, AuthError | ConfigError):
@@ -211,10 +243,9 @@ class SequentialStrategy:
             if response is not None:
                 return response
 
-            error = result.error
-            if error is None:
+            if result.error is None:
                 continue
-            tracker.handle_failure(provider, attempt_index, error)
+            tracker.handle_failure(provider, attempt_index, result)
 
         tracker.finalize_and_raise()
 
