@@ -14,13 +14,13 @@ from .consensus import (
 from .observations import _normalize_observations
 
 __all__ = [
-    "ConsensusObservation",
-    "ConsensusResult",
     "ConsensusConfig",
-    "compute_consensus",
-    "invoke_consensus_judge",
     "_Candidate",
     "_normalize_candidate_text",
+    "compute_consensus",
+    "ConsensusObservation",
+    "ConsensusResult",
+    "invoke_consensus_judge",
     "validate_consensus_schema",
     "_normalize_observations",
 ]
