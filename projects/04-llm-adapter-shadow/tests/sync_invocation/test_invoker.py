@@ -205,7 +205,7 @@ def test_provider_call_event_contains_token_usage(
         cost_calls.append((tokens_in, tokens_out))
         return 12.34
 
-    setattr(provider, "estimate_cost", fake_estimate_cost)
+    provider.estimate_cost = fake_estimate_cost
 
     def fake_run_with_shadow(*args: Any, **kwargs: Any) -> ProviderResponse:
         assert kwargs["capture_metrics"] is False
