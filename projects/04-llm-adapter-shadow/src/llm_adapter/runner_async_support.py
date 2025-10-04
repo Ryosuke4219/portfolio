@@ -19,7 +19,7 @@ from .runner_shared import log_provider_call, log_provider_skipped, RateLimiter
 from .shadow import run_with_shadow_async, ShadowMetrics
 from .utils import elapsed_ms
 
-TypingMapping = Mapping
+TypingMapping = Mapping  # Backwards-compatible alias for typing.Mapping
 
 
 def build_shadow_log_metadata(shadow_metrics: ShadowMetrics | None) -> dict[str, Any]:
