@@ -113,21 +113,22 @@ class _SequentialRunTracker:
             metadata_with_shadow = merged_metadata
         else:
             metadata_with_shadow = self._context.metadata
-        log_run_metric(
-            self._event_logger,
-            request_fingerprint=self._context.request_fingerprint,
-            request=self._context.request,
-            provider=provider,
-            status="error",
-            attempts=attempt,
-            latency_ms=latency_ms,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            cost_usd=0.0,
-            error=error,
-            metadata=metadata_with_shadow,
-            shadow_used=self._context.shadow_used,
-        )
+        if not result.provider_call_logged:
+            log_run_metric(
+                self._event_logger,
+                request_fingerprint=self._context.request_fingerprint,
+                request=self._context.request,
+                provider=provider,
+                status="error",
+                attempts=attempt,
+                latency_ms=latency_ms,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                cost_usd=0.0,
+                error=error,
+                metadata=metadata_with_shadow,
+                shadow_used=self._context.shadow_used,
+            )
         if isinstance(error, FatalError):
             if isinstance(error, AuthError | ConfigError):
                 if self._event_logger is not None:
