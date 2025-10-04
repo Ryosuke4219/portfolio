@@ -22,7 +22,7 @@ def compute_cost_usd(
     return round(prompt_cost + completion_cost, 6)
 
 
-def estimate_cost(config: "ProviderConfig", input_tokens: int, output_tokens: int) -> float:
+def estimate_cost(config: ProviderConfig, input_tokens: int, output_tokens: int) -> float:
     """プロバイダ設定に基づいて概算コストを算出する。"""
 
     pricing = config.pricing
