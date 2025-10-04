@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import threading
-import time
 from collections.abc import Sequence
 from concurrent.futures import Future
 from pathlib import Path
+import threading
+import time
 from typing import Any
 
 import pytest
@@ -17,16 +17,14 @@ from src.llm_adapter.runner import Runner
 from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 
 from ..parallel_helpers import (
-    RecordingLogger,
-    _RetryProbeProvider,
-    _StaticProvider,
     _install_recording_executor,
     _read_metrics,
+    _RetryProbeProvider,
+    _StaticProvider,
+    RecordingLogger,
 )
 
-
 # --- ANY のキャンセル/再試行 ---
-
 
 def test_run_parallel_any_sync_cancels_pending_futures(
     monkeypatch: pytest.MonkeyPatch,
