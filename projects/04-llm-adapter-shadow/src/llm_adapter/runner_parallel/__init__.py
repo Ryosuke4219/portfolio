@@ -1,5 +1,4 @@
 """Parallel runner consensus utilities."""
-
 from __future__ import annotations
 
 from ..runner_config import ConsensusConfig
