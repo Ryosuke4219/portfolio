@@ -10,7 +10,7 @@ from src.llm_adapter.runner_config import RunnerConfig
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 from src.llm_adapter.runner_sync_modes import SequentialStrategy
 
-from .conftest import _FailingProvider, _make_context, _RecordingLogger
+from .conftest import _FailingProvider, _RecordingLogger, _make_context
 
 
 def test_sequential_strategy_emits_fallback_for_auth_error(
