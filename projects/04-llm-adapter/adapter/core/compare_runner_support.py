@@ -13,13 +13,13 @@ import uuid
 from .budgets import BudgetManager
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics import (
+from .metrics.diff import compute_diff_rate
+from .metrics.models import (
     BudgetSnapshot,
-    compute_diff_rate,
     EvalMetrics,
+    RunMetrics,
     hash_text,
     now_ts,
-    RunMetrics,
 )
 from .providers import BaseProvider, ProviderFactory, ProviderResponse
 

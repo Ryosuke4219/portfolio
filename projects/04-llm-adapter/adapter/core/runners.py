@@ -19,7 +19,7 @@ from .compare_runner_support import (
 from .config import ProviderConfig
 from .datasets import GoldenTask
 from .execution.compare_task_runner import run_tasks
-from .metrics import BudgetSnapshot, RunMetrics
+from .metrics.models import BudgetSnapshot, RunMetrics
 from .providers import BaseProvider, ProviderResponse
 from .runner_execution import (
     _SchemaValidator,

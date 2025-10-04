@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics import compute_diff_rate, RunMetrics
+from .metrics.diff import compute_diff_rate
+from .metrics.models import RunMetrics
 from .providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
