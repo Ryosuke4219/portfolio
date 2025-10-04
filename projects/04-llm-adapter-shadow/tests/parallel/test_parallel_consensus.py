@@ -12,14 +12,13 @@ from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
 from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
 from src.llm_adapter.runner_parallel import (
-    ConsensusConfig,
     _normalize_candidate_text,
     compute_consensus,
+    ConsensusConfig,
 )
 from src.llm_adapter.shadow import run_with_shadow
 
 from ..parallel_helpers import _StaticProvider
-
 
 # --- コンセンサス/シャドー計測 ---
 
