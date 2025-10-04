@@ -12,9 +12,7 @@ from src.llm_adapter.runner_sync_invocation import (
 
 from ..parallel_helpers import _StaticProvider
 
-
 # --- ParallelResultLogger・CancelledResultsBuilder のユーティリティ ---
-
 
 def test_cancelled_results_builder_populates_cancelled_slots() -> None:
     run_started = 100.0
