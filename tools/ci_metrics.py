@@ -11,7 +11,7 @@ from tools import weekly_summary
 from tools.weekly_summary import coerce_str, load_runs
 
 PASS_STATUSES = {"pass", "passed"}
-FAIL_STATUSES = {"fail", "failed"}
+FAIL_STATUSES = {"fail", "failed", "failure"}
 ERROR_STATUSES = {"error", "errored"}
 
 
