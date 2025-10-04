@@ -54,10 +54,10 @@ class ParallelAnyRunStrategy(ParallelStrategyBase):
         tokens_in = usage.prompt
         tokens_out = usage.completion
         cost_usd = estimate_cost(provider, tokens_in, tokens_out)
-        response_latency = getattr(response, "latency_ms", None)
+        response_latency_ms = getattr(response, "latency_ms", None)
         latency_ms = (
-            int(response_latency)
-            if response_latency is not None
+            int(response_latency_ms)
+            if response_latency_ms is not None
             else elapsed_ms(context.run_started)
         )
         log_run_metric(
