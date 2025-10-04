@@ -18,9 +18,9 @@ if TYPE_CHECKING:
 def test_parallel_attempt_executor_parallel_all_mode(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     batch, summaries, stop_reason = _run_parallel_case(
         tmp_path,
@@ -39,9 +39,9 @@ def test_parallel_attempt_executor_parallel_all_mode(
 def test_parallel_attempt_executor_parallel_all_regression(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     batch, summaries, stop_reason = _run_parallel_case(
         tmp_path,
@@ -61,9 +61,9 @@ def test_parallel_attempt_executor_parallel_all_regression(
 def test_parallel_attempt_executor_parallel_all_failure_regression(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     behaviours = {
         "parallel_all": {
