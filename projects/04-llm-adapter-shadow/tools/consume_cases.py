@@ -56,14 +56,16 @@ def _attempt_case_id(attempt: Mapping[str, Any]) -> str | None:
     return prefix.strip() or None
 
 
+_STATUS_ALIASES: dict[str, str] = {
+    "errored": "error",
+    "failed": "fail",
+    "failure": "fail",
+}
+
+
 def _normalize_status(raw_status: str) -> str:
     normalized = raw_status.strip().lower()
-    alias_map = {
-        "errored": "error",
-        "failed": "fail",
-        "failure": "fail",
-    }
-    return alias_map.get(normalized, normalized)
+    return _STATUS_ALIASES.get(normalized, normalized)
 
 
 def _build_metrics(
