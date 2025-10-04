@@ -171,6 +171,11 @@ def log_provider_call(
     retries = max(0, attempt - 1)
     shadow_metadata = _extract_shadow_metadata(metadata)
 
+    if isinstance(error, SkipError):
+        outcome = "skip"
+    else:
+        outcome = _normalize_outcome(status)
+
     event_logger.emit(
         "provider_call",
         {
@@ -184,7 +189,7 @@ def log_provider_call(
             "retries": retries,
             "total_providers": total_providers,
             "status": status,
-            "outcome": _normalize_outcome(status),
+            "outcome": outcome,
             "latency_ms": latency_ms,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
@@ -230,7 +235,10 @@ def log_run_metric(
     providers = metadata.get("providers")
     shadow_provider_id = metadata.get("shadow_provider_id")
     retries = attempts - 1 if attempts > 0 else 0
-    outcome = _normalize_outcome(status)
+    if isinstance(error, SkipError):
+        outcome = "skip"
+    else:
+        outcome = _normalize_outcome(status)
     cost_estimate = float(cost_usd)
     prompt_tokens = tokens_in if tokens_in is not None else 0
     completion_tokens = tokens_out if tokens_out is not None else 0
