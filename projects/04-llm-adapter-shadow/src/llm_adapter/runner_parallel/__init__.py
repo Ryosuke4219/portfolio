@@ -1,14 +1,15 @@
 """Parallel runner consensus utilities."""
+
 from __future__ import annotations
 
 from ..runner_config import ConsensusConfig
 from .consensus import (
-    ConsensusObservation,
-    ConsensusResult,
-    compute_consensus,
-    invoke_consensus_judge,
     _Candidate,
     _normalize_candidate_text,
+    compute_consensus,
+    ConsensusObservation,
+    ConsensusResult,
+    invoke_consensus_judge,
     validate_consensus_schema,
 )
 from .observations import _normalize_observations
