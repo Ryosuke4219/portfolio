@@ -57,3 +57,26 @@ def test_otlp_payloads_cover_provider_and_run_metrics() -> None:
     assert _attr(attrs, "shadow_used")["boolValue"] is False
     cost = _metric(payload, "llm_adapter.run_metric.cost_usd")["gauge"]["dataPoints"][0]
     assert pytest.approx(cost["asDouble"], rel=1e-6) == 0.25
+
+
+@pytest.mark.parametrize("event_type", ("provider_call", "run_metric"))
+def test_status_values_are_normalized_for_errored_status(event_type: str) -> None:
+    record: dict[str, Any] = {
+        "ts": 1_700_000_001_000,
+        "provider": "primary",
+        "status": "errored",
+        "latency_ms": 10,
+        "tokens_in": 1,
+        "tokens_out": 2,
+        "shadow_used": False,
+    }
+    if event_type == "run_metric":
+        record["cost_usd"] = 0.01
+
+    payload = _collect(event_type, record)
+    log_attrs = payload["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["attributes"]
+    assert _attr(log_attrs, "status")["stringValue"] == "error"
+
+    metric = _metric(payload, f"llm_adapter.{event_type}.count")
+    metric_attrs = metric["gauge"]["dataPoints"][0]["attributes"]
+    assert _attr(metric_attrs, "status")["stringValue"] == "error"
