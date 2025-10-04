@@ -18,7 +18,6 @@ def _ensure_repo_root_on_path() -> None:
         sys.path.insert(0, repo_root_str)
 
 
-
 def _import_module(name: str) -> ModuleType:
     try:
         return importlib.import_module(name)
