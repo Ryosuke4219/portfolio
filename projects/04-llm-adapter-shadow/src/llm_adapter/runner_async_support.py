@@ -34,14 +34,12 @@ def build_shadow_log_metadata(shadow_metrics: ShadowMetrics | None) -> dict[str,
     mapped_outcome: str | None = None
     if isinstance(outcome_value, str):
         normalized = outcome_value.lower()
-        if normalized == "success":
-            mapped_outcome = "ok"
-        elif normalized in {"error", "timeout"}:
+        if normalized in {"success", "error", "timeout"}:
             mapped_outcome = normalized
         else:
             mapped_outcome = outcome_value
     elif payload.get("shadow_ok") is True:
-        mapped_outcome = "ok"
+        mapped_outcome = "success"
     elif payload.get("shadow_ok") is False:
         mapped_outcome = "error"
     if mapped_outcome is not None:
