@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, UTC
 import hashlib
 from typing import Any, Literal, TYPE_CHECKING
 
@@ -28,13 +28,13 @@ class RunMetric(BaseModel):
     @classmethod
     def from_resp(
         cls,
-        cfg: "ProviderConfig",
-        resp: "ProviderResponse",
+        cfg: ProviderConfig,
+        resp: ProviderResponse,
         prompt: str,
         *,
         cost_usd: float = 0.0,
         error: str | None = None,
-    ) -> "RunMetric":
+    ) -> RunMetric:
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
         return cls(
             provider=cfg.provider,
