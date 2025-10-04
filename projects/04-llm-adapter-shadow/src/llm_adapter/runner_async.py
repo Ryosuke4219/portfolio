@@ -196,7 +196,7 @@ class AsyncRunner:
             tokens_in=None,
             tokens_out=None,
             cost_usd=0.0,
-            error=failure_error,
+            error=last_err or failure_error,
             metadata=metadata,
             shadow_used=shadow_used,
         )

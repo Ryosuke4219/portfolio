@@ -151,6 +151,11 @@ def test_async_runner_emits_failure_event() -> None:
     assert event["providers"] == ["flaky"]
     assert event["last_error_type"] == "TimeoutError"
 
+    run_metric_events = logger.of_type("run_metric")
+    assert len(run_metric_events) == 1
+    run_metric = run_metric_events[0]
+    assert run_metric["error_type"] == "TimeoutError"
+
 def test_async_runner_run_metric_uses_response_latency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
