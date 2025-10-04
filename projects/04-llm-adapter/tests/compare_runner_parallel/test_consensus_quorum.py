@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
 from adapter.core.providers import BaseProvider, ProviderFactory, ProviderResponse
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runners import CompareRunner
-
-if TYPE_CHECKING:
-    from tests.compare_runner_parallel.conftest import ProviderConfigFactory, TaskFactory
+from tests.compare_runner_parallel.conftest import ProviderConfigFactory, TaskFactory
 
 
 def _register_provider(monkeypatch: pytest.MonkeyPatch, name: str, cls: type[BaseProvider]) -> None:
@@ -19,8 +16,8 @@ def _register_provider(monkeypatch: pytest.MonkeyPatch, name: str, cls: type[Bas
 
 def _run_consensus(
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
     provider_specs: list[tuple[str, str, str]],
     *,
@@ -43,8 +40,8 @@ def _run_consensus(
 def test_consensus_default_quorum_meta_uses_two(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class ThreeWayConsensusProvider(BaseProvider):
@@ -73,8 +70,8 @@ def test_consensus_default_quorum_meta_uses_two(
 def test_consensus_quorum_failure_marks_metrics(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class ConsensusProvider(BaseProvider):
@@ -107,8 +104,8 @@ def test_consensus_quorum_failure_marks_metrics(
 def test_consensus_quorum_falls_back_to_judge(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class ConsensusProvider(BaseProvider):
@@ -154,8 +151,8 @@ def test_consensus_quorum_falls_back_to_judge(
 def test_consensus_default_quorum_requires_two_votes(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class SplitConsensusProvider(BaseProvider):
