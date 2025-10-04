@@ -67,7 +67,7 @@ class PrometheusMetricsExporter:
     def handle_event(self, event_type: str, record: Mapping[str, Any]) -> None:
         if event_type == "provider_call":
             provider = str(record.get("provider") or "unknown")
-            status = str(record.get("status") or "unknown")
+            status = self._normalize_status(str(record.get("status") or "unknown"))
             shadow_used = "true" if record.get("shadow_used") else "false"
             self._provider_call_total.labels(
                 provider=provider, status=status, shadow_used=shadow_used
@@ -91,12 +91,18 @@ class PrometheusMetricsExporter:
 
         elif event_type == "run_metric":
             provider = str(record.get("provider") or "none")
-            status = str(record.get("status") or "unknown")
+            status = self._normalize_status(str(record.get("status") or "unknown"))
             self._run_total.labels(provider=provider, status=status).inc()
 
             latency_ms = record.get("latency_ms")
             if isinstance(latency_ms, (int, float)) and latency_ms >= 0:  # noqa: UP038
                 self._run_latency_ms.labels(status=status).observe(float(latency_ms))
+
+    def _normalize_status(self, status: str) -> str:
+        lowered = status.strip().lower()
+        if lowered in {"errored", "failed", "failure"}:
+            return "error"
+        return status
 
 
 class _ExporterLogger:
