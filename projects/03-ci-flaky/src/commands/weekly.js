@@ -9,7 +9,7 @@ import {
   summarise,
   isFailureStatus,
 } from '../analyzer.js';
-import { loadConfig, resolveConfigPaths } from '../config.js';
+import { loadConfig, resolveConfigPaths } from '../config/index.js';
 import { ensureDir } from '../fs-utils.js';
 import { resolveConfigPath } from './utils.js';
 
