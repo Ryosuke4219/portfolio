@@ -1,7 +1,7 @@
 """Parallel execution helpers shared across runner implementations."""
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import (
     as_completed,
     FIRST_COMPLETED,
@@ -13,31 +13,13 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 from . import parallel_async as _parallel_async
+from .errors import ParallelExecutionError
 
 T = TypeVar("T")
 S = TypeVar("S")
 
 
 SyncWorker = Callable[[], T]
-
-
-class ParallelExecutionError(RuntimeError):
-    """Raised when all parallel workers fail to produce a response."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        failures: Sequence[Mapping[str, str]] | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.failures: list[dict[str, str]] | None
-        if failures is None:
-            self.failures = None
-        else:
-            self.failures = [dict(detail) for detail in failures]
-
-
 @dataclass(slots=True)
 class ParallelAllResult(Generic[T, S]):
     """Container capturing every result from ``run_parallel_all_*`` helpers."""

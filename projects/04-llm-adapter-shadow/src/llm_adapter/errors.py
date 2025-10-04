@@ -7,7 +7,7 @@ Runner retry policy:
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from enum import Enum
 
 
@@ -33,6 +33,22 @@ class AllFailedError(FatalError):
     def __init__(self, message: str, *, failures: Sequence[dict[str, str]] | None = None) -> None:
         super().__init__(message)
         self.failures: list[dict[str, str]] = list(failures or [])
+
+
+class ParallelExecutionError(FatalError):
+    """Raised when all parallel workers fail to produce a response."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        failures: Sequence[Mapping[str, str]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        if failures is None:
+            self.failures: list[dict[str, str]] | None = None
+        else:
+            self.failures = [dict(detail) for detail in failures]
 
 
 class TimeoutError(RetryableError):
@@ -100,6 +116,7 @@ __all__ = [
     "SkipError",
     "FatalError",
     "AllFailedError",
+    "ParallelExecutionError",
     "ProviderSkip",
     "SkipReason",
     "ConfigError",
