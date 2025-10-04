@@ -28,7 +28,7 @@ def build_shadow_log_metadata(shadow_metrics: ShadowMetrics | None) -> dict[str,
     payload: Mapping[str, Any] = shadow_metrics.payload
     metadata: dict[str, Any] = {}
     latency = payload.get("shadow_latency_ms")
-    if isinstance(latency, (int, float)):
+    if isinstance(latency, int | float):
         metadata["shadow_latency_ms"] = int(latency)
     outcome_value: Any = payload.get("shadow_outcome")
     mapped_outcome: str | None = None
