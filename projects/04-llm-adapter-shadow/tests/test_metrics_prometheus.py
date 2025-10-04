@@ -1,10 +1,9 @@
 """Tests for Prometheus metrics exporter status normalization."""
 from __future__ import annotations
 
-from typing import Any
-
 import sys
 import types
+from typing import Any
 
 from pytest import MonkeyPatch
 
@@ -12,7 +11,7 @@ from src.llm_adapter.metrics import PrometheusMetricsExporter
 
 
 class _LabelStub:
-    def __init__(self, metric: "_MetricStub", labels: dict[str, Any]) -> None:
+    def __init__(self, metric: _MetricStub, labels: dict[str, Any]) -> None:
         self._metric = metric
         self._labels = labels
 
