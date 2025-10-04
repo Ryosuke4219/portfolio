@@ -18,12 +18,12 @@ def finalize_run_metrics(
     *,
     attempt_index: int,
     provider_result: ProviderCallResult,
-    response: "ProviderResponse",
+    response: ProviderResponse,
     status: str,
     failure_kind: str | None,
     error_message: str | None,
     schema_error: str | None,
-    shadow_result: "ShadowRunnerResult" | None,
+    shadow_result: ShadowRunnerResult | None,
     fallback_shadow_id: str | None,
     active_provider_ids: Sequence[str],
     current_attempt_index: int,
@@ -61,7 +61,7 @@ def finalize_run_metrics(
 
 def apply_shadow_metrics(
     run_metrics: RunMetrics,
-    shadow_result: "ShadowRunnerResult" | None,
+    shadow_result: ShadowRunnerResult | None,
     fallback_shadow_id: str | None,
 ) -> None:
     if shadow_result is None:
