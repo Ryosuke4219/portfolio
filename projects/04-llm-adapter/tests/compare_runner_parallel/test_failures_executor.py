@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import cast, TYPE_CHECKING
 
 import pytest
 
@@ -15,6 +15,7 @@ from adapter.core.runner_execution_parallel import (
     ParallelAttemptExecutor,
     ProviderFailureSummary,
 )
+
 if TYPE_CHECKING:
     from tests.compare_runner_parallel.conftest import (
         ProviderConfigFactory,
@@ -51,9 +52,9 @@ def _run_parallel_case(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     mode: str,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
     behaviours: dict[str, dict[str, dict[str, object]]] | None = None,
 ) -> tuple[list[tuple[int, SingleRunResult]], list[ProviderFailureSummary], str | None]:
     from adapter.core.runner_execution_parallel import ParallelAnyState
@@ -149,9 +150,9 @@ def _run_parallel_case(
 def test_parallel_executor_parallel_modes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
     mode: str,
     expected_stop: str,
 ) -> None:
@@ -176,9 +177,9 @@ def test_parallel_executor_parallel_modes(
 def test_parallel_attempt_executor_parallel_all_regression(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     batch, summaries, stop_reason = _run_parallel_case(
         tmp_path,
@@ -198,9 +199,9 @@ def test_parallel_attempt_executor_parallel_all_regression(
 def test_parallel_attempt_executor_parallel_all_failure_regression(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     behaviours = {
         "parallel_all": {
@@ -233,9 +234,9 @@ def test_parallel_attempt_executor_parallel_all_failure_regression(
 def test_parallel_attempt_executor_parallel_any_regression(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     batch, summaries, stop_reason = _run_parallel_case(
         tmp_path,
@@ -257,9 +258,9 @@ def test_parallel_attempt_executor_parallel_any_regression(
 def test_parallel_attempt_executor_parallel_any_failure_regression(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     retries = {"fail": 2, "win": 3, "tail": 4}
     behaviours = {
