@@ -10,11 +10,10 @@ from __future__ import annotations
 from .parallel_exec import ParallelExecutionError
 from .runner_config import ConsensusConfig
 from .runner_parallel.consensus import (
-    ConsensusObservation,
-    ConsensusResult,
-    _Candidate,
     _normalize_candidate_text,
     compute_consensus,
+    ConsensusObservation,
+    ConsensusResult,
     invoke_consensus_judge,
     validate_consensus_schema,
 )
