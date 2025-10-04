@@ -5,8 +5,12 @@ from collections.abc import Callable, Mapping, Sequence
 import importlib
 from typing import Any, cast
 
-from ..consensus_candidates import _Candidate
-from ..provider_spi import ProviderResponse
+from ..consensus_candidates import (
+    _Candidate,
+)
+from ..provider_spi import (
+    ProviderResponse,
+)
 
 
 def _load_judge(path: str) -> Callable[[Sequence[ProviderResponse]], Any]:
