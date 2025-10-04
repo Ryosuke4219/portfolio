@@ -2,11 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter
-
-# isort: split
 from collections.abc import Mapping, Sequence
-
-# isort: split
 import json
 from pathlib import Path
 from statistics import mean, median
