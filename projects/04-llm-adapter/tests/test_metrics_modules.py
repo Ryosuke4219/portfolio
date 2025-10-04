@@ -163,6 +163,31 @@ def test_build_regression_summary_and_weekly_summary(tmp_path: Path) -> None:
     assert "| Rank | Failure Kind | Count |" in content
 
 
+def test_build_regression_summary_treats_success_status_as_pass(
+    tmp_path: Path,
+) -> None:
+    golden_dir = tmp_path / "golden"
+    baseline_dir = golden_dir / "baseline"
+    baseline_dir.mkdir(parents=True)
+    (baseline_dir / "expectations.json").write_text(
+        "[{\"provider\": \"p\", \"model\": \"m\", \"prompt_id\": \"id\", \"max_diff_rate\": 1.0}]",
+        encoding="utf-8",
+    )
+    metrics = [
+        {
+            "provider": "p",
+            "model": "m",
+            "prompt_id": "id",
+            "status": "success",
+            "eval": {"diff_rate": 0.1},
+            "ts": "2024-01-01T00:00:00Z",
+        }
+    ]
+    regression_html = regression_mod.build_regression_summary(metrics, golden_dir)
+    assert "<td>PASS</td>" in regression_html
+    assert "最新ステータス" not in regression_html
+
+
 @pytest.mark.parametrize(
     "golden_dir, expected",
     [
