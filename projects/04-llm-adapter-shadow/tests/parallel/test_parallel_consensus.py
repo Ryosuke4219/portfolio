@@ -6,7 +6,10 @@ from typing import cast
 
 import pytest
 
-from src.llm_adapter.parallel_exec import ParallelExecutionError, run_parallel_any_sync
+from src.llm_adapter.parallel_exec import (
+    ParallelExecutionError,
+    run_parallel_any_sync,
+)
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
