@@ -10,7 +10,7 @@ from src.llm_adapter.runner_config import RunnerConfig
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 from src.llm_adapter.runner_sync_modes import SequentialStrategy
 
-from .conftest import _FailingProvider, _RecordingLogger, _make_context
+from .conftest import _FailingProvider, _make_context, _RecordingLogger
 
 
 def test_sequential_raises_all_failed_error_with_cause() -> None:

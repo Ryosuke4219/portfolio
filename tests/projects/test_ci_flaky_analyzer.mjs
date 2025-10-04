@@ -24,3 +24,10 @@ test('failure-like attempts are treated as failures', () => {
     assert.equal(results[0].fails, 1);
   }
 });
+
+test('isFailureStatus treats uppercase failure statuses as failures', () => {
+  for (const status of ['FAILED', 'ERROR']) {
+    assert.strictEqual(isFailureStatus(status), true);
+    assert.strictEqual(isFailureStatus({ status }), true);
+  }
+});

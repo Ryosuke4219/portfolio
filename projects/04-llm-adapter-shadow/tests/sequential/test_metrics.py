@@ -9,7 +9,7 @@ from src.llm_adapter.runner_config import RunnerConfig
 from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 from src.llm_adapter.runner_sync_modes import SequentialStrategy
 
-from .conftest import _RecordingLogger, _SuccessfulProvider, _make_context
+from .conftest import _make_context, _RecordingLogger, _SuccessfulProvider
 
 
 def test_sequential_strategy_handles_successful_provider_result(

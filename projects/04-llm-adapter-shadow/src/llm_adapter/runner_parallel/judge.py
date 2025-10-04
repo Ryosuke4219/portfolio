@@ -1,9 +1,8 @@
 """Judge loading and invocation helpers for consensus evaluation."""
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
 import importlib
-from typing import Any, cast
+from typing import Any, Callable, cast, Mapping, Sequence
 
 from ..consensus_candidates import _Candidate
 from ..provider_spi import ProviderResponse
