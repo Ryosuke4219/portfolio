@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
-from .helpers import _run_parallel_case
+from tests.compare_runner_parallel.conftest import (
+    ProviderConfigFactory,
+    RunMetricsFactory,
+    TaskFactory,
+)
 
-if TYPE_CHECKING:
-    from tests.compare_runner_parallel.conftest import (
-        ProviderConfigFactory,
-        RunMetricsFactory,
-        TaskFactory,
-    )
+from .helpers import _run_parallel_case
 
 
 def test_parallel_attempt_executor_parallel_all_mode(
