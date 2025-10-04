@@ -10,7 +10,12 @@ from uuid import uuid4
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
-from .metrics.models import BudgetSnapshot, EvalMetrics, now_ts, RunMetrics
+from .metrics.models import (
+    BudgetSnapshot,
+    EvalMetrics,
+    now_ts,
+    RunMetrics,
+)
 from .providers import BaseProvider
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
