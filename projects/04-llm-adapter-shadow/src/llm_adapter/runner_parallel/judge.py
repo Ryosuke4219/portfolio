@@ -5,6 +5,7 @@ from collections.abc import Callable, Mapping, Sequence
 import importlib
 from typing import Any, cast
 
+# Local imports (alphabetical)
 from ..consensus_candidates import _Candidate
 from ..provider_spi import ProviderResponse
 
