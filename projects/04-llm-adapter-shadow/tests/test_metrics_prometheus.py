@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import sys
-import types
+from types import SimpleNamespace
 from typing import Any
 
 from pytest import MonkeyPatch
@@ -36,7 +36,7 @@ class _MetricStub:
 
 
 def test_prometheus_metrics_normalizes_errored_status(monkeypatch: MonkeyPatch) -> None:
-    stub_module = types.SimpleNamespace(Counter=_MetricStub, Histogram=_MetricStub)
+    stub_module = SimpleNamespace(Counter=_MetricStub, Histogram=_MetricStub)
     monkeypatch.setitem(sys.modules, "prometheus_client", stub_module)
 
     exporter = PrometheusMetricsExporter(namespace="test")
