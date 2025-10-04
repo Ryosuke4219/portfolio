@@ -150,3 +150,27 @@ def test_async_runner_emits_failure_event() -> None:
     assert event["provider_attempts"] == 1
     assert event["providers"] == ["flaky"]
     assert event["last_error_type"] == "TimeoutError"
+
+def test_async_runner_run_metric_uses_response_latency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logger = _CapturingLogger()
+    provider = _AsyncProbeProvider("timed", delay=0.05, text="ok")
+    runner = AsyncRunner(
+        [provider],
+        logger=logger,
+        config=RunnerConfig(mode=RunnerMode.SEQUENTIAL),
+    )
+    request = ProviderRequest(model="gpt-test", prompt="hello")
+
+    monkeypatch.setattr(
+        "src.llm_adapter.runner_async_modes.sequential.elapsed_ms",
+        lambda start: 999,
+    )
+
+    response = asyncio.run(asyncio.wait_for(runner.run_async(request), timeout=0.2))
+
+    events = logger.of_type("run_metric")
+    assert len(events) == 1
+    event = events[0]
+    assert event["latency_ms"] == response.latency_ms
