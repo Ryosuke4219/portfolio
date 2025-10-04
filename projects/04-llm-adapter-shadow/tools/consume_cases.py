@@ -60,6 +60,8 @@ def _normalize_status(raw_status: str) -> str:
     normalized = raw_status.strip().lower()
     alias_map = {
         "errored": "error",
+        "failed": "fail",
+        "failure": "fail",
     }
     return alias_map.get(normalized, normalized)
 
