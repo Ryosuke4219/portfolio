@@ -105,11 +105,5 @@ def test_async_parallel_any_returns_first_completion() -> None:
 
     response = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
-チェックリスト:
-- [ ] 新規テストは ``projects/04-llm-adapter-shadow/tests/async_runner/parallel`` に追加する
-- [ ] 互換性が不要になったらこのシムを削除する
-"""
-
-from __future__ import annotations
 
 from .parallel import *  # noqa: F401,F403
