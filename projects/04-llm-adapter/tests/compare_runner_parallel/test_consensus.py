@@ -78,7 +78,7 @@ def test_majority_vote_uses_json_equality_when_schema_present() -> None:
 
 
 def test_auto_tie_breaker_applies_latency_cost_and_order(
-    run_metrics_factory: "RunMetricsFactory",
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     config = RunnerConfig(mode="consensus")
     candidates = [_candidate(0, "same"), _candidate(1, "same")]
@@ -132,8 +132,8 @@ def _register_provider(monkeypatch: pytest.MonkeyPatch, name: str, cls: type[Bas
 
 def _run_consensus(
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
     provider_specs: list[tuple[str, str, str]],
     *,
@@ -157,8 +157,8 @@ def _run_consensus(
 def test_consensus_majority_and_judge_tiebreak(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class ConsensusProvider(BaseProvider):
