@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from src.llm_adapter.errors import TimeoutError
+from src.llm_adapter.errors import AllFailedError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import AsyncRunner, Runner
@@ -141,7 +141,7 @@ def test_async_runner_emits_failure_event() -> None:
     async def _execute() -> None:
         await runner.run_async(request)
 
-    with pytest.raises(TimeoutError):
+    with pytest.raises(AllFailedError):
         asyncio.run(asyncio.wait_for(_execute(), timeout=0.1))
 
     events = logger.of_type("provider_chain_failed")
@@ -155,6 +155,26 @@ def test_async_runner_emits_failure_event() -> None:
     assert len(run_metric_events) == 1
     run_metric = run_metric_events[0]
     assert run_metric["error_type"] == "TimeoutError"
+
+
+def test_async_runner_raises_all_failed_error() -> None:
+    provider = _AsyncProbeProvider(
+        "flaky",
+        delay=0.0,
+        text="nope",
+        failures=[TimeoutError("boom")],
+    )
+    runner = AsyncRunner(
+        [provider],
+        config=RunnerConfig(mode=RunnerMode.SEQUENTIAL),
+    )
+    request = ProviderRequest(model="gpt-test", prompt="fail")
+
+    async def _execute() -> None:
+        await runner.run_async(request)
+
+    with pytest.raises(AllFailedError):
+        asyncio.run(asyncio.wait_for(_execute(), timeout=0.1))
 
 def test_async_runner_run_metric_uses_response_latency(
     monkeypatch: pytest.MonkeyPatch,
