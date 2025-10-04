@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 import sys
-from typing import cast, TYPE_CHECKING
+from typing import cast, TYPE_CHECKING  # Maintain typing import order to satisfy lint I001.
 
 import pytest
 
