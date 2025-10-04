@@ -27,9 +27,9 @@ if TYPE_CHECKING:
 
 def test_runner_execution_records_shadow_budget_and_schema(
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
-    run_metrics_factory: "RunMetricsFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
 ) -> None:
     provider_config = provider_config_factory(
         tmp_path, name="p-main", provider="p-main", model="m1"
@@ -74,7 +74,7 @@ def test_runner_execution_records_shadow_budget_and_schema(
 
     def build_metrics(
         cfg: ProviderConfig,
-        golden_task: "GoldenTask",
+        golden_task: GoldenTask,
         attempt_index: int,
         mode: str,
         provider_response: ProviderResponse,
@@ -84,7 +84,7 @@ def test_runner_execution_records_shadow_budget_and_schema(
         latency_ms: int,
         budget_snapshot: BudgetSnapshot,
         cost_usd: float,
-    ) -> tuple["RunMetrics", str]:
+    ) -> tuple[RunMetrics, str]:
         metrics = run_metrics_factory(
             provider=cfg.provider,
             model=cfg.model,
@@ -140,8 +140,8 @@ def test_runner_execution_records_shadow_budget_and_schema(
 def test_runner_config_dataclass_initializes_helpers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     token_bucket_args: list[int | None] = []
@@ -192,8 +192,8 @@ def test_runner_config_dataclass_initializes_helpers(
 def test_run_metrics_records_error_type_and_attempts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    provider_config_factory: "ProviderConfigFactory",
-    task_factory: "TaskFactory",
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
     budget_manager_factory,
 ) -> None:
     class FlakyProvider(BaseProvider):
