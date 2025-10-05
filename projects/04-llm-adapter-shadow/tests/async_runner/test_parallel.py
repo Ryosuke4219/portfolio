@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from src.llm_adapter.errors import TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
 from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
@@ -81,6 +82,58 @@ def test_async_runner_parallel_any_logs_cancelled_providers() -> None:
     assert run_metrics["fast"]["status"] == "ok"
     assert run_metrics["slow"]["status"] == "error"
     assert run_metrics["slow"]["error_type"] == "CancelledError"
+
+
+def test_async_runner_parallel_any_logs_timeout_failures_in_run_metrics() -> None:
+    class _TimeoutProvider:
+        def __init__(self, name: str, delay: float) -> None:
+            self._name = name
+            self._delay = delay
+
+        def name(self) -> str:
+            return self._name
+
+        def capabilities(self) -> set[str]:
+            return set()
+
+        async def invoke_async(self, request: ProviderRequest) -> ProviderResponse:
+            await asyncio.sleep(self._delay)
+            raise TimeoutError("operation timed out")
+
+    timeout_provider = _TimeoutProvider("timeout", delay=0.01)
+    success_provider = _AsyncProbeProvider("success", delay=0.05, text="success")
+    logger = _CapturingLogger()
+    runner = AsyncRunner(
+        [timeout_provider, success_provider],
+        logger=logger,
+        config=RunnerConfig(mode=RunnerMode.PARALLEL_ANY, max_concurrency=2),
+    )
+    request = ProviderRequest(prompt="hi", model="async-parallel-any-timeout")
+
+    response = asyncio.run(runner.run_async(request))
+
+    assert response.text == "success:hi"
+
+    run_metrics = [
+        event
+        for event in logger.of_type("run_metric")
+        if event.get("provider") in {timeout_provider.name(), success_provider.name()}
+    ]
+    assert len(run_metrics) == 2
+    timeout_events = [
+        event for event in run_metrics if event.get("provider") == timeout_provider.name()
+    ]
+    assert len(timeout_events) == 1
+    timeout_metric = timeout_events[0]
+    assert timeout_metric["status"] == "error"
+    assert timeout_metric["outcome"] == "error"
+    assert timeout_metric["error_type"] == "TimeoutError"
+
+    success_events = [
+        event for event in run_metrics if event.get("provider") == success_provider.name()
+    ]
+    assert len(success_events) == 1
+    assert success_events[0]["status"] == "ok"
 
 
 def test_async_parallel_all_emits_run_metric_per_provider() -> None:
