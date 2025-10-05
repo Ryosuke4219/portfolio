@@ -1,5 +1,5 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 const MODULE_BASE = '../../projects/03-ci-flaky/src/config';
 
