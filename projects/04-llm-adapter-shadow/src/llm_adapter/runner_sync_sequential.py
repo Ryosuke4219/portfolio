@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 import time
 from typing import NoReturn, TYPE_CHECKING
 
@@ -27,6 +28,17 @@ if TYPE_CHECKING:
     from .runner_sync_modes import SyncRunContext
 
 
+@dataclass(slots=True)
+class _FailureMetric:
+    provider: ProviderSPI
+    attempt: int
+    latency_ms: int
+    tokens_in: int | None
+    tokens_out: int | None
+    error: Exception
+    metadata: Mapping[str, object]
+
+
 class _SequentialRunTracker:
     def __init__(self, context: SyncRunContext) -> None:
         self._context = context
@@ -35,6 +47,7 @@ class _SequentialRunTracker:
         self._event_logger = context.event_logger
         self._last_error: Exception | None = None
         self._failure_details: list[dict[str, str]] = []
+        self._pending_failure_metrics: list[_FailureMetric] = []
         self.attempt_count = 0
 
     def record_attempt(self, attempt: int) -> None:
@@ -49,6 +62,7 @@ class _SequentialRunTracker:
         response = result.response
         if response is None:
             return None
+        self._emit_failure_metrics()
         tokens_in = result.tokens_in if result.tokens_in is not None else 0
         tokens_out = result.tokens_out if result.tokens_out is not None else 0
         cost_usd = estimate_cost(provider, tokens_in, tokens_out)
@@ -113,20 +127,16 @@ class _SequentialRunTracker:
             metadata_with_shadow = merged_metadata
         else:
             metadata_with_shadow = self._context.metadata
-        log_run_metric(
-            self._event_logger,
-            request_fingerprint=self._context.request_fingerprint,
-            request=self._context.request,
-            provider=provider,
-            status="error",
-            attempts=attempt,
-            latency_ms=latency_ms,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            cost_usd=0.0,
-            error=error,
-            metadata=metadata_with_shadow,
-            shadow_used=self._context.shadow_used,
+        self._pending_failure_metrics.append(
+            _FailureMetric(
+                provider=provider,
+                attempt=attempt,
+                latency_ms=latency_ms,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                error=error,
+                metadata=metadata_with_shadow,
+            )
         )
         if isinstance(error, FatalError):
             if isinstance(error, AuthError | ConfigError):
@@ -142,6 +152,7 @@ class _SequentialRunTracker:
                         },
                     )
                 return
+            self._emit_failure_metrics(force=True)
             raise error
         if isinstance(error, RateLimitError):
             sleep_duration = self._config.backoff.rate_limit_sleep_s
@@ -151,16 +162,20 @@ class _SequentialRunTracker:
         if isinstance(error, RetryableError):
             if isinstance(error, TimeoutError):
                 if not self._config.backoff.timeout_next_provider:
+                    self._emit_failure_metrics(force=True)
                     raise error
                 return
             if self._config.backoff.retryable_next_provider:
                 return
+            self._emit_failure_metrics(force=True)
             raise error
         if isinstance(error, SkipError | ProviderSkip):
             return
+        self._emit_failure_metrics(force=True)
         raise error
 
     def finalize_and_raise(self) -> NoReturn:
+        self._pending_failure_metrics.clear()
         event_logger = self._event_logger
         if event_logger is not None:
             event_logger.emit(
@@ -209,6 +224,33 @@ class _SequentialRunTracker:
         if self._last_error is not None:
             raise failure_error from self._last_error
         raise failure_error
+
+    def _should_emit_attempt_metrics(self) -> bool:
+        return self._context.metrics_path is None
+
+    def _emit_failure_metrics(self, *, force: bool = False) -> None:
+        if not self._pending_failure_metrics:
+            return
+        if not force and not self._should_emit_attempt_metrics():
+            self._pending_failure_metrics.clear()
+            return
+        for metric in self._pending_failure_metrics:
+            log_run_metric(
+                self._event_logger,
+                request_fingerprint=self._context.request_fingerprint,
+                request=self._context.request,
+                provider=metric.provider,
+                status="error",
+                attempts=metric.attempt,
+                latency_ms=metric.latency_ms,
+                tokens_in=metric.tokens_in,
+                tokens_out=metric.tokens_out,
+                cost_usd=0.0,
+                error=metric.error,
+                metadata=metric.metadata,
+                shadow_used=self._context.shadow_used,
+            )
+        self._pending_failure_metrics.clear()
 
 
 class SequentialStrategy:
