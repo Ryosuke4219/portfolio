@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 from typing import cast, Protocol, runtime_checkable
 
+import pytest
+
 
 def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
@@ -110,7 +112,9 @@ def test_weekly_summary_generates_expected_markdown(tmp_path: Path) -> None:
     assert output_path.read_text(encoding="utf-8") == expected
 
 
-def test_weekly_summary_counts_ok_status_as_success(tmp_path: Path) -> None:
+def test_weekly_summary_counts_ok_status_as_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     input_path = tmp_path / "runs-metrics.jsonl"
     output_path = tmp_path / "summary.md"
 
@@ -141,6 +145,12 @@ def test_weekly_summary_counts_ok_status_as_success(tmp_path: Path) -> None:
     )
 
     main = _load_main()
+    module = sys.modules[main.__module__]
+
+    def _to_ok(_: str) -> str:
+        return "ok"
+
+    monkeypatch.setattr(module, "_STATUS_NORMALIZE_OUTCOME", _to_ok)
     main(["--input", str(input_path), "--output", str(output_path)])
 
     output = output_path.read_text(encoding="utf-8")

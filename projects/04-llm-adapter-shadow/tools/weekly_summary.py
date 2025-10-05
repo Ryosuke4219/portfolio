@@ -37,6 +37,7 @@ _ERROR_OUTCOME_VALUES = {
     "failure",
     "exception",
 }
+_SUCCESS_OUTCOME_VALUES = {"ok", "success"}
 
 
 def _load_records(path: Path) -> Iterable[dict[str, Any]]:
@@ -63,14 +64,18 @@ def _normalize_outcome(record: Mapping[str, Any]) -> str:
             continue
         if normalized in _ERROR_OUTCOME_VALUES:
             return "error"
+        candidate = normalized
         if _STATUS_NORMALIZE_OUTCOME is not None:
             mapped = _STATUS_NORMALIZE_OUTCOME(normalized)
-            if mapped in {"success", "error", "skipped"}:
-                return mapped
-            return mapped
-        if normalized in {"ok", "success"}:
+            if isinstance(mapped, str):
+                candidate = mapped.strip().lower()
+                if not candidate:
+                    continue
+        if candidate in _ERROR_OUTCOME_VALUES:
+            return "error"
+        if candidate in _SUCCESS_OUTCOME_VALUES:
             return "success"
-        return normalized
+        return candidate
     return "unknown"
 
 
