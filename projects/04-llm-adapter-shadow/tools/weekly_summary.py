@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 import json
 from pathlib import Path
 from statistics import mean, median
 from typing import Any
+
+try:
+    from llm_adapter.runner_shared.logging.status import (
+        _normalize_outcome as _status_normalize_outcome,
+    )
+except ImportError:  # pragma: no cover - fallback when package unavailable
+    _STATUS_NORMALIZE_OUTCOME: Callable[[str], str] | None = None
+else:
+    _STATUS_NORMALIZE_OUTCOME = _status_normalize_outcome
 
 
 @dataclass(slots=True)
@@ -54,6 +63,13 @@ def _normalize_outcome(record: Mapping[str, Any]) -> str:
             continue
         if normalized in _ERROR_OUTCOME_VALUES:
             return "error"
+        if _STATUS_NORMALIZE_OUTCOME is not None:
+            mapped = _STATUS_NORMALIZE_OUTCOME(normalized)
+            if mapped in {"success", "error", "skipped"}:
+                return mapped
+            return mapped
+        if normalized in {"ok", "success"}:
+            return "success"
         return normalized
     return "unknown"
 

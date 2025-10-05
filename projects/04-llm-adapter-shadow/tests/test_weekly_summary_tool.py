@@ -110,6 +110,47 @@ def test_weekly_summary_generates_expected_markdown(tmp_path: Path) -> None:
     assert output_path.read_text(encoding="utf-8") == expected
 
 
+def test_weekly_summary_counts_ok_status_as_success(tmp_path: Path) -> None:
+    input_path = tmp_path / "runs-metrics.jsonl"
+    output_path = tmp_path / "summary.md"
+
+    _write_jsonl(
+        input_path,
+        [
+            {
+                "event": "run_metric",
+                "outcome": "success",
+                "latency_ms": 120,
+            },
+            {
+                "event": "run_metric",
+                "status": "success",
+                "latency_ms": 180,
+            },
+            {
+                "event": "run_metric",
+                "status": "ok",
+                "latency_ms": 210,
+            },
+            {
+                "event": "run_metric",
+                "outcome": "error",
+                "latency_ms": 300,
+            },
+        ],
+    )
+
+    main = _load_main()
+    main(["--input", str(input_path), "--output", str(output_path)])
+
+    output = output_path.read_text(encoding="utf-8")
+    assert "- Total Runs: 4" in output
+    assert "- Successes: 3" in output
+    assert "- Failures: 1" in output
+    assert "| success | 3 |" in output
+    assert "| ok |" not in output
+
+
 def test_weekly_summary_normalizes_errored_status(tmp_path: Path) -> None:
     input_path = tmp_path / "runs-metrics.jsonl"
     output_path = tmp_path / "summary.md"
