@@ -15,7 +15,12 @@ from .provider_spi import (
     ProviderSPI,
 )
 from .runner_async_modes import AsyncRunContext, collect_failure_details, WorkerResult
-from .runner_shared import log_provider_call, log_provider_skipped, RateLimiter
+from .runner_shared import (
+    log_provider_call,
+    log_provider_skipped,
+    log_run_metric,
+    RateLimiter,
+)
 from .shadow import run_with_shadow_async, ShadowMetrics
 from .utils import elapsed_ms
 
@@ -75,6 +80,13 @@ class AsyncProviderInvoker:
         shadow_metrics: ShadowMetrics | None = None
         shadow_log_metadata: dict[str, Any] = {}
         response: ProviderResponse
+        def _with_shadow_metadata(base_metadata: Mapping[str, Any]) -> Mapping[str, Any]:
+            if not shadow_log_metadata:
+                return base_metadata
+            merged_metadata = dict(base_metadata)
+            merged_metadata.update(shadow_log_metadata)
+            return merged_metadata
+
         try:
             should_capture = shadow_async is not None
             if should_capture:
@@ -105,6 +117,22 @@ class AsyncProviderInvoker:
                 )
                 response = cast(ProviderResponse, response_only)
         except RateLimitError as err:
+            enriched_metadata = _with_shadow_metadata(metadata)
+            log_run_metric(
+                event_logger,
+                request_fingerprint=request_fingerprint,
+                request=request,
+                provider=provider,
+                status="error",
+                attempts=attempt,
+                latency_ms=elapsed_ms(attempt_started),
+                tokens_in=None,
+                tokens_out=None,
+                cost_usd=0.0,
+                error=err,
+                metadata=enriched_metadata,
+                shadow_used=shadow is not None,
+            )
             log_provider_call(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -123,6 +151,22 @@ class AsyncProviderInvoker:
             )
             raise
         except RetryableError as err:
+            enriched_metadata = _with_shadow_metadata(metadata)
+            log_run_metric(
+                event_logger,
+                request_fingerprint=request_fingerprint,
+                request=request,
+                provider=provider,
+                status="error",
+                attempts=attempt,
+                latency_ms=elapsed_ms(attempt_started),
+                tokens_in=None,
+                tokens_out=None,
+                cost_usd=0.0,
+                error=err,
+                metadata=enriched_metadata,
+                shadow_used=shadow is not None,
+            )
             log_provider_call(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -141,6 +185,7 @@ class AsyncProviderInvoker:
             )
             raise
         except SkipError as err:
+            enriched_metadata = _with_shadow_metadata(metadata)
             if isinstance(err, ProviderSkip):
                 log_provider_skipped(
                     event_logger,
@@ -151,6 +196,21 @@ class AsyncProviderInvoker:
                     total_providers=total_providers,
                     error=err,
                 )
+            log_run_metric(
+                event_logger,
+                request_fingerprint=request_fingerprint,
+                request=request,
+                provider=provider,
+                status="error",
+                attempts=attempt,
+                latency_ms=elapsed_ms(attempt_started),
+                tokens_in=None,
+                tokens_out=None,
+                cost_usd=0.0,
+                error=err,
+                metadata=enriched_metadata,
+                shadow_used=shadow is not None,
+            )
             log_provider_call(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -169,6 +229,22 @@ class AsyncProviderInvoker:
             )
             raise
         except FatalError as err:
+            enriched_metadata = _with_shadow_metadata(metadata)
+            log_run_metric(
+                event_logger,
+                request_fingerprint=request_fingerprint,
+                request=request,
+                provider=provider,
+                status="error",
+                attempts=attempt,
+                latency_ms=elapsed_ms(attempt_started),
+                tokens_in=None,
+                tokens_out=None,
+                cost_usd=0.0,
+                error=err,
+                metadata=enriched_metadata,
+                shadow_used=shadow is not None,
+            )
             log_provider_call(
                 event_logger,
                 request_fingerprint=request_fingerprint,
