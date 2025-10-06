@@ -10,37 +10,6 @@ from ..utils import elapsed_ms
 from .context import AsyncRunContext, StrategyResult
 
 
-def _log_failure_run_metric(
-    context: AsyncRunContext,
-    *,
-    provider,
-    attempt: int,
-    latency_ms: int,
-    error: Exception,
-) -> None:
-    shadow_metadata = build_shadow_log_metadata(None)
-    metric_metadata = (
-        context.metadata
-        if not shadow_metadata
-        else dict(context.metadata, **shadow_metadata)
-    )
-    log_run_metric(
-        context.event_logger,
-        request_fingerprint=context.request_fingerprint,
-        request=context.request,
-        provider=provider,
-        status="error",
-        attempts=attempt,
-        latency_ms=latency_ms,
-        tokens_in=None,
-        tokens_out=None,
-        cost_usd=0.0,
-        error=error,
-        metadata=metric_metadata,
-        shadow_used=context.shadow is not None,
-    )
-
-
 class SequentialRunStrategy:
     async def run(self, context: AsyncRunContext) -> StrategyResult:
         for attempt_index, (provider, async_provider) in enumerate(context.providers, start=1):
@@ -55,26 +24,12 @@ class SequentialRunStrategy:
                 )
             except RateLimitError as err:
                 context.last_error = err
-                _log_failure_run_metric(
-                    context,
-                    provider=provider,
-                    attempt=attempt_index,
-                    latency_ms=elapsed_ms(attempt_started),
-                    error=err,
-                )
                 sleep_duration = context.config.backoff.rate_limit_sleep_s
                 if sleep_duration > 0:
                     await context.sleep_fn(sleep_duration)
                 continue
             except RetryableError as err:
                 context.last_error = err
-                _log_failure_run_metric(
-                    context,
-                    provider=provider,
-                    attempt=attempt_index,
-                    latency_ms=elapsed_ms(attempt_started),
-                    error=err,
-                )
                 if isinstance(err, TimeoutError):
                     if context.config.backoff.timeout_next_provider:
                         continue
@@ -84,23 +39,9 @@ class SequentialRunStrategy:
                 raise
             except SkipError as err:
                 context.last_error = err
-                _log_failure_run_metric(
-                    context,
-                    provider=provider,
-                    attempt=attempt_index,
-                    latency_ms=elapsed_ms(attempt_started),
-                    error=err,
-                )
                 continue
             except FatalError as err:
                 context.last_error = err
-                _log_failure_run_metric(
-                    context,
-                    provider=provider,
-                    attempt=attempt_index,
-                    latency_ms=elapsed_ms(attempt_started),
-                    error=err,
-                )
                 raise
             else:
                 usage = response.token_usage

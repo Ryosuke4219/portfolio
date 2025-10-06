@@ -154,6 +154,8 @@ def test_async_runner_emits_failure_event() -> None:
     run_metric_events = logger.of_type("run_metric")
     assert len(run_metric_events) == 2
     failure_metric, final_metric = run_metric_events
+    provider_metrics = [event for event in run_metric_events if event["provider_id"]]
+    assert provider_metrics == [failure_metric]
     assert failure_metric["provider_id"] == "flaky"
     assert failure_metric["error_type"] == "TimeoutError"
     assert final_metric["provider_id"] is None
