@@ -28,18 +28,17 @@ def estimate_cost(provider: object, tokens_in: int, tokens_out: int) -> float:
     cached = _get_cached_cost(provider, tokens_in, tokens_out)
     if cached is not None:
         return cached
-    if hasattr(provider, "estimate_cost"):
-        estimator = provider.estimate_cost  # type: ignore[attr-defined]
-        if callable(estimator):
-            try:
-                value = float(estimator(tokens_in, tokens_out))
-            except Exception:  # pragma: no cover - defensive guard
-                return 0.0
-            try:
-                setattr(provider, _COST_CACHE_ATTR, ((tokens_in, tokens_out), value))
-            except Exception:  # pragma: no cover - defensive guard
-                pass
-            return value
+    estimator = getattr(provider, "estimate_cost", None)
+    if callable(estimator):
+        try:
+            value = float(estimator(tokens_in, tokens_out))
+        except Exception:  # pragma: no cover - defensive guard
+            return 0.0
+        try:
+            setattr(provider, _COST_CACHE_ATTR, ((tokens_in, tokens_out), value))
+        except Exception:  # pragma: no cover - defensive guard
+            pass
+        return value
     return 0.0
 
 

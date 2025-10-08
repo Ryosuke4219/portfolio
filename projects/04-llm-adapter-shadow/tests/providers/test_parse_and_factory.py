@@ -40,6 +40,18 @@ def test_create_provider_from_spec_supports_overrides():
     assert provider.name() == "dummy:test-model"
 
 
+def test_create_provider_from_spec_supports_openrouter(monkeypatch):
+    sentinel = DummyProvider("stub")
+
+    def fake_openrouter(model: str):
+        assert model == "meta-llama"
+        return sentinel
+
+    monkeypatch.setattr(providers_factory, "OpenRouterProvider", fake_openrouter)
+    provider = providers_factory.create_provider_from_spec("openrouter:meta-llama")
+    assert provider is sentinel
+
+
 def test_provider_from_environment_optional_none(monkeypatch):
     monkeypatch.setenv("SHADOW_PROVIDER", "none")
     result = providers_factory.provider_from_environment(
