@@ -2,39 +2,63 @@
 
 ## Providers
 
-### タスク1: OpenRouter Provider 契約テストを追加する
-- 背景: Roadmap の M3 では OpenAI/Ollama/OpenRouter の3系統を同一SPIで扱うことがExit Criteriaだが、進捗レビューでは OpenRouter 連携が未完了と整理されている。【F:04/ROADMAP.md†L12-L34】【F:04/progress-2025-10-04.md†L16-L32】
-- 作業: `projects/04-llm-adapter-shadow/tests/providers/test_openrouter_provider.py` を新設し、OpenRouterレスポンス/エラーのモックを使って (1) 429→`RateLimitError`、(2) 5xx→`RetriableError`、(3) ストリーミング指定の透過を検証するテストを追加する。先にテストを赤にし、既存 OpenAI/Gemini のテストスタイルを踏襲する。【F:projects/04-llm-adapter-shadow/tests/providers/test_openai_provider.py†L1-L200】
-- 検証: `pytest projects/04-llm-adapter-shadow/tests/providers/test_openrouter_provider.py` を実行し、未実装段階では失敗することを確認する（CI想定の pytest エラー）。【F:justfile†L29-L34】
+### タスク1: OpenRouter Provider の契約テストを作成
+- 背景: Roadmap M3 では OpenAI/Ollama/OpenRouter を同一SPIで扱うことが Exit Criteria。既存テストは OpenAI のみで、OpenRouter 向けの回帰が不足している。【F:04/ROADMAP.md†L12-L34】【F:projects/04-llm-adapter-shadow/tests/providers/test_openai_provider.py†L1-L200】
+- 作業: `projects/04-llm-adapter-shadow/tests/providers/test_openrouter_provider.py` を新設し、(1) 429→`RateLimitError`、(2) 5xx→`RetriableError`、(3) ストリーミング指定透過、(4) usage 正規化のテストを OpenAI ケースに倣って用意する。FakeSession/FakeResponse を使ってプロトコル整合性を確認する。
+- 検証: `pytest projects/04-llm-adapter-shadow/tests/providers/test_openrouter_provider.py` を実行し、未実装段階で失敗することを確認する。【F:justfile†L29-L34】
 
-### タスク2: OpenRouter Provider 実装とファクトリ登録
-- 背景: 上記テストが失敗するため、OpenRouter 実装とファクトリ登録で解消する必要がある。【F:04/ROADMAP.md†L12-L34】【F:projects/04-llm-adapter-shadow/src/llm_adapter/providers/factory.py†L51-L69】
-- 作業:
-  1. `projects/04-llm-adapter-shadow/src/llm_adapter/providers/openrouter.py` を追加し、OpenAI 互換APIに近いレスポンス正規化（`text`抽出・トークン使用量・finish_reason）と `_requests_compat` 経由のHTTP呼び出しを実装する。既存 `OpenAIProvider` の実装パターンを参考にする。【F:projects/04-llm-adapter-shadow/src/llm_adapter/providers/openai.py†L16-L144】
-  2. `factory.py` に `"openrouter"` プレフィックスを登録し、環境変数経由の生成でも利用できるようにする。【F:projects/04-llm-adapter-shadow/src/llm_adapter/providers/factory.py†L51-L96】
-  3. 必要に応じて `_requests_compat.py` や共通エラーマップへ差分を追加してテストが通るまで実装を進める。
-- 検証: `pytest projects/04-llm-adapter-shadow/tests/providers/test_openrouter_provider.py` → `pytest projects/04-llm-adapter-shadow/tests/providers/test_parse_and_factory.py` の順で緑化し、`ruff check` と `mypy --config-file pyproject.toml` で新規ファイルの静的検証を通す。【F:justfile†L29-L34】【F:pyproject.toml†L1-L58】
+### タスク2: OpenRouter Provider 実装を追加
+- 背景: OpenRouter API を呼び出すプロバイダ実装が未提供のため、上記テストが失敗する。【F:projects/04-llm-adapter-shadow/src/llm_adapter/providers/openai.py†L1-L200】
+- 作業: `projects/04-llm-adapter-shadow/src/llm_adapter/providers/openrouter.py` を新設し、OpenAI 実装をベースに `_requests_compat` 経由で HTTP POST を行う。レスポンスから `text`/`token_usage`/`finish_reason` を正規化し、エラーを RateLimit/Retriable/Timeout にマップする。APIキー・Base URL は環境変数 (`OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL`) から取得できるようにする。
+- 検証: `pytest projects/04-llm-adapter-shadow/tests/providers/test_openrouter_provider.py` を緑化し、`ruff check` / `mypy --config-file pyproject.toml` を通過させる。【F:justfile†L29-L34】【F:pyproject.toml†L1-L58】
+
+### タスク3: Provider ファクトリへ OpenRouter を登録
+- 背景: Factory のデフォルトマッピングは Gemini/Ollama/Mock のみで OpenRouter が未登録。【F:projects/04-llm-adapter-shadow/src/llm_adapter/providers/factory.py†L44-L96】
+- 作業: `projects/04-llm-adapter-shadow/src/llm_adapter/providers/factory.py` に `"openrouter"` プレフィックスを追加し、APIキーを自動注入するコールバックを実装する。`parse_provider_spec` の挙動は維持しつつ、環境変数経由の生成 (`provider_from_environment`) でも OpenRouter が利用できることを確認する。
+- 検証: `pytest projects/04-llm-adapter-shadow/tests/providers/test_parse_and_factory.py` を実行して登録漏れがないことを確認する。
+
+### タスク4: Factory テストを OpenRouter 対応に拡張
+- 背景: 既存の `test_parse_and_factory.py` には OpenRouter の登録確認がない。【F:projects/04-llm-adapter-shadow/tests/providers/test_parse_and_factory.py†L1-L48】
+- 作業: `projects/04-llm-adapter-shadow/tests/providers/test_parse_and_factory.py` に OpenRouter のデフォルト登録を検証するケースを追加し、`provider_from_environment` で `openrouter:gpt-4o-mini` を解決できることを確認する。
+- 検証: `pytest projects/04-llm-adapter-shadow/tests/providers/test_parse_and_factory.py` を緑化する。【F:justfile†L29-L34】
 
 ## Documentation
 
-### タスク3: OpenRouter 利用手順を README に追記
-- 背景: README の Provider 設定例では Gemini/Ollama のみ記載されており、OpenRouter への導線が欠落している。【F:projects/04-llm-adapter-shadow/README.md†L111-L139】
-- 作業: README の Provider configuration 節に OpenRouter の環境変数・モデル指定例・APIキー設定を追加し、`docs/spec/v0.2/ROADMAP.md` へも参照リンクを追記する。
-- 検証: `just lint` の Markdown/Compile チェック、および `pytest projects/04-llm-adapter-shadow/tests/test_version.py` でドキュメント更新によるバージョン逸脱が無いことを確認する。【F:justfile†L37-L48】
+### タスク5: README に OpenRouter 設定例を追記
+- 背景: Provider configuration 節には Gemini/Ollama のみ記載されており、OpenRouter への導線が欠落している。【F:projects/04-llm-adapter-shadow/README.md†L111-L135】
+- 作業: `projects/04-llm-adapter-shadow/README.md` の Provider configuration セクションに OpenRouter の環境変数 (`OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL`) やモデル指定例、API キーの取得手順リンクを追加する。
+- 検証: `just lint` の Markdown チェックと `pytest projects/04-llm-adapter-shadow/tests/test_version.py` を実行して差分影響がないことを確認する。【F:justfile†L37-L48】
 
-## CI/Quality
+### タスク6: Roadmap に OpenRouter 対応の参照を追加
+- 背景: v0.2 Roadmap はプレースホルダのみで OpenRouter 対応へのリンクがない。【F:docs/spec/v0.2/ROADMAP.md†L1-L5】
+- 作業: `docs/spec/v0.2/ROADMAP.md` に OpenRouter Provider 追加タスクへの参照リンクを追記し、進捗把握の導線を整備する。
+- 検証: `just lint` を実行してドキュメント検証を通す。【F:justfile†L37-L48】
 
-### タスク4: OpenRouter 追加後の CI コマンドを監視しエラーを解消
-- 背景: DoD では ruff/mypy/pytest/node:test を全て緑に保つ必要があるため、新規Provider追加で発生し得る静的解析・Nodeスイートのエラーに対応するタスクを用意する。【F:04/ROADMAP.md†L72-L74】【F:justfile†L20-L58】【F:pyproject.toml†L1-L70】
-- 作業:
-  1. Provider 実装差分を導入したブランチで `just lint`・`ruff check`・`mypy --config-file pyproject.toml` を順に実行し、警告や型エラーが出れば修正する。
-  2. `just node-test` を走らせ、OpenRouter 向けの spec 生成や e2e テストで失敗する箇所があればログを精査し、必要に応じて Node 側のモック/スタブを更新する。
-  3. CI ログに新規の失敗種別が現れた場合は、再発防止のガード（テスト or lint 設定）を別途検討する。
-- 検証: `just lint` → `just node-test` → `just python-test` をシーケンシャルに実行し、全て成功することを確認する。【F:justfile†L20-L58】
+## CI / Quality
+
+### タスク7: ruff チェックエラーの解消
+- 背景: 新規ファイル追加後に `ruff check` を走らせ、スタイル違反が発生した場合に迅速に修正する必要がある。【F:justfile†L37-L48】
+- 作業: `ruff check` を実行し、違反が出た箇所に `ruff --fix` もしくは手動修正を適用する。修正は対象ファイル単位で別途タスクに従って行う。
+- 検証: `ruff check` が 0 exit code になること。
+
+### タスク8: mypy 型チェックエラーの解消
+- 背景: Provider SPI は strict 設定で型検証しており、新規実装での型崩れを防ぐ必要がある。【F:pyproject.toml†L1-L58】
+- 作業: `mypy --config-file pyproject.toml` を実行し、検出された型エラーを該当モジュールで修正する。
+- 検証: `mypy --config-file pyproject.toml` が成功すること。
+
+### タスク9: pytest スイートのエラー解消
+- 背景: Provider 実装に伴い Python テストが失敗する可能性があるため、逐次修正が必要。【F:justfile†L29-L34】
+- 作業: `pytest projects/04-llm-adapter-shadow/tests` を実行し、失敗したケースを原因切り分けして修正する。修正内容は該当タスクにて管理する。
+- 検証: `pytest projects/04-llm-adapter-shadow/tests` が成功すること。
+
+### タスク10: Node テストとビルドのエラー解消
+- 背景: `just node-test` で生成される spec や e2e が Provider 追加の影響を受ける可能性がある。【F:justfile†L20-L36】
+- 作業: `just node-test` を実行し、失敗する場合はモックや型定義を更新して整合性を保つ。
+- 検証: `just node-test` が成功すること。
 
 ## Refactoring
 
-### タスク5: ConsensusCandidate 集約ロジックのモジュール分割
-- 背景: `consensus_candidates.py` は候補集約・スコア計算・スキーマ検証・タイブレークまで単一ファイルに内包しており 270 行超と肥大化している。責務を分割して可読性とテスト性を高めたい。【F:projects/04-llm-adapter-shadow/src/llm_adapter/consensus_candidates.py†L1-L274】
-- 作業: 集約ロジック（`CandidateSet`/`_Candidate`）とスキーマ検証 (`validate_consensus_schema`)・タイブレーク (`_apply_tie_breaker`) を別モジュールへ切り出し、既存インポート互換を維持しつつ内部APIを整理する。単体テストを追加して機能維持を確認する。
-- 検証: `pytest projects/04-llm-adapter-shadow/tests/test_runner_consensus.py` と `pytest projects/04-llm-adapter-shadow/tests/consensus/test_tie_breakers.py` を中心に全体テストを実行し、分割後も合議ロジックが変わらないことを保証する。【F:justfile†L29-L34】
+### タスク11: ConsensusCandidate 集約ロジックのモジュール分割
+- 背景: `consensus_candidates.py` が候補集約・スコア計算・スキーマ検証・タイブレークまで単一ファイルに集中しており 270 行超で可読性が低い。【F:projects/04-llm-adapter-shadow/src/llm_adapter/consensus_candidates.py†L1-L274】
+- 作業: `projects/04-llm-adapter-shadow/src/llm_adapter/consensus_candidates.py` から集約ロジックと検証処理を新モジュールへ分割し、API を維持したまま内部責務を整理する。分割後は単体テストを追加して機能維持を確認する。
+- 検証: `pytest projects/04-llm-adapter-shadow/tests/test_runner_consensus.py` と `pytest projects/04-llm-adapter-shadow/tests/consensus/test_tie_breakers.py` を実行し、緑化を確認する。【F:justfile†L29-L34】
