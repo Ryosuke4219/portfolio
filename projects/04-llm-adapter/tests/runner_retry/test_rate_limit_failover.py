@@ -12,10 +12,10 @@ from adapter.core.runner_api import BackoffPolicy
 from adapter.core.runner_execution import RunnerExecution
 
 from .conftest import (
-    RateLimitStubProvider,
-    SuccessProvider,
     make_provider_config,
     make_task,
+    RateLimitStubProvider,
+    SuccessProvider,
 )
 
 

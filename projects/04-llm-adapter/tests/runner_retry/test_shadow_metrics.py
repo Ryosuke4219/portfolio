@@ -9,7 +9,7 @@ from adapter.core.provider_spi import TokenUsage
 from adapter.core.providers import ProviderResponse
 from adapter.core.runner_execution import RunnerExecution
 
-from .conftest import TrackingProvider, UnusedProvider, make_provider_config, make_task
+from .conftest import make_provider_config, make_task, TrackingProvider, UnusedProvider
 
 
 class _ShadowProvider:

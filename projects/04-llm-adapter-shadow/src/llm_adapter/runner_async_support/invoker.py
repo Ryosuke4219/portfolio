@@ -1,15 +1,15 @@
 """Async provider invocation utilities."""
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
+import time
 from typing import Any, cast
 
 from ..errors import FatalError, ProviderSkip, RateLimitError, RetryableError, SkipError
 from ..observability import EventLogger
 from ..provider_spi import AsyncProviderSPI, ProviderRequest, ProviderResponse, ProviderSPI
-from ..runner_shared import RateLimiter, log_provider_call, log_provider_skipped, log_run_metric
-from ..shadow import ShadowMetrics, run_with_shadow_async
+from ..runner_shared import log_provider_call, log_provider_skipped, log_run_metric, RateLimiter
+from ..shadow import run_with_shadow_async, ShadowMetrics
 from ..utils import elapsed_ms
 from .shadow_logging import build_shadow_log_metadata
 

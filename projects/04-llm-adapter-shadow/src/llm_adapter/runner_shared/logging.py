@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 # NOTE: 新構成へ移行済みの場合、このファイルの利用箇所を削除してください。
-
 from .logging.base import MetricsPath, resolve_event_logger
 from .logging.events import log_provider_call, log_provider_skipped, log_run_metric
 from .logging.status import error_family

@@ -29,10 +29,9 @@ def resolve_event_logger(
 def _provider_name(provider: ProviderSPI | AsyncProviderSPI | None) -> str | None:
     if provider is None:
         return None
-    if hasattr(provider, "name"):
-        name = provider.name  # type: ignore[attr-defined]
-        if callable(name):
-            return str(name())
+    name_attr = getattr(provider, "name", None)
+    if callable(name_attr):
+        return str(name_attr())
     return None
 
 

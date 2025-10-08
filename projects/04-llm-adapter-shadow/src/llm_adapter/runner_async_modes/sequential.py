@@ -56,7 +56,7 @@ class SequentialRunStrategy:
                 )
                 latency_ms = getattr(response, "latency_ms", None)
                 if latency_ms is None:
-                    latency_ms = elapsed_ms(context.run_started)
+                    latency_ms = elapsed_ms(attempt_started)
 
                 log_run_metric(
                     context.event_logger,

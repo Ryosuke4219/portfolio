@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from ._event_loop import ensure_socket_free_event_loop_policy
-from .errors import AllFailedError, FatalError
+from .errors import AllFailedError
 from .observability import EventLogger
 from .parallel_exec import ParallelAllResult
 from .provider_spi import (
