@@ -36,8 +36,9 @@ def logger() -> _RecordingLogger:
     return _RecordingLogger()
 
 
-def test_log_provider_call_normalizes_errored_outcome(
-    logger: _RecordingLogger, provider_request: ProviderRequest
+@pytest.mark.parametrize("status", ["errored", "fail", "failed"])
+def test_log_provider_call_normalizes_error_family_outcome(
+    logger: _RecordingLogger, provider_request: ProviderRequest, status: str
 ) -> None:
     provider = _DummyProvider("dummy")
 
@@ -48,7 +49,7 @@ def test_log_provider_call_normalizes_errored_outcome(
         request=provider_request,
         attempt=1,
         total_providers=1,
-        status="errored",
+        status=status,
         latency_ms=123,
         tokens_in=10,
         tokens_out=20,
@@ -59,7 +60,7 @@ def test_log_provider_call_normalizes_errored_outcome(
 
     event_type, payload = logger.events[-1]
     assert event_type == "provider_call"
-    assert payload["status"] == "errored"
+    assert payload["status"] == status
     assert payload["outcome"] == "error"
 
 
@@ -89,15 +90,16 @@ def test_log_provider_call_records_skip_outcome_from_skip_error(
     assert payload["outcome"] == "skip"
 
 
-def test_log_run_metric_normalizes_errored_outcome(
-    logger: _RecordingLogger, provider_request: ProviderRequest
+@pytest.mark.parametrize("status", ["errored", "fail", "failed"])
+def test_log_run_metric_normalizes_error_family_outcome(
+    logger: _RecordingLogger, provider_request: ProviderRequest, status: str
 ) -> None:
     log_run_metric(
         logger,
         request_fingerprint="fingerprint",
         request=provider_request,
         provider=_DummyProvider("dummy"),
-        status="errored",
+        status=status,
         attempts=1,
         latency_ms=123,
         tokens_in=10,
@@ -110,7 +112,7 @@ def test_log_run_metric_normalizes_errored_outcome(
 
     event_type, payload = logger.events[-1]
     assert event_type == "run_metric"
-    assert payload["status"] == "errored"
+    assert payload["status"] == status
     assert payload["outcome"] == "error"
 
 
