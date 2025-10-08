@@ -23,7 +23,7 @@ def error_family(error: Exception | None) -> str | None:
 def _normalize_outcome(status: str) -> str:
     normalized = status.lower()
     success_values = {"ok", "success"}
-    error_values = {"error", "errored", "failure"}
+    error_values = {"error", "errored", "failure", "fail", "failed"}
     skipped_values = {"skip", "skipped"}
     if normalized in success_values:
         return "success"
