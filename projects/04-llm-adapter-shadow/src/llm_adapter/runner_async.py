@@ -26,7 +26,8 @@ from .runner_async_modes import (
     SequentialRunStrategy,
     WorkerResult,
 )
-from .runner_async_support import AsyncProviderInvoker, emit_consensus_failure
+from .runner_async_support.failures import emit_consensus_failure
+from .runner_async_support.invoker import AsyncProviderInvoker
 from .runner_config import RunnerConfig, RunnerMode
 from .runner_shared import (
     error_family,
