@@ -114,6 +114,8 @@ projects/04-llm-adapter-shadow/
 - `SHADOW_PROVIDER` — 影実行用。デフォルトは `ollama:gemma3n:e2b`。`none` や空文字で無効化できます。
 - `OLLAMA_BASE_URL` — Ollama API のベースURL（未指定時は `http://127.0.0.1:11434`。旧名の `OLLAMA_HOST` もフォールバックとして解釈されます）。
 - `GEMINI_API_KEY` — Gemini SDK が参照するAPIキー。未設定の場合、Gemini プロバイダは安全にスキップされます。
+- `OPENROUTER_API_KEY` — OpenRouter 経由で Anthropic / OpenAI などを利用する際の API キー。未設定なら OpenRouter プロバイダは自動スキップします。
+- `OPENROUTER_BASE_URL` — OpenRouter の API ベース URL。既定値は `https://openrouter.ai/api/v1` で、セルフホストや将来のリージョン分離時のみ変更してください。
 
 
 プロバイダ文字列は最初のコロンのみを区切り文字として扱うため、`ollama:gemma3n:e2b` のようにモデルIDにコロンを含めても問題ありません。`mock:foo` を指定するとモックプロバイダで簡易動作確認が可能です。
@@ -128,9 +130,18 @@ export SHADOW_PROVIDER="ollama:gemma3n:e2b"
 export GEMINI_API_KEY="<YOUR_GEMINI_KEY>"
 export OLLAMA_BASE_URL="http://127.0.0.1:11434"
 
+# OpenRouter を優先プロバイダにする場合
+export PRIMARY_PROVIDER="openrouter:openrouter/anthropic/claude-3.5-sonnet"
+export OPENROUTER_API_KEY="<YOUR_OPENROUTER_KEY>"
+export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+
 ```
 
 ルート直下の `.env.example` をコピーして `.env` を作成すると、上記の雛形をそのまま利用できます。
+
+OpenRouter のモデル指定は `openrouter:<vendor>/<model>` 形式で、OpenRouter 側のモデルリストに合わせて記述します。`OPENROUTER_API_KEY` は公式ダッシュボードで発行し、`.env` やシークレットストアに保管してください。組織のポリシーに従い、監査ログへ API キーを残さないようご注意ください。
+
+OpenRouter 経由で複数ベンダーにアクセスすると、OpenRouter 側のレート制限と個別ベンダーのポリシーが同時に適用されます。`parallel_*` モード利用時は 429 が発生しやすいため、`RunnerConfig.rpm` を調整しつつ `RateLimitError` のリトライ挙動（0.05 秒バックオフ）に依存しすぎない構成にすることを推奨します。
 
 Gemini の構造化出力を利用したい場合は、`generation_config` に
 `{"response_mime_type": "application/json"}` や
