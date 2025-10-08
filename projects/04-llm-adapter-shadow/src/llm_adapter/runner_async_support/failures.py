@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ..parallel_exec import ParallelExecutionError
-from ..runner_async_modes import AsyncRunContext, WorkerResult, collect_failure_details
+from ..runner_async_modes import AsyncRunContext, collect_failure_details, WorkerResult
 
 
 def emit_consensus_failure(

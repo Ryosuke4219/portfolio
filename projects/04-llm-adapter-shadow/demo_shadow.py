@@ -53,6 +53,9 @@ if __name__ == "__main__":
         print(f"Configuration error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
+    if primary is None:  # pragma: no cover - configuration guard
+        raise SystemExit("Primary provider is required")
+
     if start_http_server is not None:
         try:
             register_metrics_exporter(PrometheusMetricsExporter())

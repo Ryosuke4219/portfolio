@@ -11,9 +11,9 @@ from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 from src.llm_adapter.runner_sync_modes import SequentialStrategy
 
 from .conftest import (
+    _make_context,
     _RecordingLogger,
     _SuccessfulProvider,
-    _make_context,
 )
 
 

@@ -166,13 +166,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.format == "json":
         indent = 2 if args.pretty else None
         separators = (",", ": ") if args.pretty else (",", ":")
-        json_kwargs = {
-            "ensure_ascii": False,
-            "indent": indent,
-            "separators": separators,
-            "sort_keys": True,
-        }
-        text = json.dumps(metrics, **json_kwargs)
+        text = json.dumps(
+            metrics,
+            ensure_ascii=False,
+            indent=indent,
+            separators=separators,
+            sort_keys=True,
+        )
     else:
         text = _format_text(metrics)
 

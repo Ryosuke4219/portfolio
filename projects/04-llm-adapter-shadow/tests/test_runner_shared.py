@@ -6,7 +6,7 @@ import pytest
 
 from src.llm_adapter.errors import ProviderSkip
 from src.llm_adapter.observability import EventLogger
-from src.llm_adapter.provider_spi import ProviderRequest
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.runner_shared import log_provider_call, log_run_metric
 
 
@@ -24,6 +24,19 @@ class _DummyProvider:
 
     def name(self) -> str:
         return self._name
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - unused
+        return ProviderResponse(
+            "unused",
+            latency_ms=0,
+            token_usage=TokenUsage(prompt=0, completion=0),
+        )
+
+    def estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
+        return 0.0
 
 
 @pytest.fixture()

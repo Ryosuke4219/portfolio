@@ -31,6 +31,9 @@ class StubProvider:
     def invoke(self, request: ProviderRequest) -> ProviderResponse:  # pragma: no cover - unused
         raise NotImplementedError
 
+    def estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
+        return 0.0
+
 
 class FakeMetrics(ShadowMetrics):
     def __init__(self) -> None:
