@@ -63,6 +63,33 @@ def test_log_provider_call_normalizes_errored_outcome(
     assert payload["outcome"] == "error"
 
 
+@pytest.mark.parametrize("status", ["failed", "fail"])
+def test_log_provider_call_normalizes_failed_status(
+    status: str, logger: _RecordingLogger, provider_request: ProviderRequest
+) -> None:
+    provider = _DummyProvider("dummy")
+
+    log_provider_call(
+        logger,
+        request_fingerprint="fingerprint",
+        provider=provider,
+        request=provider_request,
+        attempt=1,
+        total_providers=1,
+        status=status,
+        latency_ms=123,
+        tokens_in=10,
+        tokens_out=20,
+        error=None,
+        metadata={},
+        shadow_used=False,
+    )
+
+    _, payload = logger.events[-1]
+    assert payload["status"] == status
+    assert payload["outcome"] == "error"
+
+
 def test_log_provider_call_records_skip_outcome_from_skip_error(
     logger: _RecordingLogger, provider_request: ProviderRequest
 ) -> None:
