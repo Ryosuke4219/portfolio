@@ -99,8 +99,8 @@ class _SequentialRunTracker:
                 "summary": summary,
             }
         )
-        tokens_in = result.tokens_in
-        tokens_out = result.tokens_out
+        tokens_in = result.tokens_in if result.tokens_in is not None else 0
+        tokens_out = result.tokens_out if result.tokens_out is not None else 0
         latency_ms = (
             result.latency_ms
             if result.latency_ms is not None
@@ -113,27 +113,21 @@ class _SequentialRunTracker:
             metadata_with_shadow = merged_metadata
         else:
             metadata_with_shadow = self._context.metadata
-        should_log_metric = not (
-            result.provider_call_logged
-            and tokens_in is None
-            and tokens_out is None
+        log_run_metric(
+            self._event_logger,
+            request_fingerprint=self._context.request_fingerprint,
+            request=self._context.request,
+            provider=provider,
+            status="error",
+            attempts=attempt,
+            latency_ms=latency_ms,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=0.0,
+            error=error,
+            metadata=metadata_with_shadow,
+            shadow_used=self._context.shadow_used,
         )
-        if should_log_metric:
-            log_run_metric(
-                self._event_logger,
-                request_fingerprint=self._context.request_fingerprint,
-                request=self._context.request,
-                provider=provider,
-                status="error",
-                attempts=attempt,
-                latency_ms=latency_ms,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-                cost_usd=0.0,
-                error=error,
-                metadata=metadata_with_shadow,
-                shadow_used=self._context.shadow_used,
-            )
         if isinstance(error, FatalError):
             if isinstance(error, AuthError | ConfigError):
                 if self._event_logger is not None:
@@ -196,21 +190,6 @@ class _SequentialRunTracker:
         failure_error = AllFailedError(message, failures=self._failure_details)
         metric_error = (
             self._last_error if self._last_error is not None else failure_error
-        )
-        log_run_metric(
-            event_logger,
-            request_fingerprint=self._context.request_fingerprint,
-            request=self._context.request,
-            provider=None,
-            status="error",
-            attempts=self.attempt_count,
-            latency_ms=elapsed_ms(self._context.run_started),
-            tokens_in=None,
-            tokens_out=None,
-            cost_usd=0.0,
-            error=metric_error,
-            metadata=self._context.metadata,
-            shadow_used=self._context.shadow_used,
         )
         if self._last_error is not None:
             raise failure_error from self._last_error

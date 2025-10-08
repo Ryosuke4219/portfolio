@@ -118,6 +118,7 @@ class AsyncProviderInvoker:
                 response = cast(ProviderResponse, response_only)
         except RateLimitError as err:
             enriched_metadata = _with_shadow_metadata(metadata)
+            latency_ms = elapsed_ms(attempt_started)
             log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -125,9 +126,9 @@ class AsyncProviderInvoker:
                 provider=provider,
                 status="error",
                 attempts=attempt,
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 cost_usd=0.0,
                 error=err,
                 metadata=enriched_metadata,
@@ -141,9 +142,9 @@ class AsyncProviderInvoker:
                 attempt=attempt,
                 total_providers=total_providers,
                 status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 error=err,
                 metadata=metadata,
                 shadow_used=shadow is not None,
@@ -152,6 +153,7 @@ class AsyncProviderInvoker:
             raise
         except RetryableError as err:
             enriched_metadata = _with_shadow_metadata(metadata)
+            latency_ms = elapsed_ms(attempt_started)
             log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -159,9 +161,9 @@ class AsyncProviderInvoker:
                 provider=provider,
                 status="error",
                 attempts=attempt,
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 cost_usd=0.0,
                 error=err,
                 metadata=enriched_metadata,
@@ -175,9 +177,9 @@ class AsyncProviderInvoker:
                 attempt=attempt,
                 total_providers=total_providers,
                 status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 error=err,
                 metadata=metadata,
                 shadow_used=shadow is not None,
@@ -186,6 +188,7 @@ class AsyncProviderInvoker:
             raise
         except SkipError as err:
             enriched_metadata = _with_shadow_metadata(metadata)
+            latency_ms = elapsed_ms(attempt_started)
             if isinstance(err, ProviderSkip):
                 log_provider_skipped(
                     event_logger,
@@ -203,9 +206,9 @@ class AsyncProviderInvoker:
                 provider=provider,
                 status="error",
                 attempts=attempt,
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 cost_usd=0.0,
                 error=err,
                 metadata=enriched_metadata,
@@ -219,9 +222,9 @@ class AsyncProviderInvoker:
                 attempt=attempt,
                 total_providers=total_providers,
                 status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 error=err,
                 metadata=metadata,
                 shadow_used=shadow is not None,
@@ -230,6 +233,7 @@ class AsyncProviderInvoker:
             raise
         except FatalError as err:
             enriched_metadata = _with_shadow_metadata(metadata)
+            latency_ms = elapsed_ms(attempt_started)
             log_run_metric(
                 event_logger,
                 request_fingerprint=request_fingerprint,
@@ -237,9 +241,9 @@ class AsyncProviderInvoker:
                 provider=provider,
                 status="error",
                 attempts=attempt,
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 cost_usd=0.0,
                 error=err,
                 metadata=enriched_metadata,
@@ -253,9 +257,9 @@ class AsyncProviderInvoker:
                 attempt=attempt,
                 total_providers=total_providers,
                 status="error",
-                latency_ms=elapsed_ms(attempt_started),
-                tokens_in=None,
-                tokens_out=None,
+                latency_ms=latency_ms,
+                tokens_in=0,
+                tokens_out=0,
                 error=err,
                 metadata=metadata,
                 shadow_used=shadow is not None,

@@ -185,21 +185,6 @@ class AsyncRunner:
                 },
             )
         failure_error = AllFailedError("All providers failed to produce a result")
-        log_run_metric(
-            event_logger,
-            request_fingerprint=request_fingerprint,
-            request=request,
-            provider=None,
-            status="error",
-            attempts=attempt_count,
-            latency_ms=elapsed_ms(run_started),
-            tokens_in=None,
-            tokens_out=None,
-            cost_usd=0.0,
-            error=last_err or failure_error,
-            metadata=metadata,
-            shadow_used=shadow_used,
-        )
         if last_err is not None:
             if mode == RunnerMode.CONSENSUS or total_providers <= 1:
                 raise last_err

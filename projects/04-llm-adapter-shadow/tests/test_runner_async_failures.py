@@ -30,7 +30,12 @@ async def test_all_failed_error_is_raised_and_wrapped() -> None:
         await runner.run_async(request, shadow_metrics_path="unused.jsonl")
 
     assert isinstance(excinfo.value.__cause__, RetriableError)
-    run_event = logger.of_type("run_metric")[0]
+    run_events = logger.of_type("run_metric")
+    assert run_events, "expected run_metric events to be emitted"
+    for event in run_events:
+        assert isinstance(event["provider_id"], str)
+        assert event["provider_id"], "provider_id should not be empty"
+    run_event = run_events[0]
     assert run_event["status"] == "error"
     assert run_event["run_id"] == run_event["request_fingerprint"]
     assert run_event["mode"] == "sequential"

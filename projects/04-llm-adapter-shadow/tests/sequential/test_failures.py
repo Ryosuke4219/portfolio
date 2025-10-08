@@ -72,10 +72,18 @@ def test_sequential_strategy_all_failed_logs_once(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr(runner, "_invoke_provider_sync", fake_invoke)
 
-    log_calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    original_log_run_metric = (
+        __import__("src.llm_adapter.runner_sync_sequential", fromlist=["log_run_metric"])
+        .log_run_metric
+    )
+    recorded_providers: list[str] = []
 
-    def fake_log_run_metric(*args: Any, **kwargs: Any) -> None:
-        log_calls.append((args, kwargs))
+    def fake_log_run_metric(event_logger: Any, *args: Any, **kwargs: Any) -> None:
+        provider = kwargs.get("provider")
+        assert provider is not None, "provider should be present for failure metrics"
+        provider_name = provider.name()
+        recorded_providers.append(provider_name)
+        original_log_run_metric(event_logger, *args, **kwargs)
 
     monkeypatch.setattr(
         "src.llm_adapter.runner_sync_sequential.log_run_metric",
@@ -88,5 +96,9 @@ def test_sequential_strategy_all_failed_logs_once(monkeypatch: pytest.MonkeyPatc
     message = str(exc_info.value)
     assert "primary (attempt 1)" in message
     assert "secondary (attempt 2)" in message
-    assert len(log_calls) == 1
-    assert log_calls[0][1]["status"] == "error"
+    assert recorded_providers == [provider.name() for provider in providers]
+    run_metrics = [record for event_type, record in logger.events if event_type == "run_metric"]
+    assert len(run_metrics) == len(providers)
+    for event, provider in zip(run_metrics, providers, strict=True):
+        assert event["provider"] == provider.name()
+        assert event["provider_id"] == provider.name()
