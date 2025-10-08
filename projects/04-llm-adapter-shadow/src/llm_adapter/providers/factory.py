@@ -8,6 +8,7 @@ from ..provider_spi import ProviderSPI
 from .gemini import GeminiProvider
 from .mock import MockProvider
 from .ollama import OllamaProvider
+from .openrouter import OpenRouterProvider
 
 __all__ = [
     "parse_provider_spec",
@@ -52,6 +53,7 @@ def create_provider_from_spec(
         "gemini": lambda model: GeminiProvider(model=model),
         "ollama": lambda model: OllamaProvider(model=model),
         "mock": lambda model: MockProvider(model),
+        "openrouter": lambda model: OpenRouterProvider(model=model),
     }
 
     if factories:
