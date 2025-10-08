@@ -1,8 +1,10 @@
+# ruff: noqa: I001
+
 """Diagnostics and error classification tests for the single prompt CLI."""
 
 import asyncio
-from pathlib import Path
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import adapter.cli as cli_module
