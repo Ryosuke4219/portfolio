@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from ._event_loop import ensure_socket_free_event_loop_policy
-from .errors import FatalError
+from .errors import AllFailedError, FatalError
 from .observability import EventLogger
 from .parallel_exec import ParallelAllResult
 from .provider_spi import (
@@ -40,10 +40,6 @@ from .shadow import DEFAULT_METRICS_PATH, ShadowMetrics
 from .utils import content_hash, elapsed_ms
 
 ensure_socket_free_event_loop_policy()
-
-
-class AllFailedError(FatalError):
-    """Raised when all providers fail to produce a response."""
 
 
 class AsyncRunner:
