@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 
 from ..errors import FatalError, RateLimitError, RetryableError, SkipError, TimeoutError
-from ..runner_async_support import build_shadow_log_metadata
+from ..runner_async_support.shadow_logging import build_shadow_log_metadata
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import elapsed_ms
 from .context import AsyncRunContext, StrategyResult
