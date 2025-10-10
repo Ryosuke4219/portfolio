@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any
 
-from ..errors import RateLimitError, RetriableError, TimeoutError
+from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from ._requests_compat import create_session, requests_exceptions, SessionProtocol
 from .base import BaseProvider
@@ -98,6 +98,8 @@ def _normalize_error(exc: Exception) -> Exception:
         except (TypeError, ValueError):  # pragma: no cover - defensive guard
             code = None
         message = str(exc)
+        if code in {401, 403}:
+            return AuthError(message)
         if code == 429:
             return RateLimitError(message)
         if code in {408, 504}:
