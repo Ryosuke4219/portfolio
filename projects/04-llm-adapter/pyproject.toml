@@ -6,7 +6,20 @@ build-backend = "setuptools.build_meta"
 name = "llm-adapter"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["jsonschema>=4.21", "openai>=1.30", "pyyaml", "pydantic>=2", "tqdm"]
+dependencies = [
+    "jsonschema>=4.21",
+    "pydantic>=2",
+    "pyyaml>=6",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+providers = [
+    "openai>=1.30",
+    "google-genai>=0.3.0",
+]
+provider-openai = ["openai>=1.30"]
+provider-google = ["google-genai>=0.3.0"]
 
 [project.scripts]
 llm-adapter = "adapter.cli:main"
