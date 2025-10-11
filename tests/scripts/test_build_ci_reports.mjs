@@ -2,9 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { summariseJUnit } from '../../scripts/build-ci-reports.mjs';
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(currentDir, '..', '..');
+const scriptPath = path.resolve(repoRoot, 'scripts/build-ci-reports.mjs');
+const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 
 test('summariseJUnit counts errored status as error', (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-reports-'));
@@ -21,4 +27,17 @@ test('summariseJUnit counts errored status as error', (t) => {
   const summary = summariseJUnit(inputPath, outputDir);
 
   assert.equal(summary.errors, 1);
+});
+
+test('coverage paths target main project directory', () => {
+  const expectedHtmlPath = "path.resolve(rootDir, 'projects/04-llm-adapter/htmlcov')";
+  const expectedXmlPath = "path.resolve(rootDir, 'projects/04-llm-adapter/coverage.xml')";
+
+  if (!scriptSource.includes(expectedHtmlPath)) {
+    throw new Error(`coverageHtmlDir は ${expectedHtmlPath} を参照していません`);
+  }
+
+  if (!scriptSource.includes(expectedXmlPath)) {
+    throw new Error(`coverageXmlPath は ${expectedXmlPath} を参照していません`);
+  }
 });
