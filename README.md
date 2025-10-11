@@ -90,14 +90,14 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 3. **03: ci-flaky-analyzer — JUnit → HTML/CSV（決定的）**  
    CIのJUnitログを取り込み、flaky挙動を集計・可視化します。
 
-4. **04: llm-adapter-shadow — LLMモデル選択/比較（唯一のLLM使用箇所）**
-   *primary* と *shadow* の2系統LLMを並走させ、差分・フォールバック・異常系を検証します。
+4. **04: llm-adapter — LLMモデル選択/比較（唯一のLLM使用箇所）**
+   複数プロバイダを並走させ、差分・フォールバック・異常系を検証します。
 
    **最短コマンドと入出力例:**
 
    ```bash
    llm-adapter --provider adapter/config/providers/openai.yaml \
-     --prompts examples/prompts/ja_one_liner.jsonl --out out.jsonl
+     --prompts examples/prompts/ja_one_liner.jsonl --out out/
    ```
 
    * `examples/prompts/ja_one_liner.jsonl`
@@ -106,7 +106,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
      {"prompt": "日本語で1行、自己紹介して"}
      ```
 
-   * `out.jsonl`（一例）
+   * `out/metrics.jsonl`（一例）
 
      ```jsonl
      {"provider": "openai", "model": "gpt-4o-mini", "latency_ms": 812, "status": "ok", "prompt_sha256": "d16a2c…", "output": "こんにちは、QAエンジニアのRyです。"}
@@ -220,8 +220,10 @@ JSONL バッチを処理する場合は次のように指定します。
 ```bash
 llm-adapter --provider adapter/config/providers/openai.yaml \
   --prompts examples/prompts/ja_one_liner.jsonl \
-  --out out --format jsonl --json-logs
+  --out out/ --format jsonl --json-logs
 ```
+
+出力は `out/metrics.jsonl`（および `out/logs/` 配下の詳細ログ）として生成されます。
 
 **収集メトリクス（代表）**
 
