@@ -1,7 +1,7 @@
 [project]
 name = "portfolio-llm-adapter-shadow"
 version = "0.1.0"
-description = "Legacy-only shadow-execution + error-cases PoC for portfolio"
+description = "Legacy-only shadow package that omits llm-adapter CLI exposure to avoid script collisions"
 requires-python = ">=3.10"
 dependencies = [
     "PyYAML>=6.0",
