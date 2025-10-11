@@ -1,5 +1,5 @@
 provider: ollama
-endpoint: http://127.0.0.1:11434
+endpoint: http://127.0.0.1:11434  # ローカル実ホスト（env で上書き可）
 model: llama3.1:8b-instruct
 auth_env: null
 seed: 0
