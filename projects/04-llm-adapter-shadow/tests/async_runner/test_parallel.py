@@ -186,5 +186,5 @@ def test_async_parallel_any_returns_first_completion() -> None:
     _ = asyncio.run(asyncio.wait_for(_execute(), timeout=0.2))
 
 # チェックリスト:
-# - [ ] 新規テストは ``projects/04-llm-adapter-shadow/tests/async_runner/parallel`` に追加する
+# - [ ] 新規テストは ``projects/04-llm-adapter/tests/runner_async`` へ追加する
 # - [ ] 互換性が不要になったらこのシムを削除する
