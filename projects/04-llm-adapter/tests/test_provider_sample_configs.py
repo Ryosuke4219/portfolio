@@ -26,3 +26,14 @@ def test_budget_overrides_use_allowed_providers() -> None:
     root_dir = Path(__file__).resolve().parents[1]
     budget_book = load_budget_book(root_dir / "adapter" / "config" / "budgets.yaml")
     assert set(budget_book.overrides) <= ALLOWED_PROVIDERS
+
+
+def test_openrouter_config_declares_auth_and_base_url_env() -> None:
+    root_dir = Path(__file__).resolve().parents[1]
+    config = load_provider_config(root_dir / "adapter" / "config" / "providers" / "openrouter.yaml")
+    assert config.auth_env == "OPENROUTER_API_KEY"
+    assert config.raw.get("base_url_env") == "OPENROUTER_BASE_URL"
+    env_info = config.raw.get("env")
+    assert isinstance(env_info, dict)
+    assert env_info.get("OPENROUTER_API_KEY") == "OPENROUTER_API_KEY"
+    assert env_info.get("OPENROUTER_BASE_URL") == "https://openrouter.ai/api/v1"
