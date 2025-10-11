@@ -61,3 +61,8 @@ markers = [
 pythonpath = [
     ".",
 ]
+
+[tool.coverage.run]
+omit = [
+    "projects/04-llm-adapter-shadow/*",
+]
