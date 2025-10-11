@@ -23,5 +23,9 @@ def test_runner_logging_shim_executes_to_error() -> None:
     spec = importlib.util.spec_from_file_location("_deprecated_logging_shim", shim_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    with pytest.raises(ModuleNotFoundError, match="adapter.core"):
+    with pytest.raises(ModuleNotFoundError) as exc_info:
         spec.loader.exec_module(module)
+
+    error = exc_info.value
+    assert error.name == "llm_adapter.runner_shared.logging"
+    assert "adapter.core" in str(error)
