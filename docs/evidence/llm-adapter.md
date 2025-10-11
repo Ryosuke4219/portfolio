@@ -16,14 +16,15 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 
 - `llm-adapter` CLI が `adapter/run_compare.py` を通じて複数プロバイダを連続・並列・合意形成モードで呼び出し、共通メトリクスを収集。
 - `adapter/core/runner_execution.py` のランナーがリトライやプロバイダ固有の例外を整理し、比較用のイベントをストリーム出力。
-- `adapter/core/metrics.py` が JSONL メトリクスと派生サマリを構築し、CLI の `--out` で指定した `out/metrics.jsonl` などに追記可能（既定の `adapter/run_compare.py` は `data/runs-metrics.jsonl` に保存）。
+- `adapter/core/metrics/update.py` と `adapter/core/metrics/models.py` が JSONL メトリクスと派生サマリを構築し、CLI の `--out` で指定した `out/metrics.jsonl` などに追記可能（既定の `adapter/run_compare.py` は `data/runs-metrics.jsonl` に保存）。
 
 ## Key Artifacts
 
 - [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — CLI と設定ファイルの詳細な説明。
 - [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — CLI の比較モード実装とエントリポイント。
 - [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — プロバイダ実行・リトライ・メトリクス集約の中心ロジック。
-- [adapter/core/metrics.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics.py) — メトリクス構造体と JSONL 出力ユーティリティ。
+- [adapter/core/metrics/update.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/update.py) — JSONL メトリクス更新ユーティリティ。
+- [adapter/core/metrics/models.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/models.py) — メトリクス構造体とシリアライズモデル。
 
 ## How to Reproduce
 
