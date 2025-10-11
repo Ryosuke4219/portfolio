@@ -90,6 +90,66 @@ def test_parallel_any_success_marks_failures_and_cancellations(
     assert cancelled_result.stop_reason == "cancelled"
 
 
+def test_parallel_any_skip_outcome_is_preserved(
+    make_provider_config,
+    golden_task,
+    make_run_metrics,
+    make_parallel_executor,
+    parallel_any_value,
+) -> None:
+    providers = [
+        make_provider_config("skipper"),
+        make_provider_config("winner"),
+    ]
+
+    def run_single(config, _provider, _task, _attempt, mode):
+        assert mode == parallel_any_value
+        if config.provider == "skipper":
+            metrics = make_run_metrics(
+                config,
+                status="skip",
+                failure_kind="skip",
+                error_message="skipped",
+            )
+            metrics.outcome = "skip"
+            return SingleRunResult(
+                metrics=metrics,
+                raw_output="",
+                stop_reason="skip",
+                backoff_next_provider=True,
+            )
+        metrics = make_run_metrics(
+            config,
+            status="ok",
+            failure_kind=None,
+            error_message=None,
+        )
+        return SingleRunResult(
+            metrics=metrics,
+            raw_output="ok",
+            stop_reason="completed",
+        )
+
+    executor = make_parallel_executor(run_single)
+    provider_pairs = [(cfg, cast(BaseProvider, object())) for cfg in providers]
+    config = RunnerConfig(mode=RunnerMode.PARALLEL_ANY)
+
+    batch, stop_reason = executor.run(provider_pairs, golden_task, attempt_index=0, config=config)
+
+    assert stop_reason == "completed"
+    assert len(batch) == 2
+    results = {index: result for index, result in batch}
+
+    skip_result = results[0]
+    assert skip_result.metrics.status == "skip"
+    assert skip_result.metrics.failure_kind == "skip"
+    assert skip_result.metrics.outcome == "skip"
+
+    winner_result = results[1]
+    assert winner_result.metrics.status == "ok"
+    assert winner_result.stop_reason == "completed"
+
+
 def test_parallel_any_all_failures_raise_parallel_error(
     make_provider_config,
     golden_task,

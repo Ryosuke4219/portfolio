@@ -82,7 +82,8 @@ class _ParallelAnyCoordinator(_ParallelCoordinatorBase):
                 should_cancel = self._state.should_cancel()
                 metrics = result.metrics
                 if metrics.status != "ok":
-                    metrics.outcome = "error"
+                    if metrics.status == "error":
+                        metrics.outcome = "error"
                     self._results[index] = result
                     summary = self._build_failure_summary(
                         index, provider_config, result
