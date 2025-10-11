@@ -1,8 +1,7 @@
 provider: ollama
-endpoint: chat
+endpoint: http://127.0.0.1:11434
 model: llama3.1:8b-instruct
 auth_env: null
-host_env: OLLAMA_HOST
 seed: 0
 temperature: 0.2
 top_p: 0.9
