@@ -155,3 +155,24 @@ def test_budget_evaluator_flags_budget_exceed(
     assert "daily budget" in error_message
     assert error_message.startswith("preexisting | ")
     assert stop_reason == "provider=mock daily budget 1.0000 USD exceeded (spent=2.0000 USD)"
+
+
+def test_budget_evaluator_allows_budget_overrun(
+    provider_config: ProviderConfig,
+    budget_manager: BudgetManager,
+) -> None:
+    evaluator = BudgetEvaluator(budget_manager=budget_manager, allow_overrun=True, logger=logging.getLogger(__name__))
+
+    snapshot, stop_reason, status, failure_kind, error_message = evaluator.evaluate(
+        provider_config=provider_config,
+        cost_usd=2.0,
+        status="ok",
+        failure_kind=None,
+        error_message=None,
+    )
+
+    assert snapshot.hit_stop is True
+    assert stop_reason is None
+    assert status == "ok"
+    assert failure_kind is None
+    assert error_message is None
