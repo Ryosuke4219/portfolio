@@ -191,3 +191,23 @@ def test_ollama_provider_skip_when_offline(monkeypatch: pytest.MonkeyPatch, tmp_
     assert result.failure_kind == "skip"
     assert isinstance(result.error, ProviderSkip)
     assert result.backoff_next_provider is True
+
+
+def test_ollama_provider_honors_offline_override_in_ci(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="success")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    monkeypatch.setenv("CI", "true")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "say hello")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.failure_kind is None
+    assert result.response.text == "Hello from Ollama"
