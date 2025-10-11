@@ -256,6 +256,28 @@ def test_ollama_provider_auto_pull_disabled(monkeypatch: pytest.MonkeyPatch, tmp
     assert getattr(fake_client, "pull_called", False) is False
 
 
+def test_ollama_provider_auto_pull_disabled_env_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="missing_model")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    monkeypatch.setenv("OLLAMA_AUTO_PULL", "false")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        config.raw["auto_pull"] = True
+        provider = ProviderFactory.create(config)
+        request = ProviderRequest(model=config.model, prompt="say hello")
+        with pytest.raises(RetriableError):
+            provider.invoke(request)
+    finally:
+        local_patch.undo()
+
+    assert provider._auto_pull is False
+    fake_client = provider._client
+    assert getattr(fake_client, "pull_called", False) is False
+
+
 def test_ollama_provider_executor_success_in_ci(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
