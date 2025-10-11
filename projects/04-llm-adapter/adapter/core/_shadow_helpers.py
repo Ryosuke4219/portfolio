@@ -3,20 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from .config import ProviderConfig
 from .execution.shadow_runner import ShadowRunner, ShadowRunnerResult
-
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-
-        class ProviderSPI:  # pragma: no cover - 型補完不要
-            """プロバイダ SPI フォールバック."""
+from .provider_spi import ProviderSPI
 
 
 @dataclass(slots=True)
@@ -51,4 +41,3 @@ __all__ = [
     "start_shadow_session",
     "finalize_shadow_session",
 ]
-
