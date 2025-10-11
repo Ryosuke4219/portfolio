@@ -17,6 +17,10 @@ EXPECTED_REFERENCES = (
     "projects/04-llm-adapter/adapter/core/runner_execution.py",
 )
 
+DISALLOWED_REFERENCES = (
+    "adapter/core/metrics.py",
+)
+
 
 @pytest.mark.parametrize("evidence_path", EVIDENCE_PATHS)
 def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
@@ -25,4 +29,9 @@ def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
     assert not missing, (
         "Missing references in evidence file"
         f" {evidence_path.relative_to(PROJECT_ROOT)}: {missing}"
+    )
+    unexpected = [ref for ref in DISALLOWED_REFERENCES if ref in content]
+    assert not unexpected, (
+        "Unexpected references in evidence file"
+        f" {evidence_path.relative_to(PROJECT_ROOT)}: {unexpected}"
     )
