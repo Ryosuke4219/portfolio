@@ -14,7 +14,7 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-single-line = false
-known-first-party = ["adapter", "llm_adapter", "src.llm_adapter", "src", "tests"]
+known-first-party = ["adapter", "llm_adapter", "tests"]
 order-by-type = false
 force-sort-within-sections = true
 
@@ -26,7 +26,6 @@ ignore_missing_imports = true
 namespace_packages = true
 mypy_path = ["projects/04-llm-adapter"]
 explicit_package_bases = true
-exclude = "^projects/04-llm-adapter/tests/test_parallel_any_executor\\.py$"
 
 [[tool.mypy.overrides]]
 module = "adapter.*"
@@ -42,16 +41,6 @@ disallow_incomplete_defs = true
 
 [[tool.mypy.overrides]]
 module = "llm_adapter._event_loop"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.llm_adapter.*"
-check_untyped_defs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-
-[[tool.mypy.overrides]]
-module = "src.llm_adapter._event_loop"
 ignore_errors = true
 
 [tool.pytest.ini_options]
