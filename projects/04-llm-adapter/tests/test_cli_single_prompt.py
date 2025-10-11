@@ -89,6 +89,37 @@ def test_cli_fake_provider(echo_provider, tmp_path: Path, capfd) -> None:
     assert request.options == {"foo": "bar"}
 
 
+def test_cli_metadata_passthrough(echo_provider, tmp_path: Path, capfd) -> None:
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        (
+            "provider: fake\n"
+            "model: dummy\n"
+            "auth_env: NONE\n"
+            "max_tokens: 128\n"
+            "metadata:\n"
+            "  run_id: cli-demo\n"
+            "options:\n"
+            "  foo: bar\n"
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == 0
+    assert "echo:hello" in captured.out
+    request = echo_provider.requests[-1]
+    assert request.metadata == {"run_id": "cli-demo"}
+
+
 def test_cli_json_log_prompts(echo_provider, tmp_path: Path, capfd) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
