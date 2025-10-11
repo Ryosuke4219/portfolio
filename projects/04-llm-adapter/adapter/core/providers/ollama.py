@@ -10,11 +10,10 @@ from ..config import ProviderConfig
 from ..errors import ConfigError, ProviderSkip, RetriableError, SkipReason
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
-from ._requests_compat import create_session, requests_exceptions, SessionProtocol
+from ._requests_compat import SessionProtocol, create_session, requests_exceptions
 from .ollama_client import OllamaClient
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
-__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
 
 
 def _token_usage_from_payload(payload: Mapping[str, Any]) -> TokenUsage:
@@ -83,14 +82,13 @@ class OllamaProvider(BaseProvider):
         offline_env = os.getenv("LLM_ADAPTER_OFFLINE")
         ci_flag = os.getenv("CI", "").strip().lower() == "true"
         if offline_env is not None:
-            lowered_offline = offline_env.strip().lower()
-            if lowered_offline in {"0", "false"}:
+            normalized_offline = offline_env.strip().lower()
+            if normalized_offline in {"0", "false"}:
                 self._offline = False
-            elif lowered_offline in {"1", "true"}:
+            elif normalized_offline in {"1", "true", "yes", "on"}:
                 self._offline = True
             else:
-                offline_flag = _coerce_bool(offline_env, True)
-                self._offline = offline_flag
+                self._offline = _coerce_bool(offline_env, True)
         else:
             self._offline = ci_flag
 
@@ -278,3 +276,4 @@ class OllamaProvider(BaseProvider):
         )
 
 
+__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]

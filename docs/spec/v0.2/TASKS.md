@@ -38,7 +38,7 @@
 
 ## Providers
 
-### タスク6: Ollama プロバイダを v0.2 コアへ移植する（対応済み）
+### タスク6: Ollama プロバイダを v0.2 コアへ移植する（進行中）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
@@ -46,11 +46,14 @@
 - 対応状況:
   - `OllamaProvider` が環境変数や設定ファイルからホスト・タイムアウト・自動 Pull 設定を解決し、オフライン時は `ProviderSkip` で安全にスキップする実装をコアへ移植済み。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L48-L148】
   - `ProviderRequest` のメッセージ/オプションを Ollama API のチャットペイロードへ正規化し、応答からトークン使用量とメタ情報を `ProviderResponse` に集約する。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L150-L268】
-  - `ProviderFactory` に Ollama を登録し、README に利用手順と注意事項を追記済み。【F:projects/04-llm-adapter/adapter/core/providers/__init__.py†L132-L184】【F:projects/04-llm-adapter/README.md†L159-L194】
 - 品質エビデンス:
-  - `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、成功応答・レート制限・サーバーエラー・オフラインスキップの挙動を網羅している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L124-L193】
+  - ❌ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が `offline` 制御時の挙動差異により失敗している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L124-L193】
+- 残タスク:
+  - CLI からの `offline` 制御フラグをコア実装へ連結し、テストの `ProviderSkip` 期待値と揃える。
+  - `OLLAMA_ENV_*` を環境変数から API オプションへマッピングする設定レイヤーを整備する。
+  - 失敗テストを緑化するため、必要なモック/フィクスチャ修正と CI での再検証を完了する。
 
-### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
+### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（進行中）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
@@ -58,9 +61,12 @@
 - 対応状況:
   - `OpenRouterProvider` が API キーとベース URL の解決・セッションヘッダ設定を行い、Shadow 依存なくコアへ統合されている。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L32-L117】
   - `ProviderRequest` からチャットペイロードを生成し、ストリーミング含む応答の正規化とトークン計測を `ProviderResponse` に反映する。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L118-L330】
-  - `ProviderFactory` への登録と README の利用手順/トラブルシューティング更新を完了済み。【F:projects/04-llm-adapter/adapter/core/providers/__init__.py†L132-L184】【F:projects/04-llm-adapter/README.md†L172-L201】
 - 品質エビデンス:
-  - `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、成功応答・レート制限・サーバー/認証エラー正規化・API キー/ベース URL 解決・キー未設定スキップを確認済み。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L99-L340】
+  - ❌ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が API キー/環境変数マッピング不足により失敗している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L99-L340】
+- 残タスク:
+  - OpenRouter 用の環境変数マッピングと CLI オプション同期を行い、`ProviderFactory` 登録設定を更新する。
+  - レート制限・認証エラーハンドリングのモックを最新仕様へ合わせる。
+  - 失敗テストの修正と CI 再実行で緑化を確認する。
 
 ## CLI Request Pipeline
 

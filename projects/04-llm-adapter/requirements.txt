@@ -3,4 +3,5 @@ jsonschema>=4.21
 openai>=1.30
 pydantic>=2
 PyYAML>=6
+requests>=2
 tqdm>=4.66
