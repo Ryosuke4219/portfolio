@@ -136,6 +136,7 @@ class OpenRouterProvider(BaseProvider):
             auth_env_name = config.auth_env.strip()
         if not auth_env_name or auth_env_name.upper() == "NONE":
             auth_env_name = "OPENROUTER_API_KEY"
+        self._configured_auth_env = auth_env_name
         resolved_auth_env_name = auth_env_name
         if isinstance(raw_env, Mapping):
             override_name = raw_env.get(auth_env_name)
@@ -198,6 +199,11 @@ class OpenRouterProvider(BaseProvider):
             if self._api_key:
                 headers["Authorization"] = f"Bearer {self._api_key}"
         self._default_timeout = float(config.timeout_s or 30)
+        options_from_config = raw.get("options") if isinstance(raw, Mapping) else None
+        if isinstance(options_from_config, Mapping):
+            self._config_options = dict(options_from_config)
+        else:
+            self._config_options = {}
 
     def _build_payload(self, request: ProviderRequest) -> dict[str, Any]:
         messages = [dict(message) for message in (request.messages or [])]
@@ -213,6 +219,11 @@ class OpenRouterProvider(BaseProvider):
             payload["top_p"] = request.top_p
         if request.stop is not None:
             payload["stop"] = list(request.stop)
+        if self._config_options:
+            for key, value in self._config_options.items():
+                if key == "stream":
+                    continue
+                payload[key] = value
         options = request.options or {}
         if isinstance(options, Mapping):
             for key, value in options.items():
@@ -223,9 +234,14 @@ class OpenRouterProvider(BaseProvider):
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         if not self._api_key:
-            env_name = self._auth_env_name or "OPENROUTER_API_KEY"
+            resolved_env = self._auth_env_name or "OPENROUTER_API_KEY"
+            configured_env = self._configured_auth_env or resolved_env
+            if configured_env and configured_env != resolved_env:
+                message = f"openrouter: {configured_env} (resolved as {resolved_env}) not set"
+            else:
+                message = f"openrouter: {resolved_env} not set"
             raise ProviderSkip(
-                f"openrouter: {env_name} not set",
+                message,
                 reason=SkipReason.MISSING_OPENROUTER_API_KEY,
             )
         timeout = request.timeout_s if request.timeout_s is not None else self._default_timeout
