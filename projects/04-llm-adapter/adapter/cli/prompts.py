@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 import os
 from pathlib import Path
 import socket
@@ -165,6 +165,34 @@ def _exit_code_for_results(results: Iterable[PromptResult]) -> int:
     return EXIT_OK
 
 
+def _iter_env_aliases(alias_obj: object) -> Iterable[str]:
+    if isinstance(alias_obj, str):
+        candidate = alias_obj.strip()
+        if candidate:
+            yield candidate
+        return
+    if isinstance(alias_obj, Iterable) and not isinstance(alias_obj, str | bytes):
+        for item in alias_obj:
+            if isinstance(item, str):
+                candidate = item.strip()
+                if candidate:
+                    yield candidate
+
+
+def _has_api_key(auth_env: str, raw: Mapping[str, object] | None) -> bool:
+    if os.getenv(auth_env):
+        return True
+    if raw is None:
+        return False
+    env_map = raw.get("env") if isinstance(raw, Mapping) else None
+    if isinstance(env_map, Mapping):
+        alias_obj = env_map.get(auth_env)
+        for alias in _iter_env_aliases(alias_obj):
+            if os.getenv(alias):
+                return True
+    return False
+
+
 def run_prompts(argv: list[str] | None, provider_factory: object | None = None) -> int:
     parser = _build_parser()
     try:
@@ -186,7 +214,8 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
         return EXIT_INPUT_ERROR
 
     auth_env = (config.auth_env or "").strip()
-    if auth_env and auth_env.upper() != "NONE" and not os.getenv(auth_env):
+    raw_config = config.raw if isinstance(config.raw, Mapping) else None
+    if auth_env and auth_env.upper() != "NONE" and not _has_api_key(auth_env, raw_config):
         message = _msg(lang, "api_key_missing", env=auth_env)
         LOGGER.error(_sanitize_message(message))
         return EXIT_ENV_ERROR
