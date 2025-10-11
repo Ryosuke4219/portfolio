@@ -86,7 +86,7 @@
   - `projects/04-llm-adapter/adapter/cli/prompt_runner.py`
   - `projects/04-llm-adapter/adapter/core/provider_spi.py`
 - 完了条件:
-  - Shadow 実装の [CLI runner](../../../projects/04-llm-adapter-shadow/src/llm_adapter/cli/runner.py) と同等に、CLI 引数から `ProviderRequest` を構築して `ProviderSPI.invoke` へ渡す。
+  - [CLI runner](../../../projects/04-llm-adapter/adapter/cli/prompt_runner.py) が CLI 引数から `ProviderRequest` を構築し、`ProviderSPI.invoke` へ渡す流れを `projects/04-llm-adapter/adapter/cli/app.py` から呼び出す形へ統一する。
   - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt_diagnostics.py` と `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` が成功し、`generate` API を経由するコードは残さない。
   - `docs/spec/v0.2/ROADMAP.md` に CLI 移行状況の脚注を追記する。
 
@@ -97,7 +97,8 @@
   - `projects/04-llm-adapter/adapter/config/providers`
 - 完了条件:
   - `adapter/cli/app.py` の `--provider`/`--model` オプションで Ollama/OpenRouter 固有の `options.*` を指定できるよう、`ProviderRequest` の追加フィールドをマッピングする。
-  - 現状 `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` と `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` は既存だが、`projects/04-llm-adapter/README.md` の [Provider configuration](../../../projects/04-llm-adapter/README.md#provider-configuration) に揃うよう項目を精査し不足分を補う。
+  - CLI で `ProviderRequest.options.*` へ OpenAI など汎用プロバイダ設定を伝播させる残課題を解消し、`projects/04-llm-adapter/adapter/cli/prompt_runner.py` から `ProviderSPI.invoke` まで一貫させる。
+  - 現状 `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` と `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` は既存だが、`projects/04-llm-adapter/README.md` の [サンプル設定とプロンプト](../../../projects/04-llm-adapter/README.md#サンプル設定とプロンプト) に揃うよう項目を精査し不足分を補う。
   - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt_diagnostics.py::test_prompt_runner_provider_response_tokens` を含む CLI 系テストが成功し、`markdownlint docs/spec/v0.2/TASKS.md` も通過する。
 
 ## Docs & Templates
