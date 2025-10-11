@@ -15,10 +15,6 @@ def ensure_import_paths() -> None:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
 
-    if SHADOW_ROOT.exists() and str(SHADOW_ROOT) not in sys.path:
-        sys.path.insert(0, str(SHADOW_ROOT))
-
-
 ensure_import_paths()
 
 
