@@ -7,6 +7,7 @@ import pytest
 
 from adapter.core.errors import ParallelExecutionError, RateLimitError, RetriableError, TimeoutError
 from adapter.core.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from adapter.core import runner_async
 from adapter.core.runner_async import AsyncRunner
 from adapter.core.runner_config_builder import BackoffPolicy, RunnerConfig, RunnerMode
 
@@ -115,4 +116,9 @@ async def test_async_consensus_all_timeout_propagates_original_error() -> None:
 
     with pytest.raises((ParallelExecutionError, TimeoutError)):
         await runner.run_async(request, shadow_metrics_path="unused.jsonl")
+
+
+def test_async_runner_module_reference() -> None:
+    assert AsyncRunner is runner_async.AsyncRunner
+    assert AsyncRunner.__module__ == "adapter.core.runner_async"
 
