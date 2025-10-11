@@ -103,8 +103,8 @@ class OllamaProvider(BaseProvider):
         auto_pull_default = True
         if isinstance(raw, Mapping) and "auto_pull" in raw:
             auto_pull_default = _coerce_bool(raw.get("auto_pull"), auto_pull_default)
-        if auto_pull_env is not None and auto_pull_env.strip() == "0" and not allow_network:
-            auto_pull_default = False
+        if auto_pull_env is not None:
+            auto_pull_default = _coerce_bool(auto_pull_env, auto_pull_default)
         self._auto_pull = auto_pull_default
         self._allow_network = allow_network
         self._ready_models: set[str] = set()
@@ -249,7 +249,45 @@ class OllamaProvider(BaseProvider):
 
         try:
             if stream:
-                payload_json = self._consume_stream_response(response)
+                parts: list[str] = []
+                final_payload: dict[str, Any] | None = None
+                for raw_line in response.iter_lines():
+                    if not raw_line:
+                        continue
+                    if isinstance(raw_line, bytes):
+                        try:
+                            decoded = raw_line.decode("utf-8")
+                        except UnicodeDecodeError as exc:  # pragma: no cover - 不正なUTF-8防御
+                            raise RetriableError("invalid UTF-8 from Ollama stream") from exc
+                    else:
+                        decoded = str(raw_line)
+                    decoded = decoded.strip()
+                    if not decoded:
+                        continue
+                    try:
+                        chunk = json.loads(decoded)
+                    except ValueError as exc:
+                        raise RetriableError("invalid JSON from Ollama") from exc
+                    if not isinstance(chunk, Mapping):
+                        continue
+                    final_payload = dict(chunk)
+                    message = chunk.get("message")
+                    if isinstance(message, Mapping):
+                        content = message.get("content")
+                        if isinstance(content, str):
+                            parts.append(content)
+                if final_payload is None:
+                    raise RetriableError("empty stream from Ollama")
+                if parts:
+                    message_payload: dict[str, Any]
+                    raw_message = final_payload.get("message")
+                    if isinstance(raw_message, Mapping):
+                        message_payload = dict(raw_message)
+                    else:
+                        message_payload = {}
+                    message_payload["content"] = "".join(parts)
+                    final_payload["message"] = message_payload
+                payload_json = final_payload
             else:
                 try:
                     payload_json = response.json()
@@ -282,46 +320,3 @@ class OllamaProvider(BaseProvider):
             raw=payload_json,
         )
 
-    def _consume_stream_response(self, response: Any) -> dict[str, Any]:
-        parts: list[str] = []
-        final_payload: dict[str, Any] | None = None
-        for raw_line in response.iter_lines():
-            if not raw_line:
-                continue
-            if isinstance(raw_line, bytes):
-                try:
-                    decoded = raw_line.decode("utf-8")
-                except UnicodeDecodeError as exc:  # pragma: no cover - 不正なUTF-8防御
-                    raise RetriableError("invalid UTF-8 from Ollama stream") from exc
-            else:
-                decoded = str(raw_line)
-            decoded = decoded.strip()
-            if not decoded:
-                continue
-            try:
-                chunk = json.loads(decoded)
-            except ValueError as exc:
-                raise RetriableError("invalid JSON from Ollama") from exc
-            if not isinstance(chunk, Mapping):
-                continue
-            final_payload = dict(chunk)
-            message = chunk.get("message")
-            if isinstance(message, Mapping):
-                content = message.get("content")
-                if isinstance(content, str):
-                    parts.append(content)
-
-        if final_payload is None:
-            raise RetriableError("empty stream from Ollama")
-
-        if parts:
-            message_payload: dict[str, Any]
-            raw_message = final_payload.get("message")
-            if isinstance(raw_message, Mapping):
-                message_payload = dict(raw_message)
-            else:
-                message_payload = {}
-            message_payload["content"] = "".join(parts)
-            final_payload["message"] = message_payload
-
-        return final_payload

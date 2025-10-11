@@ -39,6 +39,12 @@ class _FakeResponse:
     def close(self) -> None:
         self.closed = True
 
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, exc_type, exc: Any, traceback: Any) -> None:
+        self.close()
+
     def iter_lines(self):  # pragma: no cover - streaming未使用
         yield from self._chunks
 
@@ -95,11 +101,17 @@ def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
             self.session = session
             self.timeout = timeout
             self.pull_timeout = pull_timeout
+            self.pull_called = False
+            self.last_stream: bool | None = None
+            self._mode = mode
 
         def show(self, payload: dict[str, Any]) -> _FakeResponse:
+            if self._mode == "missing_model":
+                return _FakeResponse({"result": "missing"}, status_code=404)
             return _FakeResponse({"result": "ok"})
 
         def pull(self, payload: dict[str, Any]) -> _FakeResponse:
+            self.pull_called = True
             return _FakeResponse({"done": True})
 
         def chat(
@@ -109,6 +121,7 @@ def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
             timeout: float | None = None,
             stream: bool | None = None,
         ) -> _FakeResponse:
+            self.last_stream = bool(stream)
             if mode == "success":
                 return _FakeResponse(
                     {
@@ -136,6 +149,8 @@ def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
                     },
                     chunks=chunks,
                 )
+            if mode == "missing_model":
+                raise AssertionError("chat should not be called when model is missing")
             if mode == "rate_limit":
                 raise RateLimitError("too many requests")
             if mode == "server_error":
@@ -205,6 +220,52 @@ def test_ollama_provider_streaming_concat(monkeypatch: pytest.MonkeyPatch, tmp_p
         assert message_raw.get("content") == "Hello from stream"
     else:  # pragma: no cover - RED 期待
         pytest.fail("message payload must be a dict for streaming responses")
+
+
+def test_ollama_provider_executor_streaming_concat(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="stream")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    try:
+        fake_client = module.OllamaClient(
+            host="http://127.0.0.1:11434",
+            session=object(),
+            timeout=60.0,
+            pull_timeout=300.0,
+        )
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        config.raw["client"] = fake_client
+        config.raw["options"] = {"stream": True}
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "say hello")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.failure_kind is None
+    assert result.response.text == "Hello from stream"
+    assert result.response.token_usage.prompt == 5
+    assert result.response.token_usage.completion == 2
+    assert fake_client.last_stream is True
+
+
+def test_ollama_provider_auto_pull_disabled_by_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="missing_model")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    monkeypatch.setenv("OLLAMA_AUTO_PULL", "false")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        provider = ProviderFactory.create(config)
+        client = provider._client  # type: ignore[attr-defined]
+        request = ProviderRequest(model=config.model, prompt="say hello")
+        with pytest.raises(RetriableError):
+            provider.invoke(request)
+    finally:
+        local_patch.undo()
+
+    assert getattr(client, "pull_called", False) is False
 
 
 def test_ollama_provider_executor_success_in_ci(
