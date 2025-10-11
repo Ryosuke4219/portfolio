@@ -1,5 +1,7 @@
 # 04. LLM Adapter — Shadow Execution & Error Handling (Minimal)
 
+> ⚠️ **アーカイブ済み:** この Shadow 版は保存目的で維持されています。最新の開発状況とセットアップ手順は [projects/04-llm-adapter](../04-llm-adapter/README.md) 配下の README を参照してください。
+
 ## Overview
 
 **JP:** プライマリ結果はそのまま採用しつつ、裏で別プロバイダを“影実行”してメトリクスだけを記録する PoC。タイムアウト / レート制限 / 形式不正などの**異常系固定セット**も最小実装で再現します。
