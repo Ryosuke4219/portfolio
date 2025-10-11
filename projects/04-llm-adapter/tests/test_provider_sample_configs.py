@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from adapter.core.loader import load_budget_book, load_provider_config
 
@@ -44,3 +45,11 @@ def test_openrouter_config_declares_auth_and_base_url_env() -> None:
     assert isinstance(env_info, dict)
     assert env_info.get("OPENROUTER_API_KEY") == "OPENROUTER_API_KEY"
     assert env_info.get("OPENROUTER_BASE_URL") == "https://openrouter.ai/api/v1"
+
+
+def test_openrouter_example_includes_base_url_env_hint() -> None:
+    root_dir = Path(__file__).resolve().parents[1]
+    sample_path = root_dir / "examples" / "providers" / "openrouter.yml"
+    with sample_path.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    assert data.get("base_url_env") == "OPENROUTER_BASE_URL"
