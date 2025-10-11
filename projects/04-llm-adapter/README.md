@@ -103,9 +103,9 @@ Windows で環境変数を毎回設定する手間を省くため、`--env .env`
 
 `llm-adapter doctor` で Python バージョン・仮想環境・API キー・DNS/HTTPS 接続・エンコーディング・`.env` 依存関係・RPM 上限を一括チェックできます。問題が見つかると ❌ と対処法を 1 行で表示し、終了コード 3 を返します。
 
-### JSONL バッチ実行（run_compare 併用）
+### JSONL バッチ実行（CLI 内部処理）
 
-`--prompts` を指定すると JSONL バッチを実行できます（内部で `adapter/run_compare.py` を呼び出します）。
+`--prompts` を指定すると JSONL バッチを実行できます。CLI では `adapter/cli/prompt_runner.execute_prompts` が直接 JSONL を読み込み、単一プロバイダに順次送信します。`adapter/run_compare.py` は複数プロバイダ比較や集約ロジック向けの別ツールです。
 
 ### run_compare のモードと集約オプション
 
