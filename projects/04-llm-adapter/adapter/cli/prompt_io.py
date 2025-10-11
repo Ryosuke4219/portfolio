@@ -20,7 +20,7 @@ def read_jsonl_prompts(path: Path, lang: str) -> list[str]:
                 line = raw_line.strip()
                 if not line:
                     continue
-                obj = json.loads(line)
+                obj = json.loads(line.lstrip("\ufeff"))
                 if isinstance(obj, str):
                     prompts.append(obj)
                     continue
@@ -62,7 +62,7 @@ def collect_prompts(
         except FileNotFoundError as exc:
             parser.error(_msg(lang, "jsonl_missing", path=path))
             raise SystemExit from exc
-        prompts.append(text.rstrip("\n"))
+        prompts.append(text.rstrip("\r\n"))
     if args.prompts:
         prompts_path = Path(args.prompts).expanduser().resolve()
         prompts.extend(read_jsonl_prompts(prompts_path, lang))
