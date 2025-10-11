@@ -5,5 +5,3 @@ default:
 overrides:
   openai:
     run_budget_usd: 0.1
-  local_ollama:
-    run_budget_usd: 0.0

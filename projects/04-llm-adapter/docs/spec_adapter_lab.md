@@ -46,7 +46,7 @@
   ├─ run_compare.py                     # 比較ランナー（並列/直列）
   ├─ config/
   │    ├─ providers/openai.yaml         # 例：プロバイダ設定（seed/温度/価格/制限）
-  │    ├─ providers/local_ollama.yaml   # 例：ローカル推論
+  │    ├─ providers/simulated.yaml      # 例：サンプル評価用ローカルモック
   │    └─ budgets.yaml                  # 予算と打ち切りポリシー
 /datasets/
   └─ golden/
@@ -147,7 +147,6 @@ default:
   stop_on_budget_exceed: true
 overrides:
   openai: { run_budget_usd: 0.10 }
-  local_ollama: { run_budget_usd: 0.00 }   # ローカルはコスト0扱い
 ```
 
 ### 4.4 ゴールデン小データ（`/datasets/golden/tasks.jsonl`）
@@ -304,7 +303,7 @@ just golden
 
 ```
 python adapter/run_compare.py \
-  --providers adapter/config/providers/openai.yaml,adapter/config/providers/local_ollama.yaml \
+  --providers adapter/config/providers/openai.yaml,adapter/config/providers/simulated.yaml \
   --prompts datasets/golden/tasks.jsonl \
   --repeat 3 --mode parallel
 
