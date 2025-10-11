@@ -77,6 +77,24 @@ def _coerce_finish_reason(payload: Mapping[str, Any] | None) -> str | None:
     return None
 
 
+def _extract_status_code(exc: Exception) -> int | None:
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    try:
+        return int(status) if status is not None else None
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        return None
+
+
+def _resolve_env(name: Any) -> str:
+    if not isinstance(name, str):
+        return ""
+    env_name = name.strip()
+    if not env_name or env_name.upper() == "NONE":
+        return ""
+    return (os.getenv(env_name) or "").strip()
+
+
 def _normalize_error(exc: Exception) -> Exception:
     if isinstance(exc, TimeoutError):  # pragma: no cover - defensive
         return exc
@@ -85,12 +103,7 @@ def _normalize_error(exc: Exception) -> Exception:
     if isinstance(exc, requests_exceptions.ConnectionError):
         return RetriableError(str(exc))
     if isinstance(exc, requests_exceptions.HTTPError):
-        response = getattr(exc, "response", None)
-        status = getattr(response, "status_code", None)
-        try:
-            code = int(status) if status is not None else None
-        except (TypeError, ValueError):  # pragma: no cover - defensive
-            code = None
+        code = _extract_status_code(exc)
         message = str(exc)
         if code == 429:
             return RateLimitError(message)
@@ -102,7 +115,11 @@ def _normalize_error(exc: Exception) -> Exception:
             return RetriableError(message)
         return RetriableError(message)
     if isinstance(exc, requests_exceptions.RequestException):
-        return RetriableError(str(exc))
+        code = _extract_status_code(exc)
+        message = str(exc)
+        if code in {401, 403}:
+            return AuthError(message or "OpenRouter authentication failed")
+        return RetriableError(message)
     return exc
 
 
@@ -112,19 +129,15 @@ class OpenRouterProvider(BaseProvider):
     def __init__(self, config: ProviderConfig) -> None:
         super().__init__(config)
         raw = config.raw if isinstance(config.raw, Mapping) else {}
-        api_key_obj = raw.get("api_key")
-        if isinstance(api_key_obj, str):
-            api_key_value = api_key_obj.strip()
-        elif api_key_obj is not None:
-            api_key_value = str(api_key_obj).strip()
-        else:
-            api_key_value = ""
+        api_key_value = _resolve_env(config.auth_env)
         if not api_key_value:
-            auth_env = (config.auth_env or "").strip()
-            if auth_env and auth_env.upper() != "NONE":
-                api_key_value = (os.getenv(auth_env) or "").strip()
+            api_key_obj = raw.get("api_key")
+            if isinstance(api_key_obj, str):
+                api_key_value = api_key_obj.strip()
+            elif api_key_obj is not None:
+                api_key_value = str(api_key_obj).strip()
         if not api_key_value:
-            api_key_value = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+            api_key_value = _resolve_env("OPENROUTER_API_KEY")
         self._api_key = api_key_value
         session_override = raw.get("session") if isinstance(raw, Mapping) else None
         if session_override is None:
@@ -133,17 +146,16 @@ class OpenRouterProvider(BaseProvider):
             session = cast(SessionProtocol, session_override)
         self._session = session
         base_url_value: str | None = None
-        candidate = raw.get("base_url")
-        if isinstance(candidate, str):
-            base_url_value = candidate
-        base_url_env = raw.get("base_url_env")
-        if isinstance(base_url_env, str):
-            env_value = (os.getenv(base_url_env) or "").strip()
-            if env_value:
-                base_url_value = env_value
+        env_candidate = _resolve_env(raw.get("base_url_env"))
+        if env_candidate:
+            base_url_value = env_candidate
+        elif isinstance(raw, Mapping):
+            base_candidate = raw.get("base_url")
+            if isinstance(base_candidate, str):
+                base_url_value = base_candidate
         if base_url_value is None and config.endpoint:
             base_url_value = config.endpoint
-        default_base = os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
+        default_base = _resolve_env("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
         self._base_url = (base_url_value or default_base).rstrip("/")
         headers = getattr(self._session, "headers", None)
         if isinstance(headers, MutableMapping):

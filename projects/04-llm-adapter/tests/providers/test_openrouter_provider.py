@@ -322,6 +322,41 @@ def test_openrouter_provider_normalizes_auth_error(
     assert result.backoff_next_provider is True
 
 
+def test_openrouter_provider_normalizes_auth_error_from_request_exception(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    requests_exceptions = getattr(module, "requests_exceptions", None)
+    if requests_exceptions is None:  # pragma: no cover - RED 期待
+        pytest.fail("openrouter provider must expose requests_exceptions")
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        error = requests_exceptions.RequestException("forbidden")
+        response = _FakeResponse({}, status_code=403)
+        setattr(error, "response", response)
+        raise error
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    try:
+        config = _provider_config(tmp_path)
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "403 RequestException")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "error"
+    assert result.failure_kind == "auth"
+    assert isinstance(result.error, AuthError)
+    assert result.backoff_next_provider is True
+
+
 def test_openrouter_provider_skip_without_api_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     module = _load_openrouter_module()
     local_patch = _install_fake_session(module, lambda *_: _FakeResponse({}))
