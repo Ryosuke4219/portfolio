@@ -146,29 +146,7 @@ header button.par.show_par { background: #ffa; border: 2px solid #bbbb00; margin
 
 #help_panel_wrapper { float: right; position: relative; }
 
-#help_panel_wrapper label { cursor: pointer; display: inline-flex; align-items: center; }
-
-#keyboard_icon {
-    margin: 5px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 16px;
-    background: #f8f8f8;
-    color: #444;
-}
-
-@media (prefers-color-scheme: dark) {
-    #keyboard_icon {
-        border-color: #555;
-        background: #333;
-        color: #eee;
-    }
-}
+#keyboard_icon { margin: 5px; }
 
 #help_panel_state { display: none; }
 
