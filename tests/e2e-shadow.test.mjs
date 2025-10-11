@@ -82,7 +82,7 @@ test('spec → playwright → junit → python metrics pipeline', async () => {
   const adapterScript = path.join(
     repoRoot,
     'projects',
-    '04-llm-adapter-shadow',
+    '04-llm-adapter',
     'tools',
     'consume_cases.py',
   );
