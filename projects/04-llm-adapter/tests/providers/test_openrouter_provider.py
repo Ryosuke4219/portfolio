@@ -14,7 +14,7 @@ from adapter.core.config import (
     RateLimitConfig,
     RetryConfig,
 )
-from adapter.core.errors import ProviderSkip, RateLimitError, RetriableError
+from adapter.core.errors import AuthError, ProviderSkip, RateLimitError, RetriableError
 from adapter.core.providers import ProviderFactory
 
 
@@ -204,6 +204,122 @@ def test_openrouter_provider_normalizes_server_error(monkeypatch: pytest.MonkeyP
     assert result.failure_kind == "retryable"
     assert isinstance(result.error, RetriableError)
     assert result.backoff_next_provider is False
+
+
+def test_openrouter_provider_resolves_api_key_from_auth_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "auth"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("CUSTOM_OPENROUTER_KEY", "custom-value")
+    try:
+        config = _provider_config(tmp_path)
+        config.auth_env = "CUSTOM_OPENROUTER_KEY"
+        provider = ProviderFactory.create(config)
+        session = getattr(provider, "_session")
+        headers = getattr(session, "headers", {})
+        assert headers.get("Authorization") == "Bearer custom-value"
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "auth env")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.response.text == "auth"
+
+
+def test_openrouter_provider_resolves_base_url_from_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    base_url = "https://example.invalid/openrouter"
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert url == f"{base_url}/chat/completions"
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "env"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("CUSTOM_BASE_URL", base_url)
+    try:
+        config = _provider_config(tmp_path)
+        config.raw["base_url_env"] = "CUSTOM_BASE_URL"
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "base url env")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.response.text == "env"
+
+
+def test_openrouter_provider_normalizes_auth_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    requests_exceptions = getattr(module, "requests_exceptions", None)
+    if requests_exceptions is None:  # pragma: no cover - RED 期待
+        pytest.fail("openrouter provider must expose requests_exceptions")
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        error = requests_exceptions.HTTPError("unauthorized")
+        response = _FakeResponse({}, status_code=401)
+        setattr(error, "response", response)
+        raise error
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    try:
+        config = _provider_config(tmp_path)
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "401")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "error"
+    assert result.failure_kind == "auth"
+    assert isinstance(result.error, AuthError)
+    assert result.backoff_next_provider is True
 
 
 def test_openrouter_provider_skip_without_api_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
