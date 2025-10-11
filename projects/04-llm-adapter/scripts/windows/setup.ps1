@@ -14,13 +14,18 @@ if (-not (Test-Path .venv)) {
 # 依存関係をインストール
 pip install -e .
 
-Write-Host "OpenAI/Gemini の API キーを .env に記入してください" -ForegroundColor Yellow
+Write-Host "OpenAI/Gemini/OpenRouter/Ollama の設定を .env に記入してください" -ForegroundColor Yellow
 if (-not (Test-Path .env)) {
     @(
         "OPENAI_API_KEY=",
-        "GEMINI_API_KEY="
+        "GEMINI_API_KEY=",
+        "OPENROUTER_API_KEY=",
+        "OLLAMA_HOST="
     ) | Set-Content -Encoding UTF8 .env
 }
 
 Write-Host "サンプル実行:" -ForegroundColor Cyan
 Write-Host "llm-adapter --provider examples/providers/openai.yml --prompt '日本語で1行、自己紹介して'"
+Write-Host "llm-adapter --provider examples/providers/gemini.yml --prompt '日本語で1行、自己紹介して'"
+Write-Host "llm-adapter --provider examples/providers/openrouter.yml --prompt '日本語で1行、自己紹介して'"
+Write-Host "llm-adapter --provider examples/providers/ollama.yml --prompt '日本語で1行、自己紹介して'"
