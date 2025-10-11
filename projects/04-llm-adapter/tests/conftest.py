@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import sys
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PROJECT_ROOT.parent.parent
 project_path = str(PROJECT_ROOT)
@@ -95,3 +97,16 @@ def pytest_ignore_collect(collection_path: Path, config):  # pragma: no cover - 
     if root_shadow_tests in candidate.parents or candidate == root_shadow_tests:
         return True
     return False
+
+
+@pytest.fixture()
+def socket_enabled():
+    try:
+        from pytest_socket import socket_enabled as plugin_socket_enabled
+    except ModuleNotFoundError:
+        try:
+            import socket  # noqa: F401
+        finally:
+            yield
+    else:
+        yield from plugin_socket_enabled()

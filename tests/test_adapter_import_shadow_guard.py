@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
+import inspect
 import sys
 from pathlib import Path
 
@@ -34,3 +36,26 @@ def clean_adapter_modules() -> list[str]:
     finally:
         for name in removed:
             sys.modules.pop(name, None)
+
+
+def test_projects_socket_enabled_fixture_available() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    conftest_path = repo_root / "projects" / "04-llm-adapter" / "tests" / "conftest.py"
+
+    spec = importlib.util.spec_from_file_location(
+        "llm_adapter_tests_conftest", conftest_path
+    )
+    assert spec and spec.loader is not None
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    fixture_def = getattr(module, "socket_enabled", None)
+    assert fixture_def is not None, "socket_enabled fixture must be defined"
+
+    fixture_function = getattr(fixture_def, "_fixture_function", None)
+    assert fixture_function is not None, "socket_enabled fixture must expose fixture function"
+
+    assert inspect.isgeneratorfunction(
+        fixture_function
+    ), "socket_enabled fixture must be a generator function"
