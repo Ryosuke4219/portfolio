@@ -131,8 +131,13 @@ python adapter/run_compare.py \
 
 > `--aggregate` などを省略した場合は従来通り単純な応答比較として動作します。
 
-判定用の設定ファイル `adapter/config/providers/judge.yaml` はリポジトリに含まれており、そのまま利用できます。スキーマが必要な場
-合は、次のようにサンプルを生成して `examples/schemas/basic_output.json` を参照してください（検証項目は適宜調整）。
+判定用の設定ファイル `adapter/config/providers/judge.yaml` はリポジトリに含まれており、そのまま利用できます。実案件では次の手順で評価ルールを調整することを推奨します。
+
+1. `cp adapter/config/providers/judge.yaml <path/to/judge.yaml>` で複製する（最小構成は `examples/providers/judge.yaml` も参照）。
+2. `prompt_template` に判定観点や出力フォーマットを明記し、比較対象や期待する回答形式に合わせて編集する。
+3. 必要に応じて `model` や `request_kwargs.temperature` などを環境に合わせて変更する。
+
+スキーマが必要な場合は、次のようにサンプルを生成して `examples/schemas/basic_output.json` を参照してください（検証項目は適宜調整）。
 
 ```bash
 mkdir -p examples/schemas
@@ -205,6 +210,7 @@ OpenRouter は中継側と先方ベンダーの両方でレート制限が課さ
 * `examples/providers/openai.yml` : OpenAI Responses API 用の最小構成。
 * `examples/providers/gemini.yml` : Gemini 1.5 Flash 用のサンプル。
 * `examples/providers/ollama.yml` : ローカル Ollama との接続に必要な最小設定。
+* `examples/providers/judge.yaml` : 追加判定プロバイダ向けのサンプル構成。`prompt_template` を評価基準に合わせて調整してください。
 * `examples/providers/openrouter.yml` : OpenRouter 経由で外部モデルを呼び出す設定例。
 * `examples/prompts/ja_one_liner.jsonl` : 日本語 1 行プロンプトの JSONL テンプレート。
 * `scripts/windows/setup.ps1` : UTF-8 設定・仮想環境作成・`pip install -e .`・サンプル実行までを 1 コマンドで整える PowerShell スクリプト。
