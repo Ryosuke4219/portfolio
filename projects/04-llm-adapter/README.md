@@ -156,19 +156,49 @@ python adapter/run_compare.py \
 
 `adapter/config/providers/openai.yaml` では `model: gpt-4o-mini` を既定とし、Responses API を優先的に呼び出します。旧 Chat Completion API しか利用できない SDK バージョンでも自動的にフォールバックします。料金やレートリミットは目安値です。Azure OpenAI 等でエンドポイントが異なる場合は `endpoint` や `request_kwargs` を適宜上書きしてください。
 
+### Ollama を利用する
+
+ローカルで Ollama を実行している場合は、`OLLAMA_BASE_URL`（または旧互換の `OLLAMA_HOST`）で API のベース URL を指定し、Ollama 用の設定ファイルを読み込みます。API キーは不要です。
+
+```bash
+export OLLAMA_BASE_URL="http://127.0.0.1:11434"
+python adapter/run_compare.py \
+  --providers adapter/config/providers/ollama.yaml \
+  --prompts datasets/golden/tasks.jsonl
+```
+
+Ollama はローカル GPU/CPU を直接利用するため、`--parallel` や `--mode parallel-*` を併用するとマシン負荷が急増します。必要に応じて `--max-concurrency` や `--rpm` を下げ、実行中は `ollama list` でモデルの自動ダウンロード状況を確認してください。
+
+### OpenRouter を利用する
+
+OpenRouter 経由で各社モデルへアクセスする場合は、`OPENROUTER_API_KEY` を設定し、必要に応じて `OPENROUTER_BASE_URL` でエンドポイントを上書きします（既定値: `https://openrouter.ai/api/v1`）。
+
+```bash
+export OPENROUTER_API_KEY="<取得したAPIキー>"
+python adapter/run_compare.py \
+  --providers adapter/config/providers/openrouter.yaml \
+  --prompts datasets/golden/tasks.jsonl
+```
+
+OpenRouter は中継側と先方ベンダーの両方でレート制限が課されるため、`parallel-any` / `parallel-all` などの並列モードでは 429 が発生しやすくなります。必要に応じて `--rpm` を調整し、OpenAI など既存プロバイダの設定と重複しないよう `.env` の API キーを整理してください。
+
 ## サンプル設定とプロンプト
 
 * `examples/providers/openai.yml` : OpenAI Responses API 用の最小構成。
 * `examples/providers/gemini.yml` : Gemini 1.5 Flash 用のサンプル。
+* `examples/providers/ollama.yml` : ローカル Ollama との接続に必要な最小設定。
+* `examples/providers/openrouter.yml` : OpenRouter 経由で外部モデルを呼び出す設定例。
 * `examples/prompts/ja_one_liner.jsonl` : 日本語 1 行プロンプトの JSONL テンプレート。
 * `scripts/windows/setup.ps1` : UTF-8 設定・仮想環境作成・`pip install -e .`・サンプル実行までを 1 コマンドで整える PowerShell スクリプト。
 
-必要な API キーは `.env.example` をコピーして `.env` を作成し、`--env .env` で読み込むと便利です。
+必要な API キーやベース URL（`OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `OLLAMA_BASE_URL` など）は `.env.example` をコピーして `.env` を作成し、`--env .env` で読み込むと便利です。未掲載のキーは追記してください。
 
 ## Troubleshooting
 
 * **事前に `llm-adapter doctor` を実行**: ネットワークや API キー、エンコーディング設定を自動チェックできます。
-* **API キーが未設定**: `RuntimeError` を検出すると、CLI が「環境変数 `<KEY>` を設定してください」と案内します。`.env` を作成し `--env .env` で読み込みましょう。
+* **API キーが未設定**: `RuntimeError` を検出すると、CLI が「環境変数 `<KEY>` を設定してください」と案内します。`.env` に `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` を記載し、`--env .env` で読み込みましょう。
+* **OpenRouter の 401 / 429**: API キーが誤っている、あるいは並列実行が多すぎると発生します。`OPENROUTER_API_KEY` と `OPENROUTER_BASE_URL` を再確認し、`--rpm` や `--mode parallel-*` の設定を見直してください。
+* **Ollama へ接続できない**: ローカルで `ollama serve` が起動しているか、`OLLAMA_BASE_URL`（旧 `OLLAMA_HOST`）が正しいかを確認してください。初回実行でモデルを自動取得中の場合は完了まで待機します。
 * **OpenAI の quota / 429**: `OpenAI quota exceeded` エラー時は、ダッシュボードの請求・使用量・プロジェクトキーのクォータを確認してください。CLI も同旨のメッセージを表示します。
 * **Windows での文字化け**: 冒頭の UTF-8 設定を実施するか、`scripts/windows/setup.ps1` を実行します。
 * **PYTHONPATH の設定が必要?**: `pip install -e .` 済みなら不要です。CLI も仮想環境内から直接利用できます。
