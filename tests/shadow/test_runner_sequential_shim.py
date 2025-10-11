@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from importlib.machinery import PathFinder
+from importlib.util import find_spec
 from pathlib import Path
 
 
@@ -13,5 +13,5 @@ def test_runner_sequential_shim_is_absent() -> None:
         / "04-llm-adapter-shadow"
         / "tests"
     )
-    spec = PathFinder.find_spec("test_runner_sequential", [str(shim_dir)])
+    spec = find_spec("test_runner_sequential", [str(shim_dir)])
     assert spec is None, "Legacy sequential runner shim should be removed"
