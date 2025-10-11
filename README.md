@@ -187,7 +187,7 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
 → 詳細: [Flaky Analyzer CLI README](projects/03-ci-flaky/README.md)
 
-### 4. LLM Adapter — Multi Provider CLI (Core)
+### 4. llm-adapter — Multi Provider CLI (Core)
 
 **概要**
 複数プロバイダの応答を比較・記録・可視化する**本体 CLI**（`projects/04-llm-adapter`）。Shadow 実行を前提にせず、`llm-adapter` コマンドから直接プロダクション想定のリクエストを発行し、レイテンシ・トークン数・コスト・失敗分類などを JSON/JSONL で取得します。
