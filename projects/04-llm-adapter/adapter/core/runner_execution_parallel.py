@@ -8,6 +8,7 @@ from typing import Protocol, TYPE_CHECKING
 
 from .config import ProviderConfig
 from .datasets import GoldenTask
+from .errors import AllFailedError
 from .parallel.coordinators import (
     _is_parallel_any_mode,
     _normalize_mode_value,
@@ -83,7 +84,11 @@ class ParallelAttemptExecutor:
         config: RunnerConfig,
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
-            return [], None
+            error = AllFailedError("no providers were attempted")
+            setattr(error, "failures", [])
+            setattr(error, "batch", [])
+            setattr(error, "stop_reason", None)
+            raise error
         normalized_mode = _normalize_mode_value(config.mode)
         if _is_parallel_any_mode(normalized_mode):
             coordinator: _ParallelCoordinatorBase = _ParallelAnyCoordinator(
