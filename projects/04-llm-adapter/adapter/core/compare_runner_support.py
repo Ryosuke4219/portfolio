@@ -106,17 +106,18 @@ class BudgetEvaluator:
                 stop_reason = run_reason
         budget_messages = [msg for msg in (run_reason, daily_reason) if msg]
         if budget_messages:
-            if status == "ok":
-                status = "error"
-            if failure_kind is None:
-                failure_kind = "guard_violation"
             joined = " | ".join(budget_messages)
-            if error_message:
-                error_message = f"{error_message} | {joined}"
-            else:
-                error_message = joined
             if self.allow_overrun and stop_reason is None:
                 self._logger.warning("予算超過を許容 (--allow-overrun): %s", joined)
+            else:
+                if status == "ok":
+                    status = "error"
+                if failure_kind is None:
+                    failure_kind = "guard_violation"
+                if error_message:
+                    error_message = f"{error_message} | {joined}"
+                else:
+                    error_message = joined
         return budget_snapshot, stop_reason, status, failure_kind, error_message
 
 
