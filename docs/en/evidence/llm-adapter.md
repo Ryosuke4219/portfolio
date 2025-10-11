@@ -20,11 +20,11 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 
 ## Key Artifacts
 
-- [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — Detailed CLI and configuration overview.
-- [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — Entry point and implementation of comparison modes.
-- [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — Core logic for provider execution, retries, and metric aggregation.
-- [adapter/core/metrics/update.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/update.py) — JSONL metric update utilities.
-- [adapter/core/metrics/models.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/models.py) — Metric data models and serialization helpers.
+- [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — Comprehensive CLI usage and configuration reference.
+- [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — CLI comparison modes and their entry point implementation.
+- [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — Central logic covering provider execution, retries, and metric aggregation.
+- [adapter/core/metrics/update.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/update.py) — Utilities that append JSONL metrics and derived summaries.
+- [adapter/core/metrics/models.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/models.py) — Metric data models that define serialization helpers.
 
 ## How to Reproduce
 
@@ -34,6 +34,6 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 
 ## Next Steps
 
-- Extend `adapter/core/providers/` with additional SDK integrations to enrich latency and cost comparisons.
+- Extend `adapter/core/providers/` with additional SDK integrations to deepen latency and cost comparisons.
 - Ship JSONL logs to your data platform and capture weekly insights in the [summary index]({{ '/weekly-summary.html' | relative_url }}).
 - Explore `adapter/core/runner_async.py` to integrate asynchronous runners and evaluate streaming responses.
