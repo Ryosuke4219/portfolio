@@ -1,36 +1,38 @@
 ---
 layout: default
-title: LLM Adapter — Shadow Execution
-description: 影実行でメトリクスを収集し異常系も再現する LLM アダプタのハイライト
+title: LLM Adapter — Provider Benchmarking
+description: 複数プロバイダの比較・記録・可視化を一括で担う LLM アダプタのハイライト
 ---
 
 > [English version]({{ '/en/evidence/llm-adapter.html' | relative_url }})
 
-# LLM Adapter — Shadow Execution
+# LLM Adapter — Provider Benchmarking
 
-メインの LLM プロバイダを維持したまま、影（shadow）実行で別プロバイダを並走させるアダプタです。レスポンス差分や異常系イベントを JSONL に記録し、フォールバックやベンダ比較のための計測基盤を最小構成で提供します。
+複数プロバイダの LLM 応答を比較・記録・可視化する実験用アダプタです。Shadow 実行ではなく、本番想定のプロンプトを同一条件で投げ、
+レスポンス差分・レイテンシ・コスト・失敗分類を JSONL に追記します。`datasets/golden/` のゴールデンタスクと `adapter/config/providers/`
+の設定ファイルを組み合わせ、基準データに対する回帰テストを高速に行えます。
 
 ## Highlights
 
-- `run_with_shadow` でプライマリ結果を返しつつ、影プロバイダのメトリクスを非同期収集。
-- タイムアウト / レート制限 / 形式不正を `[TIMEOUT]` などのマーカーで再現し、フォールバック挙動をテスト可能。
-- `Runner` が例外ハンドリングとプロバイダ切り替えを担い、イベントログを `artifacts/runs-metrics.jsonl` へ蓄積。
+- `llm-adapter` CLI が `adapter/run_compare.py` を通じて複数プロバイダを連続・並列・合意形成モードで呼び出し、共通メトリクスを収集。
+- `adapter/core/runner_execution.py` のランナーがリトライやプロバイダ固有の例外を整理し、比較用のイベントをストリーム出力。
+- `adapter/core/metrics.py` が JSONL メトリクスと派生サマリを構築し、`out/metrics.jsonl` に追記可能。
 
 ## Key Artifacts
 
-- [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/README.md) — アダプタの概要と使い方。
-- [src/llm_adapter/runner.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/src/llm_adapter/runner.py) — フォールバック制御の中核ロジック。
-- [src/llm_adapter/metrics.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/src/llm_adapter/metrics.py) — JSONL でのメトリクス記録。
-- [demo_shadow.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/demo_shadow.py) — 影実行デモとイベント出力。
+- [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — CLI と設定ファイルの詳細な説明。
+- [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — CLI の比較モード実装とエントリポイント。
+- [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — プロバイダ実行・リトライ・メトリクス集約の中心ロジック。
+- [adapter/core/metrics.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics.py) — メトリクス構造体と JSONL 出力ユーティリティ。
 
 ## How to Reproduce
 
-1. `projects/04-llm-adapter-shadow/` で仮想環境を作成し、`pip install -r requirements.txt` を実行。
-2. `python demo_shadow.py` で影実行の動作と `artifacts/runs-metrics.jsonl` のログを確認。
-3. `pytest -q` で shadow diff / error handling に関するテストを実行。
+1. `cd projects/04-llm-adapter` で仮想環境を作成し、`pip install -r requirements.txt` を実行して依存関係を揃える。
+2. `pip install -e .` で CLI をインストールし、`llm-adapter --providers adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して" --out out --json-logs` を実行。`out/metrics.jsonl` に比較結果が追記される。
+3. `pytest -q` を流して CLI・ランナー・メトリクスのユニットテストが通ることを確認。
 
 ## Next Steps
 
-- 実プロバイダ SDK を `providers/` に追加し、メトリクスの比較軸（レイテンシ・トークン使用量）を拡張。
+- 実プロバイダ SDK を `adapter/core/providers/` に追加し、レイテンシやコストの比較軸を拡張。
 - JSONL をデータ基盤に送信し、週次の影響度を [週次サマリ一覧]({{ '/weekly-summary.html' | relative_url }}) に記録。
-- `Runner` のイベント出力を OpenTelemetry 形式に変換し、監視ツールとの連携を強化。
+- `adapter/core/runner_async.py` を活用して非同期ランナーとの連携やストリーム応答の評価を強化。

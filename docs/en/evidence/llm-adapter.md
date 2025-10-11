@@ -1,36 +1,38 @@
 ---
 layout: default
-title: LLM Adapter — Shadow Execution (EN)
-description: Highlights of the adapter that keeps primary responses while shadow providers capture anomalies
+title: LLM Adapter — Provider Benchmarking (EN)
+description: Highlights of the adapter that compares, records, and visualizes multi-provider LLM responses
 ---
 
 > [日本語版]({{ '/evidence/llm-adapter.html' | relative_url }})
 
-# LLM Adapter — Shadow Execution
+# LLM Adapter — Provider Benchmarking
 
-The adapter keeps your primary LLM provider intact while running a shadow provider in parallel. It records response diffs and anomaly events as JSONL, offering a lightweight measurement foundation for fallbacks and vendor comparisons.
+The adapter compares, records, and visualizes responses from multiple LLM providers without relying on shadow execution. It sends
+the same prompts under production-like conditions, appends diffs, latency, cost, and failure classes to JSONL logs, and keeps
+`datasets/golden/` tasks ready for regression testing together with `adapter/config/providers/` presets.
 
 ## Highlights
 
-- `run_with_shadow` returns the primary result while collecting shadow metrics asynchronously.
-- Replays timeout, rate limiting, and malformed responses using markers such as `[TIMEOUT]` for repeatable fallback testing.
-- The `Runner` coordinates exception handling and provider switching, storing event logs under `artifacts/runs-metrics.jsonl`.
+- The `llm-adapter` CLI invokes comparison modes implemented in `adapter/run_compare.py`, orchestrating sequential, parallel, and consensus runs with shared metrics.
+- `adapter/core/runner_execution.py` handles retries and provider-specific exceptions, emitting comparison events for downstream tooling.
+- `adapter/core/metrics.py` shapes JSONL metrics and derived summaries, appending results to `out/metrics.jsonl`.
 
 ## Key Artifacts
 
-- [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/README.md) — Overview and usage guide.
-- [src/llm_adapter/runner.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/src/llm_adapter/runner.py) — Core fallback orchestration logic.
-- [src/llm_adapter/metrics.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/src/llm_adapter/metrics.py) — JSONL metric recording utilities.
-- [demo_shadow.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter-shadow/demo_shadow.py) — Demo showcasing shadow execution and event output.
+- [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — Detailed CLI and configuration overview.
+- [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — Entry point and implementation of comparison modes.
+- [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — Core logic for provider execution, retries, and metric aggregation.
+- [adapter/core/metrics.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics.py) — Metric structures and JSONL emission utilities.
 
 ## How to Reproduce
 
-1. In `projects/04-llm-adapter-shadow/`, create a virtual environment and run `pip install -r requirements.txt`.
-2. Execute `python demo_shadow.py` to observe shadow execution and the resulting `artifacts/runs-metrics.jsonl` log.
-3. Run `pytest -q` to verify tests covering shadow diffs and error handling.
+1. `cd projects/04-llm-adapter`, create a virtual environment, and run `pip install -r requirements.txt` to install dependencies.
+2. Install the CLI with `pip install -e .`, then execute `llm-adapter --providers adapter/config/providers/openai.yaml --prompt "Say hello in English" --out out --json-logs` to record metrics under `out/metrics.jsonl`.
+3. Run `pytest -q` to ensure CLI, runner, and metric modules pass their test suites.
 
 ## Next Steps
 
-- Add real provider SDKs under `providers/` and expand metrics (latency, token usage) for richer comparisons.
-- Ship JSONL logs to your data platform and record weekly insights in the [summary index]({{ '/weekly-summary.html' | relative_url }}).
-- Emit events in OpenTelemetry format to integrate with existing observability stacks.
+- Extend `adapter/core/providers/` with additional SDK integrations to enrich latency and cost comparisons.
+- Ship JSONL logs to your data platform and capture weekly insights in the [summary index]({{ '/weekly-summary.html' | relative_url }}).
+- Explore `adapter/core/runner_async.py` to integrate asynchronous runners and evaluate streaming responses.
