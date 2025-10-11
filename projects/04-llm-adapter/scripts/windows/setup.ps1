@@ -20,7 +20,9 @@ if (-not (Test-Path .env)) {
         "OPENAI_API_KEY=",
         "GEMINI_API_KEY=",
         "OPENROUTER_API_KEY=",
-        "OLLAMA_HOST="
+        "OPENROUTER_BASE_URL=",
+        "OLLAMA_HOST=",
+        "OLLAMA_BASE_URL="
     ) | Set-Content -Encoding UTF8 .env
 }
 
