@@ -15,6 +15,7 @@ from .errors import (
     RetriableError,
     TimeoutError,
 )
+from .provider_spi import ProviderRequest
 from .providers import BaseProvider, ProviderResponse
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
@@ -60,7 +61,19 @@ class ProviderCallExecutor:
     ) -> _ProviderCallResult:
         start = perf_counter()
         try:
-            response = provider.generate(prompt)
+            model = (provider_config.model or provider_config.provider).strip()
+            timeout: float | None = None
+            if provider_config.timeout_s > 0:
+                timeout = float(provider_config.timeout_s)
+            request = ProviderRequest(
+                model=model,
+                prompt=prompt,
+                max_tokens=provider_config.max_tokens,
+                temperature=provider_config.temperature,
+                top_p=provider_config.top_p,
+                timeout_s=timeout,
+            )
+            response = provider.invoke(request)
         except ProviderSkip as exc:
             latency_ms = int((perf_counter() - start) * 1000)
             response = self._build_error_response(prompt, latency_ms, billable=False)
