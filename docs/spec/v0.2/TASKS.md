@@ -49,9 +49,9 @@
 - 品質エビデンス:
   - ❌ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が `offline` 制御時の挙動差異により失敗している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L124-L193】
 - 残タスク:
-  - CLI からの `offline` 制御フラグをコア実装へ連結し、テストの `ProviderSkip` 期待値と揃える。
-  - `OLLAMA_ENV_*` を環境変数から API オプションへマッピングする設定レイヤーを整備する。
-  - 失敗テストを緑化するため、必要なモック/フィクスチャ修正と CI での再検証を完了する。
+  - CLI から渡された `ProviderRequest.options` (`ollama.*` や `request_kwargs.*`) を HTTP リクエストまで伝播させ、既存 YAML 設定との優先順位を統一する。
+  - ストリーミング応答のチャンク終端・エラー再試行を `PromptRunner` 経由で検証する回帰テストを追加し、CLI からの実行ログと整合させる。
+  - 失敗テストのモック/フィクスチャを更新し、`pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` を緑化する。
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（進行中）
 - 対象モジュール:
@@ -64,9 +64,9 @@
 - 品質エビデンス:
   - ❌ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が API キー/環境変数マッピング不足により失敗している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L99-L340】
 - 残タスク:
-  - OpenRouter 用の環境変数マッピングと CLI オプション同期を行い、`ProviderFactory` 登録設定を更新する。
-  - レート制限・認証エラーハンドリングのモックを最新仕様へ合わせる。
-  - 失敗テストの修正と CI 再実行で緑化を確認する。
+  - CLI からの `ProviderRequest.options` (`openrouter.*` と共通 `request_kwargs.*`) を API 呼び出しに反映し、Shadow 依存を残さない形で `ProviderFactory` を更新する。
+  - ストリーミング応答のチャンク分割・`done` イベント検知を再現するモックを追加し、`PromptRunner` と `ProviderResponse` の同期を確認する。
+  - 認証・レート制限ハンドリングを最新仕様へ合わせた上でテストを修正し、`pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を緑化する。
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する
 - 対象モジュール:
