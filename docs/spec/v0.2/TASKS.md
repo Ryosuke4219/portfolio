@@ -23,9 +23,9 @@
 ### タスク3: 決定性ゲート失敗時のエラーメッセージを記録する
 - 背景: v1.0仕様では失敗分類ログを残すことが求められているが【F:projects/04-llm-adapter/docs/spec_adapter_lab.md†L18-L21】、現在の `DeterminismGate` は `status`/`failure_kind` を更新するのみで具体的な理由を `error_message` に残さない。【F:projects/04-llm-adapter/adapter/core/compare_runner_finalizer.py†L25-L78】
 - 手順:
-  1. `projects/04-llm-adapter/tests/test_compare_runner_metrics.py` に決定性閾値超過時に `error_message` が `median_diff` や `len_stdev` を含むことを期待するテスト（閾値超過時は差分統計を記録すべき旨を明示）を先に追加する。
+  1. `projects/04-llm-adapter/tests/test_compare_runner_finalizer.py` を新規作成し、決定性閾値超過でゲートが失敗した際に `error_message` に `median_diff` と `len_stdev` が含まれること（差分統計を理由として記録すべき旨をコメントで補足）を確認するテストを先に追加する。
   2. `DeterminismGate.apply` 内でゲート失敗時に `error_message` へ理由を追記（既存メッセージがあれば連結）する実装を追加し、標準出力には変化を与えない。
-  3. `pytest projects/04-llm-adapter/tests/test_compare_runner_metrics.py` を流し、文言追加後に緑化する。
+  3. `pytest projects/04-llm-adapter/tests/test_compare_runner_finalizer.py` を流し、文言追加後に緑化する。
 
 ## CI / 品質維持
 
