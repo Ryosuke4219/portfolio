@@ -43,6 +43,26 @@ class _DummyProvider(BaseProvider):
         raise NotImplementedError
 
 
+def test_base_provider_generate_propagates_config_values(tmp_path: Path) -> None:
+    config = _provider_config(tmp_path, provider="mock-provider")
+    config.max_tokens = 128
+    config.temperature = 0.42
+    config.top_p = 0.73
+    config.timeout_s = 45
+
+    class _AssertingProvider(_DummyProvider):
+        def invoke(self, request: ProviderRequest) -> ProviderResponse:
+            assert request.max_tokens == config.max_tokens
+            assert request.temperature == config.temperature
+            assert request.top_p == config.top_p
+            assert request.timeout_s == float(config.timeout_s)
+            return ProviderResponse(text="ok", latency_ms=0)
+
+    provider = _AssertingProvider(config)
+
+    provider.generate("hello world")
+
+
 def test_base_provider_name_returns_provider_id(tmp_path: Path) -> None:
     config = _provider_config(tmp_path, provider="mock-provider")
     provider = _DummyProvider(config)
