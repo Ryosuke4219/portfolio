@@ -3,19 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
-from typing import Protocol, TYPE_CHECKING
 
 from .config import ProviderConfig
-
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderSPI
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-
-        class ProviderSPI(Protocol):
-            """プロバイダ SPI フォールバック."""
+from .provider_spi import ProviderSPI
 
 
 class RunnerMode(str, Enum):

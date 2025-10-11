@@ -7,7 +7,6 @@ from dataclasses import fields, is_dataclass
 import inspect
 import logging
 from pathlib import Path
-from typing import Protocol, TYPE_CHECKING
 
 from .budgets import BudgetManager
 from .config import (
@@ -16,6 +15,7 @@ from .config import (
     load_provider_configs,
 )
 from .datasets import load_golden_tasks
+from .provider_spi import ProviderSPI
 from .runner_config_builder import (
     BackoffPolicy,
     RunnerConfig,
@@ -23,16 +23,6 @@ from .runner_config_builder import (
     RunnerMode,
 )
 from .runners import CompareRunner
-
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderSPI
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-
-        class ProviderSPI(Protocol):
-            """プロバイダ SPI フォールバック."""
 
 
 def default_budgets_path() -> Path:
