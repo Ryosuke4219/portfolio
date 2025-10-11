@@ -44,9 +44,11 @@
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/test_ollama_provider.py`
 - 対応状況:
-  - `ProviderRequest` ベースの呼び出しとトークン計測をコア実装へ移植し、`projects/04-llm-adapter/README.md` に Ollama の利用方法を記載済み。
+  - `OllamaProvider` が環境変数や設定ファイルからホスト・タイムアウト・自動 Pull 設定を解決し、オフライン時は `ProviderSkip` で安全にスキップする実装をコアへ移植済み。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L48-L148】
+  - `ProviderRequest` のメッセージ/オプションを Ollama API のチャットペイロードへ正規化し、応答からトークン使用量とメタ情報を `ProviderResponse` に集約する。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L150-L268】
+  - `ProviderFactory` に Ollama を登録し、README に利用手順と注意事項を追記済み。【F:projects/04-llm-adapter/adapter/core/providers/__init__.py†L132-L184】【F:projects/04-llm-adapter/README.md†L159-L194】
 - 品質エビデンス:
-  - `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、既存 YAML と整合するオプションが網羅されている。
+  - `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、成功応答・レート制限・サーバーエラー・オフラインスキップの挙動を網羅している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L124-L193】
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
@@ -54,9 +56,11 @@
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py`
 - 対応状況:
-  - `ProviderRequest` からヘッダ構成とレート制御を構築する実装をコア側へ反映し、`projects/04-llm-adapter/README.md` に OpenRouter の利用手順と環境変数を追記済み。
+  - `OpenRouterProvider` が API キーとベース URL の解決・セッションヘッダ設定を行い、Shadow 依存なくコアへ統合されている。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L32-L117】
+  - `ProviderRequest` からチャットペイロードを生成し、ストリーミング含む応答の正規化とトークン計測を `ProviderResponse` に反映する。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L118-L330】
+  - `ProviderFactory` への登録と README の利用手順/トラブルシューティング更新を完了済み。【F:projects/04-llm-adapter/adapter/core/providers/__init__.py†L132-L184】【F:projects/04-llm-adapter/README.md†L172-L201】
 - 品質エビデンス:
-  - `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、既存 YAML の必須キーを読み込めている。
+  - `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、成功応答・レート制限・サーバー/認証エラー正規化・API キー/ベース URL 解決・キー未設定スキップを確認済み。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L99-L340】
 
 ## CLI Request Pipeline
 
