@@ -1,5 +1,5 @@
 # サンプル: OpenRouter API 用プロバイダ設定
-# .env 例:
+# 推奨 .env 例:
 #   OPENROUTER_API_KEY=sk-or-...
 #   OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 provider: openrouter
