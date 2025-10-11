@@ -68,6 +68,16 @@
   - レート制限・認証エラーハンドリングのモックを最新仕様へ合わせる。
   - 失敗テストの修正と CI 再実行で緑化を確認する。
 
+### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する
+- 対象モジュール:
+  - `projects/04-llm-adapter/adapter/core/providers/openai.py`
+  - `projects/04-llm-adapter/adapter/config/providers/openai.yaml`
+  - `projects/04-llm-adapter/adapter/cli/app.py`
+- 完了条件:
+  - `ProviderRequest.options` の `openai.*` パラメータを OpenAI API へ透過する共通マッピングを整備し、トークン計測やストリーミング挙動を既存実装と揃える。
+  - CLI から `--provider openai` 選択時に上記オプションを指定・検証できるよう入力バリデーションとヘルプを更新し、`pytest projects/04-llm-adapter/tests/test_cli_single_prompt_diagnostics.py` を含む CLI テスト群を緑化する。
+  - `markdownlint 04/ROADMAP.md` を含む既存のドキュメント整形チェックを通過させ、`docs/spec/v0.2/TASKS.md` の該当節へ進捗リンクを追加する。
+
 ## CLI Request Pipeline
 
 ### タスク8: CLI から `ProviderRequest` への移行を完了する

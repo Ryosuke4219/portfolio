@@ -30,7 +30,14 @@
 
 ## M3 — Provider 実装
 **進捗**: 🟡 `ProviderFactory`のregistryへ`simulated`・`openai`・`gemini`・`ollama`・`openrouter`を登録済で、Ollama/OpenRouterのSPI実装と契約テストは完了（[docs/spec/v0.2/TASKS.md#タスク6](../docs/spec/v0.2/TASKS.md#タスク6-ollama-プロバイダを-v02-コアへ移植する) / [タスク7](../docs/spec/v0.2/TASKS.md#タスク7-openrouter-プロバイダを-v02-コアに統合する)達成済）。OpenRouter 401 正規化は完了済で、差分ログの整備と残りの例外系を共通マップへ統合するタスクが継続。[^provider-registry]
-**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)。 **Exit Criteria**: 同一SPIで主要プロバイダが動作、ストリーミング指定を下層へ伝播(アサート)、401/429/5xx/ネットワークを共通例外へ正規化。 **タスク**: envマッピング対応 / CIオフライン制御の分岐導入 / OpenRouter例外マップ(429/5xx/ネットワーク)の共通例外マップ反映 / OpenRouter差分ログ出力整備 / 429バックオフベンチ継続 / CLI経路のOllama/OpenRouterオプション追従（[docs/spec/v0.2/TASKS.md#タスク9](../docs/spec/v0.2/TASKS.md#タスク9-cli-入力パイプラインに-ollamaopenrouter-の設定項目を追加する)参照）。
+**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)。 **Exit Criteria**: 同一SPIで主要プロバイダが動作、ストリーミング指定を下層へ伝播(アサート)、401/429/5xx/ネットワークを共通例外へ正規化。 **タスク**:
+- envマッピング対応。
+- CIオフライン制御の分岐導入。
+- OpenRouter例外マップ(429/5xx/ネットワーク)の共通例外マップ反映。
+- OpenRouter差分ログ出力整備。
+- 429バックオフベンチ継続。
+- CLI経路のOllama/OpenRouterオプション追従（[docs/spec/v0.2/TASKS.md#タスク9](../docs/spec/v0.2/TASKS.md#タスク9-cli-入力パイプラインに-ollamaopenrouter-の設定項目を追加する)参照）。
+- OpenAIプロバイダのリクエストオプション拡張とCLI入力パイプラインへのマッピング（[docs/spec/v0.2/TASKS.md#タスク12](../docs/spec/v0.2/TASKS.md#タスク12-openai-プロバイダの-リクエストオプションを-v02-コアへ拡張する)参照）。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
