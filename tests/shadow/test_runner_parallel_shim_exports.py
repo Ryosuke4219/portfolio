@@ -21,4 +21,6 @@ def test_runner_parallel_shim_import_raises_import_error() -> None:
     assert spec.loader is not None
     with pytest.raises(ImportError) as excinfo:
         spec.loader.exec_module(module)
-    assert "shim has been removed" in str(excinfo.value)
+    message = str(excinfo.value)
+    assert "shim has been removed" in message
+    assert "src.llm_adapter.runner_parallel" in message
