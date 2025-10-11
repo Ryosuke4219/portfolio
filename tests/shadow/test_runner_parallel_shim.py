@@ -10,5 +10,6 @@ def test_runner_parallel_shim_removed() -> None:
     shim_path = repo_root / "projects" / "04-llm-adapter-shadow" / "tests" / "test_runner_parallel.py"
     assert not shim_path.exists(), (
         "projects/04-llm-adapter-shadow/tests/test_runner_parallel.py は削除済みのシムです。"
-        "parallel/ 配下のテストを参照してください。"
+        "並列ケースは projects/04-llm-adapter-shadow/tests/parallel/ 配下を利用し"
+        "、pytest projects/04-llm-adapter-shadow/tests/parallel を実行してください。"
     )
