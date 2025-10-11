@@ -13,7 +13,10 @@ from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
 from ._requests_compat import SessionProtocol, create_session, requests_exceptions
 
-__all__ = ["OpenRouterProvider"]
+__all__ = ["OpenRouterProvider", "requests_exceptions"]
+
+
+_INTERNAL_OPTION_KEYS = {"stream", "request_timeout_s", "REQUEST_TIMEOUT_S"}
 
 
 def _coerce_text(payload: Mapping[str, Any] | None) -> str:
@@ -153,9 +156,13 @@ class OpenRouterProvider(BaseProvider):
             if isinstance(raw_env, Mapping):
                 override_name = raw_env.get(default_name)
             if isinstance(override_name, str):
-                override_value = _resolve_env(override_name)
-                if override_value:
-                    return override_value
+                candidate = override_name.strip()
+                if candidate:
+                    if "://" in candidate:
+                        return candidate
+                    override_value = _resolve_env(candidate)
+                    if override_value:
+                        return override_value
             return _resolve_env(default_name)
 
         mapped_api_key = _resolve_from_env_mapping("OPENROUTER_API_KEY")
@@ -201,7 +208,11 @@ class OpenRouterProvider(BaseProvider):
         self._default_timeout = float(config.timeout_s or 30)
         options_from_config = raw.get("options") if isinstance(raw, Mapping) else None
         if isinstance(options_from_config, Mapping):
-            self._config_options = dict(options_from_config)
+            self._config_options = {
+                key: value
+                for key, value in options_from_config.items()
+                if key not in _INTERNAL_OPTION_KEYS
+            }
         else:
             self._config_options = {}
 
@@ -221,13 +232,13 @@ class OpenRouterProvider(BaseProvider):
             payload["stop"] = list(request.stop)
         if self._config_options:
             for key, value in self._config_options.items():
-                if key == "stream":
+                if key in _INTERNAL_OPTION_KEYS:
                     continue
                 payload[key] = value
         options = request.options or {}
         if isinstance(options, Mapping):
             for key, value in options.items():
-                if key == "stream":
+                if key in _INTERNAL_OPTION_KEYS:
                     continue
                 payload[key] = value
         return payload
@@ -249,6 +260,14 @@ class OpenRouterProvider(BaseProvider):
         options = request.options or {}
         if isinstance(options, Mapping):
             stream = bool(options.get("stream"))
+            for key in ("request_timeout_s", "REQUEST_TIMEOUT_S"):
+                raw_timeout = options.get(key)
+                if raw_timeout is not None:
+                    try:
+                        timeout = float(raw_timeout)
+                    except (TypeError, ValueError):  # pragma: no cover - defensive
+                        continue
+                    break
         payload = self._build_payload(request)
         if stream:
             payload.setdefault("stream", True)
