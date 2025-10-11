@@ -33,12 +33,15 @@ projects/04-llm-adapter-shadow/
   │   ├─ runner.py
   │   └─ providers/mock.py
   ├─ tests/
+  │   ├─ parallel/
   │   ├─ test_err_cases.py
   │   └─ test_shadow.py
   ├─ demo_shadow.py
   ├─ pyproject.toml
   └─ requirements.txt
 ```
+
+> ℹ️ 並列ランナーの詳細ケースは `tests/parallel/` 配下に集約しました。旧 `test_runner_parallel.py` シムは削除済みです。
 
 ## Usage
 
