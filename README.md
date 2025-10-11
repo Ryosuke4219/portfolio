@@ -187,72 +187,58 @@ New automation pipelines and LLM-driven PoCs are published regularly, with a per
 
 → 詳細: [Flaky Analyzer CLI README](projects/03-ci-flaky/README.md)
 
-### 4. LLM Adapter — Shadow Execution & Error Handling (Minimal)
+### 4. LLM Adapter — Multi Provider CLI (Core)
 
 **概要**
-プライマリの応答はそのまま返しつつ、同一プロンプトを**別プロバイダで影（shadow）実行**して差分メトリクスを**JSONL**に収集。`TIMEOUT / RATELIMIT / INVALID_JSON` は**障害注入**（モック／ラッパ）で再現し、**フォールバックの連鎖**を最小構成で検証できる。
-（要約）プライマリ結果を使いながら裏で並走し、差分を記録して可視化。
+複数プロバイダの応答を比較・記録・可視化する**本体 CLI**（`projects/04-llm-adapter`）。Shadow 実行を前提にせず、`llm-adapter` コマンドから直接プロダクション想定のリクエストを発行し、レイテンシ・トークン数・コスト・失敗分類などを JSON/JSONL で取得します。
 
-**収集メトリクス（Minimal）**
-
-* 差分系：`latency_ms_delta`, `tokens_in_delta`, `tokens_out_delta`, `content_sha256_equal`
-* 個別計測：`{primary, shadow}.status|latency_ms|tokens_in|tokens_out|content_sha256`
-* フォールバック：`fallback.attempted`, `fallback.chain`, `fallback.final_outcome`
-* 追跡：`trace_id`
-
-**使い方**
+**セットアップ**
 
 ```bash
-cd projects/04-llm-adapter-shadow
+cd projects/04-llm-adapter
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\activate
 pip install -r requirements.txt
-
-# デモ：影実行と差分メトリクスを記録
-python demo_shadow.py
-# => artifacts/runs-metrics.jsonl に1行/リクエストで追記
+pip install -e .
 ```
+
+**CLI クイックスタート**
 
 ```bash
-# LLM Adapter 本体の最短バッチ実行
-cat <<'JSONL' > sample.jsonl
-{"prompt": "日本語で1行、自己紹介して"}
-JSONL
-
-llm-adapter --provider projects/04-llm-adapter/adapter/config/providers/openai.yaml \
-  --prompts sample.jsonl --out out.jsonl --format jsonl
+llm-adapter --provider adapter/config/providers/openai.yaml \
+  --prompt "日本語で1行、自己紹介して" --format json
 ```
-
-```jsonl
-{"prompt_sha256": "d4b8…", "status": "ok", "latency_ms": 480, "model": "gpt-4o-mini", "output_tokens": 34}
-```
-
-**異常系テストとCI**
-
-```bash
-pytest -q   # ERR（障害注入）/ SHD（影実行）シナリオ一式
-```
-
-* `[TIMEOUT]` / `[RATELIMIT]` / `[INVALID_JSON]` を含むプロンプトで異常系を明示的に再現し、フォールバック挙動を検証。
-
-**記録フォーマット（例）**
-
-→ 詳細: [LLM Adapter (Core) README](projects/04-llm-adapter/README.md) / [Shadow Adapter README](projects/04-llm-adapter-shadow/README.md)
 
 ```json
 {
-  "trace_id": "2025-09-21T02:10:33.412Z-7f2c",
-  "primary": { "provider": "openrouter:gpt-x", "status": "ok", "latency_ms": 812, "tokens_in": 128, "tokens_out": 236, "content_sha256": "5e1d...a9" },
-  "shadow":  { "provider": "ollama:qwen",       "status": "ok", "latency_ms": 1046,"tokens_in": 128, "tokens_out": 230, "content_sha256": "5e1d...a9" },
-  "deltas":  { "latency_ms_delta": 234, "tokens_in_delta": 0, "tokens_out_delta": -6, "content_sha256_equal": true },
-  "fallback": { "attempted": false, "chain": [], "final_outcome": "ok" }
+  "provider": "openai", "model": "gpt-4o-mini", "latency_ms": 480,
+  "input_tokens": 21, "output_tokens": 34, "status": "ok"
 }
 ```
 
-**補足**
+JSONL バッチを処理する場合は次のように指定します。
 
-* “Minimal”の範囲は**観測（差分収集）×影実行×障害注入×単段フォールバック**に限定。
-* リトライ／指数バックオフ／多段フォールバック／詳細コスト集計は**将来拡張**として棚上げ。
-* 詳細は `projects/04-llm-adapter-shadow/README.md` を参照。
+```bash
+llm-adapter --provider adapter/config/providers/openai.yaml \
+  --prompts examples/prompts/ja_one_liner.jsonl \
+  --out out --format jsonl --json-logs
+```
+
+**収集メトリクス（代表）**
+
+* ベース指標：`latency_ms`, `input_tokens`, `output_tokens`, `cost_usd`, `status`, `error`
+* 追跡用：`prompt_sha256`, `endpoint`, `provider`, `model`
+* 追加設定：`--parallel`, `--rpm`, `--aggregate`, `--tie-breaker`, `--judge` などで比較モードや再試行を制御
+
+**just との連携**
+
+* `just setup` — 仮想環境と依存関係を初期化し、`pip install -e .` まで一括実行。
+* `just test` — Node/Python 回帰の一括実行。Python 側は `projects/04-llm-adapter/tests` を対象。
+* `just lint` — JavaScript の構文検証と `projects/04-llm-adapter` のバイトコード検証。
+* `just report` — Python テスト＋カバレッジ計測後に週次サマリを生成。
+
+**レガシー補足**
+
+* 影実行と障害注入を中心にした旧 Shadow 版（`04-llm-adapter-shadow`）の手順・サンプルは Git 履歴に保存しています。差分メトリクスの最小構成を確認したい場合のみ参照してください。
 
 ---
 
@@ -286,7 +272,7 @@ Quick Start で触れた `just` コマンドを詳しく説明します。セッ
    * `.venv/` に Python 3.11 の仮想環境を自動作成します。
 2. `just test` で CI 相当の検証を一括実行できます。
    * Node 側: 仕様ケースの検証 → E2E テスト生成 → デモサーバー起動 → Playwright スタブ実行 → JUnit 解析/レポート生成。
-   * Python 側: `projects/04-llm-adapter-shadow` の pytest を実行。
+   * Python 側: `projects/04-llm-adapter/tests` の pytest を実行。
 3. `just lint` / `just report` でワンコマンド lint / カバレッジ計測が可能です。
 4. `pre-commit install` で Git フックを有効化し、初回は `pre-commit run --all-files` で一括検証できます。
 
