@@ -28,7 +28,7 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 ## How to Reproduce
 
 1. `cd projects/04-llm-adapter` で仮想環境を作成し、`pip install -r requirements.txt` を実行して依存関係を揃える。
-2. `pip install -e .` で CLI をインストールし、`llm-adapter --providers adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して" --out out --json-logs` を実行。`--out` で指定したディレクトリ（例: `out/metrics.jsonl`）へ比較結果が追記される。`python adapter/run_compare.py ...` を直接呼び出す場合は既定で `data/runs-metrics.jsonl` に出力される。
+2. `pip install -e .` で CLI をインストールし、`llm-adapter --provider adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して" --out out --json-logs` を実行。`--out` で指定したディレクトリ（例: `out/metrics.jsonl`）へ比較結果が追記される。`python adapter/run_compare.py ...` を直接呼び出す場合は既定で `data/runs-metrics.jsonl` に出力される。
 3. `pytest -q` を流して CLI・ランナー・メトリクスのユニットテストが通ることを確認。
 
 ## Next Steps
