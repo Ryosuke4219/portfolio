@@ -32,7 +32,9 @@
 **進捗**: 🟡 OpenRouter 429/5xx 発生状況の週次集計を継続中。集計結果を Runner のバックオフ/RPM 設計へ反映する判断材料を整備中。[^provider-registry]
 **成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了。
 **タスク**:
-- OpenRouter 429/5xx エラー統計から得た傾向をバックオフ/RPM 調整ポリシーに反映するガイドラインをまとめる。
+- OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。
+- CLI から渡される env 設定を ProviderRequest へマッピングする経路を整備し、既定値と必須項目の整合を確認する。
+- OpenRouter 用の env リテラル(OPENROUTER_API_KEY など)を CLI/env マッピングに追加し、参照ドキュメントを同期する。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 

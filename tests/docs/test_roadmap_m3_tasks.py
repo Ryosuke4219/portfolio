@@ -8,6 +8,8 @@ ROADMAP_PATH = Path("04/ROADMAP.md")
 
 EXPECTED_TASKS = [
     "OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。",
+    "CLI から渡される env 設定を ProviderRequest へマッピングする経路を整備し、既定値と必須項目の整合を確認する。",
+    "OpenRouter 用の env リテラル(OPENROUTER_API_KEY など)を CLI/env マッピングに追加し、参照ドキュメントを同期する。",
 ]
 
 
