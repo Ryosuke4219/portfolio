@@ -9,7 +9,7 @@
 | **M0 — SRS確定 & 骨子固定** | Week40: 2025-09-29〜10-05 | SRS最終化 | `04/llm-adapter-srs.md`最終版 / 参照アーキ図 / M1〜M6 Exit Criteria | ✅ 完了（2025-10-04 SRS v1.0確定・用語集統合完了） |
 | **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / 直列Runner / 最小UT | ✅ 完了（SPI型定義確定・直列Runner/例外UTマージ済） |
 | **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `run_with_shadow` / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（影実行APIとJSONLスキーマv1安定化） |
-| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | OpenAI互換/Ollama/OpenRouter / ストリーミング透過 / 契約テスト | 🔴 未完了（OpenRouter統合未着手。例外マップ更新・registry整合が残タスク）[^provider-registry] |
+| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト | 🔴 未完了（Simulated/OpenAI/Geminiのみ提供中。Ollama/OpenRouter統合と例外マップ整備が残タスク）[^provider-registry] |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（parallel_all/consensusで多数決・タイブレーク・shadow差分記録を実装し、合議イベント検証も通過） |
 | **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ自動生成ツールを`just report`に統合） |
 | **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（コードとドキュメントは`0.1.0`へ更新済。`v0.1.0`タグ発行とOpenRouterガイド追補が残タスク） |
@@ -29,10 +29,10 @@
 **成果物**: `run_with_shadow`、`artifacts/runs-metrics.jsonl`(timestamp/provider/latency_ms/token_usage/diff_kind等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、JSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 影並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
 
 ## M3 — Provider 実装
-**進捗**: 🔴 OpenRouter向け実装は未着手で、`ProviderFactory`のregistryにも登録されていないためOpenAI/Gemini/Ollamaのみ利用可能。[^provider-registry]
-**成果物**: `providers/`配下にOpenAI互換・Ollama、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状2種)。 **Exit Criteria**: 同一SPIで3種動作、ストリーミング指定を下層へ伝播(アサート)、429/5xx/ネットワークを共通例外へ正規化。 **タスク**: OpenRouter実装とregistry登録 / OpenRouter例外マップ(429/5xx/ネットワーク)の共通例外マップ反映 / 共通リトライポリシー閾値調整 / OpenRouter差分ログ出力整備 / 429バックオフベンチ継続。
+**進捗**: 🔴 `ProviderFactory`のregistryには`simulated`・`openai`・`gemini`のみ登録済で、Ollama/OpenRouter向け実装は未着手。[^provider-registry]
+**成果物**: `providers/`配下にSimulated・OpenAI互換・Gemini、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状2種)。 **Exit Criteria**: 同一SPIで3種動作、ストリーミング指定を下層へ伝播(アサート)、429/5xx/ネットワークを共通例外へ正規化。 **タスク**: Ollama/OpenRouter実装とregistry登録 / OpenRouter例外マップ(429/5xx/ネットワーク)の共通例外マップ反映 / 共通リトライポリシー閾値調整 / OpenRouter差分ログ出力整備 / 429バックオフベンチ継続。
 
-[^provider-registry]: `ProviderFactory` が登録しているプロバイダ一覧。`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
+[^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`。Ollama は未実装。`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
 ## M4 — Parallel & Consensus
 **進捗**: ✅ `runner_parallel`/`runner_sync_consensus`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定と`consensus_vote`イベント記録を実装。影勝者へshadow差分を反映するテストもCIで緑。

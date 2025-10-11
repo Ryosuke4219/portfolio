@@ -46,7 +46,7 @@
   ├─ run_compare.py                     # 比較ランナー（並列/直列）
   ├─ config/
   │    ├─ providers/openai.yaml         # 例：プロバイダ設定（seed/温度/価格/制限）
-  │    ├─ providers/simulated.yaml      # 例：サンプル評価用ローカルモック
+  │    ├─ providers/simulated.yaml      # 例：サンプル評価用ローカルモック。シミュレーション用プロバイダ
   │    └─ budgets.yaml                  # 予算と打ち切りポリシー
 /datasets/
   └─ golden/
@@ -147,6 +147,7 @@ default:
   stop_on_budget_exceed: true
 overrides:
   openai: { run_budget_usd: 0.10 }
+  simulated: { run_budget_usd: 0.00 }      # シミュレーションはコスト0扱い
 ```
 
 ### 4.4 ゴールデン小データ（`/datasets/golden/tasks.jsonl`）
