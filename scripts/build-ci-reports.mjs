@@ -9,8 +9,8 @@ import { XMLParser } from '../packages/fast-xml-parser/index.js';
 const rootDir = process.cwd();
 const junitInputPath = path.resolve(rootDir, 'junit-results.xml');
 const flakyOutputDir = path.resolve(rootDir, 'projects/03-ci-flaky/out');
-const coverageHtmlDir = path.resolve(rootDir, 'projects/04-llm-adapter-shadow/htmlcov');
-const coverageXmlPath = path.resolve(rootDir, 'projects/04-llm-adapter-shadow/coverage.xml');
+const coverageHtmlDir = path.resolve(rootDir, 'projects/04-llm-adapter/htmlcov');
+const coverageXmlPath = path.resolve(rootDir, 'projects/04-llm-adapter/coverage.xml');
 const reportsDir = path.resolve(rootDir, 'reports');
 
 function ensureCleanDir(target) {
