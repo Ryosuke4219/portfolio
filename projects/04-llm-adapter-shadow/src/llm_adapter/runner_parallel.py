@@ -3,5 +3,5 @@ from __future__ import annotations
 
 raise ImportError(
     "llm_adapter.runner_parallel shim has been removed; import from "
-    "llm_adapter.runner_parallel package instead"
+    "src.llm_adapter.runner_parallel instead"
 )

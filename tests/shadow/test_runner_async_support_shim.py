@@ -1,19 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
-
-
-def _load_module(path: Path) -> None:
-    spec = importlib.util.spec_from_file_location(
-        "llm_adapter.runner_async_support_shim", path
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    with pytest.raises(ImportError, match="adapter\\.core\\.runner_async_support"):
-        spec.loader.exec_module(module)
 
 
 def test_runner_async_support_shim_is_disabled() -> None:
@@ -27,4 +18,13 @@ def test_runner_async_support_shim_is_disabled() -> None:
         / "runner_async_support.py"
     )
     assert shim_path.exists()
-    _load_module(shim_path)
+    sys.modules.pop("llm_adapter.runner_async_support", None)
+
+    spec = importlib.util.spec_from_file_location(
+        "llm_adapter.runner_async_support", shim_path
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+
+    with pytest.raises(ImportError, match="adapter\\.core\\.runner_async_support"):
+        spec.loader.exec_module(module)
