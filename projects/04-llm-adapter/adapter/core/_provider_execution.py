@@ -65,6 +65,12 @@ class ProviderCallExecutor:
             timeout: float | None = None
             if provider_config.timeout_s > 0:
                 timeout = float(provider_config.timeout_s)
+            raw_options = provider_config.raw.get("options")
+            if raw_options is None:
+                options: dict[str, object] = {}
+            else:
+                options = dict(raw_options)
+            metadata = provider_config.raw.get("metadata")
             request = ProviderRequest(
                 model=model,
                 prompt=prompt,
@@ -72,6 +78,8 @@ class ProviderCallExecutor:
                 temperature=provider_config.temperature,
                 top_p=provider_config.top_p,
                 timeout_s=timeout,
+                options=options,
+                metadata=metadata,
             )
             response = provider.invoke(request)
         except ProviderSkip as exc:
