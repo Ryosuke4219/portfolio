@@ -9,7 +9,7 @@
 | **M0 — SRS確定 & 骨子固定** | Week40: 2025-09-29〜10-05 | SRS最終化 | `04/llm-adapter-srs.md`最終版 / 参照アーキ図 / M1〜M6 Exit Criteria | ✅ 完了（2025-10-04 SRS v1.0確定・用語集統合完了） |
 | **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / 直列Runner / 最小UT | ✅ 完了（`projects/04-llm-adapter/adapter/core`でSPI型と直列Runnerテストを確定） |
 | **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `run_with_shadow` / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（比較実行APIとJSONLスキーマv1を`projects/04-llm-adapter`へ反映） |
-| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト | 🟡 進行中（`ProviderFactory`へOllama/OpenRouterまで登録済。OpenRouter 401正規化は完了。残タスク: envマッピング対応・CIオフライン制御・共通例外マップ整理・429バックオフ微調整[^provider-registry]） |
+| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト | 🟡 進行中（`ProviderFactory`へOllama/OpenRouterまで登録済。OpenRouter 401/429/5xx 正規化とストリーミング対応は完了。残タスク: OpenRouter 429/5xx エラー統計の集計とバックオフ調整指針づくり[^provider-registry]） |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（`runner_parallel`と`runner_sync_consensus`で多数決・タイブレーク・差分記録を実装しイベント検証も通過） |
 | **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ生成ツールを`projects/04-llm-adapter`の`just report`へ統合） |
 | **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（コードとドキュメントを`0.1.0`へ更新済。`v0.1.0`タグ発行とOpenRouterガイド追補が残タスク） |
@@ -29,15 +29,10 @@
 **成果物**: `run_with_shadow`、`artifacts/runs-metrics.jsonl`(timestamp/provider/latency_ms/token_usage/diff_kind等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、JSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
 
 ## M3 — Provider 実装
-**進捗**: 🟡 `ProviderFactory`のregistryへ`simulated`・`openai`・`gemini`・`ollama`・`openrouter`を登録済で、Ollama/OpenRouterのSPI実装と契約テストは完了（[docs/spec/v0.2/TASKS.md#タスク6](../docs/spec/v0.2/TASKS.md#タスク6-ollama-プロバイダを-v02-コアへ移植する) / [タスク7](../docs/spec/v0.2/TASKS.md#タスク7-openrouter-プロバイダを-v02-コアに統合する)達成済）。OpenRouter 401 正規化は完了済で、差分ログの整備と残りの例外系を共通マップへ統合するタスクが継続。[^provider-registry]
-**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)。 **Exit Criteria**: 同一SPIで主要プロバイダが動作、ストリーミング指定を下層へ伝播(アサート)、401/429/5xx/ネットワークを共通例外へ正規化。 **タスク**:
-- envマッピング対応。
-- CIオフライン制御の分岐導入。
-- OpenRouter例外マップ(429/5xx/ネットワーク)の共通例外マップ反映。
-- OpenRouter差分ログ出力整備。
-- 429バックオフベンチ継続。
-- CLI経路のOllama/OpenRouterオプション追従（[docs/spec/v0.2/TASKS.md#タスク9](../docs/spec/v0.2/TASKS.md#タスク9-cli-入力パイプラインに-ollamaopenrouter-の設定項目を追加する)参照）。
-- OpenAIプロバイダのリクエストオプション拡張とCLI入力パイプラインへのマッピング（[docs/spec/v0.2/TASKS.md#タスク12](../docs/spec/v0.2/TASKS.md#タスク12-openai-プロバイダの-リクエストオプションを-v02-コアへ拡張する)参照）。
+**進捗**: 🟡 `ProviderFactory`のregistryへ`simulated`・`openai`・`gemini`・`ollama`・`openrouter`を登録済で、Ollama/OpenRouterのSPI実装と契約テストは完了（[docs/spec/v0.2/TASKS.md#タスク6](../docs/spec/v0.2/TASKS.md#タスク6-ollama-プロバイダを-v02-コアへ移植する) / [タスク7](../docs/spec/v0.2/TASKS.md#タスク7-openrouter-プロバイダを-v02-コアに統合する)達成済）。OpenRouter 401/429/5xx/ネットワーク系の正規化とストリーミング透過も完了し、残りは 429/5xx 発生状況を集計して Runner のバックオフ/RPM 調整指針へ還元する検討のみ。[^provider-registry]
+**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)。 **Exit Criteria**: 同一SPIで主要プロバイダが動作、ストリーミング指定を下層へ伝播(アサート)、401/429/5xx/ネットワークを共通例外へ正規化。
+**タスク**:
+- OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
