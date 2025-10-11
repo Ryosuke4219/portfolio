@@ -1,0 +1,12 @@
+# サンプル: OpenRouter API 用プロバイダ設定
+# .env 例:
+#   OPENROUTER_API_KEY=sk-or-...
+#   OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+provider: openrouter
+endpoint: chat/completions
+model: meta-llama/llama-3.1-8b-instruct:free
+auth_env: OPENROUTER_API_KEY
+base_url_env: OPENROUTER_BASE_URL
+seed: 0
+temperature: 0.2
+timeout_s: 60

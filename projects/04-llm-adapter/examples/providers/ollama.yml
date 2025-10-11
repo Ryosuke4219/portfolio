@@ -1,0 +1,8 @@
+# サンプル: Ollama ローカル推論用プロバイダ設定
+# .env 例: OLLAMA_HOST=http://127.0.0.1:11434
+provider: ollama
+model: llama3.1:8b-instruct
+host_env: OLLAMA_HOST
+seed: 0
+temperature: 0.2
+timeout_s: 60

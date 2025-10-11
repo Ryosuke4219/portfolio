@@ -1,0 +1,23 @@
+provider: ollama
+endpoint: chat
+model: llama3.1:8b-instruct
+auth_env: null
+host_env: OLLAMA_HOST
+seed: 0
+temperature: 0.2
+top_p: 0.9
+max_tokens: 1024
+timeout_s: 60
+retries:
+  max: 2
+  backoff_s: 1.0
+persist_output: true
+pricing:
+  prompt_usd: 0.00000
+  completion_usd: 0.00000
+rate_limit:
+  rpm: 120
+  tpm: 60000
+quality_gates:
+  determinism_diff_rate_max: 0.2
+  determinism_len_stdev_max: 80

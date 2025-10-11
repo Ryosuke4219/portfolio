@@ -1,0 +1,23 @@
+provider: openrouter
+endpoint: chat/completions
+model: meta-llama/llama-3.1-8b-instruct:free
+auth_env: OPENROUTER_API_KEY
+base_url_env: OPENROUTER_BASE_URL
+seed: 0
+temperature: 0.2
+top_p: 1.0
+max_tokens: 2048
+timeout_s: 60
+retries:
+  max: 2
+  backoff_s: 1.0
+persist_output: true
+pricing:
+  prompt_usd: 0.00020
+  completion_usd: 0.00020
+rate_limit:
+  rpm: 300
+  tpm: 180000
+quality_gates:
+  determinism_diff_rate_max: 0.2
+  determinism_len_stdev_max: 80
