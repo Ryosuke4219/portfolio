@@ -20,11 +20,11 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 
 ## Key Artifacts
 
-- [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — CLI と設定ファイルの詳細な説明。
-- [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — CLI の比較モード実装とエントリポイント。
-- [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — プロバイダ実行・リトライ・メトリクス集約の中心ロジック。
-- [adapter/core/metrics/update.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/update.py) — JSONL メトリクス更新ユーティリティ。
-- [adapter/core/metrics/models.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/models.py) — メトリクス構造体とシリアライズモデル。
+- [projects/04-llm-adapter/README.md](../../projects/04-llm-adapter/README.md) — CLI と設定ファイルの詳細な説明。
+- [projects/04-llm-adapter/adapter/run_compare.py](../../projects/04-llm-adapter/adapter/run_compare.py) — CLI の比較モード実装とエントリポイント。
+- [projects/04-llm-adapter/adapter/core/runner_execution.py](../../projects/04-llm-adapter/adapter/core/runner_execution.py) — プロバイダ実行・リトライ・メトリクス集約の中心ロジック。
+- [projects/04-llm-adapter/adapter/core/metrics/update.py](../../projects/04-llm-adapter/adapter/core/metrics/update.py) — JSONL メトリクス更新ユーティリティ。
+- [projects/04-llm-adapter/adapter/core/metrics/models.py](../../projects/04-llm-adapter/adapter/core/metrics/models.py) — メトリクス構造体とシリアライズモデル。
 
 ## How to Reproduce
 
@@ -34,6 +34,6 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 
 ## Next Steps
 
-- 実プロバイダ SDK を `adapter/core/providers/` に追加し、レイテンシやコストの比較軸を拡張。
-- JSONL をデータ基盤に送信し、週次の影響度を [週次サマリ一覧]({{ '/weekly-summary.html' | relative_url }}) に記録。
-- `adapter/core/runner_async.py` を活用して非同期ランナーとの連携やストリーム応答の評価を強化。
+- `tools/report/metrics/cli.py` と `tools/report/metrics/weekly_summary.py` を CI ジョブに組み込み、`reports/index.html` と `docs/weekly-summary.md` を自動生成。
+- `datasets/golden/` と `datasets/golden/baseline/` を拡充し、`tools/report/metrics/regression_summary.py` を通じて回帰検知を自動化。
+- `adapter/core/metrics/diff.py` を拡張し、構造化応答向けメトリクスを `RunMetrics.eval` に取り込む。
