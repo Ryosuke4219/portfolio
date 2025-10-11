@@ -47,7 +47,9 @@
   - `OllamaProvider` が環境変数・設定ファイル・CLI からホストやタイムアウト、自動 Pull の優先順位を解決し、CI/オフライン制御に応じて `ProviderSkip` を返す挙動を含めてコアへ組み込まれた。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L50-L166】
   - `ProviderRequest` のメッセージと `options.*` をチャットペイロードへ取り込み、ストリーミング応答を `ProviderResponse` に正規化する処理を実装した。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L168-L268】
 - 品質エビデンス:
-  - ✅ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、ストリーミング連結・オフラインスキップ・レート制限/再試行の正規化を回帰テストで担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L170-L390】
+  - ✅ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、ストリーミング結合・自動 Pull 無効時の例外・429/5xx 正規化・CI/オフライン分岐を契約テストで担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
+- 残タスク:
+  - 実サーバーでのストリーミング透過検証を進め、運用フローに組み込む（Issue Seeds）。【F:04/ROADMAP.md†L61-L62】
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
@@ -58,7 +60,9 @@
   - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
 - 品質エビデンス:
-  - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー解決・環境変数優先順位・ストリーミング/エラーハンドリングの動作を網羅テストしている。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L100-L520】
+  - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー/ベース URL 解決、ストリーミング透過、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
+- 残タスク:
+  - OpenRouter 429/5xx 発生統計の収集と Runner バックオフ/RPM 調整指針づくりを継続する。【F:04/ROADMAP.md†L12-L35】
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する
 - 対象モジュール:
