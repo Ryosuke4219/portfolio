@@ -5,7 +5,13 @@ from typing import Any
 
 import pytest
 
-from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
+from src.llm_adapter.errors import (
+    ProviderSkip,
+    RateLimitError,
+    RetriableError,
+    SkipReason,
+    TimeoutError,
+)
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.openrouter import OpenRouterProvider
 from tests.helpers.fakes import FakeResponse, FakeSession
@@ -127,6 +133,19 @@ def test_openrouter_provider_normalizes_http_errors(
 
     with pytest.raises(expected_exc):
         provider.invoke(ProviderRequest(prompt="hello", model="meta-llama/llama-3-8b-instruct:free"))
+
+
+def test_openrouter_provider_skips_without_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    provider = OpenRouterProvider(
+        "meta-llama/llama-3-8b-instruct:free",
+        api_key="",
+    )
+
+    with pytest.raises(ProviderSkip) as excinfo:
+        provider.invoke(ProviderRequest(prompt="hello", model="meta-llama/llama-3-8b-instruct:free"))
+
+    assert excinfo.value.reason is SkipReason.MISSING_OPENROUTER_API_KEY
 
 
 def test_openrouter_provider_normalizes_timeout() -> None:

@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any
 
-from ..errors import RateLimitError, RetriableError, TimeoutError
+from ..errors import ProviderSkip, RateLimitError, RetriableError, SkipReason, TimeoutError
 from ..provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from ._requests_compat import create_session, requests_exceptions, SessionProtocol
 from .base import BaseProvider
@@ -145,6 +145,11 @@ class OpenRouterProvider(BaseProvider):
         return payload
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        if not self._api_key:
+            raise ProviderSkip(
+                "openrouter: OPENROUTER_API_KEY not set",
+                reason=SkipReason.MISSING_OPENROUTER_API_KEY,
+            )
         timeout = request.timeout_s if request.timeout_s is not None else 30.0
         stream = False
         if isinstance(request.options, Mapping):
