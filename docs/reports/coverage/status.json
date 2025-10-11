@@ -2,6 +2,49 @@
   "note": "This file is an internal implementation detail to speed up HTML report generation. Its format can change at any time. You might be looking for the JSON report: https://coverage.rtfd.io/cmd.html#cmd-json",
   "format": 5,
   "version": "7.10.7",
-  "globals": "fc5446ae75f2bd1cb77c12c6752f31e3",
-  "files": {}
+  "globals": "4b7a92d89dcbb9c516e6e8d3e5f96448",
+  "files": {
+    "adapter___init___py": {
+      "index": {
+        "file": "projects/04-llm-adapter/adapter/__init__.py",
+        "relative": "adapter/__init__.py",
+        "html_filename": "z_adapter___init___py.html",
+        "nums": {
+          "stmts": 4,
+          "miss": 0,
+          "branch": 0,
+          "excluded": 0,
+          "percent_covered": 100.0
+        }
+      }
+    },
+    "adapter_core_runner_api_py": {
+      "index": {
+        "file": "projects/04-llm-adapter/adapter/core/runner_api.py",
+        "relative": "adapter/core/runner_api.py",
+        "html_filename": "z_adapter_core_runner_api_py.html",
+        "nums": {
+          "stmts": 128,
+          "miss": 6,
+          "branch": 0,
+          "excluded": 2,
+          "percent_covered": 95.31
+        }
+      }
+    },
+    "adapter_core_runner_execution_py": {
+      "index": {
+        "file": "projects/04-llm-adapter/adapter/core/runner_execution.py",
+        "relative": "adapter/core/runner_execution.py",
+        "html_filename": "z_adapter_core_runner_execution_py.html",
+        "nums": {
+          "stmts": 212,
+          "miss": 18,
+          "branch": 0,
+          "excluded": 5,
+          "percent_covered": 91.51
+        }
+      }
+    }
+  }
 }
