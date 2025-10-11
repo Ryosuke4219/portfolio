@@ -92,6 +92,7 @@ class _ParallelCoordinatorBase:
         if result is not None:
             metrics = result.metrics
             metrics.status = "skip"
+            metrics.outcome = "skip"
             if not metrics.failure_kind:
                 metrics.failure_kind = "cancelled"
             if metrics.error_message == self.LEGACY_CANCEL_MESSAGE:
