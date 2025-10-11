@@ -1,8 +1,8 @@
 # サンプル: Ollama ローカル推論用プロバイダ設定
-# .env 例: OLLAMA_HOST=http://127.0.0.1:11434
+# .env 例: OLLAMA_BASE_URL=http://127.0.0.1:11434 （旧互換の OLLAMA_HOST でも上書き可）
 provider: ollama
 model: llama3.1:8b-instruct
-host_env: OLLAMA_HOST
+host: http://127.0.0.1:11434  # 実行時は OLLAMA_BASE_URL / OLLAMA_HOST で上書きできます
 seed: 0
 temperature: 0.2
 timeout_s: 60
