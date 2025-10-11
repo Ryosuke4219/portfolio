@@ -20,6 +20,8 @@ ALLOWED_PROVIDERS = {"simulated", "openai", "gemini", "ollama", "openrouter"}
 def test_provider_configs_use_allowed_providers(config_path: Path) -> None:
     config = load_provider_config(config_path)
     assert config.provider in ALLOWED_PROVIDERS
+    if config.provider in {"openai", "gemini", "openrouter"}:
+        assert config.auth_env, "認証環境変数が未設定です"
 
 
 def test_budget_overrides_use_allowed_providers() -> None:
