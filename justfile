@@ -27,33 +27,53 @@ node-test:
         node --test tests/e2e-shadow.test.mjs
 
 python-test:
-	set -euo pipefail
-	./.venv/bin/pytest -q projects/04-llm-adapter-shadow/tests
+        set -euo pipefail
+        PYTHONPATH=projects/04-llm-adapter \
+        ./.venv/bin/pytest -q projects/04-llm-adapter/tests
 
 # Node と Python のテストスイートを一括実行
 test: node-test python-test
 
 # JS 構文チェックと Python バイトコード検証
 lint:
-	set -euo pipefail
-	JS_FILES=$(find . -type f \( -name '*.mjs' -o -name '*.js' \))
-	if [ -n "${JS_FILES}" ]; then
-		for file in ${JS_FILES}; do
-			node --check "${file}"
-		done
-	else
-		echo "No JavaScript modules found"
-	fi
-	./.venv/bin/python -m compileall projects/04-llm-adapter-shadow
+        set -euo pipefail
+        JS_FILES=$(find . -type f \( -name '*.mjs' -o -name '*.js' \))
+        if [ -n "${JS_FILES}" ]; then
+                for file in ${JS_FILES}; do
+                        node --check "${file}"
+                done
+        else
+                echo "No JavaScript modules found"
+        fi
+        PYTHONPATH=projects/04-llm-adapter \
+        ./.venv/bin/python -m compileall projects/04-llm-adapter/adapter
 
 # 週次サマリ生成
 weekly-summary:
         set -euo pipefail
-        python -m projects.04-llm-adapter-shadow.tools.weekly_summary --input artifacts/runs-metrics.jsonl --output docs/weekly-summary.md
+        PYTHONPATH=projects/04-llm-adapter \
+        ./.venv/bin/python - <<'PY'
+from pathlib import Path
+
+from tools.report.metrics.data import build_failure_summary, load_metrics
+from tools.report.metrics.weekly_summary import update_weekly_summary
+
+metrics_path = Path("artifacts/runs-metrics.jsonl")
+weekly_path = Path("docs/weekly-summary.md")
+
+if metrics_path.exists():
+    metrics = load_metrics(metrics_path)
+else:
+    metrics = []
+
+failure_total, failure_summary = build_failure_summary(metrics)
+update_weekly_summary(weekly_path, failure_total, failure_summary)
+PY
 
 # Python プロジェクトのカバレッジ付きレポート生成
 report:
         set -euo pipefail
         just test
-        ./.venv/bin/pytest --cov=projects/04-llm-adapter-shadow --cov-report=xml --cov-report=term-missing projects/04-llm-adapter-shadow/tests
+        PYTHONPATH=projects/04-llm-adapter \
+        ./.venv/bin/pytest --cov=adapter --cov-report=xml --cov-report=term-missing projects/04-llm-adapter/tests
         just weekly-summary
