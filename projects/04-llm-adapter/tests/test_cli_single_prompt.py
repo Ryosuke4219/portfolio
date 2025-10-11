@@ -19,12 +19,20 @@ def _install_provider_factory(monkeypatch, provider_cls: type) -> None:
 
 
 class EchoProvider:
+    requests: list[provider_module.ProviderRequest] = []
+
     def __init__(self, config):
         self.config = config
 
-    def generate(self, prompt: str) -> provider_module.ProviderResponse:
+    def generate(self, prompt: str) -> provider_module.ProviderResponse:  # pragma: no cover - 旧 API 経由
+        raise AssertionError("generate() は使用しないでください")
+
+    def invoke(
+        self, request: provider_module.ProviderRequest
+    ) -> provider_module.ProviderResponse:
+        self.__class__.requests.append(request)
         return provider_module.ProviderResponse(
-            output_text=f"echo:{prompt}",
+            output_text=f"echo:{request.prompt}",
             input_tokens=1,
             output_tokens=1,
             latency_ms=1,
@@ -33,7 +41,9 @@ class EchoProvider:
 
 @pytest.fixture
 def echo_provider(monkeypatch):
+    EchoProvider.requests = []
     _install_provider_factory(monkeypatch, EchoProvider)
+    return EchoProvider
 
 
 @pytest.fixture
@@ -57,7 +67,7 @@ def test_cli_help_smoke() -> None:
 def test_cli_fake_provider(echo_provider, tmp_path: Path, capfd) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
-        "provider: fake\nmodel: dummy\nauth_env: NONE\n",
+        "provider: fake\nmodel: dummy\nauth_env: NONE\nmax_tokens: 128\noptions:\n  foo: bar\n",
         encoding="utf-8",
     )
 
@@ -72,12 +82,17 @@ def test_cli_fake_provider(echo_provider, tmp_path: Path, capfd) -> None:
     captured = capfd.readouterr()
     assert exit_code == 0
     assert "echo:hello" in captured.out
+    assert len(echo_provider.requests) == 1
+    request = echo_provider.requests[0]
+    assert request.prompt == "hello"
+    assert request.max_tokens == 128
+    assert request.options == {"foo": "bar"}
 
 
 def test_cli_json_log_prompts(echo_provider, tmp_path: Path, capfd) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
-        "provider: fake\nmodel: dummy\nauth_env: NONE\n",
+        "provider: fake\nmodel: dummy\nauth_env: NONE\nmax_tokens: 128\noptions:\n  foo: bar\n",
         encoding="utf-8",
     )
 
@@ -101,7 +116,7 @@ def test_cli_json_log_prompts(echo_provider, tmp_path: Path, capfd) -> None:
 def test_cli_json_without_prompts(echo_provider, tmp_path: Path, capfd) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
-        "provider: fake\nmodel: dummy\nauth_env: NONE\n",
+        "provider: fake\nmodel: dummy\nauth_env: NONE\nmax_tokens: 128\noptions:\n  foo: bar\n",
         encoding="utf-8",
     )
 
@@ -175,7 +190,7 @@ def test_cli_rate_limit_exit_code(install_provider, tmp_path: Path, capfd) -> No
 
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
-        "provider: fake\nmodel: dummy\nauth_env: NONE\n",
+        "provider: fake\nmodel: dummy\nauth_env: NONE\nmax_tokens: 128\noptions:\n  foo: bar\n",
         encoding="utf-8",
     )
 

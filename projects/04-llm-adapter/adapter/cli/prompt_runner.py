@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import time
-from typing import cast
+from typing import Any, cast
 
 from adapter.core import providers as provider_module
 from adapter.core.config import ProviderConfig
@@ -14,6 +14,7 @@ from adapter.core.metrics.models import RunMetric
 
 from .utils import _sanitize_message, LOGGER
 
+ProviderRequest = provider_module.ProviderRequest
 ProviderResponse = provider_module.ProviderResponse
 Classifier = Callable[[Exception, ProviderConfig, str], tuple[str, str]]
 
@@ -53,6 +54,29 @@ class PromptResult:
     error_kind: str | None = None
 
 
+def _request_options(config: ProviderConfig) -> dict[str, Any]:
+    raw_options = config.raw.get("options")
+    if isinstance(raw_options, Mapping):
+        return dict(raw_options)
+    return {}
+
+
+def _build_request(prompt: str, config: ProviderConfig) -> ProviderRequest:
+    model = (config.model or config.provider).strip() or config.provider
+    timeout: float | None = None
+    if config.timeout_s > 0:
+        timeout = float(config.timeout_s)
+    return ProviderRequest(
+        model=model,
+        prompt=prompt,
+        max_tokens=config.max_tokens,
+        temperature=config.temperature,
+        top_p=config.top_p,
+        timeout_s=timeout,
+        options=_request_options(config),
+    )
+
+
 async def _process_prompt(
     index: int,
     prompt: str,
@@ -68,7 +92,15 @@ async def _process_prompt(
         loop = asyncio.get_running_loop()
         start = time.perf_counter()
         try:
-            response = await loop.run_in_executor(None, provider.generate, prompt)
+            request = _build_request(prompt, config)
+            if hasattr(provider, "invoke"):
+                response = await loop.run_in_executor(  # type: ignore[arg-type]
+                    None, getattr(provider, "invoke"), request
+                )
+            else:  # pragma: no cover - 後方互換
+                response = await loop.run_in_executor(  # type: ignore[arg-type]
+                    None, getattr(provider, "generate"), prompt
+                )
         except Exception as exc:  # pragma: no cover - 実 API 呼び出し向けの防御
             latency_ms = int((time.perf_counter() - start) * 1000)
             friendly, error_kind = classify_error(exc, config, lang)
