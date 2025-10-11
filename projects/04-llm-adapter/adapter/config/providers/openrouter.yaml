@@ -3,7 +3,6 @@ endpoint: https://openrouter.ai/api/v1
 model: meta-llama/llama-3.1-8b-instruct:free
 env:
   OPENROUTER_API_KEY: OPENROUTER_API_KEY
-  OPENROUTER_BASE_URL: OPENROUTER_BASE_URL
 seed: 0
 temperature: 0.2
 top_p: 1.0
