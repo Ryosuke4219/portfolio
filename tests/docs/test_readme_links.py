@@ -14,6 +14,23 @@ RED_WORDS: tuple[str, ...] = (
 )
 
 
+def test_readme_llm_adapter_section_highlights_cli_usage() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    expected_snippets = (
+        "4. **04: llm-adapter —",
+        "### 4. llm-adapter —",
+        "llm-adapter --provider adapter/config/providers/openai.yaml \\",
+        "    --prompts examples/prompts/ja_one_liner.jsonl --out out/",
+        "* `out/metrics.jsonl`",
+    )
+
+    for snippet in expected_snippets:
+        assert (
+            snippet in readme
+        ), f"README.md に llm-adapter の CLI 手順が {snippet!r} 形式で記載されていません。"
+
+
 def test_llm_adapter_readme_does_not_reference_missing_paths() -> None:
     readme = Path("projects/04-llm-adapter/README.md").read_text(encoding="utf-8")
 

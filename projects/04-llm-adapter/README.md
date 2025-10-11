@@ -133,7 +133,7 @@ python adapter/run_compare.py \
 
 判定用の設定ファイル `adapter/config/providers/judge.yaml` はリポジトリに含まれており、そのまま利用できます。実案件では次の手順で評価ルールを調整することを推奨します。
 
-1. `cp adapter/config/providers/judge.yaml <path/to/judge.yaml>` で複製する（最小構成は `examples/providers/judge.yaml` も参照）。
+1. `cp adapter/config/providers/judge.yaml adapter/config/providers/judge.local.yaml` で複製する（最小構成は `examples/providers/judge.yaml` も参照）。
 2. `prompt_template` に判定観点や出力フォーマットを明記し、比較対象や期待する回答形式に合わせて編集する。
 3. 必要に応じて `model` や `request_kwargs.temperature` などを環境に合わせて変更する。
 
