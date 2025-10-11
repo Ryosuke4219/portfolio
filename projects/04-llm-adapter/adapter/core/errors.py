@@ -44,6 +44,9 @@ class SkipReason(str, Enum):
 
     UNKNOWN = "unknown"
     MISSING_GEMINI_API_KEY = "missing_gemini_api_key"
+    MISSING_OPENROUTER_API_KEY = "missing_openrouter_api_key"
+    MISSING_OLLAMA_ENDPOINT = "missing_ollama_endpoint"
+    OLLAMA_OFFLINE = "ollama_offline"
 
 
 class ProviderSkip(SkipError):

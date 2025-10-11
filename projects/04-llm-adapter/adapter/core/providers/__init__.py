@@ -168,3 +168,17 @@ except Exception:  # pragma: no cover - 依存不足時は openai を登録し�
     OpenAIProvider = None  # type: ignore[assignment]
 else:  # pragma: no cover - 実行時に openai プロバイダを登録
     ProviderFactory.register("openai", OpenAIProvider)
+
+try:  # pragma: no cover - optional依存の存在に応じて処理
+    from .ollama import OllamaProvider
+except Exception:  # pragma: no cover - 依存不足時は ollama を登録しない
+    OllamaProvider = None  # type: ignore[assignment]
+else:  # pragma: no cover - 実行時に ollama プロバイダを登録
+    ProviderFactory.register("ollama", OllamaProvider)
+
+try:  # pragma: no cover - optional依存の存在に応じて処理
+    from .openrouter import OpenRouterProvider
+except Exception:  # pragma: no cover - 依存不足時は openrouter を登録しない
+    OpenRouterProvider = None  # type: ignore[assignment]
+else:  # pragma: no cover - 実行時に openrouter プロバイダを登録
+    ProviderFactory.register("openrouter", OpenRouterProvider)
