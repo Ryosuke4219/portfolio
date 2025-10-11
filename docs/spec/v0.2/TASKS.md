@@ -43,20 +43,24 @@
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`（新規）
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/test_ollama.py`（新規）
+- 現状:
+  - `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` は既存だが Shadow 実装との差分を埋めるコード・テストが未整備。
 - 完了条件:
-  - Shadow 側の [Ollama 実装](../../../projects/04-llm-adapter-shadow/src/llm_adapter/providers/ollama.py) と同じ `ProviderRequest` ベースの呼び出しとトークン計測を再現する。
-  - `pytest projects/04-llm-adapter/tests/providers/test_ollama.py` が成功する。
-  - `projects/04-llm-adapter/README.md` のプロバイダ表へ Ollama を追記する。
+  1. Shadow 側の [Ollama 実装](../../../projects/04-llm-adapter-shadow/src/llm_adapter/providers/ollama.py) と同じ `ProviderRequest` ベースの呼び出しとトークン計測を再現する。
+  2. `pytest projects/04-llm-adapter/tests/providers/test_ollama.py` が成功し、既存 YAML と整合するオプションが網羅される。
+  3. `projects/04-llm-adapter/README.md` のプロバイダ表へ Ollama を追記する。
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`（新規）
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/test_openrouter.py`（新規）
+- 現状:
+  - `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` も既存だが、Shadow 側で保持しているヘッダ・レート制御ロジックが未移植。
 - 完了条件:
-  - Shadow 側の [OpenRouter 実装](../../../projects/04-llm-adapter-shadow/src/llm_adapter/providers/openrouter.py) に合わせ、ヘッダ構成とレート制御を `ProviderRequest` から組み立てる。
-  - `pytest projects/04-llm-adapter/tests/providers/test_openrouter.py` が成功する。
-  - `projects/04-llm-adapter/README.md` に OpenRouter の利用手順を追記し、環境変数の説明を更新する。
+  1. Shadow 側の [OpenRouter 実装](../../../projects/04-llm-adapter-shadow/src/llm_adapter/providers/openrouter.py) に合わせ、ヘッダ構成とレート制御を `ProviderRequest` から組み立てる。
+  2. `pytest projects/04-llm-adapter/tests/providers/test_openrouter.py` が成功し、既存 YAML の必須キーが全て読み込まれる。
+  3. `projects/04-llm-adapter/README.md` に OpenRouter の利用手順を追記し、環境変数の説明を更新する。
 
 ## CLI Request Pipeline
 
@@ -77,7 +81,7 @@
   - `projects/04-llm-adapter/adapter/config/providers`
 - 完了条件:
   - `adapter/cli/app.py` の `--provider`/`--model` オプションで Ollama/OpenRouter 固有の `options.*` を指定できるよう、`ProviderRequest` の追加フィールドをマッピングする。
-  - `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` および `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` を追加し、Shadow README の [Provider configuration](../../../projects/04-llm-adapter-shadow/README.md#provider-configuration) と整合させる。
+  - 現状 `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` と `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` は既存だが、Shadow README の [Provider configuration](../../../projects/04-llm-adapter-shadow/README.md#provider-configuration) に揃うよう項目を精査し不足分を補う。
   - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt_diagnostics.py::test_prompt_runner_provider_response_tokens` を含む CLI 系テストが成功し、`markdownlint docs/spec/v0.2/TASKS.md` も通過する。
 
 ## Docs & Templates
@@ -91,3 +95,12 @@
   - Shadow README の最新情報を `projects/04-llm-adapter/README.md` に反映し、Ollama/OpenRouter のセットアップ手順と API キー環境変数を追記する。
   - `projects/04-llm-adapter/adapter/config/providers/*.yaml` に新規テンプレートを追加し、`just lint` と `pytest projects/04-llm-adapter/tests` を通過させる。
   - 本タスクリストを更新し、`markdownlint` で整形エラーがないことを確認する。
+
+### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する
+- 対象モジュール:
+  - `pyproject.toml`
+  - `projects/04-llm-adapter/adapter/**`
+- 完了条件:
+  1. Shadow 専用の `src.llm_adapter` 参照をコア側へ移行または削除し、`pyproject.toml` の `known-first-party` や `coverage` 設定から除去する。
+  2. `just lint` と `pytest projects/04-llm-adapter/tests` が成功する。
+  3. コア実装へ統合された場合は該当モジュールの import 先を更新し、Shadow 側の同名ファイルに deprecation を残すかどうかを判断する。

@@ -16,9 +16,12 @@
 ## [v0.1.0] - 2025-10-02
 
 ### Added
-- `projects/04-llm-adapter-shadow` に CLI コマンド群を整備し、`just` レシピから一括実行できるよう統合。
-- シャドー実行のメトリクス収集と週次サマリ生成フローを自動化し、リリース準備の定常運用を確立。
-- CLI/just/週次サマリの各成果物を M6 リリース向けに整理し、初期バージョン `v0.1.0` として公開。
+- `projects/04-llm-adapter` に CLI コマンド群と `just` レシピを統合し、推論プロバイダの並列実行を本番運用フローへ組み込み。
+- 影実行のメトリクス収集と週次サマリ生成を自動化し、監視・改善サイクルをドキュメント化。
+- CLI/just/週次サマリの成果物を M6 リリース向けに再編し、`v0.1.0` として公開。
+
+### Migration
+- 旧 `projects/04-llm-adapter-shadow` のスクリプト群を `projects/04-llm-adapter` へ統合し、移行手順と影響範囲をドキュメント化。
 
 ## [v1.0.0] - 2025-09-23
 
@@ -42,7 +45,7 @@
 - 仕様書テキストから JSON テストケースを生成・検証・実行する `projects/01-spec2cases-md2json` パイプラインを整備。
 - LLM を活用して受け入れ基準を拡張し Playwright テストを自動生成する `projects/02-blueprint-to-playwright` PoC を追加。
 - JUnit XML を解析して flaky テストを検出・可視化する `projects/03-ci-flaky` ツール群を実装。
-- LLM 影実行とフォールバック挙動を記録する `projects/04-llm-adapter-shadow` のミニマル実装を公開。
+- LLM 影実行とフォールバック挙動を記録するアダプタのミニマル実装を公開。
 
 ### Docs
 - GitHub Pages を利用した Portfolio Gallery とレポート公開フローを README に整理。

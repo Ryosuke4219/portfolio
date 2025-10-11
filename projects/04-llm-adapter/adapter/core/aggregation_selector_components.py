@@ -9,24 +9,11 @@ from typing import Any, cast, Protocol, TYPE_CHECKING
 
 from .aggregation import AggregationCandidate, FirstTieBreaker, TieBreaker
 from .runner_execution import SingleRunResult
+from .providers import ProviderResponse as JudgeProviderResponse
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .config import ProviderConfig
     from .runner_api import RunnerConfig
-
-try:  # pragma: no cover - 実環境では src.* が存在する
-    from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-    from dataclasses import dataclass as _dataclass
-    from typing import Any as _Any
-
-    @_dataclass(slots=True)
-    class JudgeProviderResponse:  # type: ignore[override]
-        text: str
-        latency_ms: int
-        tokens_in: int = 0
-        tokens_out: int = 0
-        raw: _Any | None = None
 
 
 class JudgeProviderFactory(Protocol):
@@ -48,8 +35,8 @@ class CandidateBuilder:
             response = JudgeProviderResponse(
                 text=result.raw_output,
                 latency_ms=result.metrics.latency_ms,
-                tokens_in=result.metrics.input_tokens,
-                tokens_out=result.metrics.output_tokens,
+                input_tokens=result.metrics.input_tokens,
+                output_tokens=result.metrics.output_tokens,
             )
             candidate = AggregationCandidate(
                 index=index,

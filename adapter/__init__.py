@@ -8,13 +8,8 @@ import sys
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _TARGET_DIR = _REPO_ROOT / "projects" / "04-llm-adapter" / "adapter"
-_SHADOW_SRC_ROOT = _REPO_ROOT / "projects" / "04-llm-adapter-shadow"
 if not _TARGET_DIR.exists():  # pragma: no cover - 開発環境の構成不備
     raise ImportError("projects/04-llm-adapter/adapter が見つかりません")
-if _SHADOW_SRC_ROOT.exists():
-    shadow_path = str(_SHADOW_SRC_ROOT)
-    if shadow_path not in sys.path:
-        sys.path.insert(0, shadow_path)
 
 _spec = spec_from_file_location(
     __name__,

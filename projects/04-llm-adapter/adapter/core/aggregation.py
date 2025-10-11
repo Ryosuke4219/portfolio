@@ -9,10 +9,7 @@ from typing import Any, Protocol, runtime_checkable, TYPE_CHECKING
 
 __path__ = [str(Path(__file__).with_name("aggregation"))]
 
-try:  # pragma: no cover
-    from src.llm_adapter.provider_spi import ProviderResponse
-except ModuleNotFoundError:  # pragma: no cover
-    from .providers import ProviderResponse
+from .providers import ProviderResponse
 
 
 @dataclass(slots=True)

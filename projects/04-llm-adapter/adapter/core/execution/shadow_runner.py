@@ -8,15 +8,9 @@ from time import perf_counter
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderSPI
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-        from typing import Protocol
-
-        class ProviderSPI(Protocol):
-            """プロバイダ SPI フォールバック."""
+    from adapter.core.provider_spi import ProviderSPI
+else:
+    from adapter.core.provider_spi import ProviderSPI
 
 from ..config import ProviderConfig
 from ..provider_spi import ProviderRequest

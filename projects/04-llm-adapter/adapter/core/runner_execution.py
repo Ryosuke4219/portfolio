@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
-from typing import Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from ._parallel_shim import (
     ParallelExecutionError,
@@ -22,6 +22,7 @@ from .execution.guards import _SchemaValidator, _TokenBucket
 from .metrics.costs import estimate_cost
 from .metrics.models import BudgetSnapshot, RunMetrics
 from .metrics.update import finalize_run_metrics
+from .provider_spi import ProviderSPI
 from .providers import BaseProvider, ProviderResponse
 from .runner_execution_attempts import (
     ParallelAttemptExecutor,
@@ -29,16 +30,7 @@ from .runner_execution_attempts import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-
     from .runner_api import BackoffPolicy, RunnerConfig
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.provider_spi import ProviderSPI  # type: ignore[import-not-found]
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-
-        class ProviderSPI(Protocol):
-            """プロバイダ SPI フォールバック."""
 
 _EvaluateBudget = Callable[
     [ProviderConfig, float, str, str | None, str | None],
