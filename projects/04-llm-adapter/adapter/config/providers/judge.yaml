@@ -1,0 +1,36 @@
+provider: judge
+endpoint: null
+model: gpt-4o-mini-judge
+auth_env: null
+seed: 0
+temperature: 0.0
+top_p: 1.0
+max_tokens: 256
+timeout_s: 60
+retries:
+  max: 2
+  backoff_s: 1.0
+persist_output: true
+pricing:
+  prompt_usd: 0.00000
+  completion_usd: 0.00000
+rate_limit:
+  rpm: 120
+  tpm: 60000
+quality_gates:
+  determinism_diff_rate_max: 0.2
+  determinism_len_stdev_max: 80
+evaluation:
+  aggregate: judge
+  quality_score:
+    expected_range: [0.0, 1.0]
+  decision_logic: max_score  # judge の quality_score を採用する合議戦略
+prompt_template: |-
+  You are an expert judge. Compare the following candidates and select the single best answer.
+  Base your decision on factual accuracy, clarity, and alignment with the user request.
+  Output only the number of the chosen candidate.
+request_options:
+  max_tokens: 32
+  temperature: 0.0
+  top_p: 1.0
+  stop: []

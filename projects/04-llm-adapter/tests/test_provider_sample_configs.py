@@ -8,7 +8,7 @@ import pytest
 
 from adapter.core.loader import load_budget_book, load_provider_config
 
-ALLOWED_PROVIDERS = {"simulated", "openai", "gemini", "ollama", "openrouter"}
+ALLOWED_PROVIDERS = {"simulated", "openai", "gemini", "ollama", "openrouter", "judge"}
 AUTH_REQUIRED_PROVIDERS = {"openai", "gemini", "openrouter"}
 
 
@@ -25,6 +25,8 @@ def test_provider_configs_use_allowed_providers(config_path: Path) -> None:
         assert config.auth_env, "認証環境変数が未設定です"
     if config.provider in AUTH_REQUIRED_PROVIDERS:
         assert isinstance(config.auth_env, str) and config.auth_env.strip()
+    if config.provider == "judge":
+        assert config.auth_env in (None, ""), "judge プロバイダに認証は不要です"
 
 
 def test_budget_overrides_use_allowed_providers() -> None:
