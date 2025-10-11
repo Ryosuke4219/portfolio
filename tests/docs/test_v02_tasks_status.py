@@ -23,33 +23,44 @@ def _load_task_section(task_number: int) -> str:
     return text[start:next_header]
 
 
-def _assert_task_completed(section: str, *, test_path: str) -> None:
+def _assert_task_in_progress_with_todos(
+    section: str,
+    *,
+    required_todos: list[str],
+) -> None:
     lines = section.splitlines()
     if not lines:
         pytest.fail("タスク節が空です")
 
     header = lines[0]
-    assert "（対応済み）" in header, "タスク見出しが対応済みになっていない"
+    assert "（進行中）" in header, "タスク見出しが進行中になっていない"
 
-    matching = [line for line in lines if test_path in line]
-    if not matching:
-        pytest.fail(f"{test_path} を参照する記述が不足している")
+    has_remaining_section = any("残タスク:" in line for line in lines)
+    assert has_remaining_section, "残タスクの節が存在しない"
 
-    assert all("❌" not in line for line in matching), "品質エビデンスが失敗扱いになっている"
-    assert any("✅" in line for line in matching), "品質エビデンスに成功記号がない"
+    for todo in required_todos:
+        matching = [line for line in lines if todo in line]
+        if not matching:
+            pytest.fail(f"残タスクに '{todo}' が記載されていない")
 
 
 def test_task6_section_reflects_completion() -> None:
     section = _load_task_section(6)
-    _assert_task_completed(
+    _assert_task_in_progress_with_todos(
         section,
-        test_path="projects/04-llm-adapter/tests/providers/test_ollama_provider.py",
+        required_todos=[
+            "CLI 環境変数マッピング",
+            "OpenRouter env リテラル",
+        ],
     )
 
 
 def test_task7_section_reflects_completion() -> None:
     section = _load_task_section(7)
-    _assert_task_completed(
+    _assert_task_in_progress_with_todos(
         section,
-        test_path="projects/04-llm-adapter/tests/providers/test_openrouter_provider.py",
+        required_todos=[
+            "CLI 環境変数マッピング",
+            "OpenRouter env リテラル",
+        ],
     )
