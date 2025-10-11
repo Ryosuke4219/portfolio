@@ -86,7 +86,17 @@ class BaseProvider:
             stacklevel=2,
         )
         model = (self.config.model or self.config.provider).strip()
-        request = ProviderRequest(model=model, prompt=prompt)
+        timeout: float | None = None
+        if self.config.timeout_s > 0:
+            timeout = float(self.config.timeout_s)
+        request = ProviderRequest(
+            model=model,
+            prompt=prompt,
+            max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            top_p=self.config.top_p,
+            timeout_s=timeout,
+        )
         return self.invoke(request)
 
 
