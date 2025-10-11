@@ -103,8 +103,8 @@ class OllamaProvider(BaseProvider):
         auto_pull_default = True
         if isinstance(raw, Mapping) and "auto_pull" in raw:
             auto_pull_default = _coerce_bool(raw.get("auto_pull"), auto_pull_default)
-        if auto_pull_env is not None and auto_pull_env.strip() == "0" and not allow_network:
-            auto_pull_default = False
+        if auto_pull_env is not None:
+            auto_pull_default = _coerce_bool(auto_pull_env, auto_pull_default)
         self._auto_pull = auto_pull_default
         self._allow_network = allow_network
         self._ready_models: set[str] = set()
@@ -247,16 +247,19 @@ class OllamaProvider(BaseProvider):
         ts0 = time.time()
         response = self._client.chat(payload, timeout=timeout_override, stream=stream)
 
-        try:
-            if stream:
+        if stream:
+            try:
                 payload_json = self._consume_stream_response(response)
-            else:
+            finally:
+                response.close()
+        else:
+            try:
                 try:
                     payload_json = response.json()
                 except ValueError as exc:  # pragma: no cover - 非ストリーム時の保険
                     raise RetriableError("invalid JSON from Ollama") from exc
-        finally:
-            response.close()
+            finally:
+                response.close()
 
         if not isinstance(payload_json, Mapping):
             raise RetriableError("invalid JSON structure from Ollama")

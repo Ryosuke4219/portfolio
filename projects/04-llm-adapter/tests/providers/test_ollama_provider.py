@@ -39,6 +39,12 @@ class _FakeResponse:
     def close(self) -> None:
         self.closed = True
 
+    def __enter__(self) -> _FakeResponse:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
     def iter_lines(self):  # pragma: no cover - streaming未使用
         yield from self._chunks
 
@@ -95,11 +101,17 @@ def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
             self.session = session
             self.timeout = timeout
             self.pull_timeout = pull_timeout
+            self.pull_called = False
 
         def show(self, payload: dict[str, Any]) -> _FakeResponse:
+            if mode == "missing_model":
+                return _FakeResponse({}, status_code=404)
             return _FakeResponse({"result": "ok"})
 
         def pull(self, payload: dict[str, Any]) -> _FakeResponse:
+            self.pull_called = True
+            if mode == "missing_model":
+                raise AssertionError("pull should not be called when auto pull is disabled")
             return _FakeResponse({"done": True})
 
         def chat(
@@ -136,6 +148,13 @@ def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
                     },
                     chunks=chunks,
                 )
+            if mode == "stream_chunks_only":
+                chunks = [
+                    b'{"message": {"content": "Hello"}}',
+                    b'{"message": {"content": " from"}}',
+                    b'{"message": {"content": " stream"}, "done": true, "done_reason": "stop"}',
+                ]
+                return _FakeResponse({}, chunks=chunks)
             if mode == "rate_limit":
                 raise RateLimitError("too many requests")
             if mode == "server_error":
@@ -198,13 +217,43 @@ def test_ollama_provider_streaming_concat(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert response.text == "Hello from stream"
     assert response.token_usage.prompt == 5
     assert response.token_usage.completion == 2
-    assert isinstance(response.raw, dict)
-    assert response.raw.get("done") is True
-    message_raw = response.raw.get("message") if isinstance(response.raw, dict) else None
-    if isinstance(message_raw, dict):
-        assert message_raw.get("content") == "Hello from stream"
-    else:  # pragma: no cover - RED 期待
-        pytest.fail("message payload must be a dict for streaming responses")
+
+
+def test_ollama_provider_streaming_iter_lines_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="stream_chunks_only")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        provider = ProviderFactory.create(config)
+        request = ProviderRequest(
+            model=config.model,
+            prompt="say hello",
+            options={"stream": True},
+        )
+        response = provider.invoke(request)
+    finally:
+        local_patch.undo()
+
+    assert response.text == "Hello from stream"
+    assert response.raw["message"]["content"] == "Hello from stream"
+
+
+def test_ollama_provider_auto_pull_disabled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="missing_model")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    monkeypatch.setenv("OLLAMA_AUTO_PULL", "false")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        provider = ProviderFactory.create(config)
+        request = ProviderRequest(model=config.model, prompt="say hello")
+        with pytest.raises(RetriableError):
+            provider.invoke(request)
+    finally:
+        local_patch.undo()
+    fake_client = provider._client
+    assert getattr(fake_client, "pull_called", False) is False
 
 
 def test_ollama_provider_executor_success_in_ci(
