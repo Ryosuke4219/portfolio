@@ -1,8 +1,9 @@
 """CompareRunner 用の補助クラス。"""
 from __future__ import annotations
 
-from dataclasses import replace
 import logging
+from collections.abc import Mapping
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from .budgets import BudgetManager
@@ -127,12 +128,20 @@ class _JudgeInvoker:
         self._config = config
 
     def invoke(self, request: object) -> JudgeProviderResponse:
-        if hasattr(request, "prompt_text"):
-            prompt = request.prompt_text or ""
-        elif hasattr(request, "prompt"):
-            prompt = request.prompt or ""
-        else:
-            prompt = ""
+        prompt = ""
+        if isinstance(request, Mapping):
+            mapping_value = request.get("text")
+            if isinstance(mapping_value, str):
+                prompt = mapping_value
+            else:
+                mapping_value = request.get("prompt")
+                if isinstance(mapping_value, str):
+                    prompt = mapping_value
+        if not prompt:
+            if hasattr(request, "prompt_text"):
+                prompt = request.prompt_text or ""
+            elif hasattr(request, "prompt"):
+                prompt = request.prompt or ""
         response = self._provider.generate(prompt)
         return JudgeProviderResponse(
             text=response.output_text,
