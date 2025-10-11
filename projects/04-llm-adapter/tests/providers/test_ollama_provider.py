@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import importlib
 from pathlib import Path
 from typing import Any
@@ -15,14 +16,22 @@ from adapter.core.config import (
     RetryConfig,
 )
 from adapter.core.errors import ProviderSkip, RateLimitError, RetriableError, SkipReason
+from adapter.core.provider_spi import ProviderRequest
 from adapter.core.providers import ProviderFactory
 
 
 class _FakeResponse:
-    def __init__(self, payload: dict[str, Any], *, status_code: int = 200) -> None:
+    def __init__(
+        self,
+        payload: dict[str, Any],
+        *,
+        status_code: int = 200,
+        chunks: Sequence[bytes | str] | None = None,
+    ) -> None:
         self._payload = payload
         self.status_code = status_code
         self.closed = False
+        self._chunks: tuple[bytes | str, ...] = tuple(chunks or ())
 
     def json(self) -> dict[str, Any]:
         return self._payload
@@ -31,7 +40,7 @@ class _FakeResponse:
         self.closed = True
 
     def iter_lines(self):  # pragma: no cover - streaming未使用
-        yield from ()
+        yield from self._chunks
 
 
 def _load_ollama_module() -> Any:
@@ -108,6 +117,25 @@ def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
                         "eval_count": 3,
                     }
                 )
+            if mode == "stream":
+                chunks = [
+                    b'{"message": {"content": "Hello"}}',
+                    b'{"message": {"content": " from"}}',
+                    (
+                        b'{"message": {"content": " stream"}, "done": true, '
+                        b'"done_reason": "stop", "prompt_eval_count": 5, "eval_count": 2}'
+                    ),
+                ]
+                return _FakeResponse(
+                    {
+                        "message": {"content": " stream"},
+                        "done": True,
+                        "done_reason": "stop",
+                        "prompt_eval_count": 5,
+                        "eval_count": 2,
+                    },
+                    chunks=chunks,
+                )
             if mode == "rate_limit":
                 raise RateLimitError("too many requests")
             if mode == "server_error":
@@ -143,6 +171,40 @@ def test_ollama_provider_executor_success(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert result.response.text == "Hello from Ollama"
     assert result.response.token_usage.prompt == 7
     assert result.response.token_usage.completion == 3
+
+
+def test_ollama_provider_streaming_concat(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="stream")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        config.raw["client"] = module.OllamaClient(
+            host="http://127.0.0.1:11434",
+            session=object(),
+            timeout=60.0,
+            pull_timeout=300.0,
+        )
+        provider = ProviderFactory.create(config)
+        request = ProviderRequest(
+            model=config.model,
+            prompt="say hello",
+            options={"stream": True},
+        )
+        response = provider.invoke(request)
+    finally:
+        local_patch.undo()
+
+    assert response.text == "Hello from stream"
+    assert response.token_usage.prompt == 5
+    assert response.token_usage.completion == 2
+    assert isinstance(response.raw, dict)
+    assert response.raw.get("done") is True
+    message_raw = response.raw.get("message") if isinstance(response.raw, dict) else None
+    if isinstance(message_raw, dict):
+        assert message_raw.get("content") == "Hello from stream"
+    else:  # pragma: no cover - RED 期待
+        pytest.fail("message payload must be a dict for streaming responses")
 
 
 def test_ollama_provider_executor_success_in_ci(

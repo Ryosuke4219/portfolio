@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import json
 import os
 import time
 from typing import Any, cast
@@ -10,8 +11,10 @@ from ..config import ProviderConfig
 from ..errors import ConfigError, ProviderSkip, RetriableError, SkipReason
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
-from ._requests_compat import SessionProtocol, create_session, requests_exceptions
+from ._requests_compat import create_session, requests_exceptions, SessionProtocol
 from .ollama_client import OllamaClient
+
+__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 
@@ -245,9 +248,13 @@ class OllamaProvider(BaseProvider):
         response = self._client.chat(payload, timeout=timeout_override, stream=stream)
 
         try:
-            payload_json = response.json()
-        except ValueError as exc:
-            raise RetriableError("invalid JSON from Ollama") from exc
+            if stream:
+                payload_json = self._consume_stream_response(response)
+            else:
+                try:
+                    payload_json = response.json()
+                except ValueError as exc:  # pragma: no cover - 非ストリーム時の保険
+                    raise RetriableError("invalid JSON from Ollama") from exc
         finally:
             response.close()
 
@@ -275,5 +282,46 @@ class OllamaProvider(BaseProvider):
             raw=payload_json,
         )
 
+    def _consume_stream_response(self, response: Any) -> dict[str, Any]:
+        parts: list[str] = []
+        final_payload: dict[str, Any] | None = None
+        for raw_line in response.iter_lines():
+            if not raw_line:
+                continue
+            if isinstance(raw_line, bytes):
+                try:
+                    decoded = raw_line.decode("utf-8")
+                except UnicodeDecodeError as exc:  # pragma: no cover - 不正なUTF-8防御
+                    raise RetriableError("invalid UTF-8 from Ollama stream") from exc
+            else:
+                decoded = str(raw_line)
+            decoded = decoded.strip()
+            if not decoded:
+                continue
+            try:
+                chunk = json.loads(decoded)
+            except ValueError as exc:
+                raise RetriableError("invalid JSON from Ollama") from exc
+            if not isinstance(chunk, Mapping):
+                continue
+            final_payload = dict(chunk)
+            message = chunk.get("message")
+            if isinstance(message, Mapping):
+                content = message.get("content")
+                if isinstance(content, str):
+                    parts.append(content)
 
-__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
+        if final_payload is None:
+            raise RetriableError("empty stream from Ollama")
+
+        if parts:
+            message_payload: dict[str, Any]
+            raw_message = final_payload.get("message")
+            if isinstance(raw_message, Mapping):
+                message_payload = dict(raw_message)
+            else:
+                message_payload = {}
+            message_payload["content"] = "".join(parts)
+            final_payload["message"] = message_payload
+
+        return final_payload
