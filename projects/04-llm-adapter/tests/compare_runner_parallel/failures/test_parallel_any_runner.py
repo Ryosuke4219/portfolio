@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from adapter.core import _parallel_shim, errors
-from adapter.core.errors import ProviderSkip, TimeoutError
+from adapter.core.config import ProviderConfig
+from adapter.core.errors import AuthError, ConfigError, ProviderSkip, TimeoutError
 from adapter.core.providers import BaseProvider, ProviderFactory, ProviderResponse
 from adapter.core.runner_api import RunnerConfig
+from adapter.core.runner_execution import RunnerExecution
 from adapter.core.runners import CompareRunner
-from tests.compare_runner_parallel.conftest import ProviderConfigFactory, TaskFactory
+from adapter.core.metrics.models import BudgetSnapshot, RunMetrics
+from tests.compare_runner_parallel.conftest import (
+    ProviderConfigFactory,
+    RunMetricsFactory,
+    TaskFactory,
+)
 
 
 def _normalize_mode(value: str) -> str:
@@ -163,6 +171,124 @@ def test_parallel_any_populates_metrics_for_unscheduled_workers(
     assert idle_metrics.output_tokens == 0
     assert idle_metrics.latency_ms == 0
     assert idle_metrics.cost_usd == 0.0
+
+
+@pytest.mark.parametrize(
+    ("exception_factory", "expected_status", "expected_kind", "message"),
+    [
+        (lambda: ProviderSkip("skip me"), "skip", "skip", "skip me"),
+        (lambda: AuthError("auth fail"), "error", "auth", "auth fail"),
+        (lambda: ConfigError("config fail"), "error", "config", "config fail"),
+    ],
+)
+def test_parallel_any_non_billable_errors_have_zero_cost(
+    exception_factory: Callable[[], Exception],
+    expected_status: str,
+    expected_kind: str,
+    message: str,
+    tmp_path: Path,
+    provider_config_factory: ProviderConfigFactory,
+    task_factory: TaskFactory,
+    run_metrics_factory: RunMetricsFactory,
+) -> None:
+    class ErrorProvider(BaseProvider):
+        def __init__(
+            self, config: ProviderConfig, factory: Callable[[], Exception]
+        ) -> None:
+            super().__init__(config)
+            self._factory = factory
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            raise self._factory()
+
+    provider_config = provider_config_factory(
+        tmp_path, name="error", provider="error-provider", model="error-model"
+    )
+    provider = ErrorProvider(provider_config, exception_factory)
+    task = task_factory()
+
+    budget_calls: list[float] = []
+
+    def evaluate_budget(
+        cfg: ProviderConfig,
+        cost_usd: float,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+    ) -> tuple[BudgetSnapshot, str | None, str, str | None, str | None]:
+        budget_calls.append(cost_usd)
+        assert cost_usd == pytest.approx(0.0)
+        assert status == expected_status
+        assert failure_kind == expected_kind
+        assert error_message == message
+        return (
+            BudgetSnapshot(run_budget_usd=0.0, hit_stop=False),
+            None,
+            status,
+            failure_kind,
+            error_message,
+        )
+
+    def build_metrics(
+        cfg: ProviderConfig,
+        golden_task,
+        attempt_index: int,
+        mode: str,
+        provider_response: ProviderResponse,
+        status: str,
+        failure_kind: str | None,
+        error_message: str | None,
+        latency_ms: int,
+        budget_snapshot: BudgetSnapshot,
+        cost_usd: float,
+    ) -> tuple[RunMetrics, str]:
+        assert cost_usd == pytest.approx(0.0)
+        assert provider_response.input_tokens == 0
+        assert provider_response.output_tokens == 0
+        metrics = run_metrics_factory(
+            provider=cfg.provider,
+            model=cfg.model,
+            latency_ms=latency_ms,
+            cost_usd=cost_usd,
+        )
+        metrics.status = status
+        metrics.failure_kind = failure_kind
+        metrics.error_message = error_message
+        metrics.input_tokens = provider_response.input_tokens
+        metrics.output_tokens = provider_response.output_tokens
+        return metrics, provider_response.output_text or ""
+
+    execution = RunnerExecution(
+        token_bucket=None,
+        schema_validator=None,
+        evaluate_budget=evaluate_budget,
+        build_metrics=build_metrics,
+        normalize_concurrency=lambda count, limit: count,
+        backoff=None,
+        shadow_provider=None,
+        metrics_path=None,
+        provider_weights=None,
+    )
+
+    result = execution._run_single(
+        provider_config,
+        provider,
+        task,
+        attempt_index=0,
+        mode="parallel_any",
+    )
+
+    assert len(budget_calls) == 1
+    assert budget_calls[0] == pytest.approx(0.0)
+    assert result.stop_reason is None
+    metrics = result.metrics
+    assert metrics.cost_usd == pytest.approx(0.0)
+    assert metrics.input_tokens == 0
+    assert metrics.output_tokens == 0
+    assert metrics.token_usage == {"prompt": 0, "completion": 0, "total": 0}
+    assert metrics.status == expected_status
+    assert metrics.failure_kind == expected_kind
+    assert metrics.error_message == message
 
 
 def test_parallel_any_failure_summary_includes_all_failures(

@@ -63,7 +63,7 @@ class ProviderCallExecutor:
             response = provider.generate(prompt)
         except ProviderSkip as exc:
             latency_ms = int((perf_counter() - start) * 1000)
-            response = self._build_error_response(prompt, latency_ms)
+            response = self._build_error_response(prompt, latency_ms, billable=False)
             return _ProviderCallResult(
                 response=response,
                 status="skip",
@@ -82,6 +82,7 @@ class ProviderCallExecutor:
                 status="error",
                 failure_kind="auth",
                 advance=True,
+                billable=False,
             )
         except ConfigError as exc:
             return self._build_error_result(
@@ -91,6 +92,7 @@ class ProviderCallExecutor:
                 status="error",
                 failure_kind="config",
                 advance=True,
+                billable=False,
             )
         except RateLimitError as exc:
             return self._handle_backoff_error(
@@ -127,6 +129,7 @@ class ProviderCallExecutor:
                 status="error",
                 failure_kind="provider_error",
                 advance=False,
+                billable=True,
             )
         latency_ms = response.latency_ms
         return _ProviderCallResult(
@@ -147,9 +150,10 @@ class ProviderCallExecutor:
         status: str,
         failure_kind: str,
         advance: bool,
+        billable: bool,
     ) -> _ProviderCallResult:
         latency_ms = int((perf_counter() - started_at) * 1000)
-        response = self._build_error_response(prompt, latency_ms)
+        response = self._build_error_response(prompt, latency_ms, billable=billable)
         return _ProviderCallResult(
             response=response,
             status=status,
@@ -181,13 +185,17 @@ class ProviderCallExecutor:
             status=status,
             failure_kind=failure_kind,
             advance=advance,
+            billable=True,
         )
 
     @staticmethod
-    def _build_error_response(prompt: str, latency_ms: int) -> ProviderResponse:
+    def _build_error_response(
+        prompt: str, latency_ms: int, *, billable: bool = True
+    ) -> ProviderResponse:
+        input_tokens = len(prompt.split()) if billable else 0
         return ProviderResponse(
             output_text="",
-            input_tokens=len(prompt.split()),
+            input_tokens=input_tokens,
             output_tokens=0,
             latency_ms=latency_ms,
         )
