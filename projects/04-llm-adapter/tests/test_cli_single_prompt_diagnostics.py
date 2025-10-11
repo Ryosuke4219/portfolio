@@ -24,9 +24,18 @@ from adapter.core.models import (
 
 def test_prompt_runner_provider_response_tokens() -> None:
     class FakeProvider:
-        def generate(self, prompt: str) -> provider_module.ProviderResponse:
+        def __init__(self) -> None:
+            self.last_request: provider_module.ProviderRequest | None = None
+
+        def generate(self, prompt: str) -> provider_module.ProviderResponse:  # pragma: no cover - 旧 API 経由
+            raise AssertionError("generate() は使用しないでください")
+
+        def invoke(
+            self, request: provider_module.ProviderRequest
+        ) -> provider_module.ProviderResponse:
+            self.last_request = request
             return provider_module.ProviderResponse(
-                output_text=f"echo:{prompt}",
+                output_text=f"echo:{request.prompt}",
                 input_tokens=3,
                 output_tokens=2,
                 latency_ms=5,
@@ -50,7 +59,7 @@ def test_prompt_runner_provider_response_tokens() -> None:
         pricing=PricingConfig(),
         rate_limit=RateLimitConfig(),
         quality_gates=QualityGatesConfig(),
-        raw={},
+        raw={"options": {"foo": "bar"}},
     )
 
     def classify_error(
@@ -77,6 +86,10 @@ def test_prompt_runner_provider_response_tokens() -> None:
     assert result.metric.output_tokens == 2
     assert result.response is not None
     assert result.response.output_text == "echo:hello"
+    assert provider.last_request is not None
+    assert provider.last_request.prompt == "hello"
+    assert provider.last_request.max_tokens == 16
+    assert provider.last_request.options == {"foo": "bar"}
 
 
 def test_classify_error_rate_limit_status_code() -> None:
