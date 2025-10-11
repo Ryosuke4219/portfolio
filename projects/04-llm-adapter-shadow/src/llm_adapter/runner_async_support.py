@@ -7,5 +7,5 @@ from __future__ import annotations
 
 raise ImportError(
     "llm_adapter.runner_async_support shim は廃止されました。"
-    "adapter.core.runner_async_support から直接 import してください。"
+    " adapter.core.runner_async_support から直接 import してください。"
 )
