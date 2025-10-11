@@ -14,7 +14,8 @@ from adapter.core.config import (
     RateLimitConfig,
     RetryConfig,
 )
-from adapter.core.errors import AuthError, ProviderSkip, RateLimitError, RetriableError
+from adapter.core.errors import AuthError, ProviderSkip, RateLimitError, RetriableError, SkipReason
+from adapter.core.provider_spi import ProviderRequest
 from adapter.core.providers import ProviderFactory
 
 
@@ -245,6 +246,11 @@ def test_openrouter_provider_resolves_api_key_from_auth_env(
 
     assert result.status == "ok"
     assert result.response.text == "auth"
+    session_calls = getattr(session, "calls", [])
+    assert session_calls
+    url, payload, stream, _timeout = session_calls[0]
+    assert stream is False
+    assert payload is not None and payload.get("stream") is None
 
 
 def test_openrouter_provider_resolves_base_url_from_env(
@@ -285,6 +291,56 @@ def test_openrouter_provider_resolves_base_url_from_env(
 
     assert result.status == "ok"
     assert result.response.text == "env"
+    session = getattr(provider, "_session")
+    session_calls = getattr(session, "calls", [])
+    assert session_calls
+    url, _payload, stream, _timeout = session_calls[0]
+    assert url == f"{base_url}/chat/completions"
+    assert stream is False
+
+
+def test_openrouter_provider_supports_streaming(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_openrouter_module()
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert stream is True
+        assert payload is not None
+        assert payload.get("stream") is True
+        return _FakeResponse(
+            {},
+            lines=[
+                b"data: {\"choices\": [{\"delta\": {\"content\": \"hel\"}}]}",
+                b"data: {\"choices\": [{\"delta\": {\"content\": \"lo\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 3, \"completion_tokens\": 2}, \"model\": \"stream-model\"}",
+                b"data: [DONE]",
+            ],
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    try:
+        config = _provider_config(tmp_path)
+        provider = ProviderFactory.create(config)
+        request = ProviderRequest(model=config.model, messages=[], options={"stream": True})
+        response = provider.invoke(request)
+    finally:
+        local_patch.undo()
+
+    assert response.text == "hello"
+    assert response.finish_reason == "stop"
+    assert response.token_usage.prompt == 3
+    assert response.token_usage.completion == 2
+    assert response.model == "stream-model"
+    session = getattr(provider, "_session")
+    session_calls = getattr(session, "calls", [])
+    assert session_calls
+    _url, payload, stream_flag, _timeout = session_calls[0]
+    assert stream_flag is True
+    assert payload is not None and payload.get("stream") is True
 
 
 def test_openrouter_provider_normalizes_auth_error(
@@ -372,4 +428,5 @@ def test_openrouter_provider_skip_without_api_key(monkeypatch: pytest.MonkeyPatc
     assert result.status == "skip"
     assert result.failure_kind == "skip"
     assert isinstance(result.error, ProviderSkip)
+    assert result.error.reason == SkipReason.MISSING_OPENROUTER_API_KEY
     assert result.backoff_next_provider is True
