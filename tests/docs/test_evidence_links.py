@@ -17,6 +17,9 @@ EXPECTED_REFERENCES = (
     "projects/04-llm-adapter/adapter/core/runner_execution.py",
 )
 
+LEGACY_METRICS_REFERENCE = "projects/04-llm-adapter/adapter/core/metrics.py"
+UPDATED_METRICS_REFERENCE = "projects/04-llm-adapter/adapter/core/metrics/models.py"
+
 
 @pytest.mark.parametrize("evidence_path", EVIDENCE_PATHS)
 def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
@@ -26,3 +29,10 @@ def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
         "Missing references in evidence file"
         f" {evidence_path.relative_to(PROJECT_ROOT)}: {missing}"
     )
+
+
+def test_llm_adapter_evidence_en_metrics_reference() -> None:
+    evidence_path = PROJECT_ROOT / "docs" / "en" / "evidence" / "llm-adapter.md"
+    content = evidence_path.read_text(encoding="utf-8")
+    assert LEGACY_METRICS_REFERENCE not in content
+    assert UPDATED_METRICS_REFERENCE in content

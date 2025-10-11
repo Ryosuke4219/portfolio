@@ -16,14 +16,14 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 
 - The `llm-adapter` CLI invokes comparison modes implemented in `adapter/run_compare.py`, orchestrating sequential, parallel, and consensus runs with shared metrics.
 - `adapter/core/runner_execution.py` handles retries and provider-specific exceptions, emitting comparison events for downstream tooling.
-- `adapter/core/metrics.py` shapes JSONL metrics and derived summaries, appending results to paths provided via the CLI `--out` flag such as `out/metrics.jsonl` (while the default in `adapter/run_compare.py` remains `data/runs-metrics.jsonl`).
+- `adapter/core/metrics/models.py` shapes JSONL metrics and derived summaries, appending results to paths provided via the CLI `--out` flag such as `out/metrics.jsonl` (while the default in `adapter/run_compare.py` remains `data/runs-metrics.jsonl`).
 
 ## Key Artifacts
 
 - [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — Detailed CLI and configuration overview.
 - [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — Entry point and implementation of comparison modes.
 - [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — Core logic for provider execution, retries, and metric aggregation.
-- [adapter/core/metrics.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics.py) — Metric structures and JSONL emission utilities.
+- [adapter/core/metrics/models.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/models.py) — Metric structures and JSONL emission utilities.
 
 ## How to Reproduce
 
