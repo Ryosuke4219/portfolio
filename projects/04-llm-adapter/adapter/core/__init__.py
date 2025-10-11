@@ -18,7 +18,11 @@ from .config import (  # noqa: F401
     load_budget_book,
     load_provider_config,
     load_provider_configs,
+    PricingConfig,
     ProviderConfig,
+    QualityGatesConfig,
+    RateLimitConfig,
+    RetryConfig,
 )
 from .datasets import GoldenTask, load_golden_tasks  # noqa: F401
 from .metrics.costs import compute_cost_usd, estimate_cost  # noqa: F401
@@ -44,6 +48,10 @@ __all__ = [
     "BudgetManager",
     "BudgetBook",
     "BudgetRule",
+    "RetryConfig",
+    "PricingConfig",
+    "RateLimitConfig",
+    "QualityGatesConfig",
     "ProviderConfig",
     "load_budget_book",
     "load_provider_config",
