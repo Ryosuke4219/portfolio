@@ -72,9 +72,14 @@ class DeterminismGate:
             median_diff,
             len_stdev,
         )
+        stats_message = f"median_diff={median_diff:.4f} len_stdev={len_stdev:.4f}"
         for metrics, _ in comparable:
             metrics.status = "error"
             metrics.failure_kind = "non_deterministic"
+            if metrics.error_message:
+                metrics.error_message = f"{metrics.error_message}; {stats_message}"
+            else:
+                metrics.error_message = stats_message
 
 
 class TaskFinalizer:
