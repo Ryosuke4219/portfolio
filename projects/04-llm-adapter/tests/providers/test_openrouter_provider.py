@@ -437,6 +437,57 @@ def test_openrouter_provider_request_options_override(monkeypatch: pytest.Monkey
     assert result.response.text == "overridden"
 
 
+def test_openrouter_provider_request_options_take_priority_over_config_raw(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    captured: dict[str, Any] = {}
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert stream is False
+        assert payload is not None
+        captured["payload"] = payload
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "priority"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 2, "completion_tokens": 1},
+                "model": "priority-model",
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    try:
+        config = _provider_config(tmp_path)
+        config.raw["options"] = {"response_format": "config", "seed": 42}
+        provider = ProviderFactory.create(config)
+        request = ProviderRequest(
+            model=config.model,
+            messages=[],
+            options={"response_format": "request", "extra": "value"},
+        )
+        response = provider.invoke(request)
+    finally:
+        local_patch.undo()
+
+    assert response.text == "priority"
+    payload = captured.get("payload")
+    assert isinstance(payload, dict)
+    assert payload.get("response_format") == "request"
+    assert payload.get("extra") == "value"
+    assert payload.get("seed") == 42
+
+
 def test_openrouter_provider_normalizes_auth_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -544,3 +595,27 @@ def test_openrouter_provider_skip_message_mentions_custom_auth_env(
     assert result.status == "skip"
     assert isinstance(result.error, ProviderSkip)
     assert "CUSTOM_ROUTER_KEY" in str(result.error)
+
+
+def test_openrouter_provider_skip_message_mentions_configured_and_resolved_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    local_patch = _install_fake_session(module, lambda *_: _FakeResponse({}))
+    monkeypatch.delenv("CUSTOM_ROUTER_KEY", raising=False)
+    monkeypatch.delenv("MAPPED_ROUTER_KEY", raising=False)
+    try:
+        config = _provider_config(tmp_path)
+        config.auth_env = "CUSTOM_ROUTER_KEY"
+        config.raw["env"] = {"CUSTOM_ROUTER_KEY": "MAPPED_ROUTER_KEY"}
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "missing key")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "skip"
+    assert isinstance(result.error, ProviderSkip)
+    message = str(result.error)
+    assert "CUSTOM_ROUTER_KEY" in message
+    assert "MAPPED_ROUTER_KEY" in message
