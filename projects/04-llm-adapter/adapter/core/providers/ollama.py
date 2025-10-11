@@ -10,11 +10,11 @@ from ..config import ProviderConfig
 from ..errors import ConfigError, ProviderSkip, RetriableError, SkipReason
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
-from ._requests_compat import SessionProtocol, create_session
+from ._requests_compat import create_session, requests_exceptions, SessionProtocol
 from .ollama_client import OllamaClient
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
-__all__ = ["OllamaProvider", "DEFAULT_HOST"]
+__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
 
 
 def _token_usage_from_payload(payload: Mapping[str, Any]) -> TokenUsage:
@@ -80,9 +80,13 @@ class OllamaProvider(BaseProvider):
         self._timeout = timeout_value
         self._pull_timeout = pull_timeout_value
 
-        offline_flag = os.getenv("LLM_ADAPTER_OFFLINE") == "1"
-        ci_flag = os.getenv("CI", "").lower() == "true"
-        self._offline = offline_flag or ci_flag
+        offline_env = os.getenv("LLM_ADAPTER_OFFLINE")
+        ci_flag = os.getenv("CI", "").strip().lower() == "true"
+        if offline_env is not None:
+            offline_flag = _coerce_bool(offline_env, True)
+            self._offline = offline_flag
+        else:
+            self._offline = ci_flag
 
         session_override = raw.get("session") if isinstance(raw, Mapping) else None
         client_override = raw.get("client") if isinstance(raw, Mapping) else None
@@ -163,7 +167,7 @@ class OllamaProvider(BaseProvider):
             content = entry.get("content")
             if isinstance(content, str):
                 return content
-            if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
+            if isinstance(content, Sequence) and not isinstance(content, bytes | bytearray):
                 parts = [part for part in content if isinstance(part, str)]
                 return "\n".join(parts)
             if content is None:
