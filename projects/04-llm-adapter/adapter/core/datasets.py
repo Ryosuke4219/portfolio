@@ -46,12 +46,15 @@ def load_golden_tasks(path: Path) -> list[GoldenTask]:
     """JSONL 形式のゴールデンタスクを読み込む。"""
 
     tasks: list[GoldenTask] = []
-    with path.open("r", encoding="utf-8") as fp:
-        for line in fp:
+    with path.open("r", encoding="utf-8-sig") as fp:
+        for index, line in enumerate(fp, start=1):
             line = line.strip()
             if not line:
                 continue
-            data = json.loads(line)
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"invalid JSON at {path}:{index}") from exc
             tasks.append(
                 GoldenTask(
                     task_id=str(data["id"]),
