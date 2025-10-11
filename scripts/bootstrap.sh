@@ -53,5 +53,5 @@ fi
 source "${VENV_DIR}/bin/activate"
 export PIP_CACHE_DIR="${CACHE_ROOT}/pip"
 pip install --upgrade pip
-pip install -r "${REPO_ROOT}/projects/04-llm-adapter-shadow/requirements.txt"
+pip install -r "${REPO_ROOT}/projects/04-llm-adapter/requirements.txt"
 deactivate
