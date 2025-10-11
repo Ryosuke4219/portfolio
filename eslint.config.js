@@ -10,7 +10,7 @@ export default [
       'dist/**',
       'coverage/**',
       'docs/reports/coverage/**',
-      'projects/04-llm-adapter-shadow/**',
+      'projects/04-llm-adapter/**',
       'tests/playwright-report/**',
       'projects/02-blueprint-to-playwright/tests/generated/**',
       '**/*.ts',
