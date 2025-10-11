@@ -131,6 +131,20 @@ class OpenRouterProvider(BaseProvider):
         raw = config.raw if isinstance(config.raw, Mapping) else {}
         raw_env = raw.get("env") if isinstance(raw, Mapping) else None
 
+        auth_env_name = ""
+        if isinstance(config.auth_env, str):
+            auth_env_name = config.auth_env.strip()
+        if not auth_env_name or auth_env_name.upper() == "NONE":
+            auth_env_name = "OPENROUTER_API_KEY"
+        resolved_auth_env_name = auth_env_name
+        if isinstance(raw_env, Mapping):
+            override_name = raw_env.get(auth_env_name)
+            if isinstance(override_name, str):
+                candidate = override_name.strip()
+                if candidate:
+                    resolved_auth_env_name = candidate
+        self._auth_env_name = resolved_auth_env_name
+
         def _resolve_from_env_mapping(default_name: str) -> str:
             if not isinstance(default_name, str):
                 return ""
@@ -204,13 +218,14 @@ class OpenRouterProvider(BaseProvider):
             for key, value in options.items():
                 if key == "stream":
                     continue
-                payload.setdefault(key, value)
+                payload[key] = value
         return payload
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         if not self._api_key:
+            env_name = self._auth_env_name or "OPENROUTER_API_KEY"
             raise ProviderSkip(
-                "openrouter: OPENROUTER_API_KEY not set",
+                f"openrouter: {env_name} not set",
                 reason=SkipReason.MISSING_OPENROUTER_API_KEY,
             )
         timeout = request.timeout_s if request.timeout_s is not None else self._default_timeout
