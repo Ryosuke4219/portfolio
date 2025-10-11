@@ -1,15 +1,13 @@
 [project]
 name = "portfolio-llm-adapter-shadow"
 version = "0.1.0"
-description = "Minimal shadow-execution + error-cases PoC for portfolio"
+description = "Legacy-only shadow-execution + error-cases PoC for portfolio"
 requires-python = ">=3.10"
 dependencies = [
     "PyYAML>=6.0",
     "requests>=2.31.0",
     "google-genai>=0.3",
 ]
-[project.scripts]
-llm-adapter = "src.llm_adapter.cli:main"
 [tool.pytest.ini_options]
 pythonpath = ["projects/04-llm-adapter-shadow"]
 addopts = "-q"
