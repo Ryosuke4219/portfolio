@@ -201,6 +201,40 @@ def test_cli_missing_api_key_en(monkeypatch, tmp_path: Path, capfd) -> None:
     assert "API key is missing" in captured.err
 
 
+def test_cli_accepts_auth_env_alias(
+    echo_provider, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capfd
+) -> None:
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        (
+            "provider: fake\n"
+            "model: dummy\n"
+            "auth_env: TEST_KEY\n"
+            "max_tokens: 128\n"
+            "options:\n  foo: bar\n"
+            "env:\n  TEST_KEY: TEST_KEY_ALIAS\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("TEST_KEY", raising=False)
+    monkeypatch.setenv("TEST_KEY_ALIAS", "alias-value")
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == 0
+    assert "echo:hello" in captured.out
+    assert len(echo_provider.requests) == 1
+    assert "API key is missing" not in captured.err
+
+
 def test_cli_unknown_provider(tmp_path: Path, capfd) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
