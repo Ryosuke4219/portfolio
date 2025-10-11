@@ -53,12 +53,12 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
   <article class="demo-card">
     <header>
       <p class="demo-card__id">04</p>
-      <h2><a href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Shadow Execution</a></h2>
+      <h2><a href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Provider Orchestration</a></h2>
     </header>
-    <p>An adapter that runs a shadow provider alongside the primary LLM to capture anomalies while keeping the main response.</p>
+    <p>An adapter that drives provider integration and executes comparison runs while keeping production fallbacks intact.</p>
     <ul>
-      <li>Collects shadow diff metrics as JSONL for vendor comparison.</li>
-      <li>Mocks timeouts, rate limits, and malformed responses to validate fallbacks.</li>
+      <li>Provider integration layer unifies OpenAI, Azure, and local mock drivers with consistent tracing.</li>
+      <li>Comparison CLI <code>pnpm llm-adapter compare</code> captures side-by-side diffs and exports JSONL for audits.</li>
     </ul>
     <p><a class="demo-card__link" href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
@@ -84,9 +84,9 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 - Deliverable: Running `npx flaky analyze` generates `projects/03-ci-flaky/out/index.html` (HTML/CSV/JSON) retrievable from CI artifacts.
 - Sample workflow: Ingest any JUnit XML via `npx flaky parse --input <path-to-xml>` and store the history for later analysis.
 
-### 04. LLM Adapter — Shadow Execution
-- Runs a shadow provider in parallel, records response diffs as JSONL, and visualizes the findings.
-- Recreates timeout, rate limit, and malformed responses with mocks to verify fallback design.
+### 04. LLM Adapter — Provider Orchestration
+- Unifies provider integration with resilient fallback strategies and shared telemetry hooks.
+- `pnpm llm-adapter compare` runs dual providers, persists diff metrics, and feeds provider scorecards.
 - Reference: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
 [View all weekly summaries &rarr;]({{ '/weekly-summary.html' | relative_url }})
