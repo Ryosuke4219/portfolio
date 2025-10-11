@@ -38,35 +38,27 @@
 
 ## Providers
 
-### タスク6: Ollama プロバイダを v0.2 コアへ移植する（進行中）
+### タスク6: Ollama プロバイダを v0.2 コアへ移植する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/test_ollama_provider.py`
 - 対応状況:
-  - `OllamaProvider` が環境変数や設定ファイルからホスト・タイムアウト・自動 Pull 設定を解決し、オフライン時は `ProviderSkip` で安全にスキップする実装をコアへ移植済み。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L48-L148】
-  - `ProviderRequest` のメッセージ/オプションを Ollama API のチャットペイロードへ正規化し、応答からトークン使用量とメタ情報を `ProviderResponse` に集約する。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L150-L268】
+  - `OllamaProvider` が環境変数・設定ファイル・CLI からホストやタイムアウト、自動 Pull の優先順位を解決し、CI/オフライン制御に応じて `ProviderSkip` を返す挙動を含めてコアへ組み込まれた。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L50-L166】
+  - `ProviderRequest` のメッセージと `options.*` をチャットペイロードへ取り込み、ストリーミング応答を `ProviderResponse` に正規化する処理を実装した。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L168-L268】
 - 品質エビデンス:
-  - ❌ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が `offline` 制御時の挙動差異により失敗している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L124-L193】
-- 残タスク:
-  - CLI から渡された `ProviderRequest.options` (`ollama.*` や `request_kwargs.*`) を HTTP リクエストまで伝播させ、既存 YAML 設定との優先順位を統一する。
-  - ストリーミング応答のチャンク終端・エラー再試行を `PromptRunner` 経由で検証する回帰テストを追加し、CLI からの実行ログと整合させる。
-  - 失敗テストのモック/フィクスチャを更新し、`pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` を緑化する。
+  - ✅ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、ストリーミング連結・オフラインスキップ・レート制限/再試行の正規化を回帰テストで担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L170-L390】
 
-### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（進行中）
+### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py`
 - 対応状況:
-  - `OpenRouterProvider` が API キーとベース URL の解決・セッションヘッダ設定を行い、Shadow 依存なくコアへ統合されている。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L32-L117】
-  - `ProviderRequest` からチャットペイロードを生成し、ストリーミング含む応答の正規化とトークン計測を `ProviderResponse` に反映する。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L118-L330】
+  - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
+  - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
 - 品質エビデンス:
-  - ❌ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が API キー/環境変数マッピング不足により失敗している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L99-L340】
-- 残タスク:
-  - CLI からの `ProviderRequest.options` (`openrouter.*` と共通 `request_kwargs.*`) を API 呼び出しに反映し、Shadow 依存を残さない形で `ProviderFactory` を更新する。
-  - ストリーミング応答のチャンク分割・`done` イベント検知を再現するモックを追加し、`PromptRunner` と `ProviderResponse` の同期を確認する。
-  - 認証・レート制限ハンドリングを最新仕様へ合わせた上でテストを修正し、`pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を緑化する。
+  - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー解決・環境変数優先順位・ストリーミング/エラーハンドリングの動作を網羅テストしている。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L100-L520】
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する
 - 対象モジュール:
