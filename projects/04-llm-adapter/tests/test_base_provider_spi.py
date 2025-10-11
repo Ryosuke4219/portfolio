@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from adapter.core._provider_execution import ProviderCallExecutor
 from adapter.core.config import (
     PricingConfig,
     ProviderConfig,
@@ -10,14 +13,10 @@ from adapter.core.config import (
     RateLimitConfig,
     RetryConfig,
 )
-import pytest
-
-from adapter.core._provider_execution import ProviderCallExecutor
 from adapter.core.provider_spi import ProviderRequest
-from adapter.core.providers import BaseProvider, ProviderResponse
 
 # Gemini プロバイダ依存モジュール
-from adapter.core.providers import gemini as gemini_module
+from adapter.core.providers import BaseProvider, gemini as gemini_module, ProviderResponse
 
 
 def _provider_config(tmp_path: Path, provider: str) -> ProviderConfig:
@@ -67,6 +66,29 @@ def test_base_provider_generate_propagates_config_values(tmp_path: Path) -> None
     provider = _AssertingProvider(config)
 
     provider.generate("hello world")
+
+
+def test_base_provider_generate_propagates_raw_options_and_metadata(tmp_path: Path) -> None:
+    config = _provider_config(tmp_path, provider="mock-provider")
+    config.raw = {
+        "options": {"candidate_count": 3},
+        "metadata": {"trace_id": "trace-123"},
+    }
+
+    captured: dict[str, ProviderRequest] = {}
+
+    class _AssertingProvider(_DummyProvider):
+        def invoke(self, request: ProviderRequest) -> ProviderResponse:
+            captured["request"] = request
+            return ProviderResponse(text="ok", latency_ms=0)
+
+    provider = _AssertingProvider(config)
+
+    provider.generate("hello world")
+
+    request = captured["request"]
+    assert request.options == {"candidate_count": 3}
+    assert request.metadata == {"trace_id": "trace-123"}
 
 
 def test_base_provider_name_returns_provider_id(tmp_path: Path) -> None:

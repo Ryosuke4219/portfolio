@@ -1,6 +1,7 @@
 """プロバイダとのインタフェース。"""
 from __future__ import annotations
 
+from collections.abc import Mapping
 import hashlib
 import logging
 import time
@@ -89,6 +90,15 @@ class BaseProvider:
         timeout: float | None = None
         if self.config.timeout_s > 0:
             timeout = float(self.config.timeout_s)
+        raw = self.config.raw
+        options_source = raw.get("options") if isinstance(raw, Mapping) else None
+        metadata_source = raw.get("metadata") if isinstance(raw, Mapping) else None
+        options: dict[str, Any] | None = None
+        if isinstance(options_source, Mapping):
+            options = dict(options_source)
+        metadata: Mapping[str, Any] | None = None
+        if isinstance(metadata_source, Mapping):
+            metadata = dict(metadata_source)
         request = ProviderRequest(
             model=model,
             prompt=prompt,
@@ -96,6 +106,8 @@ class BaseProvider:
             temperature=self.config.temperature,
             top_p=self.config.top_p,
             timeout_s=timeout,
+            options=options or {},
+            metadata=metadata,
         )
         return self.invoke(request)
 
