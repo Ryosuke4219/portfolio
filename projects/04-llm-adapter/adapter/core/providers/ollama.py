@@ -7,14 +7,21 @@ import time
 from typing import Any, cast
 
 from ..config import ProviderConfig
-from ..errors import ConfigError, ProviderSkip, RetriableError, SkipReason
+from ..errors import (
+    ConfigError,
+    ProviderSkip,
+    RateLimitError,
+    RetriableError,
+    SkipReason,
+    TimeoutError,
+)
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
-from ._requests_compat import SessionProtocol, create_session
+from ._requests_compat import SessionProtocol, create_session, requests_exceptions
 from .ollama_client import OllamaClient
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
-__all__ = ["OllamaProvider", "DEFAULT_HOST"]
+__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
 
 
 def _token_usage_from_payload(payload: Mapping[str, Any]) -> TokenUsage:
@@ -40,6 +47,29 @@ def _coerce_bool(value: Any, default: bool) -> bool:
         if lowered in {"0", "false", "no", "off"}:
             return False
     return default
+
+
+def _normalize_requests_error(exc: requests_exceptions.RequestException) -> Exception:
+    if isinstance(exc, requests_exceptions.Timeout):
+        return TimeoutError(str(exc))
+    if isinstance(exc, requests_exceptions.ConnectionError):
+        return RetriableError(str(exc))
+    if isinstance(exc, requests_exceptions.HTTPError):
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None)
+        try:
+            code = int(status) if status is not None else None
+        except (TypeError, ValueError):
+            code = None
+        message = str(exc)
+        if code == 429:
+            return RateLimitError(message)
+        if code in {408, 504}:
+            return TimeoutError(message)
+        if code is not None and code >= 500:
+            return RetriableError(message)
+        return RetriableError(message)
+    return RetriableError(str(exc))
 
 
 class OllamaProvider(BaseProvider):
@@ -234,7 +264,14 @@ class OllamaProvider(BaseProvider):
             payload["options"] = {**options_payload, **payload.get("options", {})}
 
         ts0 = time.time()
-        response = self._client.chat(payload, timeout=timeout_override, stream=stream)
+        try:
+            response = self._client.chat(
+                payload,
+                timeout=timeout_override,
+                stream=stream,
+            )
+        except requests_exceptions.RequestException as exc:
+            raise _normalize_requests_error(exc) from exc
 
         try:
             payload_json = response.json()
@@ -268,4 +305,4 @@ class OllamaProvider(BaseProvider):
         )
 
 
-__all__ = ["OllamaProvider", "DEFAULT_HOST"]
+__all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
