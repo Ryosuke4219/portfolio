@@ -11,12 +11,15 @@ from ..config import ProviderConfig
 from ..errors import AuthError, ProviderSkip, RateLimitError, RetriableError, SkipReason, TimeoutError
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
-from ._requests_compat import SessionProtocol, create_session, requests_exceptions
+from ._requests_compat import create_session, requests_exceptions, SessionProtocol
 
 __all__ = ["OpenRouterProvider", "requests_exceptions"]
 
 
 _INTERNAL_OPTION_KEYS = {"stream", "request_timeout_s", "REQUEST_TIMEOUT_S"}
+
+
+_LITERAL_ENV_VALUE_PREFIXES = ("file:", "mailto:")
 
 
 def _coerce_text(payload: Mapping[str, Any] | None) -> str:
@@ -98,6 +101,16 @@ def _resolve_env(name: Any) -> str:
     return (os.getenv(env_name) or "").strip()
 
 
+def _is_literal_env_value(value: str) -> bool:
+    candidate = value.strip()
+    if not candidate:
+        return False
+    if "://" in candidate:
+        return True
+    candidate_lower = candidate.lower()
+    return any(candidate_lower.startswith(prefix) for prefix in _LITERAL_ENV_VALUE_PREFIXES)
+
+
 def _normalize_error(exc: Exception) -> Exception:
     if isinstance(exc, TimeoutError):  # pragma: no cover - defensive
         return exc
@@ -158,7 +171,7 @@ class OpenRouterProvider(BaseProvider):
             if isinstance(override_name, str):
                 candidate = override_name.strip()
                 if candidate:
-                    if "://" in candidate:
+                    if _is_literal_env_value(candidate):
                         return candidate
                     override_value = _resolve_env(candidate)
                     if override_value:

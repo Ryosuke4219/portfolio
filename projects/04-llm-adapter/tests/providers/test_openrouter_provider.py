@@ -405,6 +405,53 @@ def test_openrouter_provider_env_mapping_accepts_literal_url(
     assert timeout == pytest.approx(2.5)
 
 
+def test_openrouter_provider_env_mapping_literal_overrides_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    literal_url = "https://literal.example/api/v1"
+    env_url = "https://env.example/api/v1"
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert url == f"{literal_url}/chat/completions"
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "literal override"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_BASE_URL", env_url)
+    try:
+        config = _provider_config(tmp_path)
+        config.raw["env"] = {"OPENROUTER_BASE_URL": literal_url}
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "literal override")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.response.text == "literal override"
+    session = getattr(provider, "_session")
+    session_calls = getattr(session, "calls", [])
+    assert session_calls
+    url, _payload, stream, _timeout = session_calls[0]
+    assert url == f"{literal_url}/chat/completions"
+    assert stream is False
+
+
 def test_openrouter_provider_supports_streaming(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     module = _load_openrouter_module()
 
