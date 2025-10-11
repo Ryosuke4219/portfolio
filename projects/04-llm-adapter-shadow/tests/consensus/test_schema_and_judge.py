@@ -4,7 +4,7 @@ import pytest
 
 from src.llm_adapter.provider_spi import ProviderResponse
 from src.llm_adapter.runner_config import ConsensusConfig
-from src.llm_adapter.runner_parallel import compute_consensus
+from src.llm_adapter.runner_parallel.consensus import compute_consensus
 
 
 def fake_judge(responses: list[ProviderResponse]) -> tuple[str, float]:

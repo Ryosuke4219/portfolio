@@ -14,7 +14,7 @@ from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from src.llm_adapter.providers.mock import MockProvider
 from src.llm_adapter.runner import Runner
 from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
-from src.llm_adapter.runner_parallel import (
+from src.llm_adapter.runner_parallel.consensus import (
     _normalize_candidate_text,
     compute_consensus,
     ConsensusConfig,

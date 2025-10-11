@@ -4,7 +4,7 @@ from typing import cast
 import pytest
 
 from src.llm_adapter.provider_spi import ProviderResponse, TokenUsage
-from src.llm_adapter.runner_parallel import ConsensusObservation
+from src.llm_adapter.runner_parallel.models import ConsensusObservation
 
 
 @pytest.fixture

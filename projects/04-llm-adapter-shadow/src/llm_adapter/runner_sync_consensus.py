@@ -6,7 +6,7 @@ from typing import cast, TYPE_CHECKING
 
 from .parallel_exec import ParallelAllResult, ParallelExecutionError
 from .provider_spi import ProviderResponse, ProviderSPI, TokenUsage
-from .runner_parallel import compute_consensus, ConsensusObservation
+from .runner_parallel.consensus import compute_consensus, ConsensusObservation
 from .runner_shared import estimate_cost
 from .runner_sync_modes import _limited_providers, _raise_no_attempts
 from .shadow import ShadowMetrics
