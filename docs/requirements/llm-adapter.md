@@ -144,7 +144,7 @@ class RunnerMode(Enum):
   * `--quorum K` / `--tie-breaker min_latency|min_cost|stable_order`
   * `--schema path.json` / `--judge name`
   * `--weights openai=1.0,gemini=0.9,...`
-* I/O（SHOULD）：`--input prompt.txt|jsonl`、`--out-format text|json|jsonl`、`--metrics path`
+* I/O（SHOULD）：`--prompt-file path` / `--prompts text` / `--format text|json|jsonl` / `--out path` / `--metrics path`
 
 ## 9. エラーポリシー（MUST）
 
