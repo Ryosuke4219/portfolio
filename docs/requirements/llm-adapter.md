@@ -139,6 +139,12 @@ class RunnerMode(Enum):
   * `--mode {sequential,parallel-any,parallel-all,consensus}`
   * `--providers a,b,c`
   * `--max-concurrency N` / `--rpm R`
+  * `--out <dir>`（出力ディレクトリ。未存在なら作成し、`metrics.jsonl` 等の成果物を格納する）
+* `run_compare` 系 CLI（`python adapter/run_compare.py` / `llm-adapter run-compare`）:
+  * `--providers` は**カンマ区切りの複数パス**（相対/絶対）を受け取り、指定順で Runner に渡す（MUST）。
+  * `--out <dir>` はメトリクスおよび比較ログの**ルートディレクトリ**（例：`out/metrics.jsonl`）。既定は `data/runs-metrics.jsonl`。MUST で明示指定時は既定を上書きする。
+* `llm-adapter` 単体実行（`pip install -e .` 経由で提供されるエントリポイント）:
+  * `--provider path.yaml`（単一プロバイダ構成ファイル）と `--out <dir>` の組み合わせを MUST で受け付け、比較ランナーと**同じディレクトリ仕様**で出力する。
 * 合議関連（SHOULD）:
   * `--aggregate majority_vote|max_score|weighted_vote`
   * `--quorum K` / `--tie-breaker min_latency|min_cost|stable_order`
