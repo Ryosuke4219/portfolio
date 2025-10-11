@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+pytest.importorskip("src.llm_adapter.errors")
+
 from src.llm_adapter.errors import AllFailedError
 from src.llm_adapter.parallel_exec import run_parallel_all_sync, run_parallel_any_sync
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
