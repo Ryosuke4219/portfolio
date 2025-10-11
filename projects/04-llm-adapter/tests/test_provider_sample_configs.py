@@ -1,3 +1,5 @@
+"""プロバイダ設定サンプルの整合性テスト。"""
+
 from __future__ import annotations
 
 from pathlib import Path
