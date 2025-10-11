@@ -7,12 +7,12 @@
 | Milestone | Week (JST) | 目的 | 主な成果物 | 進捗 |
 | --- | --- | --- | --- | --- |
 | **M0 — SRS確定 & 骨子固定** | Week40: 2025-09-29〜10-05 | SRS最終化 | `04/llm-adapter-srs.md`最終版 / 参照アーキ図 / M1〜M6 Exit Criteria | ✅ 完了（2025-10-04 SRS v1.0確定・用語集統合完了） |
-| **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / 直列Runner / 最小UT | ✅ 完了（SPI型定義確定・直列Runner/例外UTマージ済） |
-| **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `run_with_shadow` / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（影実行APIとJSONLスキーマv1安定化） |
-| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト | 🔴 未完了（Simulated/OpenAI/Geminiのみ提供中。Ollama/OpenRouter統合と例外マップ整備が残タスク）[^provider-registry] |
-| **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（parallel_all/consensusで多数決・タイブレーク・shadow差分記録を実装し、合議イベント検証も通過） |
-| **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ自動生成ツールを`just report`に統合） |
-| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（コードとドキュメントは`0.1.0`へ更新済。`v0.1.0`タグ発行とOpenRouterガイド追補が残タスク） |
+| **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / 直列Runner / 最小UT | ✅ 完了（`projects/04-llm-adapter/adapter/core`でSPI型と直列Runnerテストを確定） |
+| **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `run_with_shadow` / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（比較実行APIとJSONLスキーマv1を`projects/04-llm-adapter`へ反映） |
+| **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト | 🔴 未完了（Simulated/OpenAI/Geminiまで完了。Ollama/OpenRouter統合と例外マップ整備が残タスク[^provider-registry]） |
+| **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（`runner_parallel`と`runner_sync_consensus`で多数決・タイブレーク・差分記録を実装しイベント検証も通過） |
+| **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ生成ツールを`projects/04-llm-adapter`の`just report`へ統合） |
+| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | 🟡 進行中（コードとドキュメントを`0.1.0`へ更新済。`v0.1.0`タグ発行とOpenRouterガイド追補が残タスク） |
 
 ---
 
@@ -21,30 +21,34 @@
 **成果物**: SRS最終版・参照アーキ図・Exit Criteria併記。 **Exit Criteria**: 用語(Shadow/フォールバック/JSONL/異常)を一意定義、M1〜M6受け入れ条件を明文化、`04/`にSRSと図版格納・リンク健全。 **タスク**: 用語集統合 / 例外→共通例外マップ表追加 / JSONLスキーマv1＋後方互換方針記述。
 
 ## M1 — Core SPI & Runner
-**進捗**: ✅ ProviderSPI型・例外マッピング・`runner_sync_sequential`のUTを`projects/04-llm-adapter-shadow/`に統合済。
+**進捗**: ✅ ProviderSPI型・例外マッピング・`runner_sync_sequential`のUTを`projects/04-llm-adapter/adapter/core`で整備済。
 **成果物**: ProviderSPI/Request/Responseの安定化(`model`必須)・直列Runner・例外マッピングUT。 **Exit Criteria**: 1次失敗時に2次以降へ確実委譲、共通例外マップ整合、CI緑＋README最小例(`just test`)。 **タスク**: `ProviderRequest.model`必須化 / 例外→Timeout・RateLimit・Retriable・ProviderSkip整合 / 直列Runner成功・失敗・フェイルオーバーテスト。
 
 ## M2 — Shadow Execution & Metrics
-**進捗**: ✅ `shadow.py`/`shadow_metrics.py`とJSONLスキーマ検証を整備し、影実行OFF/ON同一性テストを完了。
-**成果物**: `run_with_shadow`、`artifacts/runs-metrics.jsonl`(timestamp/provider/latency_ms/token_usage/diff_kind等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、JSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 影並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
+**進捗**: ✅ `projects/04-llm-adapter/adapter/core/shadow.py`と`shadow_metrics.py`で比較実行とJSONL検証を整備し、影実行ON/OFF同一性テストを完了。
+**成果物**: `run_with_shadow`、`artifacts/runs-metrics.jsonl`(timestamp/provider/latency_ms/token_usage/diff_kind等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、JSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
 
 ## M3 — Provider 実装
 **進捗**: 🔴 `ProviderFactory`のregistryには`simulated`・`openai`・`gemini`のみ登録済で、Ollama/OpenRouter向け実装は未着手。[^provider-registry]
-**成果物**: `providers/`配下にSimulated・OpenAI互換・Gemini、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状2種)。 **Exit Criteria**: 同一SPIで3種動作、ストリーミング指定を下層へ伝播(アサート)、429/5xx/ネットワークを共通例外へ正規化。 **タスク**: Ollama/OpenRouter実装とregistry登録 / OpenRouter例外マップ(429/5xx/ネットワーク)の共通例外マップ反映 / 共通リトライポリシー閾値調整 / OpenRouter差分ログ出力整備 / 429バックオフベンチ継続。
+**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状2種)。 **Exit Criteria**: 同一SPIで3種動作、ストリーミング指定を下層へ伝播(アサート)、429/5xx/ネットワークを共通例外へ正規化。 **タスク**: Ollama/OpenRouter実装とregistry登録（[docs/spec/v0.2/TASKS.md#タスク6](../docs/spec/v0.2/TASKS.md#タスク6-ollama-プロバイダを-v02-コアへ移植する) / [タスク7](../docs/spec/v0.2/TASKS.md#タスク7-openrouter-プロバイダを-v02-コアに統合する)参照） / OpenRouter例外マップ(429/5xx/ネットワーク)の共通例外マップ反映 / 共通リトライポリシー閾値調整 / OpenRouter差分ログ出力整備 / 429バックオフベンチ継続。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`。Ollama は未実装。`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
 ## M4 — Parallel & Consensus
-**進捗**: ✅ `runner_parallel`/`runner_sync_consensus`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定と`consensus_vote`イベント記録を実装。影勝者へshadow差分を反映するテストもCIで緑。
+**進捗**: ✅ `projects/04-llm-adapter/adapter/core/runner_parallel.py`と`runner_sync_consensus.py`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定と`consensus_vote`イベント記録を実装。比較勝者への差分反映テストもCIで緑。
 **成果物**: `runner_parallel`・`compute_consensus`・`ConsensusConfig`(多数決/スコア重み/低遅延TB/コスト上限)・合議テスト。 **Exit Criteria**: N並列勝者決定が決定的(seed固定)、多数決/スコア/低遅延TBを設定切替、影実行併用で差分メトリクスJSONL記録。 **タスク**: 完了（合議アルゴリズム／制約評価／残ジョブ中断を網羅）。
 
 ## M5 — Telemetry & QA Integration
-**進捗**: ✅ `OtlpJsonExporter`で`provider_call`/`run_metric`イベントをOTLP JSONへ変換し、`weekly_summary.py`が`runs-metrics.jsonl`から週次サマリを生成。`just report`でテレメトリ集計とMarkdown更新まで自動化。
+**進捗**: ✅ `projects/04-llm-adapter/adapter/telemetry/otlp_json_exporter.py`で`provider_call`/`run_metric`イベントをOTLP JSONへ変換し、`tools/weekly_summary.py`が`runs-metrics.jsonl`から週次サマリを生成。`just report`でテレメトリ集計とMarkdown更新まで自動化。
 **成果物**: メトリクス→OTLP/JSON変換、`tools/`による`docs/weekly-summary.md`自動生成、Evidence更新。 **Exit Criteria**: ローカル/CIでメトリクスがダッシュボード(または静的HTML)へ反映、Evidence/Weekly Summaryリンク整合、CI緑＋`just report`でレポート生成。 **タスク**: 完了（OTLPエクスポータと週次サマリ自動化を導入済）。
 
 ## M6 — CLI/Docs/Release 0.1.0
-**進捗**: 🟢 `projects/04-llm-adapter(-shadow)`の`pyproject.toml`と`llm_adapter.__init__`を`0.1.0`へ引き上げ、`CHANGELOG.md`にv0.1.0リリースノートを反映。README/justコマンドのCLI導線を整理し、日本語/英語ドキュメントの差分同期まで完了。
-**成果物**: `just`/CLI(`setup|test|demo|report|bench`)、README(JP/EN)・サンプル・トラブルシュート、セマンティックバージョン・CHANGELOG・`pyproject.toml`。 **Exit Criteria**: `pip install -e . && just demo`で影実行→JSONL→週次サマリを一気通貫、v0.1.0タグと公開API安定宣言、CI緑＋リリースノートにKnown Issues/Next Steps。 **タスク**: v0.1.0タグ発行 / リリースノートEvidence添付最終確認。
+**進捗**: 🟢 `projects/04-llm-adapter`の`pyproject.toml`と`llm_adapter.__init__`を`0.1.0`へ引き上げ、`CHANGELOG.md`にv0.1.0リリースノートを反映。README/justコマンドのCLI導線を整理し、日本語/英語ドキュメントの差分同期まで完了。
+**成果物**: `just`/CLI(`setup|test|demo|report|bench`)、README(JP/EN)・サンプル・トラブルシュート、セマンティックバージョン・CHANGELOG・`pyproject.toml`。 **Exit Criteria**: `pip install -e . && just demo`で比較実行→JSONL→週次サマリを一気通貫、v0.1.0タグと公開API安定宣言、CI緑＋リリースノートにKnown Issues/Next Steps。 **タスク**: v0.1.0タグ発行 / リリースノートEvidence添付最終確認（[docs/spec/v0.2/TASKS.md#タスク10](../docs/spec/v0.2/TASKS.md#タスク10-コア-readme-と設定テンプレートを-v02-用に同期する)でv0.2同期差分を継続管理）。
+
+### 移行メモ（Shadow 由来項目）
+- 影実行・差分計測のコードは `projects/04-llm-adapter/adapter/core/shadow*.py` へ移設済で、旧 `04-llm-adapter-shadow` はアーカイブ予定。
+- CLI から `ProviderRequest` を構築する経路は v0.2 タスク（[docs/spec/v0.2/TASKS.md#タスク8](../docs/spec/v0.2/TASKS.md#タスク8-cli-から-providerrequest-への移行を完了する) / [タスク9](../docs/spec/v0.2/TASKS.md#タスク9-cli-入力パイプラインに-ollamaopenrouter-の設定項目を追加する)）で追従。
 
 ## Stretch (Week46-47 任意)
 コスト計測&予算内選択(token単価×速度×品質)、プロバイダ健全性ヘルスチェック(プローブ/自動フェイルアウト)、影差分可視化UIと回帰検知。
