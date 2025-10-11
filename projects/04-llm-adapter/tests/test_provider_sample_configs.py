@@ -9,6 +9,7 @@ import pytest
 from adapter.core.loader import load_budget_book, load_provider_config
 
 ALLOWED_PROVIDERS = {"simulated", "openai", "gemini", "ollama", "openrouter"}
+AUTH_REQUIRED_PROVIDERS = {"openai", "gemini", "openrouter"}
 
 
 @pytest.mark.parametrize(
@@ -20,6 +21,10 @@ ALLOWED_PROVIDERS = {"simulated", "openai", "gemini", "ollama", "openrouter"}
 def test_provider_configs_use_allowed_providers(config_path: Path) -> None:
     config = load_provider_config(config_path)
     assert config.provider in ALLOWED_PROVIDERS
+    if config.provider in {"openai", "gemini", "openrouter"}:
+        assert config.auth_env, "認証環境変数が未設定です"
+    if config.provider in AUTH_REQUIRED_PROVIDERS:
+        assert isinstance(config.auth_env, str) and config.auth_env.strip()
 
 
 def test_budget_overrides_use_allowed_providers() -> None:
