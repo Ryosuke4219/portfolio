@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ..parallel_exec import ParallelExecutionError, run_parallel_all_async
-from ..runner_parallel import compute_consensus, ConsensusObservation
+from ..runner_parallel.consensus import compute_consensus, ConsensusObservation
 from ..runner_shared import estimate_cost, log_run_metric
 from ..utils import content_hash, elapsed_ms
 from .base import ParallelStrategyBase

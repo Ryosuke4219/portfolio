@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from .provider_spi import ProviderResponse
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from .runner_parallel import ConsensusObservation
+    from .runner_parallel.models import ConsensusObservation
 
 
 @dataclass(slots=True)
