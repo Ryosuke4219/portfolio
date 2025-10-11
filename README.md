@@ -238,7 +238,7 @@ llm-adapter --provider adapter/config/providers/openai.yaml \
 
 **レガシー補足**
 
-* 影実行と障害注入を中心にした旧 Shadow 版（`04-llm-adapter-shadow`）の手順・サンプルは Git 履歴に保存しています。差分メトリクスの最小構成を確認したい場合のみ参照してください。
+* 影実行と障害注入に特化した旧 shadow 版は v0.2 系の Git 履歴に残してあります。現行の primary/shadow 並走は README 冒頭の `just test` → Python 回帰フローからたどれる導線で確認してください。
 
 ---
 
