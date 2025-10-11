@@ -102,11 +102,15 @@ def pytest_ignore_collect(collection_path: Path, config):  # pragma: no cover - 
 @pytest.fixture()
 def socket_enabled():
     try:
-        from pytest_socket import socket_enabled as plugin_socket_enabled
+        import pytest_socket
     except ModuleNotFoundError:
         try:
             import socket  # noqa: F401
         finally:
             yield
     else:
-        yield from plugin_socket_enabled()
+        pytest_socket.enable_socket()
+        try:
+            yield
+        finally:
+            pytest_socket.disable_socket()
