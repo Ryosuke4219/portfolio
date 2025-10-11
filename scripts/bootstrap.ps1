@@ -53,4 +53,4 @@ if (-not (Test-Path $venvPath)) {
 
 $env:PIP_CACHE_DIR = $pipCache
 & (Join-Path $venvPath "Scripts/python.exe") -m pip install --upgrade pip
-& (Join-Path $venvPath "Scripts/pip.exe") install -r (Join-Path $script:RepoRoot "projects/04-llm-adapter-shadow/requirements.txt")
+& (Join-Path $venvPath "Scripts/pip.exe") install -r (Join-Path $script:RepoRoot "projects/04-llm-adapter/requirements.txt")
