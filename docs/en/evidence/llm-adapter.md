@@ -28,7 +28,7 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 ## How to Reproduce
 
 1. `cd projects/04-llm-adapter`, create a virtual environment, and run `pip install -r requirements.txt` to install dependencies.
-2. Install the CLI with `pip install -e .`, then execute `llm-adapter --providers adapter/config/providers/openai.yaml --prompt "Say hello in English" --out out --json-logs` to record metrics in the directory supplied via `--out` (e.g., `out/metrics.jsonl`). When you invoke `python adapter/run_compare.py ...` directly, it defaults to writing into `data/runs-metrics.jsonl`.
+2. Install the CLI with `pip install -e .`, then execute `llm-adapter --provider adapter/config/providers/openai.yaml --prompt "Say hello in English" --out out --json-logs` to record metrics in the directory supplied via `--out` (e.g., `out/metrics.jsonl`). When you invoke `python adapter/run_compare.py ...` directly, it defaults to writing into `data/runs-metrics.jsonl`.
 3. Run `pytest -q` to ensure CLI, runner, and metric modules pass their test suites.
 
 ## Next Steps
