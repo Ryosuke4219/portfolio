@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import Any
 
 from .budgets import BudgetManager
 from .compare_runner_support.metrics_builder import RunMetricsBuilder
@@ -13,35 +13,11 @@ from .metrics.models import BudgetSnapshot
 from .providers import (
     BaseProvider,
     ProviderFactory,
+    ProviderResponse,
 )
+from .provider_spi import TokenUsage
 
-if TYPE_CHECKING:  # pragma: no cover - 型補完用
-    from src.llm_adapter.provider_spi import ProviderResponse as JudgeProviderResponse
-else:  # pragma: no cover - 実行時フォールバック
-    try:
-        from src.llm_adapter.provider_spi import (  # type: ignore[import-not-found]
-            ProviderResponse as JudgeProviderResponse,
-        )
-    except ModuleNotFoundError:  # pragma: no cover - テスト用フォールバック
-        from dataclasses import dataclass
-        from types import SimpleNamespace
-        from typing import Any
-
-        @dataclass(slots=True)
-        class JudgeProviderResponse:  # type: ignore[too-many-ancestors]
-            text: str
-            latency_ms: int
-            tokens_in: int = 0
-            tokens_out: int = 0
-            raw: Any | None = None
-
-            @property
-            def token_usage(self) -> SimpleNamespace:
-                return SimpleNamespace(
-                    prompt=self.tokens_in,
-                    completion=self.tokens_out,
-                    total=self.tokens_in + self.tokens_out,
-                )
+JudgeProviderResponse = ProviderResponse
 
 LOGGER = logging.getLogger(__name__)
 
@@ -143,12 +119,15 @@ class _JudgeInvoker:
             elif hasattr(request, "prompt"):
                 prompt = request.prompt or ""
         response = self._provider.generate(prompt)
+        base_response = _coerce_provider_response(response)
+        raw_payload = _merge_raw_payload(base_response.raw, self._config.provider)
         return JudgeProviderResponse(
-            text=response.output_text,
-            latency_ms=response.latency_ms,
-            tokens_in=response.input_tokens,
-            tokens_out=response.output_tokens,
-            raw={"provider": self._config.provider},
+            text=base_response.text,
+            latency_ms=base_response.latency_ms,
+            token_usage=base_response.token_usage,
+            model=base_response.model,
+            finish_reason=base_response.finish_reason,
+            raw=raw_payload,
         )
 
 
@@ -160,3 +139,55 @@ class _JudgeProviderFactoryAdapter:
         provider_config = replace(self._config, model=model)
         provider = ProviderFactory.create(provider_config)
         return _JudgeInvoker(provider, provider_config)
+
+
+def _coerce_provider_response(response: object) -> ProviderResponse:
+    if isinstance(response, ProviderResponse):
+        return response
+
+    text = getattr(response, "text", None)
+    if not isinstance(text, str):
+        text = getattr(response, "output_text", "")
+    if not isinstance(text, str):
+        text = str(text)
+
+    latency = getattr(response, "latency_ms", 0)
+    try:
+        latency_ms = int(latency)
+    except (TypeError, ValueError):
+        latency_ms = 0
+
+    token_usage = getattr(response, "token_usage", None)
+    if not isinstance(token_usage, TokenUsage):
+        tokens_in = getattr(response, "tokens_in", getattr(response, "input_tokens", 0))
+        tokens_out = getattr(response, "tokens_out", getattr(response, "output_tokens", 0))
+        token_usage = TokenUsage(
+            prompt=int(tokens_in or 0),
+            completion=int(tokens_out or 0),
+        )
+
+    model = getattr(response, "model", None)
+    model_value = model if isinstance(model, str) else None
+
+    finish_reason = getattr(response, "finish_reason", None)
+    finish_value = finish_reason if isinstance(finish_reason, str) else None
+
+    raw = getattr(response, "raw", None)
+
+    return ProviderResponse(
+        text=text,
+        latency_ms=latency_ms,
+        token_usage=token_usage,
+        model=model_value,
+        finish_reason=finish_value,
+        raw=raw,
+    )
+
+
+def _merge_raw_payload(raw: Any, provider_name: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {"provider": provider_name}
+    if isinstance(raw, Mapping):
+        payload.update(raw)
+    elif raw is not None:
+        payload["payload"] = raw
+    return payload
