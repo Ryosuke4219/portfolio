@@ -101,6 +101,34 @@ def test_run_provider_call_flags_guard_violation(
     assert response.output_text.strip() == ""
 
 
+def test_run_provider_call_success(
+    runner: CompareRunner, provider_config: ProviderConfig
+) -> None:
+    class StubProvider(BaseProvider):
+        def __init__(self) -> None:
+            super().__init__(provider_config)
+
+        def generate(self, prompt: str) -> ProviderResponse:
+            return ProviderResponse(
+                output_text=f"echo: {prompt}",
+                input_tokens=len(prompt.split()),
+                output_tokens=2,
+                latency_ms=5,
+            )
+
+    response, status, failure_kind, error_message, latency_ms = runner._run_provider_call(
+        provider_config, StubProvider(), "hello"
+    )
+
+    assert status == "ok"
+    assert failure_kind is None
+    assert error_message is None
+    assert response.output_text == "echo: hello"
+    assert response.input_tokens == len("hello".split())
+    assert response.output_tokens == 2
+    assert latency_ms == 5
+
+
 def test_evaluate_budget_enforces_limits(
     runner: CompareRunner, provider_config: ProviderConfig
 ) -> None:

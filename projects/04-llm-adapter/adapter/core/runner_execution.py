@@ -108,6 +108,14 @@ class RunnerExecution:
         self._active_provider_ids: tuple[str, ...] = ()
         self._current_attempt_index = 0
 
+    def _run_provider_call(
+        self,
+        provider_config: ProviderConfig,
+        provider: BaseProvider,
+        prompt: str,
+    ) -> _ProviderCallResult:
+        return self._provider_executor.execute(provider_config, provider, prompt)
+
     def run_sequential_attempt(
         self,
         providers: Sequence[tuple[ProviderConfig, BaseProvider]],
