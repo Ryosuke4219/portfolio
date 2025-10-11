@@ -12,7 +12,7 @@ from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
 from .openai_utils import (
     build_chat_messages,
-    build_system_user_contents,
+    build_responses_input,
     coerce_raw_output,
     determine_modes,
     extract_text_from_response,
@@ -22,10 +22,13 @@ from .openai_utils import (
 
 __all__ = ["OpenAIProvider"]
 
+_openai: Any | None = None
 try:  # pragma: no cover - OpenAI SDK が存在しない環境では読み込まれない
-    import openai as _openai  # type: ignore
+    import openai as _openai_module
 except ModuleNotFoundError:  # pragma: no cover - 依存が無い環境ではプロバイダを登録しない
-    _openai = None  # type: ignore[assignment]
+    pass
+else:
+    _openai = _openai_module
 
 
 def _resolve_api_key(env_name: str | None) -> str:
@@ -201,13 +204,13 @@ class OpenAIProvider(BaseProvider):
             return None
         if not callable(create):
             return None
-        kwargs = dict(self._request_kwargs)
+        kwargs = self._prepare_request_kwargs(request)
         max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
         if max_tokens:
             kwargs.setdefault("max_output_tokens", int(max_tokens))
         if self._response_format:
             kwargs.setdefault("response_format", dict(self._response_format))
-        contents = build_system_user_contents(self._system_prompt, request.prompt)
+        contents = build_responses_input(self._system_prompt, request.messages, request.prompt)
         ts0 = time.time()
         result = create(model=request.model, input=contents, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
@@ -226,7 +229,7 @@ class OpenAIProvider(BaseProvider):
                 create = None
         if not callable(create):
             return None
-        kwargs = dict(self._request_kwargs)
+        kwargs = self._prepare_request_kwargs(request)
         max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
         if max_tokens:
             kwargs.setdefault("max_tokens", int(max_tokens))
@@ -251,7 +254,7 @@ class OpenAIProvider(BaseProvider):
                 create = None
         if not callable(create):
             return None
-        kwargs = dict(self._request_kwargs)
+        kwargs = self._prepare_request_kwargs(request)
         max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
         if max_tokens:
             kwargs.setdefault("max_tokens", int(max_tokens))
@@ -264,4 +267,22 @@ class OpenAIProvider(BaseProvider):
         result = create(model=request.model, prompt=prompt_text, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
         return result, latency_ms
+
+    def _prepare_request_kwargs(self, request: ProviderRequest) -> MutableMapping[str, Any]:
+        kwargs: MutableMapping[str, Any] = dict(self._request_kwargs)
+        options = request.options or {}
+        for key, value in options.items():
+            if isinstance(value, Mapping):
+                kwargs[key] = dict(value)
+            else:
+                kwargs[key] = value
+        if request.temperature is not None:
+            kwargs["temperature"] = float(request.temperature)
+        if request.top_p is not None:
+            kwargs["top_p"] = float(request.top_p)
+        if request.stop:
+            kwargs["stop"] = tuple(request.stop)
+        if request.timeout_s is not None:
+            kwargs["timeout"] = float(request.timeout_s)
+        return kwargs
 
