@@ -53,3 +53,4 @@ def test_openrouter_example_includes_base_url_env_hint() -> None:
     with sample_path.open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
     assert data.get("base_url_env") == "OPENROUTER_BASE_URL"
+    assert "# 推奨 .env 例:" in sample_path.read_text(encoding="utf-8")
