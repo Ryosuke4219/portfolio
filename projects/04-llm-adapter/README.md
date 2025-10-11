@@ -125,18 +125,18 @@ python adapter/run_compare.py \
   --providers adapter/config/providers/simulated.yaml \
   --prompts datasets/golden/tasks.jsonl \
   --mode consensus --aggregate judge --quorum 2 \
-  --judge path/to/judge.yaml --schema path/to/output_schema.json
+  --judge adapter/config/providers/judge.yaml \
+  --schema examples/schemas/basic_output.json
 ```
 
 > `--aggregate` などを省略した場合は従来通り単純な応答比較として動作します。
 
-`--judge` と `--schema` に渡すファイルは自前で用意します。以下は OpenAI 設定テンプレートを複製し、判定用 YAML と簡易スキーマを
-作成する例です（適宜モデルや検証項目を調整してください）。
+判定用の設定ファイル `adapter/config/providers/judge.yaml` はリポジトリに含まれており、そのまま利用できます。スキーマが必要な場
+合は、次のようにサンプルを生成して `examples/schemas/basic_output.json` を参照してください（検証項目は適宜調整）。
 
 ```bash
-mkdir -p adapter/config/providers schemas
-cp examples/providers/openai.yml adapter/config/providers/judge.yaml
-cat <<'JSON' > schemas/output_schema.json
+mkdir -p examples/schemas
+cat <<'JSON' > examples/schemas/basic_output.json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
