@@ -89,7 +89,17 @@ def test_cli_fake_provider(echo_provider, tmp_path: Path, capfd) -> None:
     assert request.options == {"foo": "bar"}
 
 
-def test_cli_passes_metadata(echo_provider, tmp_path: Path, capfd) -> None:
+@pytest.mark.parametrize(
+    ("metadata_block", "expected"),
+    [
+        ("metadata:\n  run_id: cli-demo\n", {"run_id": "cli-demo"}),
+        ("metadata: cli-demo\n", None),
+    ],
+    ids=["mapping", "non_mapping_ignored"],
+)
+def test_cli_passes_metadata(
+    echo_provider, tmp_path: Path, capfd, metadata_block: str, expected: dict[str, str] | None
+) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
         (
@@ -98,7 +108,7 @@ def test_cli_passes_metadata(echo_provider, tmp_path: Path, capfd) -> None:
             "auth_env: NONE\n"
             "max_tokens: 128\n"
             "options:\n  foo: bar\n"
-            "metadata:\n  run_id: cli-demo\n"
+            f"{metadata_block}"
         ),
         encoding="utf-8",
     )
@@ -116,7 +126,10 @@ def test_cli_passes_metadata(echo_provider, tmp_path: Path, capfd) -> None:
     assert "echo:hello" in captured.out
     assert len(echo_provider.requests) == 1
     request = echo_provider.requests[0]
-    assert request.metadata == {"run_id": "cli-demo"}
+    if expected is None:
+        assert request.metadata is None
+    else:
+        assert request.metadata == expected
 
 
 def test_cli_json_log_prompts(echo_provider, tmp_path: Path, capfd) -> None:

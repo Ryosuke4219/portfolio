@@ -61,17 +61,18 @@ def _request_options(config: ProviderConfig) -> dict[str, Any]:
     return {}
 
 
+def _request_metadata(config: ProviderConfig) -> Mapping[str, Any] | None:
+    raw_metadata = config.raw.get("metadata")
+    if isinstance(raw_metadata, Mapping):
+        return dict(raw_metadata)
+    return None
+
+
 def _build_request(prompt: str, config: ProviderConfig) -> ProviderRequest:
     model = (config.model or config.provider).strip() or config.provider
     timeout: float | None = None
     if config.timeout_s > 0:
         timeout = float(config.timeout_s)
-    raw_metadata = config.raw.get("metadata")
-    metadata: Mapping[str, Any] | None
-    if isinstance(raw_metadata, Mapping):
-        metadata = dict(raw_metadata)
-    else:
-        metadata = None
     return ProviderRequest(
         model=model,
         prompt=prompt,
@@ -79,7 +80,7 @@ def _build_request(prompt: str, config: ProviderConfig) -> ProviderRequest:
         temperature=config.temperature,
         top_p=config.top_p,
         timeout_s=timeout,
-        metadata=metadata,
+        metadata=_request_metadata(config),
         options=_request_options(config),
     )
 
