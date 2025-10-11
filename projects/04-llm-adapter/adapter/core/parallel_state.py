@@ -173,6 +173,7 @@ def build_cancelled_result(
         ci_meta={},
     )
     metrics.cost_estimate = 0.0
+    metrics.outcome = "skip"
     single_run_result_cls = _get_single_run_result_cls()
     return single_run_result_cls(
         metrics=metrics,
