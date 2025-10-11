@@ -5,10 +5,20 @@ from enum import Enum
 
 import pytest
 
+pytest.importorskip("src.llm_adapter.errors")
+
 from adapter.core.errors import AllFailedError
 from adapter.core.runner_execution_parallel import ParallelAttemptExecutor
 from adapter.core.runner_execution import SingleRunResult
 from adapter.core.datasets import GoldenTask
+from src.llm_adapter.errors import AllFailedError
+from src.llm_adapter.parallel_exec import run_parallel_all_sync, run_parallel_any_sync
+from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from src.llm_adapter.runner_config import RunnerConfig as SyncRunnerConfig, RunnerMode as SyncRunnerMode
+from src.llm_adapter.runner_sync import Runner as SyncRunner
+from src.llm_adapter.runner_sync_modes import get_sync_strategy, SyncRunContext
+from src.llm_adapter.runner_sync_parallel_any import ParallelAnyStrategy
+from src.llm_adapter.utils import content_hash
 
 try:  # pragma: no cover - 型補完と後方互換用
     from adapter.core.runner_api import RunnerConfig, RunnerMode
