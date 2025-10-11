@@ -14,6 +14,21 @@ RED_WORDS: tuple[str, ...] = (
 )
 
 
+def test_llm_adapter_readme_does_not_reference_missing_paths() -> None:
+    readme = Path("projects/04-llm-adapter/README.md").read_text(encoding="utf-8")
+
+    missing_examples = [
+        "path/to/judge.yaml",
+        "path/to/output_schema.json",
+    ]
+
+    offenders = [example for example in missing_examples if example in readme]
+
+    assert not offenders, (
+        "projects/04-llm-adapter/README.md に存在しないパスのプレースホルダーが残っています: {targets}"
+    ).format(targets=", ".join(offenders))
+
+
 def test_readme_shadow_references_stay_within_allowlist() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
