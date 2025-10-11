@@ -18,13 +18,37 @@ from adapter.core.config import (
 from adapter.core.provider_spi import ProviderRequest
 
 
+class _StreamStub:
+    def __init__(self) -> None:
+        self.response = SimpleNamespace(
+            output_text="call",
+            model="stream-model",
+            usage={"input_tokens": 3, "output_tokens": 2},
+            output=[
+                {
+                    "content": [
+                        {"type": "text", "text": "call"},
+                    ],
+                }
+            ],
+        )
+
+    def get_final_response(self) -> SimpleNamespace:
+        return self.response
+
+
 class _Recorder:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    def __call__(self, **kwargs: Any) -> SimpleNamespace:
+    def __call__(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
-        return SimpleNamespace(text="call", usage={"input_tokens": 3, "output_tokens": 2})
+        if kwargs.get("stream"):
+            return _StreamStub()
+        return SimpleNamespace(
+            text="call",
+            usage={"input_tokens": 3, "output_tokens": 2},
+        )
 
 
 def _provider_config(tmp_path: Path, mode: str) -> ProviderConfig:

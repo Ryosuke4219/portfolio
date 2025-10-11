@@ -205,6 +205,7 @@ class OpenAIProvider(BaseProvider):
         if not callable(create):
             return None
         kwargs = self._prepare_request_kwargs(request)
+        stream = bool(kwargs.get("stream"))
         max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
         if max_tokens:
             kwargs.setdefault("max_output_tokens", int(max_tokens))
@@ -214,6 +215,8 @@ class OpenAIProvider(BaseProvider):
         ts0 = time.time()
         result = create(model=request.model, input=contents, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
+        if stream:
+            result = self._unwrap_stream_result(result)
         return result, latency_ms
 
     def _call_chat_completions(self, request: ProviderRequest) -> tuple[Any, int] | None:
@@ -230,6 +233,7 @@ class OpenAIProvider(BaseProvider):
         if not callable(create):
             return None
         kwargs = self._prepare_request_kwargs(request)
+        stream = bool(kwargs.get("stream"))
         max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
         if max_tokens:
             kwargs.setdefault("max_tokens", int(max_tokens))
@@ -239,6 +243,8 @@ class OpenAIProvider(BaseProvider):
         ts0 = time.time()
         result = create(model=request.model, messages=messages, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
+        if stream:
+            result = self._unwrap_stream_result(result)
         return result, latency_ms
 
     def _call_completions(self, request: ProviderRequest) -> tuple[Any, int] | None:
@@ -255,6 +261,7 @@ class OpenAIProvider(BaseProvider):
         if not callable(create):
             return None
         kwargs = self._prepare_request_kwargs(request)
+        stream = bool(kwargs.get("stream"))
         max_tokens = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
         if max_tokens:
             kwargs.setdefault("max_tokens", int(max_tokens))
@@ -266,6 +273,8 @@ class OpenAIProvider(BaseProvider):
         ts0 = time.time()
         result = create(model=request.model, prompt=prompt_text, **kwargs)
         latency_ms = int((time.time() - ts0) * 1000)
+        if stream:
+            result = self._unwrap_stream_result(result)
         return result, latency_ms
 
     def _prepare_request_kwargs(self, request: ProviderRequest) -> MutableMapping[str, Any]:
@@ -285,4 +294,18 @@ class OpenAIProvider(BaseProvider):
         if request.timeout_s is not None:
             kwargs["timeout"] = float(request.timeout_s)
         return kwargs
+
+    def _unwrap_stream_result(self, response: Any) -> Any:
+        getter = getattr(response, "get_final_response", None)
+        if callable(getter):
+            try:
+                final = getter()
+            except Exception:  # pragma: no cover - defensive fallback
+                final = None
+            if final is not None:
+                return final
+        final_response = getattr(response, "response", None)
+        if final_response is not None:
+            return final_response
+        return response
 
