@@ -173,6 +173,26 @@ def test_ollama_provider_executor_success_in_ci(
     assert result.response.token_usage.completion == 3
 
 
+def test_ollama_provider_executor_success_in_ci_with_false_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="success")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "false")
+    monkeypatch.setenv("CI", "true")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "say hello")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.failure_kind is None
+    assert result.response.text == "Hello from Ollama"
+
+
 def test_ollama_provider_rate_limit_normalized(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     module = _load_ollama_module()
     local_patch = _install_fake_client(module, mode="rate_limit")
@@ -212,6 +232,28 @@ def test_ollama_provider_skip_when_offline(monkeypatch: pytest.MonkeyPatch, tmp_
     local_patch = _install_fake_client(module, mode="success")
     monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "1")
     monkeypatch.delenv("CI", raising=False)
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "say hello")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "skip"
+    assert result.failure_kind == "skip"
+    assert isinstance(result.error, ProviderSkip)
+    assert result.error.reason is SkipReason.OLLAMA_OFFLINE
+    assert result.backoff_next_provider is True
+
+
+def test_ollama_provider_skip_in_ci_reports_offline_reason(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="success")
+    monkeypatch.delenv("LLM_ADAPTER_OFFLINE", raising=False)
+    monkeypatch.setenv("CI", "true")
     try:
         config = _provider_config(tmp_path, provider="ollama", model="phi3")
         provider = ProviderFactory.create(config)

@@ -83,8 +83,14 @@ class OllamaProvider(BaseProvider):
         offline_env = os.getenv("LLM_ADAPTER_OFFLINE")
         ci_flag = os.getenv("CI", "").strip().lower() == "true"
         if offline_env is not None:
-            offline_flag = _coerce_bool(offline_env, True)
-            self._offline = offline_flag
+            lowered_offline = offline_env.strip().lower()
+            if lowered_offline in {"0", "false"}:
+                self._offline = False
+            elif lowered_offline in {"1", "true"}:
+                self._offline = True
+            else:
+                offline_flag = _coerce_bool(offline_env, True)
+                self._offline = offline_flag
         else:
             self._offline = ci_flag
 
@@ -272,4 +278,3 @@ class OllamaProvider(BaseProvider):
         )
 
 
-__all__ = ["OllamaProvider", "DEFAULT_HOST"]
