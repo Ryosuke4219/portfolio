@@ -21,6 +21,14 @@ DISALLOWED_REFERENCES = (
     "adapter/core/metrics.py",
 )
 
+EN_RELATIVE_REFERENCES = (
+    "../../projects/04-llm-adapter/README.md",
+    "../../projects/04-llm-adapter/adapter/run_compare.py",
+    "../../projects/04-llm-adapter/adapter/core/runner_execution.py",
+    "../../projects/04-llm-adapter/adapter/core/metrics/update.py",
+    "../../projects/04-llm-adapter/adapter/core/metrics/models.py",
+)
+
 
 @pytest.mark.parametrize("evidence_path", EVIDENCE_PATHS)
 def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
@@ -35,3 +43,9 @@ def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
         "Unexpected references in evidence file"
         f" {evidence_path.relative_to(PROJECT_ROOT)}: {unexpected}"
     )
+    if "en" in evidence_path.parts:
+        missing_relative = [ref for ref in EN_RELATIVE_REFERENCES if ref not in content]
+        assert not missing_relative, (
+            "English evidence file must link via relative paths",
+            f" {evidence_path.relative_to(PROJECT_ROOT)}: {missing_relative}",
+        )
