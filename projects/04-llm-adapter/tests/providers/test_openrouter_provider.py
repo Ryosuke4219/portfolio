@@ -299,6 +299,59 @@ def test_openrouter_provider_resolves_base_url_from_env(
     assert stream is False
 
 
+def test_openrouter_provider_prefers_env_mapping(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    base_url = "https://mapped.example/openrouter"
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert url == f"{base_url}/chat/completions"
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "mapped"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
+    monkeypatch.setenv("CUSTOM_MAPPED_API_KEY", "mapped-key")
+    monkeypatch.setenv("CUSTOM_MAPPED_BASE_URL", base_url)
+    try:
+        config = _provider_config(tmp_path)
+        config.raw["env"] = {
+            "OPENROUTER_API_KEY": "CUSTOM_MAPPED_API_KEY",
+            "OPENROUTER_BASE_URL": "CUSTOM_MAPPED_BASE_URL",
+        }
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "env mapping")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.response.text == "mapped"
+    session = getattr(provider, "_session")
+    session_calls = getattr(session, "calls", [])
+    assert session_calls
+    url, _payload, stream, _timeout = session_calls[0]
+    assert url == f"{base_url}/chat/completions"
+    assert stream is False
+    headers = getattr(session, "headers", {})
+    assert headers.get("Authorization") == "Bearer mapped-key"
+
+
 def test_openrouter_provider_supports_streaming(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     module = _load_openrouter_module()
 
