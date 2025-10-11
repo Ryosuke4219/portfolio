@@ -35,7 +35,7 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 - **Website:** <https://ryosuke4219.github.io/portfolio/> — Portfolio Gallery on GitHub Pages
 - **行動規範:** [Contributor Covenant v2.1](CODE_OF_CONDUCT.md)
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
-- **LLM Adapter Shadow CI:** `.github/workflows/python-llm-adapter-shadow.yml` は `main` ブランチへの push でフルスイート、PR ではスモークのみを実行。`workflow_dispatch` で挙動検証可。
+- **CI:** `.github/workflows/ci.yml` が Node/Python の回帰と LLM Adapter Shadow を `push`／`pull_request`／`workflow_dispatch` で実行。
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
 - **Quick Start:** `just setup && just test && just report`
 
