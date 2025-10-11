@@ -3,7 +3,7 @@
 #   OPENROUTER_API_KEY=sk-or-...
 #   OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 provider: openrouter
-endpoint: chat/completions
+base_url: https://openrouter.ai/api/v1
 model: meta-llama/llama-3.1-8b-instruct:free
 auth_env: OPENROUTER_API_KEY
 base_url_env: OPENROUTER_BASE_URL
