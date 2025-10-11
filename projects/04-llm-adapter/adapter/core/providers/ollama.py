@@ -100,12 +100,10 @@ class OllamaProvider(BaseProvider):
         allow_network = session_override is not None or client_override is not None
 
         auto_pull_env = os.getenv("OLLAMA_AUTO_PULL")
-        auto_pull_default = True
-        if isinstance(raw, Mapping) and "auto_pull" in raw:
-            auto_pull_default = _coerce_bool(raw.get("auto_pull"), auto_pull_default)
-        if auto_pull_env is not None:
-            auto_pull_default = _coerce_bool(auto_pull_env, auto_pull_default)
-        self._auto_pull = auto_pull_default
+        auto_pull_source = raw.get("auto_pull") if isinstance(raw, Mapping) else None
+        auto_pull_value = _coerce_bool(auto_pull_source, True)
+        auto_pull_value = _coerce_bool(auto_pull_env, auto_pull_value)
+        self._auto_pull = auto_pull_value
         self._allow_network = allow_network
         self._ready_models: set[str] = set()
 
