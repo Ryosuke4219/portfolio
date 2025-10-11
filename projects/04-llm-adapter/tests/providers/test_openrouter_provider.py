@@ -396,6 +396,47 @@ def test_openrouter_provider_supports_streaming(monkeypatch: pytest.MonkeyPatch,
     assert payload is not None and payload.get("stream") is True
 
 
+def test_openrouter_provider_request_options_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_openrouter_module()
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert stream is False
+        assert payload is not None
+        # config.temperature < raw option < request override
+        assert payload.get("temperature") == pytest.approx(0.7)
+        assert payload.get("response_format") == "json_schema"
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "overridden"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    try:
+        config = _provider_config(tmp_path)
+        config.temperature = 0.2
+        config.raw["options"] = {"temperature": 0.7, "response_format": "json_schema"}
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "override options")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.response.text == "overridden"
+
+
 def test_openrouter_provider_normalizes_auth_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -483,3 +524,23 @@ def test_openrouter_provider_skip_without_api_key(monkeypatch: pytest.MonkeyPatc
     assert isinstance(result.error, ProviderSkip)
     assert result.error.reason == SkipReason.MISSING_OPENROUTER_API_KEY
     assert result.backoff_next_provider is True
+
+
+def test_openrouter_provider_skip_message_mentions_custom_auth_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+    local_patch = _install_fake_session(module, lambda *_: _FakeResponse({}))
+    monkeypatch.delenv("CUSTOM_ROUTER_KEY", raising=False)
+    try:
+        config = _provider_config(tmp_path)
+        config.auth_env = "CUSTOM_ROUTER_KEY"
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "missing key")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "skip"
+    assert isinstance(result.error, ProviderSkip)
+    assert "CUSTOM_ROUTER_KEY" in str(result.error)
