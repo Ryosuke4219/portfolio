@@ -1,25 +1,25 @@
 # Async Runner/Parallel リファクタリングタスク
 
-## 1. 例外ロギングの共通化
-- 対象: `AsyncRunner._invoke_provider_async` と `Runner._invoke_provider_sync` の例外ハンドリング。【F:projects/04-llm-adapter-shadow/src/llm_adapter/runner_async.py†L76-L220】【F:projects/04-llm-adapter-shadow/src/llm_adapter/runner_sync.py†L74-L155】
-- 内容: 例外種別ごとに重複している `log_provider_call` 呼び出しを `runner_shared` 側に共通関数として抽出し、例外→ログ出力のマッピングを一元化する。
-- 期待効果: ロジック重複を排除し、エラー種別追加時に両実装へ同変更を反映するコストを削減。
-- 検証: `pytest projects/04-llm-adapter-shadow/tests/test_runner_async.py::test_async_runner_matches_sync` 等で同期・非同期挙動の整合性を確認。【F:projects/04-llm-adapter-shadow/tests/test_runner_async.py†L192-L260】
+## 1. AsyncRunner のイベント記録共通化
+- 対象: `AsyncRunner.run_async` と `_emit_provider_call` / `_emit_chain_failed` のイベント構築処理。【F:projects/04-llm-adapter/adapter/core/runner_async.py†L40-L126】
+- 内容: 成功・失敗・チェーン失敗イベントで共通化できるペイロード整形をヘルパに切り出し、イベント種別ごとの差分だけを個別メソッドに残す。
+- 期待効果: ロギング仕様変更時にイベント間の整合性を維持しやすくし、`test_async_runner` 系で検証される `error_family` などのフィールド重複定義を排除できる。【F:projects/04-llm-adapter/tests/runner_async/test_async_runner.py†L57-L117】
+- 検証: `pytest projects/04-llm-adapter/tests/runner_async/test_async_runner.py::test_async_rate_limit_triggers_backoff` などでイベント内容の後方互換を確認。
 
-## 2. `run_async` の逐次フェーズ切り出し
-- 対象: `AsyncRunner.run_async` の逐次実行ブロック。【F:projects/04-llm-adapter-shadow/src/llm_adapter/runner_async.py†L222-L332】
-- 内容: 逐次フェーズを `_run_sequential_async` などのプライベート関数へ移し、戻り値（成功レスポンス/例外）とメトリクス記録を関数側で完結させる。
-- 期待効果: `run_async` 本体の責務を入口制御に限定し、分岐ごとの読みやすさを向上。
-- 検証: `pytest projects/04-llm-adapter-shadow/tests/test_runner_async.py::test_async_runner_matches_sync` で逐次モードの挙動を回帰確認。【F:projects/04-llm-adapter-shadow/tests/test_runner_async.py†L192-L260】
+## 2. AsyncRunner の逐次/コンセンサス制御分離
+- 対象: `AsyncRunner.run_async` の逐次ループおよびコンセンサス分岐。【F:projects/04-llm-adapter/adapter/core/runner_async.py†L56-L90】
+- 内容: プロバイダ逐次試行とコンセンサス完了判定を `_run_sequential_once` / `_finalize_consensus` などに分離し、`errors` 集約や `ParallelExecutionError` 生成を責務ごとに整理する。
+- 期待効果: リトライ戦略の追加時に逐次フローとコンセンサス例外処理を独立してテスト可能にし、タイムアウト伝播の仕様を明確化する。【F:projects/04-llm-adapter/tests/runner_async/test_async_runner.py†L106-L117】
+- 検証: `pytest projects/04-llm-adapter/tests/runner_async/test_async_runner.py::test_async_consensus_all_timeout_propagates_original_error`。
 
-## 3. `run_async` の並列/コンセンサスフェーズ分離
-- 対象: `AsyncRunner.run_async` の並列系分岐と再試行制御ロジック。【F:projects/04-llm-adapter-shadow/src/llm_adapter/runner_async.py†L336-L605】
-- 内容: 並列実行・再試行・コンセンサス集約を担当するコンテキストクラス（例: `_ParallelExecutionContext`）を導入し、ワーカー生成・再試行コールバック・メトリクス送出をクラスメソッドに整理する。
-- 期待効果: ネストした内部関数を削減し、並列制御の単体テスト容易性を向上。
-- 検証: `pytest projects/04-llm-adapter-shadow/tests/test_runner_async.py` 全体および `tests/test_runner_consensus.py` のCIシナリオで後方互換を保証。【F:projects/04-llm-adapter-shadow/tests/test_runner_async.py†L1-L360】【F:projects/04-llm-adapter-shadow/tests/test_runner_consensus.py†L1-L220】
+## 3. RunnerExecution の単一実行パイプライン整理
+- 対象: `RunnerExecution._run_single` と関連ヘルパ（シャドウ記録・メトリクス集計・スキーマ検証）。【F:projects/04-llm-adapter/adapter/core/runner_execution.py†L96-L236】
+- 内容: 予算評価→スキーマ検証→メトリクス確定の順序を組み替え、`finalize_run_metrics` 呼び出しに渡すパラメータを小さなデータクラスへまとめる。シャドウ結果や停止理由の伝播も同データクラスで扱う。
+- 期待効果: シャドウプロバイダ/スキーマ違反/予算停止の分岐が明確になり、`test_runner_execution_records_shadow_budget_and_schema` の期待値更新が局所化する。【F:projects/04-llm-adapter/tests/compare_runner_parallel/test_budgeting.py†L20-L130】
+- 検証: `pytest projects/04-llm-adapter/tests/compare_runner_parallel/test_budgeting.py::test_runner_execution_records_shadow_budget_and_schema`。
 
-## 4. 並列ヘルパーの再試行制御共通化
-- 対象: `run_parallel_any_async` と `run_parallel_all_async` の再試行・attempt管理ロジック。【F:projects/04-llm-adapter-shadow/src/llm_adapter/runner_parallel.py†L166-L320】
-- 内容: `_reserve_attempt` / `_record_failure` / `_normalize_retry_directive` など重複する内部関数群を `ParallelRetryController`（仮称）にまとめ、ANY/ALL 双方が同じ状態管理を利用できるようにする。
-- 期待効果: 並列系APIの振る舞い差異を明確化し、再試行ポリシー変更時の改修範囲を局所化。
-- 検証: `pytest projects/04-llm-adapter-shadow/tests/test_runner_async.py::test_parallel_any_fallbacks` 系と `tests/test_runner_consensus.py` を中心に再試行パスの回帰確認。【F:projects/04-llm-adapter-shadow/tests/test_runner_async.py†L340-L620】【F:projects/04-llm-adapter-shadow/tests/test_runner_consensus.py†L1-L220】
+## 4. Attempt Executor の再試行結果集約改善
+- 対象: `SequentialAttemptExecutor.run` および `ParallelAttemptExecutor.run` の失敗記録とキャンセル結果生成。【F:projects/04-llm-adapter/adapter/core/runner_execution_attempts.py†L28-L72】【F:projects/04-llm-adapter/adapter/core/runner_execution_parallel.py†L57-L112】
+- 内容: 逐次・並列双方で利用できる `AttemptFailureRecorder`（仮称）を導入し、`ProviderFailureSummary` と `AllFailedError` 付随情報の組み立てを一元化する。並列 ANY/ALL モード固有のキャンセル結果も同レイヤで注入する。
+- 期待効果: 再試行上限やキャンセル分岐の仕様差を明示し、`test_rate_limit_retry_*` と `test_parallel_any_*` のメトリクス検証コードから重複した失敗集約ロジックを排除できる。【F:projects/04-llm-adapter/tests/runner_retry/test_rate_limit_failover.py†L79-L154】【F:projects/04-llm-adapter/tests/compare_runner_parallel/failures/test_parallel_any_runner.py†L27-L174】
+- 検証: `pytest projects/04-llm-adapter/tests/runner_retry/test_rate_limit_failover.py` と `pytest projects/04-llm-adapter/tests/compare_runner_parallel/failures/test_parallel_any_runner.py`。
