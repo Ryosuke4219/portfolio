@@ -16,6 +16,7 @@ from .config import (
 )
 from .datasets import load_golden_tasks
 from .provider_spi import ProviderSPI
+from .runner_async import AsyncRunner
 from .runner_config_builder import (
     BackoffPolicy,
     RunnerConfig,
@@ -168,6 +169,7 @@ def _normalize_mode(value: RunnerMode | str) -> RunnerMode:
 
 
 __all__ = [
+    "AsyncRunner",
     "BackoffPolicy",
     "RunnerMode",
     "RunnerConfig",

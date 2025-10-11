@@ -9,6 +9,7 @@ from adapter.core.errors import ParallelExecutionError, RateLimitError, Retriabl
 from adapter.core.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from adapter.core import runner_async
 from adapter.core.runner_async import AsyncRunner
+from adapter.core import runner_api
 from adapter.core.runner_config_builder import BackoffPolicy, RunnerConfig, RunnerMode
 
 
@@ -121,4 +122,8 @@ async def test_async_consensus_all_timeout_propagates_original_error() -> None:
 def test_async_runner_module_reference() -> None:
     assert AsyncRunner is runner_async.AsyncRunner
     assert AsyncRunner.__module__ == "adapter.core.runner_async"
+
+
+def test_async_runner_is_exported_via_runner_api() -> None:
+    assert runner_api.AsyncRunner is AsyncRunner
 
