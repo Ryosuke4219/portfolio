@@ -8,7 +8,7 @@ import pytest
 
 from adapter.core.loader import load_budget_book, load_provider_config
 
-ALLOWED_PROVIDERS = {"simulated", "openai", "gemini"}
+ALLOWED_PROVIDERS = {"simulated", "openai", "gemini", "ollama", "openrouter"}
 
 
 @pytest.mark.parametrize(
