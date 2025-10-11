@@ -7,6 +7,8 @@ from typing import Any, TypeVar
 from _pytest.recwarn import WarningsRecorder
 import pytest
 
+pytest.importorskip("adapter.core.runner_async_support")
+
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 
 
