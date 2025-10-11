@@ -114,6 +114,8 @@ projects/04-llm-adapter-shadow/
 - `SHADOW_PROVIDER` — 影実行用。デフォルトは `ollama:gemma3n:e2b`。`none` や空文字で無効化できます。
 - `OLLAMA_BASE_URL` — Ollama API のベースURL（未指定時は `http://127.0.0.1:11434`。旧名の `OLLAMA_HOST` もフォールバックとして解釈されます）。
 - `GEMINI_API_KEY` — Gemini SDK が参照するAPIキー。未設定の場合、Gemini プロバイダは安全にスキップされます。
+- `OPENAI_API_KEY` — OpenAI 公式APIを直接呼び出すプロバイダで利用するAPIキー。Quickstartの例と同様に必ず設定してください。
+- `OPENAI_ORGANIZATION` / `OPENAI_BASE_URL` — OpenAI の組織IDやベースURLを上書きしたい場合に指定します（未設定なら公開エンドポイントと同じ挙動）。
 - `OPENROUTER_API_KEY` — OpenRouter 経由で Anthropic / OpenAI などを利用する際の API キー。未設定なら OpenRouter プロバイダは自動スキップします。
 - `OPENROUTER_BASE_URL` — OpenRouter の API ベース URL。既定値は `https://openrouter.ai/api/v1` で、セルフホストや将来のリージョン分離時のみ変更してください。
 
