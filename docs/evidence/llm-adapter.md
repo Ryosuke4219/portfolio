@@ -16,7 +16,8 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 
 - `llm-adapter` CLI が `adapter/run_compare.py` を通じて複数プロバイダを連続・並列・合意形成モードで呼び出し、共通メトリクスを収集。
 - `adapter/core/runner_execution.py` のランナーがリトライやプロバイダ固有の例外を整理し、比較用のイベントをストリーム出力。
-- `adapter/core/metrics/update.py` と `adapter/core/metrics/models.py` が JSONL メトリクスと派生サマリを構築し、CLI の `--out` で指定した `out/metrics.jsonl` などに追記可能（既定の `adapter/run_compare.py` は `data/runs-metrics.jsonl` に保存）。
+- 単一プロバイダ実行は `projects/04-llm-adapter/adapter/cli/prompt_runner.py` の `prompt_runner` が CLI から直接呼び出され、JSONL 読み込みと送信を担う。
+- `adapter/core/metrics/update.py` と `adapter/core/metrics/models.py` が JSONL メトリクスと派生サマリを構築し、CLI の `--out` に渡したディレクトリ（例: `out/metrics.jsonl`）へ追記可能（既定の `adapter/run_compare.py` は `data/runs-metrics.jsonl` に保存）。
 
 ## Key Artifacts
 
@@ -29,7 +30,7 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 ## How to Reproduce
 
 1. `cd projects/04-llm-adapter` で仮想環境を作成し、`pip install -r requirements.txt` を実行して依存関係を揃える。
-2. `pip install -e .` で CLI をインストールし、`llm-adapter --provider adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して" --out out --json-logs` を実行。`--provider` で単一プロバイダ設定を指定し、`--out` で指定したディレクトリ（例: `out/metrics.jsonl`）へ比較結果が追記される。`python adapter/run_compare.py ...` を直接呼び出す場合は既定で `data/runs-metrics.jsonl` に出力される。
+2. `pip install -e .` で CLI をインストールし、`llm-adapter --provider adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して" --out out --json-logs` を実行。CLI からは `prompt_runner` が直接呼び出されて単一プロバイダへ送信され、`--out` で指定したディレクトリ配下（例: `out/metrics.jsonl`）に結果が追記される。`python adapter/run_compare.py ...` を直接呼び出す場合は既定で `data/runs-metrics.jsonl` に出力される。
 3. `pytest -q` を流して CLI・ランナー・メトリクスのユニットテストが通ることを確認。
 
 ## Next Steps

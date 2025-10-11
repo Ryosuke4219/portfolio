@@ -15,6 +15,7 @@ EXPECTED_REFERENCES = (
     "projects/04-llm-adapter/README.md",
     "projects/04-llm-adapter/adapter/run_compare.py",
     "projects/04-llm-adapter/adapter/core/runner_execution.py",
+    "projects/04-llm-adapter/adapter/cli/prompt_runner.py",
 )
 
 DISALLOWED_REFERENCES = (
