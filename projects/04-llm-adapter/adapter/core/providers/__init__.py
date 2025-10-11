@@ -93,7 +93,7 @@ class BaseProvider:
         raw = self.config.raw
         options_source = raw.get("options") if isinstance(raw, Mapping) else None
         metadata_source = raw.get("metadata") if isinstance(raw, Mapping) else None
-        options: dict[str, Any] | None = None
+        options: dict[str, Any] = {}
         if isinstance(options_source, Mapping):
             options = dict(options_source)
         metadata: Mapping[str, Any] | None = None
@@ -106,7 +106,7 @@ class BaseProvider:
             temperature=self.config.temperature,
             top_p=self.config.top_p,
             timeout_s=timeout,
-            options=options or {},
+            options=options,
             metadata=metadata,
         )
         return self.invoke(request)
