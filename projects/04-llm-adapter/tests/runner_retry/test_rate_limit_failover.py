@@ -68,6 +68,46 @@ def _build_metrics(
     return metrics, response.output_text or ""
 
 
+class CountingTokenBucket:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def acquire(self) -> None:
+        self.calls += 1
+
+
+def test_rate_limit_retry_invokes_token_bucket_per_attempt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("adapter.core.runner_execution.sleep", lambda _seconds: None)
+    task = make_task()
+    retry_config = RetryConfig(max=1, backoff_s=0.1)
+    provider_config = make_provider_config(tmp_path, "rate-limit", retries=retry_config)
+    provider = RateLimitStubProvider(provider_config, failures=1)
+    token_bucket = CountingTokenBucket()
+
+    execution = RunnerExecution(
+        token_bucket=token_bucket,
+        schema_validator=None,
+        evaluate_budget=_evaluate_budget,
+        build_metrics=_build_metrics,
+        normalize_concurrency=lambda total, limit: total,
+        backoff=BackoffPolicy(timeout_next_provider=False, retryable_next_provider=False),
+        shadow_provider=None,
+        metrics_path=None,
+        provider_weights=None,
+    )
+
+    execution.run_sequential_attempt(
+        [(provider_config, provider)],
+        task,
+        attempt_index=0,
+        mode="sequential",
+    )
+
+    assert token_bucket.calls == 2
+
+
 def test_rate_limit_retry_advances_after_max(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -113,4 +153,7 @@ def test_rate_limit_retry_advances_after_max(
     assert second_result.metrics.retries == 0
 
 
-__all__ = ["test_rate_limit_retry_advances_after_max"]
+__all__ = [
+    "test_rate_limit_retry_invokes_token_bucket_per_attempt",
+    "test_rate_limit_retry_advances_after_max",
+]

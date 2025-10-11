@@ -148,8 +148,6 @@ class RunnerExecution:
         attempt_index: int,
         mode: str,
     ) -> SingleRunResult:
-        if self._token_bucket:
-            self._token_bucket.acquire()
         prompt = task.render_prompt()
         shadow_session = start_shadow_session(self._shadow_provider, provider_config, prompt)
         retries_config = provider_config.retries
@@ -157,6 +155,8 @@ class RunnerExecution:
         attempt = 0
         provider_result: _ProviderCallResult | None = None
         while attempt < max_attempts:
+            if self._token_bucket:
+                self._token_bucket.acquire()
             attempt += 1
             provider_result = self._provider_executor.execute(provider_config, provider, prompt)
             provider_result.retries = attempt
