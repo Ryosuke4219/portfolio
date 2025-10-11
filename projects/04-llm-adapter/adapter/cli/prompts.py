@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 import os
 from pathlib import Path
 import socket
@@ -186,7 +186,18 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
         return EXIT_INPUT_ERROR
 
     auth_env = (config.auth_env or "").strip()
-    if auth_env and auth_env.upper() != "NONE" and not os.getenv(auth_env):
+    aliases: list[str] = []
+    raw_env = config.raw.get("env") if isinstance(config.raw, Mapping) else None
+    if auth_env and isinstance(raw_env, Mapping):
+        alias_raw = raw_env.get(auth_env)
+        if isinstance(alias_raw, str):
+            candidate = alias_raw.strip()
+            if candidate and candidate.upper() != "NONE":
+                aliases.append(candidate)
+    env_candidates = [auth_env, *aliases]
+    if auth_env and auth_env.upper() != "NONE" and not any(
+        os.getenv(name) for name in env_candidates if name
+    ):
         message = _msg(lang, "api_key_missing", env=auth_env)
         LOGGER.error(_sanitize_message(message))
         return EXIT_ENV_ERROR
