@@ -32,11 +32,13 @@ def read_jsonl_prompts(path: Path, lang: str) -> list[str]:
                             break
                     else:
                         raise ValueError(
-                            _msg(lang, "jsonl_invalid_object", path=path, line=line_no)
+                            "jsonl_invalid_object",
+                            _msg(lang, "jsonl_invalid_object", path=path, line=line_no),
                         )
                     continue
                 raise ValueError(
-                    _msg(lang, "jsonl_unsupported", path=path, line=line_no)
+                    "jsonl_unsupported",
+                    _msg(lang, "jsonl_unsupported", path=path, line=line_no),
                 )
     except FileNotFoundError as exc:
         raise SystemExit(_msg(lang, "jsonl_missing", path=path)) from exc
@@ -65,7 +67,23 @@ def collect_prompts(
         prompts.append(text.rstrip("\r\n"))
     if args.prompts:
         prompts_path = Path(args.prompts).expanduser().resolve()
-        prompts.extend(read_jsonl_prompts(prompts_path, lang))
+        try:
+            prompts.extend(read_jsonl_prompts(prompts_path, lang))
+        except ValueError as exc:
+            key: str | None = None
+            message: str
+            if exc.args:
+                first = exc.args[0]
+                last = exc.args[-1]
+                key = first if isinstance(first, str) else None
+                message = last if isinstance(last, str) else str(exc)
+            else:
+                message = str(exc)
+            if key and key.startswith("jsonl_"):
+                parser.error(f"{key}: {message}")
+            else:
+                parser.error(message)
+            raise SystemExit from exc
     if not prompts:
         parser.error(_msg(lang, "prompt_sources_missing"))
     return prompts
