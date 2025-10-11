@@ -21,6 +21,11 @@ DISALLOWED_REFERENCES = (
     "adapter/core/metrics.py",
 )
 
+CLI_EXPECTATIONS = (
+    "prompt_runner",
+    "--out",
+)
+
 
 @pytest.mark.parametrize("evidence_path", EVIDENCE_PATHS)
 def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
@@ -34,4 +39,9 @@ def test_llm_adapter_evidence_links(evidence_path: Path) -> None:
     assert not unexpected, (
         "Unexpected references in evidence file"
         f" {evidence_path.relative_to(PROJECT_ROOT)}: {unexpected}"
+    )
+    missing_cli = [ref for ref in CLI_EXPECTATIONS if ref not in content]
+    assert not missing_cli, (
+        "Missing CLI usage details in evidence file"
+        f" {evidence_path.relative_to(PROJECT_ROOT)}: {missing_cli}"
     )

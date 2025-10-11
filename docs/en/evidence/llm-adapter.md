@@ -29,7 +29,7 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 ## How to Reproduce
 
 1. `cd projects/04-llm-adapter`, create a virtual environment, and run `pip install -r requirements.txt` to install dependencies.
-2. Install the CLI with `pip install -e .`, then execute `llm-adapter --provider adapter/config/providers/openai.yaml --prompt "Say hello in English" --out out --json-logs`. Use `--provider` to supply a single provider config and `--out` to choose the directory where metrics are appended (e.g., `out/metrics.jsonl`). When you invoke `python adapter/run_compare.py ...` directly, it defaults to writing into `data/runs-metrics.jsonl`.
+2. Install the CLI with `pip install -e .`, then execute `llm-adapter --provider adapter/config/providers/openai.yaml --prompt "Say hello in English" --out out --json-logs`. Use `--provider` to supply a single provider config and `--out` to choose the directory where metrics are appended (e.g., `out/metrics.jsonl`). For a single-provider dry run you can call `python -m adapter.core.prompt_runner --provider adapter/config/providers/openai.yaml --prompt "hello" --out out/single` to run `prompt_runner` directly and append into the same `--out` directory, while `python adapter/run_compare.py ...` keeps defaulting to `data/runs-metrics.jsonl`.
 3. Run `pytest -q` to ensure CLI, runner, and metric modules pass their test suites.
 
 ## Next Steps
