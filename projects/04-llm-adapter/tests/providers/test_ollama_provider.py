@@ -14,7 +14,7 @@ from adapter.core.config import (
     RateLimitConfig,
     RetryConfig,
 )
-from adapter.core.errors import ProviderSkip, RateLimitError, RetriableError
+from adapter.core.errors import ProviderSkip, RateLimitError, RetriableError, SkipReason
 from adapter.core.providers import ProviderFactory
 
 
@@ -67,6 +67,9 @@ def _provider_config(tmp_path: Path, *, provider: str, model: str) -> ProviderCo
 
 def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
     requests_exceptions = getattr(module, "requests_exceptions", None)
+    if requests_exceptions is None:
+        compat = importlib.import_module("adapter.core.providers._requests_compat")
+        requests_exceptions = getattr(compat, "requests_exceptions", None)
     if requests_exceptions is None:  # pragma: no cover - RED 期待
         pytest.fail("ollama provider must expose requests_exceptions")
 
@@ -106,13 +109,9 @@ def _install_fake_client(module: Any, mode: str) -> pytest.MonkeyPatch:
                     }
                 )
             if mode == "rate_limit":
-                response = _FakeResponse({}, status_code=429)
-                error = requests_exceptions.HTTPError("429", response=response)
-                raise error
+                raise RateLimitError("too many requests")
             if mode == "server_error":
-                response = _FakeResponse({}, status_code=503)
-                error = requests_exceptions.HTTPError("503", response=response)
-                raise error
+                raise RetriableError("temporary server error")
             raise AssertionError(f"unsupported mode: {mode}")
 
     monkeypatch = pytest.MonkeyPatch()
@@ -127,6 +126,40 @@ def test_ollama_provider_executor_success(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
     try:
         config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        config.raw["client"] = module.OllamaClient(
+            host="http://127.0.0.1:11434",
+            session=object(),
+            timeout=60.0,
+            pull_timeout=300.0,
+        )
+        provider = ProviderFactory.create(config)
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "say hello")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.failure_kind is None
+    assert result.response.text == "Hello from Ollama"
+    assert result.response.token_usage.prompt == 7
+    assert result.response.token_usage.completion == 3
+
+
+def test_ollama_provider_executor_success_in_ci(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_ollama_module()
+    local_patch = _install_fake_client(module, mode="success")
+    monkeypatch.setenv("LLM_ADAPTER_OFFLINE", "0")
+    monkeypatch.setenv("CI", "true")
+    try:
+        config = _provider_config(tmp_path, provider="ollama", model="phi3")
+        config.raw["client"] = module.OllamaClient(
+            host="http://127.0.0.1:11434",
+            session=object(),
+            timeout=60.0,
+            pull_timeout=300.0,
+        )
         provider = ProviderFactory.create(config)
         executor = ProviderCallExecutor(backoff=None)
         result = executor.execute(config, provider, "say hello")
@@ -190,6 +223,7 @@ def test_ollama_provider_skip_when_offline(monkeypatch: pytest.MonkeyPatch, tmp_
     assert result.status == "skip"
     assert result.failure_kind == "skip"
     assert isinstance(result.error, ProviderSkip)
+    assert result.error.reason is SkipReason.OLLAMA_OFFLINE
     assert result.backoff_next_provider is True
 
 
