@@ -7,4 +7,5 @@ def test_shadow_readme_has_deprecation_notice() -> None:
     notice_block = "\n".join(nonempty_lines[:5])
 
     assert "アーカイブ済み" in notice_block
+    assert "最新手順" in notice_block
     assert "04-llm-adapter/README.md" in notice_block

@@ -1,6 +1,6 @@
 # 04. LLM Adapter — Shadow Execution & Error Handling (Minimal)
 
-> ⚠️ **アーカイブ済み:** この Shadow 版は保存目的で維持されています。最新の開発状況とセットアップ手順は [projects/04-llm-adapter](../04-llm-adapter/README.md) 配下の README を参照してください。
+> ⚠️ **アーカイブ済み:** この Shadow 版は保存目的で維持されています。最新手順および更新情報は [projects/04-llm-adapter](../04-llm-adapter/README.md) 配下の本体 README を参照してください。
 
 ## Overview
 
