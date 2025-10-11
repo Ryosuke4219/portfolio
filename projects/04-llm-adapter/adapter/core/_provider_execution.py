@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from time import perf_counter, sleep
 from typing import TYPE_CHECKING
@@ -65,12 +66,15 @@ class ProviderCallExecutor:
             timeout: float | None = None
             if provider_config.timeout_s > 0:
                 timeout = float(provider_config.timeout_s)
-            raw_options = provider_config.raw.get("options")
-            if raw_options is None:
-                options: dict[str, object] = {}
-            else:
-                options = dict(raw_options)
-            metadata = provider_config.raw.get("metadata")
+            raw = provider_config.raw
+            options_source = raw.get("options") if isinstance(raw, Mapping) else None
+            metadata_source = raw.get("metadata") if isinstance(raw, Mapping) else None
+            options: dict[str, object] = {}
+            if isinstance(options_source, Mapping):
+                options = dict(options_source)
+            metadata: Mapping[str, object] | None = None
+            if isinstance(metadata_source, Mapping):
+                metadata = dict(metadata_source)
             request = ProviderRequest(
                 model=model,
                 prompt=prompt,

@@ -60,3 +60,17 @@ def test_provider_request_receives_options_and_metadata(tmp_path: Path) -> None:
     assert provider.last_request.options == {"stream": True, "seed": 42}
     assert provider.last_request.metadata == {"tenant": "demo"}
     assert provider.last_request.options is not provider_config.raw["options"]
+    assert provider.last_request.metadata is not provider_config.raw["metadata"]
+
+
+def test_base_provider_generate_passes_copied_options_and_metadata(tmp_path: Path) -> None:
+    provider_config = _build_provider_config(tmp_path)
+    provider = _CapturingProvider(provider_config)
+
+    provider.generate("hello")
+
+    assert provider.last_request is not None
+    assert provider.last_request.options == {"stream": True, "seed": 42}
+    assert provider.last_request.metadata == {"tenant": "demo"}
+    assert provider.last_request.options is not provider_config.raw["options"]
+    assert provider.last_request.metadata is not provider_config.raw["metadata"]
