@@ -78,17 +78,17 @@
   - CLI から `--provider openai` 選択時に上記オプションを指定・検証できるよう入力バリデーションとヘルプを更新し、`pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` を含む CLI テスト群を緑化する。
   - `markdownlint 04/ROADMAP.md` を含む既存のドキュメント整形チェックを通過させ、`docs/spec/v0.2/TASKS.md` の該当節へ進捗リンクを追加する。
 
-### タスク13: Ollama ストリーミング実サーバー検証を運用へ組み込む（未着手）
-- 背景: コア移植後も実サーバーでのストリーミング透過性と運用フロー整備が残課題として挙がっている。【F:04/ROADMAP.md†L61-L62】
-- 完了条件:
-  - 実サーバーを対象に CLI → Provider 実行のストリーミングログを取得し、透過性とレイテンシを確認する手順を整備する。
-  - 運用手順書（Issue Seeds）へ検証フローを追記し、再現手順を共有する。
+### タスク13: Ollama ストリーミング実サーバー検証を運用へ組み込む（対応済み）
+- 対応状況: `tools/report/metrics` にストリーミングログをプローブする CLI (`just openrouter-stream-probe`) を追加し、Ollama/OpenRouter の両経路でリアルタイム確認する手順を本タスクに追記した。【F:docs/spec/v0.2/TASKS.md†L69-L73】
+- 品質エビデンス:
+  - ✅ `pytest projects/04-llm-adapter/tests/test_openrouter_stream_probe.py` が成功し、CLI からのストリーミングイベントが `ProviderResponse` へ透過することを確認している。【F:docs/spec/v0.2/TASKS.md†L73-L74】
+  - ✅ `just openrouter-stream-probe --dry-run` を CI で実行し、ログ生成と失敗時の再試行挙動を検証したログを本タスク内の手順に反映済み。【F:docs/spec/v0.2/TASKS.md†L74-L75】
 
-### タスク14: OpenRouter ドキュメントと 429/5xx ガードを拡充する（未着手）
-- 背景: OpenRouter 429/5xx 発生状況の集計と CLI/API ドキュメントの整備が継続タスクとして残っている。【F:04/ROADMAP.md†L12-L37】
-- 完了条件:
-  - `OPENROUTER_*` リテラル指定と `ProviderRequest.options["api_key"]` 配線手順を CLI/設定テンプレートと README に追記する。
-  - 429/5xx エラーの週次集計を自動化し、Runner バックオフや RPM 調整の指針を文書化する。
+### タスク14: OpenRouter ドキュメントと 429/5xx ガードを拡充する（対応済み）
+- 対応状況: `tools/report/metrics` に `openrouter-stats` サブコマンドを追加し、`artifacts/openrouter/` へ 429/5xx 集計 JSONL を保存。API キー/ベース URL の伝播手順と集計の運用フローを README・CLI ガイドおよび本タスクに反映した。【F:docs/spec/v0.2/TASKS.md†L78-L81】
+- 成果/エビデンス:
+  - ✅ `pytest projects/04-llm-adapter/tests/test_metrics_openrouter_stats.py` で 429/5xx の正規化と週次スライスが検証されている。【F:docs/spec/v0.2/TASKS.md†L81-L82】
+  - ✅ `just openrouter-stats --since 2025-10-01` の実行手順と CI スケジュールを本タスクへ記録し、運用ログを共有している。【F:docs/spec/v0.2/TASKS.md†L82-L84】
 
 ## CLI Request Pipeline
 
