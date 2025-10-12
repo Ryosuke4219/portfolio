@@ -89,6 +89,42 @@ def test_cli_fake_provider(echo_provider, tmp_path: Path, capfd) -> None:
     assert request.options == {"foo": "bar"}
 
 
+def test_cli_provider_without_invoke_exits_with_provider_error(
+    install_provider, tmp_path: Path, capfd
+) -> None:
+    class LegacyProvider:
+        def __init__(self, config):
+            self.config = config
+
+        def generate(self, prompt: str) -> provider_module.ProviderResponse:
+            return provider_module.ProviderResponse(
+                output_text=f"legacy:{prompt}",
+                input_tokens=1,
+                output_tokens=1,
+                latency_ms=1,
+            )
+
+    install_provider(LegacyProvider)
+
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        "provider: fake\nmodel: dummy\nauth_env: NONE\nmax_tokens: 128\n", encoding="utf-8"
+    )
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+        ]
+    )
+
+    captured = capfd.readouterr()
+    assert exit_code == cli_module.EXIT_PROVIDER_ERROR
+    assert "invoke()" in captured.err
+
+
 @pytest.mark.parametrize(
     ("metadata_block", "expected"),
     [
