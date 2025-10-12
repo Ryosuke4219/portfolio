@@ -36,8 +36,8 @@ def _load_all_failed_error() -> type[AllFailedErrorType]:
         module = module_from_spec(spec)
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
-        loaded_cls = getattr(module, "AllFailedError")
-        return cast(type[AllFailedErrorType], loaded_cls)
+        loaded_cls = cast(type[AllFailedErrorType], module.AllFailedError)
+        return loaded_cls
 
 
 AllFailedError: type[AllFailedErrorType]
