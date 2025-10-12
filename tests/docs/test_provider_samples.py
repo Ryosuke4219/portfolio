@@ -7,6 +7,6 @@ def test_ollama_comment_prioritizes_base_url():
     )
     lines = sample_path.read_text(encoding="utf-8").splitlines()
     assert (
-        "#         ※ OLLAMA_HOST は互換目的の旧変数で、設定がなければ BASE_URL のフォールバックとして解釈されます"
+        "#         ※ OLLAMA_BASE_URL が優先され、未設定の場合のみ旧互換の OLLAMA_HOST が利用されます"
         in lines
     )

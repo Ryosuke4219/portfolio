@@ -1,6 +1,6 @@
 # サンプル: Ollama ローカル推論用プロバイダ設定
 # .env 例: OLLAMA_BASE_URL=http://127.0.0.1:11434
-#         ※ OLLAMA_HOST は互換目的の旧変数で、設定がなければ BASE_URL のフォールバックとして解釈されます
+#         ※ OLLAMA_BASE_URL が優先され、未設定の場合のみ旧互換の OLLAMA_HOST が利用されます
 provider: ollama
 model: llama3.1:8b-instruct
 endpoint: http://127.0.0.1:11434  # 実行時は OLLAMA_BASE_URL / OLLAMA_HOST で上書きできます
