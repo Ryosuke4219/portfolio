@@ -64,11 +64,12 @@ class SequentialAttemptExecutor:
                 )
             )
         if not success_found:
-            error = AllFailedError("all providers failed")
-            error.failures = failures  # type: ignore[attr-defined]
-            error.batch = batch  # type: ignore[attr-defined]
-            error.stop_reason = stop_reason  # type: ignore[attr-defined]
-            raise error
+            raise AllFailedError(
+                "all providers failed",
+                failures=failures,
+                batch=batch,
+                stop_reason=stop_reason,
+            )
         return batch, stop_reason
 
 

@@ -120,11 +120,15 @@ class _CompositeTieBreaker(TieBreaker):
         if not order:
             raise ValueError("tie breaker order must not be empty")
         self._order = list(order)
-        self._last_used = self._DISPLAY_NAMES[self._order[-1][0]]
+        self._name = self._DISPLAY_NAMES[self._order[-1][0]]
 
     @property
     def name(self) -> str:
-        return self._last_used
+        return self._name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
 
     def break_tie(self, candidates: Sequence[AggregationCandidate]) -> AggregationCandidate:
         if not candidates:
@@ -141,7 +145,7 @@ class _CompositeTieBreaker(TieBreaker):
             if any(entry[0][index] != pivot for entry in scored[1:]):
                 chosen_name = name
                 break
-        self._last_used = self._DISPLAY_NAMES[chosen_name]
+        self.name = self._DISPLAY_NAMES[chosen_name]
         return best_candidate
 
 

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -78,8 +79,28 @@ class ConfigError(FatalError):
     """Raised when provider configuration is invalid."""
 
 
+@dataclass(slots=True, init=False)
 class AllFailedError(FatalError):
     """Raised when all providers fail to produce a result."""
+
+    message: str
+    failures: list[Any]
+    batch: Sequence[tuple[int, Any]] | None
+    stop_reason: str | None
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        failures: Iterable[Any] | None = None,
+        batch: Sequence[tuple[int, Any]] | None = None,
+        stop_reason: str | None = None,
+    ) -> None:
+        Exception.__init__(self, message)
+        self.message = message
+        self.failures = list(failures) if failures is not None else []
+        self.batch = list(batch) if batch is not None else None
+        self.stop_reason = stop_reason
 
 
 class ParallelExecutionError(FatalError):
