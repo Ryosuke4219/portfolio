@@ -4,7 +4,6 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-
 from src.llm_adapter.errors import (
     ProviderSkip,
     RateLimitError,
@@ -14,6 +13,7 @@ from src.llm_adapter.errors import (
 )
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.openrouter import OpenRouterProvider
+
 from tests.helpers.fakes import FakeResponse, FakeSession
 
 

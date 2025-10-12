@@ -8,7 +8,6 @@ import time
 from typing import Any
 
 import pytest
-
 from src.llm_adapter.errors import RateLimitError, TimeoutError
 from src.llm_adapter.parallel_exec import ParallelExecutionError, run_parallel_any_sync
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI

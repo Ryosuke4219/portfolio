@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Any, cast
 
 from ..errors import AuthError, RateLimitError, RetriableError, TimeoutError
-from ._requests_compat import ResponseProtocol, SessionProtocol, requests_exceptions
+from ._requests_compat import requests_exceptions, ResponseProtocol, SessionProtocol
 
 _streaming_error_candidates: list[type[BaseException]] = []
 _requests_exceptions_any = cast(Any, requests_exceptions)

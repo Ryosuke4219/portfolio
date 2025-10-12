@@ -1,13 +1,12 @@
 """consume_cases ツールのテスト."""
 from __future__ import annotations
 
+from importlib import util
 import json
+from pathlib import Path
 import subprocess
 import sys
-from importlib import util
-from pathlib import Path
 from types import ModuleType
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

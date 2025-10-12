@@ -85,9 +85,9 @@ class ParallelAttemptExecutor:
     ) -> tuple[list[tuple[int, SingleRunResult]], str | None]:
         if not providers:
             error = AllFailedError("no providers were attempted")
-            setattr(error, "failures", [])
-            setattr(error, "batch", [])
-            setattr(error, "stop_reason", None)
+            error.failures = []
+            error.batch = []
+            error.stop_reason = None
             raise error
         normalized_mode = _normalize_mode_value(config.mode)
         if _is_parallel_any_mode(normalized_mode):

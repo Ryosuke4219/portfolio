@@ -104,11 +104,11 @@ async def _process_prompt(
             request = _build_request(prompt, config)
             if hasattr(provider, "invoke"):
                 response = await loop.run_in_executor(  # type: ignore[arg-type]
-                    None, getattr(provider, "invoke"), request
+                    None, provider.invoke, request
                 )
             else:  # pragma: no cover - 後方互換
                 response = await loop.run_in_executor(  # type: ignore[arg-type]
-                    None, getattr(provider, "generate"), prompt
+                    None, provider.generate, prompt
                 )
         except Exception as exc:  # pragma: no cover - 実 API 呼び出し向けの防御
             latency_ms = int((time.perf_counter() - start) * 1000)
@@ -148,7 +148,7 @@ async def _process_prompt(
         if hasattr(response, "output_text"):
             output_text = provider_response.output_text
         elif hasattr(response, "text"):
-            output_text = cast(str, getattr(provider_response, "text"))
+            output_text = cast(str, provider_response.text)
         else:
             output_text = ""
 

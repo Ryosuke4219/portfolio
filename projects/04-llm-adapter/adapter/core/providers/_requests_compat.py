@@ -5,7 +5,7 @@ from collections.abc import Iterable
 import importlib
 from types import TracebackType
 import typing
-from typing import Any, Protocol, cast
+from typing import Any, cast, Protocol
 
 
 class ResponseProtocol(Protocol):
@@ -55,8 +55,8 @@ requests_exceptions: RequestsExceptionsProtocol
 if typing.TYPE_CHECKING:  # pragma: no cover - typing time placeholders
     import requests as _requests_mod  # type: ignore[import-untyped]  # noqa: F401
     from requests import (  # noqa: F401
-        Response as _RequestsResponse,
         exceptions as _RequestsExceptions,
+        Response as _RequestsResponse,
     )
 
 

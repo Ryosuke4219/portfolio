@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 TASKS_PATH = Path("docs/spec/v0.2/TASKS.md")
 
 

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import importlib
 import importlib.abc
 import importlib.machinery
-from collections.abc import Sequence
 import os
 from pathlib import Path
 import sys
 
 import pytest
+
+from adapter.core.compare_runner_support import RunMetricsBuilder
+from adapter.core.runner_config_builder import RunnerMode
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PROJECT_ROOT.parent.parent
@@ -37,9 +40,6 @@ class _ShadowSrcFinder(importlib.abc.MetaPathFinder):
 # Ensure the canonical adapter package is loaded before shadow import hooks can override it.
 importlib.import_module("adapter")
 
-from adapter.core.compare_runner_support import RunMetricsBuilder
-from adapter.core.runner_config_builder import RunnerMode
-
 SHADOW_ROOT = PROJECT_ROOT.parent / "04-llm-adapter-shadow"
 if SHADOW_ROOT.exists():
     shadow_finder = _ShadowSrcFinder(SHADOW_ROOT)
@@ -59,7 +59,7 @@ if (
             canonical = getattr(candidate, "canonical", None)
             if isinstance(canonical, str) and canonical:
                 if canonical.startswith("RunnerMode.") and hasattr(candidate, "value"):
-                    value = getattr(candidate, "value")
+                    value = candidate.value
                     if isinstance(value, str):
                         return value
                 return canonical

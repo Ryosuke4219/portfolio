@@ -7,7 +7,6 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
 import pytest
-
 from src.llm_adapter import provider_spi as provider_spi_module
 from src.llm_adapter.provider_spi import ProviderRequest
 

@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 import datetime as dt
 import logging
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
-from adapter.core import ProviderFactory, load_provider_config
+from adapter.core import load_provider_config, ProviderFactory
 from adapter.core.errors import ProviderSkip
 from adapter.core.provider_spi import ProviderRequest
 from adapter.core.providers.openrouter import SessionProtocol
@@ -28,11 +29,11 @@ def _wrap_response(response: Any, logger: logging.Logger) -> Any:
             if chunk and chunk != "[DONE]":
                 if chunk.startswith("data:"):
                     chunk = chunk[5:].strip()
-                stamp = dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="milliseconds")
+                stamp = dt.datetime.now(dt.UTC).astimezone().isoformat(timespec="milliseconds")
                 logger.info("%s chunk: %s", stamp, chunk)
             yield raw
 
-    setattr(response, "iter_lines", _iter_lines)
+    response.iter_lines = _iter_lines
     return response
 
 def _wrap_session(session: SessionProtocol, logger: logging.Logger) -> SessionProtocol:
@@ -44,7 +45,7 @@ def _wrap_session(session: SessionProtocol, logger: logging.Logger) -> SessionPr
         result = post(*args, **kwargs)
         return _wrap_response(result, logger) if kwargs.get("stream") else result
 
-    setattr(session, "post", _post)
+    session.post = _post
     return session
 
 def _attach_logging(provider: Any, logger: logging.Logger) -> None:

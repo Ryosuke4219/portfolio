@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from src.llm_adapter.consensus_candidates import (
-    CandidateSet,
     _apply_tie_breaker,
+    CandidateSet,
     validate_consensus_schema,
 )
 
