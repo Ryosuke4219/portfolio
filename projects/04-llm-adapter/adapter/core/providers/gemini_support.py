@@ -40,30 +40,69 @@ def resolve_api_key(env_name: str | None) -> str:
     return value
 
 
+_STATUS_NAME_TO_CODE = {
+    "UNAUTHENTICATED": 401,
+    "PERMISSION_DENIED": 403,
+    "RESOURCE_EXHAUSTED": 429,
+    "DEADLINE_EXCEEDED": 408,
+    "UNAVAILABLE": 503,
+}
+
+
 def extract_status_code(exc: Exception) -> int | None:
     """Best-effort extraction of numeric status codes from Gemini SDK errors."""
 
     for attr in ("status_code", "code"):
-        value = getattr(exc, attr, None)
-        if isinstance(value, int):
-            return value
-        if hasattr(value, "value"):
-            try:
-                numeric = int(value.value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
-                numeric = None
-            else:
-                return numeric
-        if hasattr(value, "name") and isinstance(value.name, str):
-            mapped = {
-                "UNAUTHENTICATED": 401,
-                "PERMISSION_DENIED": 403,
-                "RESOURCE_EXHAUSTED": 429,
-                "DEADLINE_EXCEEDED": 408,
-                "UNAVAILABLE": 503,
-            }.get(value.name)
+        candidate = getattr(exc, attr, None)
+        numeric = _coerce_status_code(candidate)
+        if numeric is not None:
+            return numeric
+    return None
+
+
+def _coerce_status_code(candidate: Any) -> int | None:
+    if candidate is None:
+        return None
+    if isinstance(candidate, int):
+        return candidate
+    if isinstance(candidate, str):
+        try:
+            return int(candidate)
+        except ValueError:
+            return _STATUS_NAME_TO_CODE.get(candidate)
+    if isinstance(candidate, Mapping):
+        mapping = dict(candidate)
+        for key in ("status_code", "code", "value"):
+            if key in mapping:
+                nested = _coerce_status_code(mapping[key])
+                if nested is not None:
+                    return nested
+        name_value = mapping.get("name")
+        if isinstance(name_value, str):
+            mapped = _STATUS_NAME_TO_CODE.get(name_value)
             if mapped is not None:
                 return mapped
+        return None
+    for attr in ("value", "status_code", "code"):
+        try:
+            nested_candidate = getattr(candidate, attr)
+        except AttributeError:
+            continue
+        nested = _coerce_status_code(nested_candidate)
+        if nested is not None:
+            return nested
+    try:
+        name_attr = getattr(candidate, "name")
+    except AttributeError:
+        return None
+    if isinstance(name_attr, str):
+        mapped = _STATUS_NAME_TO_CODE.get(name_attr)
+        if mapped is not None:
+            return mapped
+        try:
+            return int(name_attr)
+        except ValueError:
+            return None
     return None
 
 

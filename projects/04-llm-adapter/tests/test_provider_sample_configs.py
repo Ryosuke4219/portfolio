@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import textwrap
+
 import pytest
 import yaml
 
 from adapter.core.loader import load_budget_book, load_provider_config
+from adapter.core.providers.gemini_support import extract_status_code
 
 ALLOWED_PROVIDERS = {"simulated", "openai", "gemini", "ollama", "openrouter", "judge"}
 AUTH_REQUIRED_PROVIDERS = {"openai", "gemini", "openrouter"}
@@ -54,3 +57,52 @@ def test_openrouter_example_includes_base_url_env_hint() -> None:
         data = yaml.safe_load(fh)
     assert data.get("base_url_env") == "OPENROUTER_BASE_URL"
     assert "# 推奨 .env 例:" in sample_path.read_text(encoding="utf-8")
+
+
+def test_budget_book_coerces_numeric_fields(tmp_path: Path) -> None:
+    budget_path = tmp_path / "budgets.yaml"
+    budget_path.write_text(
+        textwrap.dedent(
+            """
+            default:
+              run_budget_usd: "12.5"
+              daily_budget_usd: {}
+              stop_on_budget_exceed: true
+            overrides:
+              openai:
+                run_budget_usd:
+                  invalid: true
+                daily_budget_usd: "7.0"
+                stop_on_budget_exceed: false
+              gemini:
+                run_budget_usd: null
+            """
+        ).strip(),
+        encoding="utf-8",
+    )
+
+    book = load_budget_book(budget_path)
+
+    assert book.default.run_budget_usd == pytest.approx(12.5)
+    assert book.default.daily_budget_usd == pytest.approx(0.0)
+    assert book.overrides["openai"].run_budget_usd == pytest.approx(12.5)
+    assert book.overrides["openai"].daily_budget_usd == pytest.approx(7.0)
+    assert book.overrides["gemini"].run_budget_usd == pytest.approx(12.5)
+
+
+def test_extract_status_code_handles_enum_like_objects() -> None:
+    class EnumLike:
+        def __init__(self, value: str, name: str) -> None:
+            self.value = value
+            self.name = name
+
+    class EnumAsMapping(dict):
+        pass
+
+    enum_exc = type("EnumExc", (Exception,), {"status_code": EnumLike("401", "UNAUTHENTICATED")})()
+    mapping_exc = type("MappingExc", (Exception,), {"code": EnumAsMapping(value="429", name="RESOURCE_EXHAUSTED")})()
+    none_exc = type("NoneExc", (Exception,), {"status_code": None})()
+
+    assert extract_status_code(enum_exc) == 401
+    assert extract_status_code(mapping_exc) == 429
+    assert extract_status_code(none_exc) is None

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, MutableMapping
+from numbers import Real
 from pathlib import Path
 from types import ModuleType
 from typing import cast
@@ -182,8 +183,8 @@ def load_budget_book(path: Path) -> BudgetBook:
     else:
         overrides_raw = cast(MutableMapping[str, object], {})
     default_rule = BudgetRule(
-        run_budget_usd=float(default_raw.get("run_budget_usd", 0.0)),
-        daily_budget_usd=float(default_raw.get("daily_budget_usd", 0.0)),
+        run_budget_usd=_coerce_budget_float(default_raw.get("run_budget_usd"), 0.0),
+        daily_budget_usd=_coerce_budget_float(default_raw.get("daily_budget_usd"), 0.0),
         stop_on_budget_exceed=bool(default_raw.get("stop_on_budget_exceed", False)),
     )
     overrides: dict[str, BudgetRule] = {}
@@ -191,12 +192,31 @@ def load_budget_book(path: Path) -> BudgetBook:
         if not isinstance(provider_name, str) or not isinstance(rule_raw, MutableMapping):
             continue
         overrides[provider_name] = BudgetRule(
-            run_budget_usd=float(rule_raw.get("run_budget_usd", default_rule.run_budget_usd)),
-            daily_budget_usd=float(
-                rule_raw.get("daily_budget_usd", default_rule.daily_budget_usd)
+            run_budget_usd=_coerce_budget_float(
+                rule_raw.get("run_budget_usd"), default_rule.run_budget_usd
+            ),
+            daily_budget_usd=_coerce_budget_float(
+                rule_raw.get("daily_budget_usd"), default_rule.daily_budget_usd
             ),
             stop_on_budget_exceed=bool(
                 rule_raw.get("stop_on_budget_exceed", default_rule.stop_on_budget_exceed)
             ),
         )
     return BudgetBook(default=default_rule, overrides=overrides)
+
+
+def _coerce_budget_float(candidate: object, fallback: float) -> float:
+    if isinstance(candidate, Real):
+        try:
+            return float(candidate)
+        except (TypeError, ValueError):
+            return fallback
+    if isinstance(candidate, str):
+        stripped = candidate.strip()
+        if not stripped:
+            return fallback
+        try:
+            return float(stripped)
+        except ValueError:
+            return fallback
+    return fallback
