@@ -1,8 +1,8 @@
-import sys
-import types
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+import sys
+import types
+from typing import cast, TYPE_CHECKING
 
 import pytest
 from src.llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_any_async
