@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import ModuleType
 import sys
 
 
-def _load_submodule(module_name: str):
+def _load_submodule(module_name: str) -> ModuleType:
     qualified_name = f"{__name__}.{module_name}"
     module_path = Path(__file__).with_name("metrics") / f"{module_name}.py"
     spec = importlib.util.spec_from_file_location(qualified_name, module_path)

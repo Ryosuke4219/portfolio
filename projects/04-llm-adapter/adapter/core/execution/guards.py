@@ -2,46 +2,90 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Protocol, TYPE_CHECKING, cast
 
-_jsonschema_spec = importlib.util.find_spec("jsonschema")
-if _jsonschema_spec is None:
-    class _MissingValidationError(RuntimeError):
-        """Raised when jsonschema is required but unavailable."""
+if TYPE_CHECKING:
+    from jsonschema.exceptions import ValidationError as _ValidationError
+else:
+    class _ValidationError(Exception):
+        path: tuple[Any, ...]
+        message: str
 
-        def __init__(self) -> None:
-            super().__init__(
-                "jsonschema is required to validate request payloads. Install "
-                "the optional dependency to enable schema validation."
-            )
 
-    class _MissingValidator:
-        def __init__(self, schema: dict[str, Any]) -> None:
-            self.schema = schema
+class _ValidatorProtocol(Protocol):
+    def __init__(self, schema: dict[str, Any]) -> None:
+        ...
 
-        @classmethod
-        def check_schema(cls, _: dict[str, Any]) -> None:
-            raise _MissingValidationError()
+    @classmethod
+    def check_schema(cls, schema: dict[str, Any]) -> None:
+        ...
 
-        def validate(self, _: Any) -> None:
-            raise _MissingValidationError()
+    def validate(self, instance: Any) -> None:
+        ...
 
-    def _validator_for(_: dict[str, Any]) -> type[_MissingValidator]:
+
+class _ValidatorsModule(Protocol):
+    def validator_for(self, schema: dict[str, Any]) -> type[_ValidatorProtocol]:
+        ...
+
+
+class _ExceptionsModule(Protocol):
+    ValidationError: type["_ValidationError"]
+
+
+class _MissingValidationError(ValueError):
+    """Raised when jsonschema is required but unavailable."""
+
+    def __init__(self) -> None:
+        message = (
+            "jsonschema is required to validate request payloads. Install "
+            "the optional dependency to enable schema validation."
+        )
+        super().__init__(message)
+        self.message = message
+        self.path: tuple[Any, ...] = ()
+
+
+class _MissingValidator:
+    def __init__(self, schema: dict[str, Any]) -> None:
+        self.schema = schema
+
+    @classmethod
+    def check_schema(cls, _: dict[str, Any]) -> None:
+        return None
+
+    def validate(self, _: Any) -> None:
+        raise _MissingValidationError()
+
+
+class _FallbackValidators:
+    @staticmethod
+    def validator_for(_: dict[str, Any]) -> type[_MissingValidator]:
         return _MissingValidator
 
-    jsonschema_exceptions = SimpleNamespace(ValidationError=_MissingValidationError)
-    validators = SimpleNamespace(validator_for=_validator_for)
-else:
-    from jsonschema import (
-        exceptions as jsonschema_exceptions,
-        validators,
+
+try:
+    from jsonschema import exceptions as _jsonschema_exceptions
+    from jsonschema import validators as _jsonschema_validators
+except ImportError:
+    _validators_impl: _ValidatorsModule = cast(
+        _ValidatorsModule, _FallbackValidators()
     )
+    _exceptions_impl: _ExceptionsModule = cast(
+        _ExceptionsModule,
+        SimpleNamespace(ValidationError=_MissingValidationError),
+    )
+else:
+    _validators_impl = cast(_ValidatorsModule, _jsonschema_validators)
+    _exceptions_impl = cast(_ExceptionsModule, _jsonschema_exceptions)
+
+validators: _ValidatorsModule = _validators_impl
+jsonschema_exceptions: _ExceptionsModule = _exceptions_impl
 
 
 class _TokenBucket:
@@ -73,7 +117,7 @@ class _TokenBucket:
 class _SchemaValidator:
     def __init__(self, schema_path: Path | None) -> None:
         self.schema: dict[str, Any] | None = None
-        self._validator: validators.Validator | None = None
+        self._validator: _ValidatorProtocol | None = None
         if schema_path and schema_path.exists():
             with schema_path.open("r", encoding="utf-8") as fp:
                 loaded = json.load(fp)
