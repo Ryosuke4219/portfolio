@@ -14,6 +14,7 @@ from adapter.core.providers.openrouter import SessionProtocol
 
 LOGGER = logging.getLogger(__name__)
 _DEFAULT_PROMPT = "Hello from llm-adapter OpenRouter probe."
+_DRY_RUN_MESSAGE = "Dry-run: set OPENROUTER_API_KEY and re-run to invoke OpenRouter probe."
 
 def _wrap_response(response: Any, logger: logging.Logger) -> Any:
     iter_lines = getattr(response, "iter_lines", None)
@@ -91,7 +92,11 @@ def main(argv: list[str] | None = None) -> int:
         help="プロバイダ設定ファイル",
     )
     parser.add_argument("--prompt", default=_DEFAULT_PROMPT, help="送信するユーザプロンプト")
+    parser.add_argument("--dry-run", action="store_true", help="接続確認のみを行い実行をスキップする")
     args = parser.parse_args(argv)
+    if args.dry_run:
+        LOGGER.info(_DRY_RUN_MESSAGE)
+        return 0
     return run_probe(provider_path=Path(args.provider).expanduser().resolve(), prompt=str(args.prompt or _DEFAULT_PROMPT))
 
 

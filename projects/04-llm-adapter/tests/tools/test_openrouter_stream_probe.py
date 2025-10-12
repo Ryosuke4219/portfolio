@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+import tools.openrouter.stream_probe as stream_probe_module
 from tools.openrouter.stream_probe import run_probe
 
 
@@ -96,3 +97,24 @@ def test_run_probe_skips_without_api_key(
     messages = [record.message for record in caplog.records]
     assert any("OPENROUTER_API_KEY" in message for message in messages)
     assert all("chunk:" not in message for message in messages)
+
+
+def test_cli_dry_run_skips_invocation(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def _unexpected_run_probe(*_: Any, **__: Any) -> int:
+        raise AssertionError("run_probe should not be called during dry-run")
+
+    monkeypatch.setattr(stream_probe_module, "run_probe", _unexpected_run_probe)
+    caplog.set_level(logging.INFO, logger="tools.openrouter.stream_probe")
+
+    status = stream_probe_module.main(["--dry-run"])
+
+    assert status == 0
+    messages = [
+        record.message
+        for record in caplog.records
+        if record.name == "tools.openrouter.stream_probe"
+    ]
+    assert messages == ["Dry-run: set OPENROUTER_API_KEY and re-run to invoke OpenRouter probe."]
