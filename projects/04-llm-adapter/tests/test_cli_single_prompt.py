@@ -156,6 +156,38 @@ def test_cli_json_log_prompts(echo_provider, tmp_path: Path, capfd) -> None:
     assert payload[0]["prompt"] == "hello"
 
 
+def test_cli_auth_env_accepts_literal_api_key(
+    echo_provider, tmp_path: Path, capfd, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FAKE_API_KEY", raising=False)
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        (
+            "provider: fake\n"
+            "model: dummy\n"
+            "auth_env: FAKE_API_KEY\n"
+            "api_key: sk-demo\n"
+            "max_tokens: 128\n"
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == 0
+    assert "echo:hello" in captured.out
+    assert len(echo_provider.requests) == 1
+    request = echo_provider.requests[0]
+    assert request.prompt == "hello"
+
+
 def test_cli_json_without_prompts(echo_provider, tmp_path: Path, capfd) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
