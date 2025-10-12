@@ -31,13 +31,15 @@ from .runner_execution import (
 )
 
 if hasattr(core_errors, "ParallelExecutionError"):
-    ParallelExecutionError = cast(
+    _ParallelExecutionErrorType = cast(
         type[Exception],
         core_errors.ParallelExecutionError,
     )
 else:
-    ParallelExecutionError = ExecutionParallelExecutionError
-    core_errors.ParallelExecutionError = ParallelExecutionError
+    _ParallelExecutionErrorType = ExecutionParallelExecutionError
+    setattr(core_errors, "ParallelExecutionError", _ParallelExecutionErrorType)
+
+ParallelExecutionError = _ParallelExecutionErrorType
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
