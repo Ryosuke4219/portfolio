@@ -17,7 +17,15 @@ from ._requests_compat import create_session, requests_exceptions, SessionProtoc
 __all__ = ["OpenRouterProvider", "requests_exceptions"]
 
 
-_INTERNAL_OPTION_KEYS = {"stream", "request_timeout_s", "REQUEST_TIMEOUT_S"}
+_OPTION_CREDENTIAL_KEYS = ("api_key", "api_token", "token", "access_token")
+
+
+_INTERNAL_OPTION_KEYS = {
+    "stream",
+    "request_timeout_s",
+    "REQUEST_TIMEOUT_S",
+    *_OPTION_CREDENTIAL_KEYS,
+}
 
 
 _LITERAL_ENV_VALUE_PREFIXES = ("file:", "mailto:")
@@ -140,6 +148,16 @@ def _is_literal_env_value(value: str) -> bool:
     if any(candidate_lower.startswith(prefix) for prefix in _LITERAL_ENV_VALUE_PREFIXES):
         return True
     return True
+
+
+def _normalize_option_credential(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        candidate = value.strip()
+    else:
+        candidate = str(value).strip()
+    return candidate
 
 
 def _normalize_error(exc: Exception) -> Exception:
@@ -334,7 +352,18 @@ class OpenRouterProvider(BaseProvider):
         return payload
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
-        if not self._api_key:
+        options = request.options or {}
+        option_api_key = ""
+        if isinstance(options, Mapping):
+            for key in _OPTION_CREDENTIAL_KEYS:
+                raw_value = options.get(key)
+                credential = _normalize_option_credential(raw_value)
+                if credential:
+                    option_api_key = credential
+                    break
+
+        api_key = self._api_key or option_api_key
+        if not api_key:
             resolved_env = self._auth_env_name or "OPENROUTER_API_KEY"
             configured_env = self._configured_auth_env or resolved_env
             if configured_env and configured_env != resolved_env:
@@ -347,7 +376,10 @@ class OpenRouterProvider(BaseProvider):
             )
         timeout = request.timeout_s if request.timeout_s is not None else self._default_timeout
         stream = False
-        options = request.options or {}
+        headers = getattr(self._session, "headers", None)
+        if isinstance(headers, MutableMapping):
+            headers.setdefault("Content-Type", "application/json")
+            headers["Authorization"] = f"Bearer {api_key}"
         if isinstance(options, Mapping):
             stream = bool(options.get("stream"))
             for key in ("request_timeout_s", "REQUEST_TIMEOUT_S"):
