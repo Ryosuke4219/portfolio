@@ -1,5 +1,31 @@
+import sys
+import types
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+
 import pytest
 from src.llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_any_async
+
+ADAPTER_ROOT = Path(__file__).resolve().parents[2] / "04-llm-adapter"
+if (adapter_root_str := str(ADAPTER_ROOT)) not in sys.path:
+    sys.path.insert(0, adapter_root_str)
+
+try:
+    from adapter.core.errors import AllFailedError
+except ModuleNotFoundError:
+    adapter_pkg = sys.modules.setdefault("adapter", types.ModuleType("adapter"))
+    adapter_pkg.__path__ = [str(ADAPTER_ROOT / "adapter")]
+    core_pkg = sys.modules.setdefault("adapter.core", types.ModuleType("adapter.core"))
+    core_pkg.__path__ = [str(ADAPTER_ROOT / "adapter" / "core")]
+    spec = spec_from_file_location(
+        "adapter.core.errors", ADAPTER_ROOT / "adapter" / "core" / "errors.py"
+    )
+    if spec is None or spec.loader is None:  # pragma: no cover - defensive fallback
+        pytest.skip("adapter.core.errors is unavailable", allow_module_level=True)
+    module = module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    AllFailedError = getattr(module, "AllFailedError")
 
 
 @pytest.mark.asyncio
@@ -49,3 +75,10 @@ async def test_run_parallel_all_async_retry_directive_abort() -> None:
         )
 
     assert call_count == 1
+
+
+def test_all_failed_error_exposes_failures_list() -> None:
+    error = AllFailedError("boom")
+
+    assert isinstance(error.failures, list)
+    assert error.failures == []
