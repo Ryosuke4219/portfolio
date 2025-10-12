@@ -91,9 +91,9 @@ def _coerce_status_code(candidate: Any) -> int | None:
         nested = _coerce_status_code(nested_candidate)
         if nested is not None:
             return nested
-    try:
-        name_attr = getattr(candidate, "name")
-    except AttributeError:
+    sentinel = object()
+    name_attr = getattr(candidate, "name", sentinel)
+    if name_attr is sentinel:
         return None
     if isinstance(name_attr, str):
         mapped = _STATUS_NAME_TO_CODE.get(name_attr)
