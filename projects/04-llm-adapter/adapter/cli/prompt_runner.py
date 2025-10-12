@@ -102,14 +102,12 @@ async def _process_prompt(
         start = time.perf_counter()
         try:
             request = _build_request(prompt, config)
-            if hasattr(provider, "invoke"):
-                response = await loop.run_in_executor(  # type: ignore[arg-type]
-                    None, provider.invoke, request
-                )
-            else:  # pragma: no cover - 後方互換
-                response = await loop.run_in_executor(  # type: ignore[arg-type]
-                    None, provider.generate, prompt
-                )
+            invoke = getattr(provider, "invoke", None)
+            if not callable(invoke):
+                raise TypeError("Provider must implement invoke(request).")
+            response = await loop.run_in_executor(  # type: ignore[arg-type]
+                None, invoke, request
+            )
         except Exception as exc:  # pragma: no cover - 実 API 呼び出し向けの防御
             latency_ms = int((time.perf_counter() - start) * 1000)
             friendly, error_kind = classify_error(exc, config, lang)

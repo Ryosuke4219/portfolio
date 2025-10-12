@@ -54,6 +54,40 @@ def install_provider(monkeypatch):
     return _install
 
 
+def test_cli_errors_when_provider_lacks_invoke(
+    install_provider, tmp_path: Path, capfd
+) -> None:
+    class LegacyProvider:
+        def __init__(self, config):
+            self.config = config
+
+        def generate(self, prompt: str) -> provider_module.ProviderResponse:
+            return provider_module.ProviderResponse(
+                output_text=prompt,
+                input_tokens=0,
+                output_tokens=0,
+                latency_ms=0,
+            )
+
+    install_provider(LegacyProvider)
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        "provider: fake\nmodel: dummy\nauth_env: NONE\n", encoding="utf-8"
+    )
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "legacy",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == cli_module.EXIT_PROVIDER_ERROR
+    assert "invoke(request)" in captured.err
+
+
 def test_cli_help_smoke() -> None:
     env = os.environ.copy()
     project_root = Path(__file__).resolve().parents[1]
