@@ -268,6 +268,9 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     literal_credentials: list[str] = []
     raw_mapping = config.raw if isinstance(config.raw, Mapping) else None
     raw_env = raw_mapping.get("env") if isinstance(raw_mapping, Mapping) else None
+    raw_options = (
+        raw_mapping.get("options") if isinstance(raw_mapping, Mapping) else None
+    )
     if auth_env and isinstance(raw_env, Mapping):
         alias_raw = raw_env.get(auth_env)
         candidate = _normalize_credential(alias_raw)
@@ -287,6 +290,12 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
             resolved_credentials = True
         if not resolved_credentials and isinstance(raw_mapping, Mapping):
             resolved_credentials = _has_embedded_credentials(raw_mapping)
+        if (
+            not resolved_credentials
+            and isinstance(raw_options, Mapping)
+            and _has_embedded_credentials(raw_options)
+        ):
+            resolved_credentials = True
         if not resolved_credentials and cli_has_credentials:
             resolved_credentials = True
     if requires_env and not resolved_credentials:
