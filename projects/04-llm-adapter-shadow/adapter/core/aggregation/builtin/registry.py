@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Mapping
+from collections.abc import Callable, Mapping
 
 from .majority_vote import MajorityVoteStrategy
 from .max_score import MaxScoreStrategy

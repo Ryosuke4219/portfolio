@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Iterable, Tuple, TypeVar
+from collections.abc import Iterable
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -8,7 +9,7 @@ T = TypeVar("T")
 class MaxScoreStrategy:
     name = "max_score"
 
-    def aggregate(self, entries: Iterable[Tuple[T, float]]) -> T:
+    def aggregate(self, entries: Iterable[tuple[T, float]]) -> T:
         best_candidate: T | None = None
         best_score = float("-inf")
         order: dict[T, int] = {}
