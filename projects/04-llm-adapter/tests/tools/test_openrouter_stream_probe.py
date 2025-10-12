@@ -1,4 +1,5 @@
 """stream_probe ツールのストリーミング挙動を検証するテスト。"""
+# ruff: noqa: I001
 from __future__ import annotations
 
 import logging
