@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, cast, TYPE_CHECKING
+from pathlib import Path
+from typing import Any, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
 from .aggregation import AggregationResult, AggregationStrategy, TieBreaker
@@ -101,7 +102,7 @@ class AggregationSelector:
             if is_weighted:
                 weighted_votes = metadata.get("weighted_votes")
                 if not isinstance(weighted_votes, Mapping):
-                    weighted_map: dict[str, float] = {}
+                    normalized_weights: dict[str, float] = {}
                     weights = config.provider_weights or {}
                     for result in lookup.values():
                         if result.metrics.status != "ok":
@@ -110,18 +111,20 @@ class AggregationSelector:
                         if not text:
                             continue
                         weight = float(weights.get(result.metrics.provider, 1.0))
-                        weighted_map[text] = weighted_map.get(text, 0.0) + weight
-                    metadata["weighted_votes"] = weighted_map
+                        normalized_weights[text] = normalized_weights.get(text, 0.0) + weight
+                    metadata["weighted_votes"] = normalized_weights
                 else:
-                    metadata["weighted_votes"] = {
+                    normalized_weights = {
                         str(text): float(weight)
                         for text, weight in weighted_votes.items()
                     }
+                    metadata["weighted_votes"] = normalized_weights
                 if votes is None:
                     chosen_text = decision.chosen.text or decision.chosen.response.text or ""
                     winner_output = chosen_text.strip()
-                    weighted_map = cast(Mapping[str, float], metadata.get("weighted_votes", {}))
-                    votes = weighted_map.get(winner_output)
+                    weighted_lookup = metadata.get("weighted_votes", {})
+                    if isinstance(weighted_lookup, Mapping):
+                        votes = weighted_lookup.get(winner_output)
                 decision.metadata = metadata
             else:
                 if votes is None:
@@ -165,8 +168,10 @@ class AggregationSelector:
                 raise ValueError("judge_factory_builder must be provided for judge aggregation")
             if "JudgeStrategy" not in aggregation_module.__dict__:
                 attr_name = "JudgeStrategy"
-                aggregation_module.JudgeStrategy = getattr(  # type: ignore[attr-defined]
-                    aggregation_module, attr_name
+                setattr(
+                    aggregation_module,
+                    attr_name,
+                    getattr(aggregation_module, attr_name),
                 )
             factory = self._judge_factory_builder(judge_config)
             return AggregationStrategy.from_string(
@@ -181,6 +186,9 @@ class AggregationSelector:
         if normalized in {"weighted_vote", "weighted"}:
             extra["provider_weights"] = provider_weights
         return AggregationStrategy.from_string(aggregate, **extra)
+
+    def _load_schema(self, schema_path: Path | None) -> Mapping[str, Any] | None:
+        return self._schema_cache.load(schema_path)
 
 
 __all__ = [

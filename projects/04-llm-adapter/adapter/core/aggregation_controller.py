@@ -169,7 +169,7 @@ class AggregationController:
         default_judge_config: ProviderConfig | None,
     ) -> AggregationStrategy | None:
         resolved_mode = _resolve_mode(mode)
-        return self._selector._resolve_aggregation_strategy(  # type: ignore[attr-defined]
+        return self._selector._resolve_aggregation_strategy(
             resolved_mode,
             config,
             default_judge_config=default_judge_config,
@@ -189,9 +189,10 @@ class AggregationController:
     def _mark_consensus_failure(
         results: Iterable[SingleRunResult],
         quorum: int,
-        votes: int,
+        votes: float | int,
     ) -> None:
-        message = f"consensus quorum not reached (votes={votes}, quorum={quorum})"
+        vote_repr = f"{float(votes):g}" if isinstance(votes, float) else f"{votes}"
+        message = f"consensus quorum not reached (votes={vote_repr}, quorum={quorum})"
         for result in results:
             metrics = result.metrics
             if metrics.status == "ok":
