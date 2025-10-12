@@ -64,7 +64,7 @@
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー/ベース URL 解決、ストリーミング透過、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
 - 残タスク:
-  - CLI リテラル API キー経路: CLI/設定ファイルから `OPENROUTER_API_KEY` と `ProviderRequest.options.raw.api_key` を結線し、`tests/test_cli_single_prompt_diagnostics.py` へ回帰テストを追加する。
+  - CLI リテラル API キー経路: CLI/設定ファイルから `OPENROUTER_API_KEY` と `ProviderRequest.options.raw.api_key` を結線し、`projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_auth_env_accepts_literal_api_key` で回帰テストを担保する。
   - ドキュメント整備: `OPENROUTER_*` のリテラル指定・デフォルト挙動を CLI ドキュメントと設定テンプレートへ追記し、Shadow との差異を整理する。
   - OpenRouter 429/5xx 発生統計の収集と Runner バックオフ/RPM 調整指針づくりを継続する。【F:04/ROADMAP.md†L12-L35】
 
@@ -75,7 +75,7 @@
   - `projects/04-llm-adapter/adapter/cli/app.py`
 - 完了条件:
   - `ProviderRequest.options` の `openai.*` パラメータを OpenAI API へ透過する共通マッピングを整備し、トークン計測やストリーミング挙動を既存実装と揃える。
-  - CLI から `--provider openai` 選択時に上記オプションを指定・検証できるよう入力バリデーションとヘルプを更新し、`pytest projects/04-llm-adapter/tests/test_cli_single_prompt_diagnostics.py` を含む CLI テスト群を緑化する。
+  - CLI から `--provider openai` 選択時に上記オプションを指定・検証できるよう入力バリデーションとヘルプを更新し、`pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` を含む CLI テスト群を緑化する。
   - `markdownlint 04/ROADMAP.md` を含む既存のドキュメント整形チェックを通過させ、`docs/spec/v0.2/TASKS.md` の該当節へ進捗リンクを追加する。
 
 ## CLI Request Pipeline
@@ -87,7 +87,7 @@
   - `projects/04-llm-adapter/adapter/core/provider_spi.py`
 - 完了条件:
   - [CLI runner](../../../projects/04-llm-adapter/adapter/cli/prompt_runner.py) が CLI 引数から `ProviderRequest` を構築し、`ProviderSPI.invoke` へ渡す流れを `projects/04-llm-adapter/adapter/cli/app.py` から呼び出す形へ統一する。
-  - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt_diagnostics.py` と `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` が成功し、`generate` API を経由するコードは残さない。
+  - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` と `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` が成功し、`generate` API を経由するコードは残さない。
   - `docs/spec/v0.2/ROADMAP.md` に CLI 移行状況の脚注を追記する。
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する
@@ -99,7 +99,7 @@
   - `adapter/cli/app.py` の `--provider`/`--model` オプションで Ollama/OpenRouter 固有の `options.*` を指定できるよう、`ProviderRequest` の追加フィールドをマッピングする。
   - CLI で `ProviderRequest.options.*` へ OpenAI など汎用プロバイダ設定を伝播させる残課題を解消し、`projects/04-llm-adapter/adapter/cli/prompt_runner.py` から `ProviderSPI.invoke` まで一貫させる。
   - 現状 `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` と `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` は既存だが、`projects/04-llm-adapter/README.md` の [サンプル設定とプロンプト](../../../projects/04-llm-adapter/README.md#サンプル設定とプロンプト) に揃うよう項目を精査し不足分を補う。
-  - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt_diagnostics.py::test_prompt_runner_provider_response_tokens` を含む CLI 系テストが成功し、`markdownlint docs/spec/v0.2/TASKS.md` も通過する。
+  - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_fake_provider` を含む CLI 系テストが成功し、`markdownlint docs/spec/v0.2/TASKS.md` も通過する。
 
 ## Docs & Templates
 
