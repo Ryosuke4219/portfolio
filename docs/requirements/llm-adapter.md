@@ -138,13 +138,15 @@ class RunnerMode(Enum):
 * MUST:
   * `--mode {sequential,parallel-any,parallel-all,consensus}`
   * `--max-concurrency N` / `--rpm R`
-* `run_compare` 系 CLI（`python adapter/run_compare.py` / `llm-adapter run-compare`）:
+* `run_compare` 系 CLI（`python adapter/run_compare.py`）:
   * `--providers <path1.yaml,path2.yaml,...>` は**カンマ区切りの複数パス**（相対/絶対）を受け取り、指定順で Runner に渡す（MUST）。
   * `--prompts <tasks.jsonl>` を MUST で要求し、比較対象のゴールデンセットを読み込む。
   * `--metrics <path>` を指定しない場合は `data/runs-metrics.jsonl` に JSONL を追記する。明示指定時はそのパス配下（例：`out/metrics.jsonl`）に保存する（SHOULD）。
 * `llm-adapter` 単体実行（`pip install -e .` 経由で提供されるエントリポイント）:
   * MUST で `--provider <provider.yaml>` を受け付け、単一プロバイダ構成ファイルを読み込む。
-  * MUST で `--out <dir>` を要求し、未存在ならディレクトリを作成して `metrics.jsonl` を生成・追記する。比較ランナーと同一フォーマット（JSONL）でメトリクスを出力する。
+  * `--out <dir>` は任意指定（MAY）で、指定があれば未存在ディレクトリを作成して `metrics.jsonl` を生成・追記する。比較ランナーと同一フォーマット（JSONL）でメトリクスを出力する。
+  * `--out` を省略した場合はカレントディレクトリに `metrics.jsonl` を生成・追記する（SHOULD）。
+* Typer CLI は `run-compare` サブコマンドを提供しない。比較実行は `python adapter/run_compare.py` を介して行う。
 * 合議関連（SHOULD）:
   * `--aggregate majority_vote|max_score|weighted_vote`
   * `--quorum K` / `--tie-breaker min_latency|min_cost|stable_order`
