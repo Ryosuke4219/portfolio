@@ -1,5 +1,4 @@
 """stream_probe ツールのストリーミング挙動を検証するテスト。"""
-
 from __future__ import annotations
 
 import logging
@@ -10,7 +9,6 @@ import pytest
 
 from tools.openrouter import stream_probe as stream_probe_module
 from tools.openrouter.stream_probe import run_probe
-
 
 class _DummyResponse:
     def __init__(self, lines: list[bytes]) -> None:
