@@ -52,6 +52,7 @@ class AggregationController:
         fallback_kind: str | None = None
         if resolved_mode == "consensus":
             votes = selection.votes if selection.votes is not None else 0
+            votes_int = int(votes)
             quorum_setting = config.quorum
             quorum = quorum_setting if quorum_setting is not None else 2
             if votes < quorum:
@@ -70,11 +71,13 @@ class AggregationController:
                         fallback_kind = "judge"
                     else:
                         self._mark_consensus_failure(
-                            selection.lookup.values(), quorum, votes
+                            selection.lookup.values(), quorum, votes_int
                         )
                         return
                 else:
-                    self._mark_consensus_failure(selection.lookup.values(), quorum, votes)
+                    self._mark_consensus_failure(
+                        selection.lookup.values(), quorum, votes_int
+                    )
                     return
         winner = selection.lookup.get(selection.decision.chosen.index)
         if winner is None:
@@ -154,10 +157,13 @@ class AggregationController:
             return None
         if resolved_mode == "consensus":
             votes = selection.votes if selection.votes is not None else 0
+            votes_int = int(votes)
             quorum_setting = config.quorum
             quorum = quorum_setting if quorum_setting is not None else 2
             if votes < quorum:
-                self._mark_consensus_failure(selection.lookup.values(), quorum, votes)
+                self._mark_consensus_failure(
+                    selection.lookup.values(), quorum, votes_int
+                )
                 return None
         return selection
 
@@ -169,7 +175,7 @@ class AggregationController:
         default_judge_config: ProviderConfig | None,
     ) -> AggregationStrategy | None:
         resolved_mode = _resolve_mode(mode)
-        return self._selector._resolve_aggregation_strategy(  # type: ignore[attr-defined]
+        return self._selector._resolve_aggregation_strategy(
             resolved_mode,
             config,
             default_judge_config=default_judge_config,
@@ -183,7 +189,7 @@ class AggregationController:
         return AggregationSelector._resolve_tie_breaker(config, lookup)
 
     def _load_schema(self, schema_path: Path | None) -> Mapping[str, Any] | None:
-        return self._selector._load_schema(schema_path)
+        return self._selector.load_schema(schema_path)
 
     @staticmethod
     def _mark_consensus_failure(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, cast, TYPE_CHECKING
 
 from . import aggregation as aggregation_module
@@ -68,7 +69,7 @@ class AggregationSelector:
         )
         if strategy is None:
             return None
-        score_metadata: dict[str, float] | None = None
+        score_metadata: Mapping[str, float] | None = None
         if strategy.name == "max_score":
             score_metadata = self._judge_scorer.score(
                 candidates,
@@ -87,7 +88,7 @@ class AggregationSelector:
         decision.strategy = preferred_strategy
         if score_metadata is not None:
             metadata = dict(decision.metadata) if decision.metadata else {}
-            metadata["scores"] = score_metadata
+            metadata["scores"] = dict(score_metadata)
             decision.metadata = metadata
         votes: float | int | None = None
         is_weighted = aggregate_kind in {"weighted_vote", "weighted"}
@@ -120,8 +121,11 @@ class AggregationSelector:
                 if votes is None:
                     chosen_text = decision.chosen.text or decision.chosen.response.text or ""
                     winner_output = chosen_text.strip()
-                    weighted_map = cast(Mapping[str, float], metadata.get("weighted_votes", {}))
-                    votes = weighted_map.get(winner_output)
+                    weighted_lookup = cast(
+                        Mapping[str, float],
+                        metadata.get("weighted_votes", {}),
+                    )
+                    votes = weighted_lookup.get(winner_output)
                 decision.metadata = metadata
             else:
                 if votes is None:
@@ -165,8 +169,10 @@ class AggregationSelector:
                 raise ValueError("judge_factory_builder must be provided for judge aggregation")
             if "JudgeStrategy" not in aggregation_module.__dict__:
                 attr_name = "JudgeStrategy"
-                aggregation_module.JudgeStrategy = getattr(  # type: ignore[attr-defined]
-                    aggregation_module, attr_name
+                setattr(
+                    aggregation_module,
+                    attr_name,
+                    getattr(aggregation_module, attr_name),
                 )
             factory = self._judge_factory_builder(judge_config)
             return AggregationStrategy.from_string(
@@ -174,13 +180,16 @@ class AggregationSelector:
                 model=judge_config.model,
                 provider_factory=factory,
             )
-        schema_data = self._schema_cache.load(getattr(config, "schema", None))
+        schema_data = self.load_schema(getattr(config, "schema", None))
         provider_weights = getattr(config, "provider_weights", None)
         extra: dict[str, Any] = {"schema": schema_data}
         normalized = aggregate.lower().replace("-", "_") if aggregate else ""
         if normalized in {"weighted_vote", "weighted"}:
             extra["provider_weights"] = provider_weights
         return AggregationStrategy.from_string(aggregate, **extra)
+
+    def load_schema(self, schema_path: Path | None) -> Mapping[str, Any] | None:
+        return self._schema_cache.load(schema_path)
 
 
 __all__ = [
