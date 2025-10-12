@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from .. import AggregationCandidate, AggregationResult, TieBreaker
 from .majority_vote import MajorityVoteStrategy
 from .tie_breakers import FirstTieBreaker
 
 __all__ = ["WeightedVoteStrategy"]
+
+
+if TYPE_CHECKING:
+    from .. import AggregationStrategy
 
 
 class WeightedVoteStrategy:
@@ -88,3 +92,9 @@ class WeightedVoteStrategy:
             tie_breaker_used=None if len(bucket_candidates) == 1 else breaker.name,
             metadata=metadata,
         )
+
+    @staticmethod
+    def from_string(kind: str, **kwargs: Any) -> "AggregationStrategy":
+        from .registry import resolve_builtin_strategy
+
+        return resolve_builtin_strategy(kind, **kwargs)

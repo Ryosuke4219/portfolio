@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any, TYPE_CHECKING
 
 from .. import AggregationCandidate, AggregationResult, TieBreaker
 from .tie_breakers import FirstTieBreaker
 
 __all__ = ["MaxScoreStrategy"]
+
+
+if TYPE_CHECKING:
+    from .. import AggregationStrategy
 
 
 class MaxScoreStrategy:
@@ -42,3 +47,9 @@ class MaxScoreStrategy:
             tie_breaker_used=breaker.name,
             metadata=None,
         )
+
+    @staticmethod
+    def from_string(kind: str, **kwargs: Any) -> "AggregationStrategy":
+        from .registry import resolve_builtin_strategy
+
+        return resolve_builtin_strategy(kind, **kwargs)
