@@ -74,17 +74,15 @@ class AsyncRunner:
             if mode is RunnerMode.CONSENSUS:
                 return response
             return response
-        if mode is RunnerMode.CONSENSUS and errors:
-            last_provider, last_error = errors[-1]
-            self._emit_chain_failed(len(errors), last_provider, last_error)
-            raise ParallelExecutionError(
-                "consensus run failed", failures=[err for _, err in errors]
-            ) from last_error
         last_provider: ProviderSPI | None = None
         last_error: BaseException | None = None
         if errors:
             last_provider, last_error = errors[-1]
             self._emit_chain_failed(len(errors), last_provider, last_error)
+            if mode is RunnerMode.CONSENSUS:
+                raise ParallelExecutionError(
+                    "consensus run failed", failures=[err for _, err in errors]
+                ) from last_error
             if last_error is not None:
                 raise last_error
         raise AllFailedError("All providers failed to produce a result")
