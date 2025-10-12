@@ -8,7 +8,6 @@ import time
 from typing import Any
 
 import pytest
-
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.providers.mock import MockProvider
 

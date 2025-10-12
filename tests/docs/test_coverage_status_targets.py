@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
+import json
 from pathlib import Path
 from typing import Any
 
-import pytest
 from _pytest.outcomes import Failed
+import pytest
 
 STATUS_PATH = Path("docs/reports/coverage/status.json")
 SHADOW_PATH_FRAGMENT = "projects/04-llm-adapter-shadow/"

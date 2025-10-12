@@ -1,21 +1,21 @@
 """CompareRunner 用の補助クラス。"""
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
 from dataclasses import replace
+import logging
 from typing import Any
 
 from .budgets import BudgetManager
 from .compare_runner_support.metrics_builder import RunMetricsBuilder
 from .config import ProviderConfig
 from .metrics.models import BudgetSnapshot
+from .provider_spi import TokenUsage
 from .providers import (
     BaseProvider,
     ProviderFactory,
     ProviderResponse,
 )
-from .provider_spi import TokenUsage
 
 JudgeProviderResponse = ProviderResponse
 

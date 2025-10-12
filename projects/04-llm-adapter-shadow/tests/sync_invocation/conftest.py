@@ -4,7 +4,6 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 import pytest
-
 from src.llm_adapter.observability import EventLogger
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from src.llm_adapter.shadow import ShadowMetrics

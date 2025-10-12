@@ -2,7 +2,6 @@ from collections.abc import Callable
 from typing import cast
 
 import pytest
-
 from src.llm_adapter.provider_spi import ProviderResponse, TokenUsage
 from src.llm_adapter.runner_parallel.models import ConsensusObservation
 

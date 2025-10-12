@@ -4,7 +4,6 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pytest
-
 from src.llm_adapter.errors import AllFailedError, FatalError, TimeoutError
 from src.llm_adapter.parallel_exec import ParallelExecutionError
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI

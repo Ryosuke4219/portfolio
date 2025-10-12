@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 import importlib
 import sys
-from collections.abc import Iterable
 
 
 class _SrcImportRecorder:

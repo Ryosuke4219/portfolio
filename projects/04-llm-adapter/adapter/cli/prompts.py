@@ -78,7 +78,7 @@ def _has_embedded_credentials(raw: Mapping[str, object]) -> bool:
                 if _search(value):
                     return True
             return False
-        if isinstance(node, (list, tuple, set)):
+        if isinstance(node, list | tuple | set):
             return any(_search(item) for item in node)
         return False
 

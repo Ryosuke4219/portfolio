@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 TASKS_PATH = Path("docs/spec/v0.2/TASKS.md")
 
 

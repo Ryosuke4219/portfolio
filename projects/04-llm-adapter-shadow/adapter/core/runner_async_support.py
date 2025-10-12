@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
-import sys
 from pathlib import Path
+import sys
 
 _CORE_SUPPORT = (
     Path(__file__).resolve().parents[2].parent

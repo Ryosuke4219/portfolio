@@ -17,7 +17,6 @@ from adapter.core.models import (
 from adapter.core.providers import BaseProvider, ProviderResponse
 from adapter.core.runner_execution import SingleRunResult
 
-
 _BASE_METRICS = dict(
     ts="2024-01-01T00:00:00Z",
     run_id="run",

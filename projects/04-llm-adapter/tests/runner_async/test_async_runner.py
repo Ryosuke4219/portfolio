@@ -5,11 +5,10 @@ from typing import Any
 
 import pytest
 
+from adapter.core import runner_api, runner_async
 from adapter.core.errors import ParallelExecutionError, RateLimitError, RetriableError, TimeoutError
 from adapter.core.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from adapter.core import runner_async
 from adapter.core.runner_async import AsyncRunner
-from adapter.core import runner_api
 from adapter.core.runner_config_builder import BackoffPolicy, RunnerConfig, RunnerMode
 
 

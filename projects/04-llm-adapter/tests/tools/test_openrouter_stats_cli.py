@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 
 
 def test_openrouter_stats_cli_generates_summary(tmp_path: Path) -> None:

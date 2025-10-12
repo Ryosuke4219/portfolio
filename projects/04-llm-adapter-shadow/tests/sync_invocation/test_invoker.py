@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-
 from src.llm_adapter.errors import ProviderSkip
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from src.llm_adapter.runner_shared import RateLimiter

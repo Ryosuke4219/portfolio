@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from typing import Any
 
 from pytest import MonkeyPatch
-
 from src.llm_adapter.metrics import PrometheusMetricsExporter
 
 

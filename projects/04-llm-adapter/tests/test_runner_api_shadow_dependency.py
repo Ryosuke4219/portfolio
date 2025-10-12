@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 from typing import Any
 

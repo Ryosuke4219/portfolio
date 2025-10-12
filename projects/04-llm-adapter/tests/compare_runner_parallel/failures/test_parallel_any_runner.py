@@ -8,11 +8,11 @@ import pytest
 from adapter.core import _parallel_shim, errors
 from adapter.core.config import ProviderConfig
 from adapter.core.errors import AuthError, ConfigError, ProviderSkip, TimeoutError
+from adapter.core.metrics.models import BudgetSnapshot, RunMetrics
 from adapter.core.providers import BaseProvider, ProviderFactory, ProviderResponse
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runner_execution import RunnerExecution
 from adapter.core.runners import CompareRunner
-from adapter.core.metrics.models import BudgetSnapshot, RunMetrics
 from tests.compare_runner_parallel.conftest import (
     ProviderConfigFactory,
     RunMetricsFactory,

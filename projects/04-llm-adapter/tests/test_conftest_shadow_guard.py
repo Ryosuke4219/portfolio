@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
+import sys
 
 
 def test_shadow_adapter_directory_not_on_sys_path_by_default() -> None:

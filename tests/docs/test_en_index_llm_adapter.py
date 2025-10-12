@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
+import re
 
 
 def test_llm_adapter_card_describes_provider_integration() -> None:

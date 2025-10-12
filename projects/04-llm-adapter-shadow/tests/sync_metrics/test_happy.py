@@ -5,7 +5,6 @@ from pathlib import Path
 import time
 
 import pytest
-
 from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from src.llm_adapter.runner_config import RunnerMode
 

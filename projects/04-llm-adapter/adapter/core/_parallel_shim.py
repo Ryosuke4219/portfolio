@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from concurrent.futures import (
+    as_completed,
     FIRST_COMPLETED,
     Future,
     ThreadPoolExecutor,
-    as_completed,
     wait,
 )
 from typing import TypeVar

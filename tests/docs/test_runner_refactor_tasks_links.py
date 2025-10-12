@@ -1,8 +1,7 @@
-import re
 from pathlib import Path
+import re
 
 import pytest
-
 
 DOC_PATH = Path("docs/tasks/runner_refactor_tasks.md")
 

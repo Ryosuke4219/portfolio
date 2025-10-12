@@ -4,10 +4,10 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-
 from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
 from src.llm_adapter.provider_spi import ProviderRequest
 from src.llm_adapter.providers.openai import OpenAIProvider
+
 from tests.helpers.fakes import FakeResponse, FakeSession
 
 

@@ -4,7 +4,6 @@ from pathlib import Path
 import re
 import tomllib
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 

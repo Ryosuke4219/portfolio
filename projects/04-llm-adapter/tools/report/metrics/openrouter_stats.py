@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+import json
 from pathlib import Path
 
 from .data import build_openrouter_http_failures, load_metrics

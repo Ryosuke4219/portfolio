@@ -1,5 +1,4 @@
 import pytest
-
 from src.llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_any_async
 
 

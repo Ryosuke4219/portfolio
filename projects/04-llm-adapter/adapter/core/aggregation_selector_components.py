@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, cast, Protocol, TYPE_CHECKING
 
 from .aggregation import AggregationCandidate, FirstTieBreaker, TieBreaker
-from .runner_execution import SingleRunResult
 from .providers import ProviderResponse as JudgeProviderResponse
+from .runner_execution import SingleRunResult
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .config import ProviderConfig
