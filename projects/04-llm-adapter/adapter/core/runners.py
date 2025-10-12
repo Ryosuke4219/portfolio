@@ -37,7 +37,7 @@ if hasattr(core_errors, "ParallelExecutionError"):
     )
 else:
     _ParallelExecutionErrorType = ExecutionParallelExecutionError
-    setattr(core_errors, "ParallelExecutionError", _ParallelExecutionErrorType)
+    core_errors.ParallelExecutionError = _ParallelExecutionErrorType
 
 ParallelExecutionError = _ParallelExecutionErrorType
 
