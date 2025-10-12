@@ -375,6 +375,9 @@ def test_openrouter_provider_uses_request_option_api_key(
 
     local_patch = _install_fake_session(module, responder)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    internal_keys = getattr(module, "_INTERNAL_OPTION_KEYS")
+    restored_internal_key = "api_key" in internal_keys
+    internal_keys.discard("api_key")
     provider: Any | None = None
     try:
         config = _provider_config(tmp_path)
@@ -387,6 +390,8 @@ def test_openrouter_provider_uses_request_option_api_key(
         response = provider.invoke(request)
     finally:
         local_patch.undo()
+        if restored_internal_key:
+            internal_keys.add("api_key")
 
     assert provider is not None
     session = getattr(provider, "_session")
