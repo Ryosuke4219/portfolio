@@ -69,11 +69,20 @@ def _normalize_credential(value: object) -> str | None:
 
 def _has_embedded_credentials(raw: Mapping[str, object]) -> bool:
     inline_keys = ("api_key", "api_token", "token", "access_token")
-    for key in inline_keys:
-        credential = _normalize_credential(raw.get(key))
-        if credential:
-            return True
-    return False
+
+    def _search(node: object) -> bool:
+        if isinstance(node, Mapping):
+            for key, value in node.items():
+                if key in inline_keys and _normalize_credential(value):
+                    return True
+                if _search(value):
+                    return True
+            return False
+        if isinstance(node, (list, tuple, set)):
+            return any(_search(item) for item in node)
+        return False
+
+    return _search(raw)
 
 
 def _build_parser() -> argparse.ArgumentParser:
