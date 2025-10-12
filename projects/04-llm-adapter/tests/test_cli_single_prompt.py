@@ -265,6 +265,59 @@ def test_cli_accepts_auth_env_alias(
     assert "echo:hello" in captured.out
     assert len(echo_provider.requests) == 1
     assert "API key is missing" not in captured.err
+    assert "API キーが未設定です" not in captured.err
+
+
+def test_cli_accepts_auth_env_alias_lower_case(
+    echo_provider, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capfd
+) -> None:
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        (
+            "provider: fake\n"
+            "model: dummy\n"
+            "auth_env: TEST_KEY\n"
+            "max_tokens: 128\n"
+            "options:\n  foo: bar\n"
+            "env:\n  TEST_KEY: test_key_alias\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("TEST_KEY", raising=False)
+    monkeypatch.delenv("test_key_alias", raising=False)
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == 3
+    assert (
+        "API キーが未設定です" in captured.err
+        or "API key is missing" in captured.err
+    )
+
+    EchoProvider.requests = []
+    monkeypatch.setenv("test_key_alias", "alias-value")
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == 0
+    assert "API key is missing" not in captured.err
+    assert "echo:hello" in captured.out
+    assert len(echo_provider.requests) == 1
 
 
 def test_cli_openrouter_env_literal_credentials(

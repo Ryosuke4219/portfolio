@@ -19,10 +19,13 @@ EXPECTED_REFERENCES = (
 
 DISALLOWED_REFERENCES = (
     "adapter/core/metrics.py",
+    "adapter/core/prompt_runner.py",
+    "python -m adapter.core.prompt_runner",
 )
 
 CLI_EXPECTATIONS = (
-    "prompt_runner",
+    "projects/04-llm-adapter/adapter/cli/prompt_runner.py",
+    "python -m adapter.cli.prompt_runner",
     "--out",
 )
 
