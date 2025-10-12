@@ -92,6 +92,7 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help="プロバイダ設定 YAML のパス",
     )
+    parser.add_argument("--model", help="プロバイダ設定の model を上書き")
     parser.add_argument("--prompt", help="単発プロンプト文字列")
     parser.add_argument(
         "--prompt-file",
@@ -251,17 +252,32 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     for key, value in option_pairs:
         cli_options[key] = value
     cli_has_credentials = _has_embedded_credentials(cli_options) if cli_options else False
+
+    raw_copy: dict[str, object] | None = None
+
+    def ensure_raw_copy() -> dict[str, object]:
+        nonlocal raw_copy
+        if raw_copy is None:
+            raw_copy = dict(deepcopy(config.raw))
+        return raw_copy
+
     if cli_options:
-        raw_copy: dict[str, object] = dict(deepcopy(config.raw))
-        existing_options = raw_copy.get("options")
+        raw_copy_map = ensure_raw_copy()
+        existing_options = raw_copy_map.get("options")
         merged_options: dict[str, object]
         if isinstance(existing_options, Mapping):
             merged_options = dict(deepcopy(existing_options))
         else:
             merged_options = {}
         merged_options.update(cli_options)
-        raw_copy["options"] = merged_options
-        config = replace(config, raw=raw_copy)
+        raw_copy_map["options"] = merged_options
+        config = replace(config, raw=raw_copy_map)
+
+    override_model = (args.model or "").strip()
+    if override_model:
+        raw_copy_map = ensure_raw_copy()
+        raw_copy_map["model"] = override_model
+        config = replace(config, model=override_model, raw=raw_copy_map)
 
     auth_env = (config.auth_env or "").strip()
     aliases: list[str] = []
