@@ -336,3 +336,20 @@ Design, integration, and final decisions remain the author’s responsibility. *
 - **License compliance and duplication** are checked to a reasonable extent.
 - Where appropriate, sources are noted in **CREDITS.md / LICENSE**.
 - Commit trailers may be used to indicate provenance (e.g., `AI-Generated: partial|substantial`, `AI-Tools: copilot, chatgpt`).
+
+##QAロール定義 / QA Role Definition
+### 日本語
+このリポジトリでは、AIエージェントによる自動開発を行っていますが、
+人間のオーナーは 品質保証（QA）および検証責任者 の立場で運用しています。
+
+- 受け入れ基準（Acceptance Criteria）およびレビュー方針を定義する
+- 設計およびテストカバレッジの整合性を検証する
+- AIが生成した成果物を、QA憲章（QA Charter）に基づき監督・承認する
+
+## QA Role Definition
+This repository automates development via AI agents, but the human owner operates in a **QA and verification capacity**:
+- Defines acceptance criteria and review policies
+- Validates design/test coverage integrity
+- Oversees AI-generated deliverables under the QA charter
+
+
