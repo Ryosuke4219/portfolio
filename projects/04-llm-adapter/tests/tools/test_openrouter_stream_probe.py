@@ -1,5 +1,4 @@
 """stream_probe ツールのストリーミング挙動を検証するテスト。"""
-
 from __future__ import annotations
 
 import logging
