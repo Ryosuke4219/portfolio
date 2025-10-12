@@ -337,7 +337,7 @@ Design, integration, and final decisions remain the author’s responsibility. *
 - Where appropriate, sources are noted in **CREDITS.md / LICENSE**.
 - Commit trailers may be used to indicate provenance (e.g., `AI-Generated: partial|substantial`, `AI-Tools: copilot, chatgpt`).
 
-##QAロール定義 / QA Role Definition
+## QAロール定義 / QA Role Definition
 ### 日本語
 このリポジトリでは、AIエージェントによる自動開発を行っていますが、
 人間のオーナーは 品質保証（QA）および検証責任者 の立場で運用しています。
