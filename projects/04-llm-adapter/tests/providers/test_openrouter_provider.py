@@ -349,6 +349,57 @@ def test_openrouter_provider_allows_literal_env_mapping_value(
     assert payload is not None and payload.get("stream") is None
 
 
+def test_openrouter_provider_uses_request_option_api_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert payload is not None
+        assert "api_key" not in payload
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "inline option"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    provider: Any | None = None
+    try:
+        config = _provider_config(tmp_path)
+        provider = ProviderFactory.create(config)
+        request = ProviderRequest(
+            model=config.model,
+            prompt="option auth",
+            options={"api_key": "inline-secret"},
+        )
+        response = provider.invoke(request)
+    finally:
+        local_patch.undo()
+
+    assert provider is not None
+    session = getattr(provider, "_session")
+    headers = getattr(session, "headers", {})
+    assert headers.get("Authorization") == "Bearer inline-secret"
+    assert response.text == "inline option"
+    session_calls = getattr(session, "calls", [])
+    assert session_calls
+    _url, payload, stream, _timeout = session_calls[0]
+    assert stream is False
+    assert payload is not None and "api_key" not in payload
+
+
 def test_openrouter_provider_resolves_base_url_from_env(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
