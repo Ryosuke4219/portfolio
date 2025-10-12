@@ -1,4 +1,4 @@
-from .majority_vote import MajorityVoteStrategy
-from .max_score import MaxScoreStrategy
-from .registry import resolve_builtin_strategy
-from .weighted_vote import WeightedVoteStrategy
+from .majority_vote import MajorityVoteStrategy as MajorityVoteStrategy
+from .max_score import MaxScoreStrategy as MaxScoreStrategy
+from .registry import resolve_builtin_strategy as resolve_builtin_strategy
+from .weighted_vote import WeightedVoteStrategy as WeightedVoteStrategy
