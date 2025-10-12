@@ -39,7 +39,7 @@ ParallelExecutionError = cast(
     ),
 )
 if not hasattr(core_errors, "ParallelExecutionError"):
-    core_errors.ParallelExecutionError = ParallelExecutionError
+    setattr(core_errors, "ParallelExecutionError", ParallelExecutionError)
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig

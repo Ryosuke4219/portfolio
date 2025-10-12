@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import fields, is_dataclass
-import inspect
 import logging
 from pathlib import Path
 
@@ -97,46 +96,8 @@ def run_compare(
         allow_overrun=allow_overrun,
         runner_config=config,
     )
-    run_signature = inspect.signature(runner.run)
     repeat_value = max(repeat, 1)
-    parameters = run_signature.parameters
-    args: list[object] = []
-    kwargs: dict[str, object] = {}
-    assigned: set[str] = set()
-
-    def _assign(name: str, value: object) -> bool:
-        parameter = parameters.get(name)
-        if parameter is None:
-            return False
-        assigned.add(name)
-        if parameter.kind in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        ):
-            args.append(value)
-        else:
-            kwargs[name] = value
-        return True
-
-    if not _assign("repeat", repeat_value):
-        args.append(repeat_value)
-
-    if not _assign("config", config):
-        mode_value = config.mode
-        if not _assign("mode", mode_value):
-            needs_positional = any(
-                parameter.kind
-                in (
-                    inspect.Parameter.POSITIONAL_ONLY,
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                )
-                and name not in assigned
-                for name, parameter in parameters.items()
-            )
-            if needs_positional:
-                args.append(mode_value)
-
-    results = runner.run(*args, **kwargs)
+    results = runner.run(repeat_value, config)
     logging.getLogger(__name__).info("%d 件の試行を記録しました", len(results))
     return 0
 
