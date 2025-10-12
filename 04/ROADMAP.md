@@ -33,9 +33,8 @@
 **成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了。
 **タスク**:
 - OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。
-- CLI から渡される env 設定を ProviderRequest へマッピングする経路を整備し、既定値と必須項目の整合を確認する。
-- CLI でリテラル指定された API キーを `ProviderRequest.options.raw.api_key` に到達させるテストと実装を追加し、CLI 完了条件に「リテラル入力の透過」を明示して誤解を防ぐ。
-- OpenRouter 用の env リテラル(OPENROUTER_API_KEY など)を CLI/env マッピングに追加し、参照ドキュメントを同期する。
+- CLI でリテラル指定された OpenRouter API キーが `ProviderRequest.options.raw.api_key` まで透過する経路を整備し、ギャップを再現する回帰テストを追加する。
+- OpenRouter 用の env/CLI マッピングと参照ドキュメントを更新し、`OPENROUTER_API_KEY` などのリテラル指定と必須項目の整合を保証する。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
