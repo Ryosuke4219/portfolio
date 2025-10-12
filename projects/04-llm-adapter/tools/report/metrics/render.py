@@ -43,9 +43,15 @@ def update_weekly_summary(
     weekly_path: Path,
     failure_total: int,
     failure_summary: Sequence[Mapping[str, object]],
+    openrouter_http_failures: Sequence[Mapping[str, object]] | None = None,
 ) -> None:
     """Proxy to :func:`weekly_summary.update_weekly_summary`."""
-    _update_weekly_summary(weekly_path, failure_total, failure_summary)
+    _update_weekly_summary(
+        weekly_path,
+        failure_total,
+        failure_summary,
+        openrouter_http_failures=openrouter_http_failures,
+    )
 
 
 __all__ = [

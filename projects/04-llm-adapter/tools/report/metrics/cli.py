@@ -10,6 +10,7 @@ from .data import (
     build_determinism_alerts,
     build_failure_summary,
     build_latency_histogram_data,
+    build_openrouter_http_failures,
     build_scatter_data,
     compute_overview,
     load_metrics,
@@ -32,6 +33,7 @@ def generate_report(
     scatter_data = build_scatter_data(metrics)
     regression_html = build_regression_summary(metrics, golden_dir)
     failure_total, failure_summary = build_failure_summary(metrics)
+    _, openrouter_http_failures = build_openrouter_http_failures(metrics)
     determinism_alerts = build_determinism_alerts(metrics)
     html = render_html(
         overview,
@@ -46,7 +48,12 @@ def generate_report(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(html, encoding="utf-8")
     if weekly_summary_path is not None:
-        update_weekly_summary(weekly_summary_path, failure_total, failure_summary)
+        update_weekly_summary(
+            weekly_summary_path,
+            failure_total,
+            failure_summary,
+            openrouter_http_failures=openrouter_http_failures,
+        )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
