@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Lock
 from time import perf_counter, sleep
 from types import SimpleNamespace
-from typing import Any, Protocol, TYPE_CHECKING, cast
+from typing import Any, cast, Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from jsonschema.exceptions import ValidationError as _ValidationError
@@ -35,7 +35,7 @@ class _ValidatorsModule(Protocol):
 
 
 class _ExceptionsModule(Protocol):
-    ValidationError: type["_ValidationError"]
+    ValidationError: type[_ValidationError]
 
 
 class _MissingValidationError(ValueError):
@@ -70,8 +70,7 @@ class _FallbackValidators:
 
 
 try:
-    from jsonschema import exceptions as _jsonschema_exceptions
-    from jsonschema import validators as _jsonschema_validators
+    from jsonschema import exceptions as _jsonschema_exceptions, validators as _jsonschema_validators
 except ImportError:
     _validators_impl: _ValidatorsModule = cast(
         _ValidatorsModule, _FallbackValidators()

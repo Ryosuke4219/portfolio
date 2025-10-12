@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import re
-from typing import Any, Protocol, TYPE_CHECKING, runtime_checkable
+from typing import Any, Protocol, runtime_checkable, TYPE_CHECKING
 
 from ..aggregation import (
     AggregationCandidate,
@@ -12,7 +12,6 @@ from ..aggregation import (
     FirstTieBreaker,
     TieBreaker,
 )
-
 
 if TYPE_CHECKING:
     from ..aggregation import AggregationStrategy
@@ -135,7 +134,7 @@ class JudgeStrategy:
         )
 
     @staticmethod
-    def from_string(kind: str, **kwargs: Any) -> "AggregationStrategy":
+    def from_string(kind: str, **kwargs: Any) -> AggregationStrategy:
         from .builtin.registry import resolve_builtin_strategy
 
         return resolve_builtin_strategy(kind, **kwargs)
