@@ -7,7 +7,19 @@ from typing import Any
 import pytest
 
 from adapter.core import runner_api
+from adapter.core.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from adapter.core.runner_config_builder import RunnerConfig, RunnerMode
+
+
+class _ShadowProvider(ProviderSPI):
+    def name(self) -> str:
+        return "shadow"
+
+    def capabilities(self) -> set[str]:
+        return set()
+
+    def invoke(self, request: ProviderRequest) -> ProviderResponse:
+        raise NotImplementedError
 
 
 @pytest.fixture()
@@ -84,7 +96,7 @@ def test_run_compare_overrides_metrics_and_shadow(
     run_compare_env: SimpleNamespace,
 ) -> None:
     env = run_compare_env
-    shadow = object()
+    shadow = _ShadowProvider()
     base_config = RunnerConfig(mode=RunnerMode.SEQUENTIAL)
 
     result = runner_api.run_compare(
@@ -99,3 +111,22 @@ def test_run_compare_overrides_metrics_and_shadow(
     config = env.captured[-1]
     assert config.metrics_path == env.metrics_path
     assert config.shadow_provider is shadow
+
+
+def test_run_compare_passes_repeat_then_config(
+    run_compare_env: SimpleNamespace,
+) -> None:
+    env = run_compare_env
+
+    repeat = 3
+    result = runner_api.run_compare(
+        env.provider_paths,
+        env.prompt_path,
+        budgets_path=env.budgets_path,
+        metrics_path=env.metrics_path,
+        repeat=repeat,
+    )
+
+    assert result == 0
+    assert env.run_calls[-1]["args"] == (repeat, env.captured[-1])
+    assert env.run_calls[-1]["kwargs"] == {}
