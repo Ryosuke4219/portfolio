@@ -5,10 +5,11 @@ import sys
 from types import ModuleType
 
 import pytest
+
 from adapter.core.aggregation.builtin.majority_vote import MajorityVoteStrategy
 from adapter.core.aggregation.builtin.max_score import MaxScoreStrategy
-from adapter.core.aggregation.builtin.weighted_vote import WeightedVoteStrategy
 from adapter.core.aggregation.builtin.registry import resolve_builtin_strategy
+from adapter.core.aggregation.builtin.weighted_vote import WeightedVoteStrategy
 
 
 @pytest.mark.parametrize(
