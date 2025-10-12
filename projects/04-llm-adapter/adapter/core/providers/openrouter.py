@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, MutableMapping
 import json
 import os
+import re
 import time
 from typing import Any, cast
 
@@ -20,6 +21,7 @@ _INTERNAL_OPTION_KEYS = {"stream", "request_timeout_s", "REQUEST_TIMEOUT_S"}
 
 
 _LITERAL_ENV_VALUE_PREFIXES = ("file:", "mailto:")
+_ENV_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 def _coerce_text(payload: Mapping[str, Any] | None) -> str:
@@ -101,14 +103,25 @@ def _resolve_env(name: Any) -> str:
     return (os.getenv(env_name) or "").strip()
 
 
+def _looks_like_env_name(value: str) -> bool:
+    candidate = value.strip()
+    if not candidate:
+        return False
+    return bool(_ENV_NAME_PATTERN.fullmatch(candidate))
+
+
 def _is_literal_env_value(value: str) -> bool:
     candidate = value.strip()
     if not candidate:
         return False
+    if _looks_like_env_name(candidate):
+        return False
     if "://" in candidate:
         return True
     candidate_lower = candidate.lower()
-    return any(candidate_lower.startswith(prefix) for prefix in _LITERAL_ENV_VALUE_PREFIXES)
+    if any(candidate_lower.startswith(prefix) for prefix in _LITERAL_ENV_VALUE_PREFIXES):
+        return True
+    return True
 
 
 def _normalize_error(exc: Exception) -> Exception:
@@ -199,12 +212,10 @@ class OpenRouterProvider(BaseProvider):
                         if candidate and candidate not in candidates:
                             candidates.append(candidate)
             for candidate in candidates:
-                if _is_literal_env_value(candidate):
-                    return candidate
-                override_value = _resolve_env(candidate)
-                if override_value:
-                    return override_value
-            return _resolve_env(default_name)
+                resolved_value = _resolve_literal_or_env(candidate)
+                if resolved_value:
+                    return resolved_value
+            return _resolve_literal_or_env(default_name)
 
         mapped_api_key = _resolve_from_env_mapping("OPENROUTER_API_KEY")
         seen_candidates: set[str] = set()

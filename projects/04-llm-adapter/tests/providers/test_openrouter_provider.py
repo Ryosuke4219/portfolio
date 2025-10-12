@@ -1,8 +1,10 @@
+# ruff: noqa: B009, B010
 from __future__ import annotations
 
+from collections.abc import Callable
 import importlib
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 
@@ -398,6 +400,47 @@ def test_openrouter_provider_prefers_env_mapping(
     assert stream is False
     headers = getattr(session, "headers", {})
     assert headers.get("Authorization") == "Bearer mapped-key"
+
+
+def test_openrouter_provider_env_mapping_accepts_literal_api_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        assert stream is False
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "literal api key"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    try:
+        config = _provider_config(tmp_path)
+        config.raw["env"] = {"OPENROUTER_API_KEY": "sk-inline"}
+        provider = ProviderFactory.create(config)
+        session = getattr(provider, "_session")
+        headers = getattr(session, "headers", {})
+        assert headers.get("Authorization") == "Bearer sk-inline"
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "literal api key")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.response.text == "literal api key"
 
 
 def test_openrouter_provider_env_mapping_accepts_literal_url(
