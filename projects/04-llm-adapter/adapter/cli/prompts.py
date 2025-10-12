@@ -37,6 +37,7 @@ def _looks_like_env_var_name(value: str) -> bool:
     for ch in value:
         if not (
             "A" <= ch <= "Z"
+            or "a" <= ch <= "z"
             or "0" <= ch <= "9"
             or ch == "_"
         ):
