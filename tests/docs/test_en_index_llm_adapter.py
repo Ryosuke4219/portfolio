@@ -23,6 +23,10 @@ def test_llm_adapter_card_describes_provider_integration() -> None:
     plain_text = re.sub(r"<[^>]+>", " ", block)
     normalized = re.sub(r"\s+", " ", plain_text).strip().casefold()
 
-    assert "provider integration" in normalized, "本文で Provider 統合が説明されていません"
-    assert "comparison" in normalized, "本文で比較実行が説明されていません"
-    assert "cli" in normalized, "本文で CLI 情報が言及されていません"
+    assert "openai" in normalized, "OpenAI の説明がありません"
+    assert "gemini" in normalized, "Gemini の説明がありません"
+    assert "ollama" in normalized, "Ollama の説明がありません"
+    assert "openrouter" in normalized, "OpenRouter の説明がありません"
+    assert "llm-adapter --provider" in normalized, "llm-adapter CLI の記述がありません"
+    assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
+    assert "pnpm" not in normalized, "旧 CLI コマンドが残っています"

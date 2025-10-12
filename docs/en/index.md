@@ -55,10 +55,10 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
       <p class="demo-card__id">04</p>
       <h2><a href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Provider Orchestration</a></h2>
     </header>
-    <p>An adapter that drives provider integration and executes comparison runs while keeping production fallbacks intact.</p>
+    <p>An adapter that orchestrates provider calls and comparison runs while keeping production fallbacks intact.</p>
     <ul>
-      <li>Provider integration layer unifies OpenAI, Azure, and local mock drivers with consistent tracing.</li>
-      <li>Comparison CLI <code>pnpm llm-adapter compare</code> captures side-by-side diffs and exports JSONL for audits.</li>
+      <li>Supports OpenAI, Gemini, Ollama, and OpenRouter behind a unified tracing layer.</li>
+      <li>Run prompts with <code>llm-adapter --provider openai prompt.yaml</code> or launch batch comparisons via <code>python adapter/run_compare.py</code>.</li>
     </ul>
     <p><a class="demo-card__link" href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
@@ -85,8 +85,8 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 - Sample workflow: Ingest any JUnit XML via `npx flaky parse --input <path-to-xml>` and store the history for later analysis.
 
 ### 04. LLM Adapter — Provider Orchestration
-- Unifies provider integration with resilient fallback strategies and shared telemetry hooks.
-- `pnpm llm-adapter compare` runs dual providers, persists diff metrics, and feeds provider scorecards.
+- Connects OpenAI, Gemini, Ollama, and OpenRouter with resilient fallback strategies and shared telemetry hooks.
+- `llm-adapter --provider openai prompt.yaml` runs a single provider, while `python adapter/run_compare.py` records comparison metrics for audits.
 - Reference: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
 [View all weekly summaries &rarr;]({{ '/weekly-summary.html' | relative_url }})
