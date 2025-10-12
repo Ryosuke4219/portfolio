@@ -21,6 +21,22 @@ _INTERNAL_OPTION_KEYS = {"stream", "request_timeout_s", "REQUEST_TIMEOUT_S"}
 
 
 _LITERAL_ENV_VALUE_PREFIXES = ("file:", "mailto:")
+_INLINE_SECRET_PREFIXES = (
+    "sk-",
+    "sk_",
+    "rk-",
+    "rk_",
+    "pk-",
+    "pk_",
+    "ak-",
+    "ak_",
+    "gsk-",
+    "gsk_",
+    "hf-",
+    "hf_",
+    "xai-",
+    "xai_",
+)
 _ENV_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
@@ -119,6 +135,8 @@ def _is_literal_env_value(value: str) -> bool:
     if "://" in candidate:
         return True
     candidate_lower = candidate.lower()
+    if any(candidate_lower.startswith(prefix) for prefix in _INLINE_SECRET_PREFIXES):
+        return True
     if any(candidate_lower.startswith(prefix) for prefix in _LITERAL_ENV_VALUE_PREFIXES):
         return True
     return True
@@ -192,7 +210,13 @@ class OpenRouterProvider(BaseProvider):
                 return ""
             if _is_literal_env_value(candidate):
                 return candidate
-            return _resolve_env(candidate)
+            resolved = _resolve_env(candidate)
+            if resolved:
+                return resolved
+            candidate_lower = candidate.lower()
+            if any(candidate_lower.startswith(prefix) for prefix in _INLINE_SECRET_PREFIXES):
+                return candidate
+            return resolved
 
         def _resolve_from_env_mapping(default_name: str) -> str:
             if not isinstance(default_name, str):
