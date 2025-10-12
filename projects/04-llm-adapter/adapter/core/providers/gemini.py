@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from importlib import import_module
 import time
-from typing import Any
+from typing import Any, Protocol, cast
 
 from ..config import ProviderConfig
 from ..provider_spi import ProviderRequest
@@ -21,10 +22,21 @@ from .gemini_support import (
 
 __all__ = ["GeminiProvider"]
 
+class _GenAIClient(Protocol):
+    def __init__(self, api_key: str) -> None:  # pragma: no cover - interface only
+        ...
+
+
+class _GenAIModule(Protocol):
+    Client: type[_GenAIClient]
+
+
 try:  # pragma: no cover - 実行環境により SDK が存在しない場合がある
-    from google import genai as _genai  # type: ignore[attr-defined]
+    _imported_genai = import_module("google.genai")
 except ModuleNotFoundError:  # pragma: no cover - SDK 未導入時
-    _genai = None  # type: ignore[assignment]
+    _genai: _GenAIModule | None = None
+else:
+    _genai = cast(_GenAIModule, _imported_genai)
 
 
 class GeminiProvider(BaseProvider):
@@ -35,7 +47,8 @@ class GeminiProvider(BaseProvider):
         if _genai is None:  # pragma: no cover - SDK 未導入時
             raise ImportError("google-genai がインストールされていません")
         api_key = _resolve_api_key(config.auth_env)
-        self._client = _genai.Client(api_key=api_key)  # type: ignore[call-arg]
+        client_cls: type[_GenAIClient] = _genai.Client
+        self._client: _GenAIClient = client_cls(api_key=api_key)
         self._model = config.model
         base_config = _prepare_generation_config(config)
         self._generation_config: Mapping[str, Any] | None = (

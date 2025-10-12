@@ -38,6 +38,32 @@ async def test_all_failed_error_is_raised_and_wrapped() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_metric_failure_logs_last_error_details() -> None:
+    logger = FakeLogger()
+    first_error = RetriableError("nope")
+    last_error = RetriableError("still nope")
+    runner = AsyncRunner(
+        [
+            _ErrorProvider("first", first_error),
+            _ErrorProvider("second", last_error),
+        ],
+        logger=logger,
+    )
+    request = ProviderRequest(prompt="hello", model="demo-model")
+
+    with pytest.raises(AllFailedError):
+        await runner.run_async(request, shadow_metrics_path="unused.jsonl")
+
+    run_metric_events = logger.of_type("run_metric")
+    assert run_metric_events
+    final_metric = run_metric_events[-1]
+    assert final_metric["provider_id"] is None
+    assert final_metric["error_type"] == "RetriableError"
+    assert final_metric["error_message"] == str(last_error)
+    assert final_metric["providers"] == ["first", "second"]
+
+
+@pytest.mark.asyncio
 async def test_run_metric_success_includes_extended_metadata() -> None:
     logger = FakeLogger()
     runner = AsyncRunner([_SuccessProvider("primary")], logger=logger)
