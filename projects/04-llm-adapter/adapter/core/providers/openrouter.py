@@ -153,14 +153,33 @@ class OpenRouterProvider(BaseProvider):
         if not auth_env_name or auth_env_name.upper() == "NONE":
             auth_env_name = "OPENROUTER_API_KEY"
         self._configured_auth_env = auth_env_name
+        override_candidates: list[str] = []
         resolved_auth_env_name = auth_env_name
         if isinstance(raw_env, Mapping):
             override_name = raw_env.get(auth_env_name)
             if isinstance(override_name, str):
                 candidate = override_name.strip()
                 if candidate:
-                    resolved_auth_env_name = candidate
+                    override_candidates.append(candidate)
+            elif isinstance(override_name, Iterable) and not isinstance(override_name, Mapping):
+                for item in override_name:
+                    if isinstance(item, str):
+                        candidate = item.strip()
+                        if candidate and candidate not in override_candidates:
+                            override_candidates.append(candidate)
+        if override_candidates:
+            resolved_auth_env_name = override_candidates[0]
         self._auth_env_name = resolved_auth_env_name
+
+        def _resolve_literal_or_env(name: str) -> str:
+            if not isinstance(name, str):
+                return ""
+            candidate = name.strip()
+            if not candidate:
+                return ""
+            if _is_literal_env_value(candidate):
+                return candidate
+            return _resolve_env(candidate)
 
         def _resolve_from_env_mapping(default_name: str) -> str:
             if not isinstance(default_name, str):
@@ -168,18 +187,41 @@ class OpenRouterProvider(BaseProvider):
             override_name = None
             if isinstance(raw_env, Mapping):
                 override_name = raw_env.get(default_name)
+            candidates: list[str] = []
             if isinstance(override_name, str):
                 candidate = override_name.strip()
                 if candidate:
-                    if _is_literal_env_value(candidate):
-                        return candidate
-                    override_value = _resolve_env(candidate)
-                    if override_value:
-                        return override_value
+                    candidates.append(candidate)
+            elif isinstance(override_name, Iterable) and not isinstance(override_name, Mapping):
+                for item in override_name:
+                    if isinstance(item, str):
+                        candidate = item.strip()
+                        if candidate and candidate not in candidates:
+                            candidates.append(candidate)
+            for candidate in candidates:
+                if _is_literal_env_value(candidate):
+                    return candidate
+                override_value = _resolve_env(candidate)
+                if override_value:
+                    return override_value
             return _resolve_env(default_name)
 
         mapped_api_key = _resolve_from_env_mapping("OPENROUTER_API_KEY")
-        api_key_value = _resolve_env(config.auth_env)
+        seen_candidates: set[str] = set()
+        api_key_value = ""
+        for candidate_name in override_candidates:
+            normalized = candidate_name.strip()
+            if not normalized or normalized in seen_candidates:
+                continue
+            seen_candidates.add(normalized)
+            resolved_value = _resolve_literal_or_env(normalized)
+            if resolved_value:
+                api_key_value = resolved_value
+                break
+        if not api_key_value:
+            configured_value = _resolve_from_env_mapping(auth_env_name)
+            if configured_value:
+                api_key_value = configured_value
         if not api_key_value and mapped_api_key:
             api_key_value = mapped_api_key
         if not api_key_value:

@@ -253,6 +253,54 @@ def test_openrouter_provider_resolves_api_key_from_auth_env(
     assert payload is not None and payload.get("stream") is None
 
 
+def test_openrouter_provider_resolves_api_key_from_env_mapping_when_auth_env_is_custom(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_openrouter_module()
+
+    def responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> _FakeResponse:
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "custom mapping"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    local_patch = _install_fake_session(module, responder)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("CUSTOM_AUTH_ENV", raising=False)
+    monkeypatch.setenv("MAPPED_CUSTOM_AUTH_ENV", "mapped-custom-value")
+    try:
+        config = _provider_config(tmp_path)
+        config.auth_env = "CUSTOM_AUTH_ENV"
+        config.raw["env"] = {"CUSTOM_AUTH_ENV": "MAPPED_CUSTOM_AUTH_ENV"}
+        provider = ProviderFactory.create(config)
+        session = getattr(provider, "_session")
+        headers = getattr(session, "headers", {})
+        assert headers.get("Authorization") == "Bearer mapped-custom-value"
+        executor = ProviderCallExecutor(backoff=None)
+        result = executor.execute(config, provider, "custom auth env mapping")
+    finally:
+        local_patch.undo()
+
+    assert result.status == "ok"
+    assert result.response.text == "custom mapping"
+    session_calls = getattr(session, "calls", [])
+    assert session_calls
+    url, payload, stream, _timeout = session_calls[0]
+    assert stream is False
+    assert payload is not None and payload.get("stream") is None
+
+
 def test_openrouter_provider_resolves_base_url_from_env(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
