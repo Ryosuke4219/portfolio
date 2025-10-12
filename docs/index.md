@@ -135,12 +135,12 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
   <article class="demo-card" id="demo-04">
     <header>
       <p class="demo-card__id">04</p>
-      <h2><a href="{{ '/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Shadow Execution</a></h2>
+      <h2><a href="{{ '/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Provider Orchestration</a></h2>
     </header>
-    <p>プライマリ応答を保持したまま影プロバイダを並走させ、異常系も再現できる LLM アダプタ。</p>
+    <p>OpenAI / Azure / ローカルモックを統合し、比較ランと本番フォールバックを両立する LLM アダプタ。</p>
     <ul>
-      <li>shadow diff メトリクスを JSONL 収集し、ベンダ比較に活用。</li>
-      <li>タイムアウト / レート制限 / 形式不正をモックで再現しフォールバック検証。</li>
+      <li>プロバイダ統合レイヤーでトレースを共通化し、切替や多重呼び出しを安全に制御。</li>
+      <li>比較 CLI <code>pnpm llm-adapter compare</code> が差分メトリクスを JSONL に出力し監査ログへ接続。</li>
     </ul>
     <p><a class="demo-card__link" href="{{ '/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
@@ -170,9 +170,9 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 - 成果物: `npx flaky analyze` 実行時に `projects/03-ci-flaky/out/index.html`（HTML/CSV/JSON）が生成され、CI ではアーティファクトとして取得。
 - 解析サンプル: 任意の JUnit XML を `npx flaky parse --input <path-to-xml>` で取り込み、履歴ストアに蓄積。
 
-### 04. LLM Adapter — Shadow Execution
-- 影プロバイダを並走させ、応答差分をメトリクス化（JSONL収集）して可視化。
-- 異常系（タイムアウト、レート制限、フォーマット不正）をモックで再現し、フォールバック設計を検証。
+### 04. LLM Adapter — Provider Orchestration
+- OpenAI / Azure / ローカルモックを共通トレースで束ね、フォールバック設計と多重呼び出しを両立。
+- `pnpm llm-adapter compare` でプロバイダ比較を実行し、差分メトリクスを JSONL にエクスポート。
 - 参考資料: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
 [週次サマリの一覧を見る &rarr;]({{ '/weekly-summary.html' | relative_url }})
