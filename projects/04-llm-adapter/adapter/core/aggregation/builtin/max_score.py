@@ -49,7 +49,7 @@ class MaxScoreStrategy:
         )
 
     @staticmethod
-    def from_string(kind: str, **kwargs: Any) -> "AggregationStrategy":
+    def from_string(kind: str, **kwargs: Any) -> AggregationStrategy:
         from .registry import resolve_builtin_strategy
 
         return resolve_builtin_strategy(kind, **kwargs)
