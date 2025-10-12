@@ -10,6 +10,7 @@ def update_weekly_summary(
     weekly_path: Path,
     failure_total: int,
     failure_summary: Sequence[Mapping[str, object]],
+    openrouter_http_failures: Sequence[Mapping[str, object]] | None = None,
 ) -> None:
     weekly_path.parent.mkdir(parents=True, exist_ok=True)
     today = datetime.now(UTC).strftime("%Y-%m-%d")
@@ -23,6 +24,17 @@ def update_weekly_summary(
             lines.append(f"| {idx} | {row['failure_kind']} | {row['count']} |")
     else:
         lines.append("- 失敗は記録されていません。")
+    if openrouter_http_failures:
+        lines.append("")
+        lines.append("### OpenRouter HTTP Failures")
+        lines.append("")
+        lines.append("| Rank | 種別 | Count | Rate% |")
+        lines.append("| ---: | :---- | ----: | ----: |")
+        for idx, row in enumerate(openrouter_http_failures, start=1):
+            label = str(row.get("label") or row.get("category") or "-")
+            count = row.get("count", 0)
+            rate = row.get("rate", 0.0)
+            lines.append(f"| {idx} | {label} | {count} | {rate} |")
     new_entry = "\n".join(lines).strip()
     header = "# LLM Adapter 週次サマリ"
     if weekly_path.exists():

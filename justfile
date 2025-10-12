@@ -55,7 +55,11 @@ weekly-summary:
         ./.venv/bin/python - <<'PY'
 from pathlib import Path
 
-from tools.report.metrics.data import build_failure_summary, load_metrics
+from tools.report.metrics.data import (
+    build_failure_summary,
+    build_openrouter_http_failures,
+    load_metrics,
+)
 from tools.report.metrics.weekly_summary import update_weekly_summary
 
 metrics_path = Path("artifacts/runs-metrics.jsonl")
@@ -67,7 +71,13 @@ else:
     metrics = []
 
 failure_total, failure_summary = build_failure_summary(metrics)
-update_weekly_summary(weekly_path, failure_total, failure_summary)
+_, openrouter_http_failures = build_openrouter_http_failures(metrics)
+update_weekly_summary(
+    weekly_path,
+    failure_total,
+    failure_summary,
+    openrouter_http_failures=openrouter_http_failures,
+)
 PY
 
 # Python プロジェクトのカバレッジ付きレポート生成
