@@ -49,9 +49,7 @@
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、ストリーミング結合・自動 Pull 無効時の例外・429/5xx 正規化・CI/オフライン分岐を契約テストで担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
 - 残タスク:
-  - CLI 環境変数マッピング: `adapter/cli/app.py` から `OLLAMA_HOST`/`OLLAMA_TIMEOUT` などの env 値を `ProviderRequest.options.*` へ正規化するパスが未接続のため、CLI 実行時の再現性確保を優先対応する。
-  - CLI が `raw.api_key` を受け付けない既知問題: CLI テストを追加して `ProviderRequest.options.raw.api_key` の引き渡しを確認し、`adapter/cli/app.py` のマッピングを修正する。
-  - OpenRouter env リテラル: OpenRouter との CLI 切替で `OLLAMA_*` 設定が残存しないことを保証するテスト・ドキュメントを整備するまでクローズしない。
+  - CLI リテラル API キー経路: CLI/設定ファイルから `ProviderRequest.options.raw.api_key` へ値を渡す経路が未実装。`adapter/cli/app.py` のマッピングと CLI テストを整備し、OpenRouter との切替でもキーが取り違わないことを確認する。
   - 実サーバーでのストリーミング透過検証を進め、運用フローに組み込む（Issue Seeds）。【F:04/ROADMAP.md†L61-L62】
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（進行中）
@@ -66,9 +64,8 @@
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー/ベース URL 解決、ストリーミング透過、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
 - 残タスク:
-  - CLI 環境変数マッピング: `adapter/cli/app.py` から `OPENROUTER_API_KEY`/`OPENROUTER_BASE_URL` など env を CLI オプションと統合し、`ProviderRequest` へ渡す経路の契約テストを追加する。
-  - CLI が `raw.api_key` を受け付けない既知問題: CLI テストで `ProviderRequest.options.raw.api_key` をカバーし、`adapter/cli/app.py` の OpenRouter 向けマッピングを修正する。リテラル API キーを CLI 引数・設定ファイルから渡す経路を実装し、回帰テストを `tests/test_cli_single_prompt_diagnostics.py` に追加する。
-  - OpenRouter env リテラル: CLI ドキュメントと設定テンプレートで `OPENROUTER_*` のリテラル指定・デフォルト挙動を明示し、Shadow 依存の環境変数差異を吸収する。
+  - CLI リテラル API キー経路: CLI/設定ファイルから `OPENROUTER_API_KEY` と `ProviderRequest.options.raw.api_key` を結線し、`tests/test_cli_single_prompt_diagnostics.py` へ回帰テストを追加する。
+  - ドキュメント整備: `OPENROUTER_*` のリテラル指定・デフォルト挙動を CLI ドキュメントと設定テンプレートへ追記し、Shadow との差異を整理する。
   - OpenRouter 429/5xx 発生統計の収集と Runner バックオフ/RPM 調整指針づくりを継続する。【F:04/ROADMAP.md†L12-L35】
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する

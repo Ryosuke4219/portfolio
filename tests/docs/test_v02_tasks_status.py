@@ -49,8 +49,8 @@ def test_task6_section_reflects_completion() -> None:
     _assert_task_in_progress_with_todos(
         section,
         required_todos=[
-            "CLI 環境変数マッピング",
-            "OpenRouter env リテラル",
+            "CLI リテラル API キー経路",
+            "ストリーミング透過検証",
         ],
     )
 
@@ -60,7 +60,7 @@ def test_task7_section_reflects_completion() -> None:
     _assert_task_in_progress_with_todos(
         section,
         required_todos=[
-            "CLI 環境変数マッピング",
-            "OpenRouter env リテラル",
+            "CLI リテラル API キー経路",
+            "ドキュメント整備",
         ],
     )
