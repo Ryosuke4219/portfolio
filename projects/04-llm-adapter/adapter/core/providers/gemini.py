@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from importlib import import_module
 import time
-from typing import Any, Protocol, cast
+from typing import Any, cast, Protocol
 
 from ..config import ProviderConfig
 from ..provider_spi import ProviderRequest
