@@ -44,6 +44,25 @@ def _looks_like_env_var_name(value: str) -> bool:
     return True
 
 
+def _normalize_credential(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        candidate = value.strip()
+    else:
+        candidate = str(value).strip()
+    return candidate or None
+
+
+def _has_embedded_credentials(raw: Mapping[str, object]) -> bool:
+    inline_keys = ("api_key", "api_token", "token", "access_token")
+    for key in inline_keys:
+        credential = _normalize_credential(raw.get(key))
+        if credential:
+            return True
+    return False
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser("llm-adapter")
     parser.add_argument(
@@ -201,19 +220,15 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     auth_env = (config.auth_env or "").strip()
     aliases: list[str] = []
     literal_credentials: list[str] = []
-    raw_env = config.raw.get("env") if isinstance(config.raw, Mapping) else None
+    raw_mapping = config.raw if isinstance(config.raw, Mapping) else None
+    raw_env = raw_mapping.get("env") if isinstance(raw_mapping, Mapping) else None
     if auth_env and isinstance(raw_env, Mapping):
         alias_raw = raw_env.get(auth_env)
-        if isinstance(alias_raw, str):
-            candidate = alias_raw.strip()
-            if candidate and candidate.upper() != "NONE":
-                if _looks_like_env_var_name(candidate):
-                    aliases.append(candidate)
-                else:
-                    literal_credentials.append(candidate)
-        elif alias_raw is not None:
-            candidate = str(alias_raw).strip()
-            if candidate:
+        candidate = _normalize_credential(alias_raw)
+        if candidate and candidate.upper() != "NONE":
+            if _looks_like_env_var_name(candidate):
+                aliases.append(candidate)
+            else:
                 literal_credentials.append(candidate)
     env_candidates = [auth_env, *aliases]
     requires_env = bool(auth_env and auth_env.upper() != "NONE")
@@ -224,12 +239,8 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
         )
         if not resolved_credentials and literal_credentials:
             resolved_credentials = True
-        if not resolved_credentials and isinstance(config.raw, Mapping):
-            api_key_raw = config.raw.get("api_key")
-            if isinstance(api_key_raw, str):
-                resolved_credentials = bool(api_key_raw.strip())
-            elif api_key_raw is not None:
-                resolved_credentials = bool(str(api_key_raw).strip())
+        if not resolved_credentials and isinstance(raw_mapping, Mapping):
+            resolved_credentials = _has_embedded_credentials(raw_mapping)
     if requires_env and not resolved_credentials:
         message = _msg(lang, "api_key_missing", env=auth_env)
         LOGGER.error(_sanitize_message(message))
