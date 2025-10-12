@@ -49,7 +49,7 @@
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、ストリーミング結合・自動 Pull 無効時の例外・429/5xx 正規化・CI/オフライン分岐を契約テストで担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
 - 残タスク:
-  - CLI リテラル API キー経路: CLI/設定ファイルから `ProviderRequest.options.raw.api_key` へ値を渡す経路が未実装。`adapter/cli/app.py` のマッピングと CLI テストを整備し、OpenRouter との切替でもキーが取り違わないことを確認する。
+  - CLI リテラル API キー経路: CLI/設定ファイルから `ProviderRequest.options["api_key"]` へ値を渡す経路が未実装。`adapter/cli/app.py` のオプション配線と CLI テストを整備し、OpenRouter との切替でもキーが取り違わないことを確認する。
   - 実サーバーでのストリーミング透過検証を進め、運用フローに組み込む（Issue Seeds）。【F:04/ROADMAP.md†L61-L62】
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（進行中）
@@ -60,12 +60,12 @@
 - 対応状況:
   - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
-  - CLI からリテラル API キーを渡す経路は未接続で、`raw.api_key` が固定文字列のまま CLI へ入力された場合に `ProviderRequest` まで届かないギャップが残っている。
+  - CLI からリテラル API キーを渡す経路は未接続で、CLI で指定した値が `ProviderRequest.options["api_key"]` まで届かないギャップが残っている。
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー/ベース URL 解決、ストリーミング透過、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
 - 残タスク:
-  - CLI リテラル API キー経路: CLI/設定ファイルから `OPENROUTER_API_KEY` と `ProviderRequest.options.raw.api_key` を結線し、`projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_auth_env_accepts_literal_api_key` で回帰テストを担保する。
-  - ドキュメント整備: `OPENROUTER_*` のリテラル指定・デフォルト挙動を CLI ドキュメントと設定テンプレートへ追記し、Shadow との差異を整理する。
+  - CLI リテラル API キー経路: CLI/設定ファイルから `OPENROUTER_API_KEY` と `ProviderRequest.options["api_key"]` を結線し、`projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_auth_env_accepts_literal_api_key` で回帰テストを担保する。
+  - ドキュメント整備: `OPENROUTER_*` のリテラル指定・デフォルト挙動、および `options["api_key"]` 配線の利用手順を CLI ドキュメントと設定テンプレートへ追記し、Shadow との差異を整理する。
   - OpenRouter 429/5xx 発生統計の収集と Runner バックオフ/RPM 調整指針づくりを継続する。【F:04/ROADMAP.md†L12-L35】
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する
