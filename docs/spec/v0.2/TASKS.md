@@ -62,11 +62,12 @@
 - 対応状況:
   - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
+  - CLI からリテラル API キーを渡す経路は未接続で、`raw.api_key` が固定文字列のまま CLI へ入力された場合に `ProviderRequest` まで届かないギャップが残っている。
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー/ベース URL 解決、ストリーミング透過、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
 - 残タスク:
   - CLI 環境変数マッピング: `adapter/cli/app.py` から `OPENROUTER_API_KEY`/`OPENROUTER_BASE_URL` など env を CLI オプションと統合し、`ProviderRequest` へ渡す経路の契約テストを追加する。
-  - CLI が `raw.api_key` を受け付けない既知問題: CLI テストで `ProviderRequest.options.raw.api_key` をカバーし、`adapter/cli/app.py` の OpenRouter 向けマッピングを修正する。
+  - CLI が `raw.api_key` を受け付けない既知問題: CLI テストで `ProviderRequest.options.raw.api_key` をカバーし、`adapter/cli/app.py` の OpenRouter 向けマッピングを修正する。リテラル API キーを CLI 引数・設定ファイルから渡す経路を実装し、回帰テストを `tests/test_cli_single_prompt_diagnostics.py` に追加する。
   - OpenRouter env リテラル: CLI ドキュメントと設定テンプレートで `OPENROUTER_*` のリテラル指定・デフォルト挙動を明示し、Shadow 依存の環境変数差異を吸収する。
   - OpenRouter 429/5xx 発生統計の収集と Runner バックオフ/RPM 調整指針づくりを継続する。【F:04/ROADMAP.md†L12-L35】
 
