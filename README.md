@@ -47,6 +47,8 @@ Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuous
 - `just test` — Execute combined regression across Node and Python projects.
 - `just lint` — Run JavaScript linting and Python bytecode validation.
 - `just report` — Generate pytest coverage reports for the Python adapter.
+- `just openrouter-stream-probe -- --dry-run` — Launch the OpenRouter streaming probe with passthrough CLI flags.
+- `just openrouter-stats -- --since 2024-01-01` — Export OpenRouter failure metrics into `artifacts/openrouter`.
 - GitHub Pages: <https://ryosuke4219.github.io/portfolio/>
 
 ### GitHub Pages 公開 / 復旧手順
@@ -64,6 +66,8 @@ Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuous
 > `just test` — Node＋Python の回帰テストを一括で実行します。
 > `just lint` — JavaScript の構文チェックと Python バイトコード検証を行います。
 > `just report` — Python プロジェクトのテスト＋カバレッジレポートを生成します。
+> `just openrouter-stream-probe -- --dry-run` — OpenRouter のストリーミングプローブを CLI 引数付きで実行します。
+> `just openrouter-stats -- --since 2024-01-01` — OpenRouter 障害メトリクスを `artifacts/openrouter` に出力します。
 >
 > ✅ 詳細手順は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) を参照してください。
 
@@ -237,6 +241,8 @@ llm-adapter --provider adapter/config/providers/openai.yaml \
 * `just test` — Node/Python 回帰の一括実行。Python 側は `projects/04-llm-adapter/tests` を対象。
 * `just lint` — JavaScript の構文検証と `projects/04-llm-adapter` のバイトコード検証。
 * `just report` — Python テスト＋カバレッジ計測後に週次サマリを生成。
+* `just openrouter-stream-probe -- --dry-run` — OpenRouter ストリーミング確認用のプローブ。
+* `just openrouter-stats -- --since 2024-01-01` — OpenRouter 429/5xx 集計を `artifacts/openrouter` へ出力。
 
 **レガシー補足**
 
