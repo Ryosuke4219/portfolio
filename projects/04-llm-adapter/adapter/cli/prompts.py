@@ -132,7 +132,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="append",
         type=_parse_provider_option,
         metavar="KEY=VALUE",
-        help="プロバイダ設定の options.* を上書き",
+        help="プロバイダ設定の options.* を上書き (繰り返し指定可)",
     )
     return parser
 

@@ -220,7 +220,9 @@ def test_cli_literal_api_key_option(
     assert "echo:hello" in captured.out
     assert len(echo_provider.requests) == 1
     request = echo_provider.requests[0]
-    assert request.options == {"foo": "bar", "api_key": "sk-inline"}
+    assert request.options["api_key"] == "sk-inline"
+    assert request.options["foo"] == "bar"
+    assert set(request.options) == {"foo", "api_key"}
 
 
 def test_cli_json_without_prompts(echo_provider, tmp_path: Path, capfd) -> None:
