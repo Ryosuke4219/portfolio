@@ -16,6 +16,7 @@ from .utils import _sanitize_message, LOGGER
 
 ProviderRequest = provider_module.ProviderRequest
 ProviderResponse = provider_module.ProviderResponse
+TokenUsage = provider_module.TokenUsage
 Classifier = Callable[[Exception, ProviderConfig, str], tuple[str, str]]
 
 
@@ -115,10 +116,9 @@ async def _process_prompt(
             LOGGER.error(_sanitize_message(friendly))
             LOGGER.debug("provider error", exc_info=True)
             stub = ProviderResponse(
-                output_text="",
-                input_tokens=0,
-                output_tokens=0,
+                text="",
                 latency_ms=latency_ms,
+                token_usage=TokenUsage(prompt=0, completion=0),
             )
             metric = RunMetric.from_resp(
                 config, stub, prompt, cost_usd=0.0, error=friendly
@@ -147,6 +147,8 @@ async def _process_prompt(
 
         if hasattr(response, "output_text"):
             output_text = provider_response.output_text
+        elif hasattr(response, "text"):
+            output_text = cast(str, getattr(provider_response, "text"))
         else:
             output_text = ""
 
@@ -157,10 +159,9 @@ async def _process_prompt(
 
         cost = estimate_cost(config, input_tokens, output_tokens)
         metric_base = ProviderResponse(
-            output_text=output_text,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
+            text=output_text,
             latency_ms=latency_ms,
+            token_usage=TokenUsage(prompt=input_tokens, completion=output_tokens),
         )
         metric = RunMetric.from_resp(config, metric_base, prompt, cost_usd=cost)
         return PromptResult(
