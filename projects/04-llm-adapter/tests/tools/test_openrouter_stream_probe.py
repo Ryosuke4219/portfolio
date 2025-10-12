@@ -1,4 +1,5 @@
 """stream_probe ツールのストリーミング挙動を検証するテスト。"""
+
 from __future__ import annotations
 
 import logging
@@ -39,15 +40,7 @@ class _DummySession:
 
 @pytest.fixture
 def provider_config_path() -> Path:
-    return (
-        Path(__file__)
-        .resolve()
-        .parents[2]
-        / "adapter"
-        / "config"
-        / "providers"
-        / "openrouter.yaml"
-    )
+    return Path(__file__).resolve().parents[2] / "adapter" / "config" / "providers" / "openrouter.yaml"
 
 
 def test_run_probe_logs_streaming_chunks(
@@ -56,8 +49,8 @@ def test_run_probe_logs_streaming_chunks(
     provider_config_path: Path,
 ) -> None:
     lines = [
-        b"data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}",
-        b"data: {\"choices\":[{\"delta\":{\"content\":\" World\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":7}}",
+        b'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+        b'data: {"choices":[{"delta":{"content":" World"},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":7}}',
     ]
     response = _DummyResponse(lines)
     session = _DummySession(response)
@@ -111,9 +104,5 @@ def test_cli_dry_run_skips_invocation(
     status = stream_probe_module.main(["--dry-run"])
 
     assert status == 0
-    messages = [
-        record.message
-        for record in caplog.records
-        if record.name == "tools.openrouter.stream_probe"
-    ]
+    messages = [record.message for record in caplog.records if record.name == "tools.openrouter.stream_probe"]
     assert messages == ["Dry-run: set OPENROUTER_API_KEY and re-run to invoke OpenRouter probe."]
