@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from enum import Enum
 import logging
 from pathlib import Path
-from typing import cast, TYPE_CHECKING
+from typing import Any, cast, TYPE_CHECKING
 
 from . import errors as core_errors
 from .aggregation_controller import AggregationController
@@ -37,7 +37,7 @@ if hasattr(core_errors, "ParallelExecutionError"):
     )
 else:
     _ParallelExecutionErrorType = ExecutionParallelExecutionError
-    core_errors.ParallelExecutionError = _ParallelExecutionErrorType
+    cast("Any", core_errors).ParallelExecutionError = _ParallelExecutionErrorType
 
 ParallelExecutionError = _ParallelExecutionErrorType
 
