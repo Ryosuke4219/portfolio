@@ -38,7 +38,7 @@
 
 ## Providers
 
-### タスク6: Ollama プロバイダを v0.2 コアへ移植する（進行中）
+### タスク6: Ollama プロバイダを v0.2 コアへ移植する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
@@ -46,13 +46,12 @@
 - 対応状況:
   - `OllamaProvider` が環境変数・設定ファイル・CLI からホストやタイムアウト、自動 Pull の優先順位を解決し、CI/オフライン制御に応じて `ProviderSkip` を返す挙動を含めてコアへ組み込まれた。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L50-L166】
   - `ProviderRequest` のメッセージと `options.*` をチャットペイロードへ取り込み、ストリーミング応答を `ProviderResponse` に正規化する処理を実装した。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L168-L268】
+  - CLI からリテラル指定した API キーを `ProviderRequest.options["api_key"]` に格納し、Ollama へも伝播できるよう CLI パイプラインを整備した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L105】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L224-L258】
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、ストリーミング結合・自動 Pull 無効時の例外・429/5xx 正規化・CI/オフライン分岐を契約テストで担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
-- 残タスク:
-  - CLI リテラル API キー経路: CLI/設定ファイルから `ProviderRequest.options["api_key"]` へ値を渡す経路が未実装。`adapter/cli/app.py` のオプション配線と CLI テストを整備し、OpenRouter との切替でもキーが取り違わないことを確認する。
-  - 実サーバーでのストリーミング透過検証を進め、運用フローに組み込む（Issue Seeds）。【F:04/ROADMAP.md†L61-L62】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI で指定したリテラル API キーが `ProviderRequest.options` へ反映される経路を検証している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L224-L258】
 
-### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（進行中）
+### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
@@ -60,13 +59,10 @@
 - 対応状況:
   - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
-  - CLI からリテラル API キーを渡す経路は未接続で、CLI で指定した値が `ProviderRequest.options["api_key"]` まで届かないギャップが残っている。
+  - CLI からのリテラル API キー指定や設定ファイルの `api_key`/`env` を `ProviderRequest.options["api_key"]` へ結線し、OpenRouter でも CLI からの入力が確実に伝播するようにした。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L105】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L393-L481】
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、API キー/ベース URL 解決、ストリーミング透過、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
-- 残タスク:
-  - CLI リテラル API キー経路: CLI/設定ファイルから `OPENROUTER_API_KEY` と `ProviderRequest.options["api_key"]` を結線し、`projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_auth_env_accepts_literal_api_key` で回帰テストを担保する。
-  - ドキュメント整備: `OPENROUTER_*` のリテラル指定・デフォルト挙動、および `options["api_key"]` 配線の利用手順を CLI ドキュメントと設定テンプレートへ追記し、Shadow との差異を整理する。
-  - OpenRouter 429/5xx 発生統計の収集と Runner バックオフ/RPM 調整指針づくりを継続する。【F:04/ROADMAP.md†L12-L35】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けにリテラル API キーが `ProviderRequest.options` へ反映されることを確認済み。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L451-L481】
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する
 - 対象モジュール:
@@ -77,6 +73,18 @@
   - `ProviderRequest.options` の `openai.*` パラメータを OpenAI API へ透過する共通マッピングを整備し、トークン計測やストリーミング挙動を既存実装と揃える。
   - CLI から `--provider openai` 選択時に上記オプションを指定・検証できるよう入力バリデーションとヘルプを更新し、`pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` を含む CLI テスト群を緑化する。
   - `markdownlint 04/ROADMAP.md` を含む既存のドキュメント整形チェックを通過させ、`docs/spec/v0.2/TASKS.md` の該当節へ進捗リンクを追加する。
+
+### タスク13: Ollama ストリーミング実サーバー検証を運用へ組み込む（未着手）
+- 背景: コア移植後も実サーバーでのストリーミング透過性と運用フロー整備が残課題として挙がっている。【F:04/ROADMAP.md†L61-L62】
+- 完了条件:
+  - 実サーバーを対象に CLI → Provider 実行のストリーミングログを取得し、透過性とレイテンシを確認する手順を整備する。
+  - 運用手順書（Issue Seeds）へ検証フローを追記し、再現手順を共有する。
+
+### タスク14: OpenRouter ドキュメントと 429/5xx ガードを拡充する（未着手）
+- 背景: OpenRouter 429/5xx 発生状況の集計と CLI/API ドキュメントの整備が継続タスクとして残っている。【F:04/ROADMAP.md†L12-L37】
+- 完了条件:
+  - `OPENROUTER_*` リテラル指定と `ProviderRequest.options["api_key"]` 配線手順を CLI/設定テンプレートと README に追記する。
+  - 429/5xx エラーの週次集計を自動化し、Runner バックオフや RPM 調整の指針を文書化する。
 
 ## CLI Request Pipeline
 
