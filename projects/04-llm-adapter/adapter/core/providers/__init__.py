@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import hashlib
 import logging
+import sys
 import time
 from typing import Any
 import warnings
@@ -167,30 +168,41 @@ class ProviderFactory:
         return provider_cls(config)
 
 
+def _register_optional_provider(
+    provider_name: str,
+    provider_cls: type[BaseProvider] | None,
+    attr_name: str,
+) -> None:
+    if provider_cls is None:
+        return
+    ProviderFactory.register(provider_name, provider_cls)
+    setattr(sys.modules[__name__], attr_name, provider_cls)
+
+
+_GeminiProvider: type[BaseProvider] | None = None
 try:  # pragma: no cover - optional依存の存在に応じて処理
-    from .gemini import GeminiProvider
+    from .gemini import GeminiProvider as _GeminiProvider
 except Exception:  # pragma: no cover - 依存不足時は gemini を登録しない
-    GeminiProvider = None  # type: ignore[assignment]
-else:  # pragma: no cover - 実行時に gemini プロバイダを登録
-    ProviderFactory.register("gemini", GeminiProvider)
+    pass
+_register_optional_provider("gemini", _GeminiProvider, "GeminiProvider")
 
+_OpenAIProvider: type[BaseProvider] | None = None
 try:  # pragma: no cover - optional依存の存在に応じて処理
-    from .openai import OpenAIProvider
+    from .openai import OpenAIProvider as _OpenAIProvider
 except Exception:  # pragma: no cover - 依存不足時は openai を登録しない
-    OpenAIProvider = None  # type: ignore[assignment]
-else:  # pragma: no cover - 実行時に openai プロバイダを登録
-    ProviderFactory.register("openai", OpenAIProvider)
+    pass
+_register_optional_provider("openai", _OpenAIProvider, "OpenAIProvider")
 
+_OllamaProvider: type[BaseProvider] | None = None
 try:  # pragma: no cover - optional依存の存在に応じて処理
-    from .ollama import OllamaProvider
+    from .ollama import OllamaProvider as _OllamaProvider
 except Exception:  # pragma: no cover - 依存不足時は ollama を登録しない
-    OllamaProvider = None  # type: ignore[assignment]
-else:  # pragma: no cover - 実行時に ollama プロバイダを登録
-    ProviderFactory.register("ollama", OllamaProvider)
+    pass
+_register_optional_provider("ollama", _OllamaProvider, "OllamaProvider")
 
+_OpenRouterProvider: type[BaseProvider] | None = None
 try:  # pragma: no cover - optional依存の存在に応じて処理
-    from .openrouter import OpenRouterProvider
+    from .openrouter import OpenRouterProvider as _OpenRouterProvider
 except Exception:  # pragma: no cover - 依存不足時は openrouter を登録しない
-    OpenRouterProvider = None  # type: ignore[assignment]
-else:  # pragma: no cover - 実行時に openrouter プロバイダを登録
-    ProviderFactory.register("openrouter", OpenRouterProvider)
+    pass
+_register_optional_provider("openrouter", _OpenRouterProvider, "OpenRouterProvider")
