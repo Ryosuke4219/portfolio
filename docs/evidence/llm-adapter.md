@@ -17,6 +17,7 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 - `llm-adapter` CLI が `adapter/run_compare.py` を通じて複数プロバイダを連続・並列・合意形成モードで呼び出し、共通メトリクスを収集。
 - `adapter/core/runner_execution.py` のランナーがリトライやプロバイダ固有の例外を整理し、比較用のイベントをストリーム出力。
 - `adapter/core/metrics/update.py` と `adapter/core/metrics/models.py` が JSONL メトリクスと派生サマリを構築し、CLI の `--out` で指定した `out/metrics.jsonl` などに追記可能（既定の `adapter/run_compare.py` は `data/runs-metrics.jsonl` に保存）。
+- `projects/04-llm-adapter/adapter/cli/prompt_runner.py` の CLI ランナーを通じて単体プロンプト実行を支援し、`--out` で指示したディレクトリへ追記。
 
 ## Key Artifacts
 
@@ -25,11 +26,12 @@ description: 複数プロバイダの比較・記録・可視化を一括で担�
 - [projects/04-llm-adapter/adapter/core/runner_execution.py](../../projects/04-llm-adapter/adapter/core/runner_execution.py) — プロバイダ実行・リトライ・メトリクス集約の中心ロジック。
 - [projects/04-llm-adapter/adapter/core/metrics/update.py](../../projects/04-llm-adapter/adapter/core/metrics/update.py) — JSONL メトリクス更新ユーティリティ。
 - [projects/04-llm-adapter/adapter/core/metrics/models.py](../../projects/04-llm-adapter/adapter/core/metrics/models.py) — メトリクス構造体とシリアライズモデル。
+- [projects/04-llm-adapter/adapter/cli/prompt_runner.py](../../projects/04-llm-adapter/adapter/cli/prompt_runner.py) — 単発プロンプト実行と JSONL 追記のエントリポイント。
 
 ## How to Reproduce
 
 1. `cd projects/04-llm-adapter` で仮想環境を作成し、`pip install -r requirements.txt` を実行して依存関係を揃える。
-2. `pip install -e .` で CLI をインストールし、`llm-adapter --provider adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して" --out out --json-logs` を実行。`--provider` で単一プロバイダ設定を指定し、`--out` で指定したディレクトリ（例: `out/metrics.jsonl`）へ比較結果が追記される。単体確認では `python -m adapter.core.prompt_runner --provider adapter/config/providers/openai.yaml --prompt "hello" --out out/single` のように `prompt_runner` を直接実行しても同じ `--out` ディレクトリ配下へ追記され、`python adapter/run_compare.py ...` を呼ぶ場合は既定で `data/runs-metrics.jsonl` に出力される。
+2. `pip install -e .` で CLI をインストールし、`llm-adapter --provider adapter/config/providers/openai.yaml --prompt "日本語で1行、自己紹介して" --out out --json-logs` を実行。`--provider` で単一プロバイダ設定を指定し、`--out` で指定したディレクトリ（例: `out/metrics.jsonl`）へ比較結果が追記される。単体確認では `python -m adapter.cli.prompt_runner --provider adapter/config/providers/openai.yaml --prompt "hello" --out out/single` のように `prompt_runner` を直接実行しても同じ `--out` ディレクトリ配下へ追記され、`python adapter/run_compare.py ...` を呼ぶ場合は既定で `data/runs-metrics.jsonl` に出力される。
 3. `pytest -q` を流して CLI・ランナー・メトリクスのユニットテストが通ることを確認。
 
 ## Next Steps
