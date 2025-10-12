@@ -29,12 +29,12 @@
 **成果物**: `run_with_shadow`、`artifacts/runs-metrics.jsonl`(timestamp/provider/latency_ms/token_usage/diff_kind等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、JSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
 
 ## M3 — Provider 実装
-**進捗**: 🟡 OpenRouter 429/5xx 発生状況の週次集計を継続中。CLI ではリテラル指定された API キーが `ProviderRequest.options["api_key"]` へ届かないギャップが残っており、週次集計と同列で対処中。[^provider-registry]
+**進捗**: 🟡 OpenRouter 429/5xx 発生状況の週次集計を継続中。CLI ではリテラル指定した API キーが `ProviderRequest.options["api_key"]` まで届かないギャップが残っており、週次集計と同列で対処中。[^provider-registry]
 **成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了。
 **タスク**:
 - OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。
-- CLI でリテラル指定された OpenRouter API キーが `ProviderRequest.options["api_key"]` に渡る経路（構成読込→`ProviderRequest` 組立）を整備し、ギャップを再現する回帰テストを追加する。
-- OpenRouter 用の env/CLI マッピングと参照ドキュメントを更新し、`OPENROUTER_API_KEY` などのリテラル指定と必須項目の整合を保証する。
+- CLI でリテラル指定された OpenRouter API キーが `ProviderRequest.options["api_key"]` まで透過する経路を整備し、ギャップを再現する回帰テストを追加する。
+- OpenRouter 用の env/CLI マッピングと参照ドキュメントを更新し、`OPENROUTER_API_KEY` などのリテラル指定と必須項目の整合、および `options["api_key"]` 配線手順の明示を保証する。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
