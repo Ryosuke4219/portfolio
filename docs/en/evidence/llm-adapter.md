@@ -14,7 +14,7 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 
 ## Highlights
 
-- The `llm-adapter` CLI invokes comparison modes implemented in `adapter/run_compare.py`, orchestrating sequential, parallel, and consensus runs with shared metrics.
+- The `llm-adapter` CLI routes single-provider executions through `adapter/cli/prompt_runner.py` while comparison modes rely on `adapter/run_compare.py` to orchestrate sequential, parallel, and consensus runs with shared metrics.
 - `adapter/core/runner_execution.py` handles retries and provider-specific exceptions, emitting comparison events for downstream tooling.
 - `adapter/core/metrics/update.py` together with `adapter/core/metrics/models.py` shape JSONL metrics and derived summaries, appending results to paths provided via the CLI `--out` flag such as `out/metrics.jsonl` (while the default in `adapter/run_compare.py` remains `data/runs-metrics.jsonl`).
 - `projects/04-llm-adapter/adapter/cli/prompt_runner.py` powers single prompt executions, appending JSONL metrics into the directory passed via `--out`.
@@ -22,6 +22,7 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 ## Key Artifacts
 
 - [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — Comprehensive CLI usage and configuration reference.
+- [adapter/cli/prompt_runner.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/cli/prompt_runner.py) — Single-provider CLI module responsible for prompt execution and metric emission.
 - [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — CLI comparison modes and their entry point implementation.
 - [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — Central logic covering provider execution, retries, and metric aggregation.
 - [adapter/core/metrics/update.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/update.py) — Utilities that append JSONL metrics and derived summaries.
