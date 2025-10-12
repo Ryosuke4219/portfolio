@@ -86,7 +86,7 @@ llm-adapter --provider adapter/config/providers/openai.yaml \
 
 ### .env の読み込み
 
-Windows で環境変数を毎回設定する手間を省くため、`--env .env` で必要なキーを読み込み可能です。`python-dotenv` が未インストールの場合は、インストール方法を案内します。
+Windows で環境変数を毎回設定する手間を省くため、`--env .env` で必要なキーを読み込み可能です。`python-dotenv` が未インストールの場合は、インストール方法を案内します。`--provider-option api_key=...` など CLI オプションで秘密値を併用した際もログ上では自動マスクされますが、共有前に出力内容を確認してください。
 
 ### エラーメッセージの言語切替
 
@@ -202,6 +202,17 @@ python adapter/run_compare.py \
   --providers adapter/config/providers/openrouter.yaml \
   --prompts datasets/golden/tasks.jsonl
 ```
+
+`.env` を使わず一時的に呼び出す場合は、CLI から直接キーを渡せます。
+
+```bash
+OPENROUTER_API_KEY="sk-..." llm-adapter \
+  --provider adapter/config/providers/openrouter.yaml \
+  --prompt "モデルの動作確認をしたい" \
+  --provider-option api_key="sk-..."
+```
+
+CLI で指定した `api_key` は YAML 内の `options.api_key` を上書きし、`.env` や環境変数 (`OPENROUTER_API_KEY`) から解決した値は Authorization ヘッダとして最優先で利用され、両方未設定の場合のみ YAML 直下の `api_key` が参照されます。
 
 OpenRouter は中継側と先方ベンダーの両方でレート制限が課されるため、`parallel-any` / `parallel-all` などの並列モードでは 429 が発生しやすくなります。必要に応じて `--rpm` を調整し、OpenAI など既存プロバイダの設定と重複しないよう `.env` の API キーを整理してください。
 
