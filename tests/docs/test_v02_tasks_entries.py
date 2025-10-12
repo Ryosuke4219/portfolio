@@ -41,3 +41,14 @@ def test_shadow_dependency_cleanup_task_exists() -> None:
 
     text = _load_tasks_markdown()
     assert "src.llm_adapter" in text, "Shadow 依存除去タスクが記載されていない"
+
+
+def test_tasks_markdown_does_not_reference_removed_cli_diagnostics() -> None:
+    """非存在の CLI diagnostics テストを参照していないか検証する。"""
+
+    text = _load_tasks_markdown()
+    forbidden = "test_cli_single_prompt_diagnostics.py"
+    assert forbidden not in text, (
+        "存在しない CLI diagnostics テストファイルへの参照を docs/spec/v0.2/TASKS.md "
+        "から削除してください"
+    )
