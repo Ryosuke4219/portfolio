@@ -14,13 +14,14 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 
 ## Highlights
 
-- The `llm-adapter` CLI invokes comparison modes implemented in `adapter/run_compare.py`, orchestrating sequential, parallel, and consensus runs with shared metrics.
+- The `llm-adapter` CLI routes single-provider executions through `adapter/cli/prompt_runner.py` while comparison modes rely on `adapter/run_compare.py` to orchestrate sequential, parallel, and consensus runs with shared metrics.
 - `adapter/core/runner_execution.py` handles retries and provider-specific exceptions, emitting comparison events for downstream tooling.
 - `adapter/core/metrics/update.py` together with `adapter/core/metrics/models.py` shape JSONL metrics and derived summaries, appending results to paths provided via the CLI `--out` flag such as `out/metrics.jsonl` (while the default in `adapter/run_compare.py` remains `data/runs-metrics.jsonl`).
 
 ## Key Artifacts
 
 - [README.md](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/README.md) — Comprehensive CLI usage and configuration reference.
+- [adapter/cli/prompt_runner.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/cli/prompt_runner.py) — Single-provider CLI module responsible for prompt execution and metric emission.
 - [adapter/run_compare.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/run_compare.py) — CLI comparison modes and their entry point implementation.
 - [adapter/core/runner_execution.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/runner_execution.py) — Central logic covering provider execution, retries, and metric aggregation.
 - [adapter/core/metrics/update.py](https://github.com/Ryosuke4219/portfolio/blob/main/projects/04-llm-adapter/adapter/core/metrics/update.py) — Utilities that append JSONL metrics and derived summaries.
@@ -29,7 +30,7 @@ the same prompts under production-like conditions, appends diffs, latency, cost,
 ## How to Reproduce
 
 1. `cd projects/04-llm-adapter`, create a virtual environment, and run `pip install -r requirements.txt` to install dependencies.
-2. Install the CLI with `pip install -e .`, then execute `llm-adapter --provider adapter/config/providers/openai.yaml --prompt "Say hello in English" --out out --json-logs`. Use `--provider` to supply a single provider config and `--out` to choose the directory where metrics are appended (e.g., `out/metrics.jsonl`). For a single-provider dry run you can call `python -m adapter.core.prompt_runner --provider adapter/config/providers/openai.yaml --prompt "hello" --out out/single` to run `prompt_runner` directly and append into the same `--out` directory, while `python adapter/run_compare.py ...` keeps defaulting to `data/runs-metrics.jsonl`.
+2. Install the CLI with `pip install -e .`, then execute `llm-adapter --provider adapter/config/providers/openai.yaml --prompt "Say hello in English" --out out --json-logs`. Use `llm-adapter` (or `python adapter/run_compare.py ...`) when benchmarking multiple providers because it writes comparison metrics to `data/runs-metrics.jsonl` by default. For a single-provider dry run invoke `python -m adapter.cli.prompt_runner --provider adapter/config/providers/openai.yaml --prompt "hello" --out out/single` to append metrics into your chosen `--out` directory without engaging comparison runners.
 3. Run `pytest -q` to ensure CLI, runner, and metric modules pass their test suites.
 
 ## Next Steps
