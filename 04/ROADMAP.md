@@ -29,7 +29,7 @@
 **成果物**: `run_with_shadow`、`artifacts/runs-metrics.jsonl`(timestamp/provider/latency_ms/token_usage/diff_kind等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、JSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
 
 ## M3 — Provider 実装
-**進捗**: 🟡 OpenRouter 429/5xx 発生状況の週次集計を継続中。CLI オプション経由で `ProviderRequest.options["api_key"]` へ到達する経路は実装済で、`test_cli_openrouter_accepts_provider_option_api_key` などの回帰テストも緑を維持。[^provider-registry]
+**進捗**: 🟡 OpenRouter 429/5xx 発生状況の週次集計のみ継続中。CLI 側のオプションマージと `ProviderRequest.options["api_key"]` への伝播経路は完了済で、`test_cli_openrouter_accepts_provider_option_api_key` を含む回帰テストも緑を維持。[^provider-registry]
 **成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了。
 **タスク**:
 - OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。
