@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-import tools.openrouter.stream_probe as stream_probe_module
+from tools.openrouter import stream_probe as stream_probe_module
 from tools.openrouter.stream_probe import run_probe
 
 
