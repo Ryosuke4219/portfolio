@@ -24,3 +24,4 @@ provider-google = ["google-genai>=0.3.0"]
 
 [project.scripts]
 llm-adapter = "adapter.cli:main"
+llm-adapter-openrouter-probe = "tools.openrouter.stream_probe:main"
