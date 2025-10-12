@@ -35,7 +35,7 @@ source .venv/bin/activate        # Windows: .\.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Python 3.10+ を想定。仮想環境下で CLI (`adapter/run_compare.py`) やレポート生成ツールを利用します。
+Python 3.10+ を想定。仮想環境下で CLI (`llm-adapter`) やレポート生成ツール、`just` レシピを利用します。
 
 ## CLI クイックスタート
 
@@ -103,55 +103,29 @@ Windows で環境変数を毎回設定する手間を省くため、`--env .env`
 
 `llm-adapter doctor` で Python バージョン・仮想環境・API キー・DNS/HTTPS 接続・エンコーディング・`.env` 依存関係・RPM 上限を一括チェックできます。問題が見つかると ❌ と対処法を 1 行で表示し、終了コード 3 を返します。
 
-### JSONL バッチ実行（CLI 内部処理）
+### JSONL バッチ実行
 
-`--prompts` を指定すると JSONL バッチを実行できます。CLI では `adapter/cli/prompt_runner.execute_prompts` が直接 JSONL を読み込み、単一プロバイダに順次送信します。`adapter/run_compare.py` は複数プロバイダ比較や集約ロジック向けの別ツールです。
-
-### run_compare のモードと集約オプション
-
-`adapter/run_compare.py` は以下の比較モードを提供します。
-
-| `--mode` | 概要 |
-| -------- | ---- |
-| `sequential` | プロバイダを順番に実行（旧 `serial` 相当） |
-| `parallel-any` | 並列実行で最初の成功を採用（旧 `parallel` 相当） |
-| `parallel-all` | 全プロバイダを並列実行し全件を記録 |
-| `consensus` | 複数応答から合意形成を試みる |
-
-追加オプションとして、`--aggregate <strategy>`、`--quorum <n>`、`--tie-breaker <name>`、`--judge <config>`、`--schema <json>` を指定すると、集約・判定のルールを細かく制御できます。レート制御は `--max-concurrency` と `--rpm` で設定してください。
+`--prompts` を指定すると JSONL バッチを実行できます。CLI では `adapter/cli/prompt_runner.execute_prompts` が直接 JSONL を読み込み、単一プロバイダへ順次送信します。`--parallel` を併用すると CPU コア数と `--rpm` に合わせて並列数を自動調整します。
 
 ```bash
-python adapter/run_compare.py \
-  --providers adapter/config/providers/simulated.yaml \
+llm-adapter --provider adapter/config/providers/simulated.yaml \
   --prompts datasets/golden/tasks.jsonl \
-  --mode consensus --aggregate judge --quorum 2 \
-  --judge adapter/config/providers/judge.yaml \
-  --schema examples/schemas/basic_output.json
+  --format jsonl --out artifacts/simulated
 ```
 
-> `--aggregate` などを省略した場合は従来通り単純な応答比較として動作します。
+出力は `artifacts/simulated/metrics.jsonl`（および `artifacts/simulated/logs/` 配下の詳細ログ）として生成されます。`--log-prompts` を付けるとプロンプト本文も JSONL に含まれます。
 
-判定用の設定ファイル `adapter/config/providers/judge.yaml` はリポジトリに含まれており、そのまま利用できます。実案件では次の手順で評価ルールを調整することを推奨します。
+### ゴールデンタスクとレポート生成
 
-1. `cp adapter/config/providers/judge.yaml adapter/config/providers/judge.local.yaml` で複製する（最小構成は `examples/providers/judge.yaml` も参照）。
-2. `prompt_template` に判定観点や出力フォーマットを明記し、比較対象や期待する回答形式に合わせて編集する。
-3. 必要に応じて `model` や `request_kwargs.temperature` などを環境に合わせて変更する。
-
-スキーマが必要な場合は、次のようにサンプルを生成して `examples/schemas/basic_output.json` を参照してください（検証項目は適宜調整）。
+ゴールデンタスクの比較を定期的に回す場合は、上記コマンドで `artifacts/runs-metrics.jsonl` など共通ディレクトリに追記したうえで、`just report` でテスト・カバレッジ・週次サマリをまとめて生成する運用を推奨します。
 
 ```bash
-mkdir -p examples/schemas
-cat <<'JSON' > examples/schemas/basic_output.json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "response": {"type": "string"}
-  },
-  "required": ["response"]
-}
-JSON
+llm-adapter --provider adapter/config/providers/simulated.yaml \
+  --prompts datasets/golden/tasks.jsonl --out artifacts
+just report
 ```
+
+`just report` は Python/Node のテストを実行し、`artifacts/runs-metrics.jsonl` を読み込んで HTML/Markdown レポートを再生成します。個別に CLI のみを検証したい場合は `just python-test` で Python 側のテストスイートだけを走らせられます。
 
 ### Google Gemini を利用する
 
@@ -159,9 +133,9 @@ JSON
 
 ```bash
 export GEMINI_API_KEY="<取得したAPIキー>"
-python adapter/run_compare.py \
-  --providers adapter/config/providers/gemini.yaml \
-  --prompts datasets/golden/tasks.jsonl
+llm-adapter --provider adapter/config/providers/gemini.yaml \
+  --prompts datasets/golden/tasks.jsonl \
+  --format jsonl --out artifacts/gemini
 ```
 
 `adapter/config/providers/gemini.yaml` では `model: gemini-1.5-flash` を既定とし、料金やレートリミットは目安値として記載しています（最新は各社の公式を参照）。追加の `generation_config` や `safety_settings` を調整したい場合は YAML を編集してください。SDK が `safety_settings` 引数を受け付けない旧バージョンでも、自動的に同引数を除外して再試行します。
@@ -172,9 +146,9 @@ OpenAI API を利用する場合は、`OPENAI_API_KEY` を設定し OpenAI 用�
 
 ```bash
 export OPENAI_API_KEY="<取得したAPIキー>"
-python adapter/run_compare.py \
-  --providers adapter/config/providers/openai.yaml \
-  --prompts datasets/golden/tasks.jsonl
+llm-adapter --provider adapter/config/providers/openai.yaml \
+  --prompts datasets/golden/tasks.jsonl \
+  --json-logs --out artifacts/openai
 ```
 
 `adapter/config/providers/openai.yaml` では `model: gpt-4o-mini` を既定とし、Responses API を優先的に呼び出します。旧 Chat Completion API しか利用できない SDK バージョンでも自動的にフォールバックします。料金やレートリミットは目安値です。Azure OpenAI 等でエンドポイントが異なる場合は `endpoint` や `request_kwargs` を適宜上書きしてください。
@@ -185,12 +159,11 @@ python adapter/run_compare.py \
 
 ```bash
 export OLLAMA_BASE_URL="http://127.0.0.1:11434"
-python adapter/run_compare.py \
-  --providers adapter/config/providers/ollama.yaml \
-  --prompts datasets/golden/tasks.jsonl
+llm-adapter --provider adapter/config/providers/ollama.yaml \
+  --prompt "モデルの動作確認をしたい" --parallel
 ```
 
-Ollama はローカル GPU/CPU を直接利用するため、`--parallel` や `--mode parallel-*` を併用するとマシン負荷が急増します。必要に応じて `--max-concurrency` や `--rpm` を下げ、実行中は `ollama list` でモデルの自動ダウンロード状況を確認してください。
+Ollama はローカル GPU/CPU を直接利用するため、`--parallel` を併用するとマシン負荷が急増します。必要に応じて `--rpm` を下げ、実行中は `ollama list` でモデルの自動ダウンロード状況を確認してください。
 
 ### OpenRouter を利用する
 
@@ -198,9 +171,9 @@ OpenRouter 経由で各社モデルへアクセスする場合は、`OPENROUTER_
 
 ```bash
 export OPENROUTER_API_KEY="<取得したAPIキー>"
-python adapter/run_compare.py \
-  --providers adapter/config/providers/openrouter.yaml \
-  --prompts datasets/golden/tasks.jsonl
+llm-adapter --provider adapter/config/providers/openrouter.yaml \
+  --prompts datasets/golden/tasks.jsonl \
+  --format jsonl --out artifacts/openrouter
 ```
 
 `.env` を使わず一時的に呼び出す場合は、CLI から直接キーを渡せます。
@@ -214,7 +187,7 @@ OPENROUTER_API_KEY="sk-..." llm-adapter \
 
 CLI で指定した `api_key` は YAML 内の `options.api_key` を上書きし、`.env` や環境変数 (`OPENROUTER_API_KEY`) から解決した値は Authorization ヘッダとして最優先で利用され、両方未設定の場合のみ YAML 直下の `api_key` が参照されます。
 
-OpenRouter は中継側と先方ベンダーの両方でレート制限が課されるため、`parallel-any` / `parallel-all` などの並列モードでは 429 が発生しやすくなります。必要に応じて `--rpm` を調整し、OpenAI など既存プロバイダの設定と重複しないよう `.env` の API キーを整理してください。
+OpenRouter は中継側と先方ベンダーの両方でレート制限が課されるため、`--parallel` で多数同時実行すると 429 が発生しやすくなります。必要に応じて `--rpm` を調整し、OpenAI など既存プロバイダの設定と重複しないよう `.env` の API キーを整理してください。
 
 ## サンプル設定とプロンプト
 
@@ -232,7 +205,7 @@ OpenRouter は中継側と先方ベンダーの両方でレート制限が課さ
 
 * **事前に `llm-adapter doctor` を実行**: ネットワークや API キー、エンコーディング設定を自動チェックできます。
 * **API キーが未設定**: `RuntimeError` を検出すると、CLI が「環境変数 `<KEY>` を設定してください」と案内します。`.env` に `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` を記載し、`--env .env` で読み込みましょう。
-* **OpenRouter の 401 / 429**: API キーが誤っている、あるいは並列実行が多すぎると発生します。`OPENROUTER_API_KEY` と `OPENROUTER_BASE_URL` を再確認し、`--rpm` や `--mode parallel-*` の設定を見直してください。
+* **OpenRouter の 401 / 429**: API キーが誤っている、あるいは並列実行が多すぎると発生します。`OPENROUTER_API_KEY` と `OPENROUTER_BASE_URL` を再確認し、`--rpm` や `--parallel` の設定を見直してください。
 * **Ollama へ接続できない**: ローカルで `ollama serve` が起動しているか、`OLLAMA_BASE_URL`（未設定なら旧 `OLLAMA_HOST`）が正しいかを確認してください。初回実行でモデルを自動取得中の場合は完了まで待機します。
 * **OpenAI の quota / 429**: `OpenAI quota exceeded` エラー時は、ダッシュボードの請求・使用量・プロジェクトキーのクォータを確認してください。CLI も同旨のメッセージを表示します。
 * **Windows での文字化け**: 冒頭の UTF-8 設定を実施するか、`scripts/windows/setup.ps1` を実行します。
@@ -252,30 +225,23 @@ OpenRouter は中継側と先方ベンダーの両方でレート制限が課さ
 
 ## コマンド一覧
 
-| コマンド                                                                                                                      | 説明                                                         |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `python adapter/run_compare.py --providers adapter/config/providers/simulated.yaml --prompts datasets/golden/tasks.jsonl` | 指定プロバイダ構成とゴールデンタスクを比較実行し、`data/runs-metrics.jsonl` に追記します。 |
-| `python adapter/run_compare.py --providers <a,b> --mode parallel-any --repeat 3 --metrics tmp/metrics.jsonl`              | 複数プロバイダを並列実行し、出力先をカスタマイズします。                               |
-| `python tools/report/metrics/cli.py --metrics data/runs-metrics.jsonl --out reports/index.html`                       | JSONL メトリクスを HTML ダッシュボードに変換します。                           |
-
-> `--budgets` で `adapter/config/budgets.yaml` を差し替えると、実行ごとのコスト上限や停止条件を変更できます。
+| コマンド | 説明 |
+| --- | --- |
+| `llm-adapter --provider adapter/config/providers/simulated.yaml --prompts datasets/golden/tasks.jsonl --format jsonl --out artifacts` | ゴールデンタスクを一括実行し、`artifacts/metrics.jsonl` にメトリクスを追記します。 |
+| `llm-adapter --provider adapter/config/providers/openrouter.yaml --prompt "モデルの動作確認をしたい" --provider-option api_key="sk-..."` | OpenRouter へ単発リクエストを送りつつ、CLI から一時的に認証情報を上書きします。 |
+| `just report` | Node/Python のテストとカバレッジを実行し、`artifacts/runs-metrics.jsonl` を読み込んでレポートを再生成します。 |
 
 ## 代表的な使い方
 
 ```bash
-# 1. 仮想環境を有効化し、サンプル設定で比較実行
-python adapter/run_compare.py \
-  --providers adapter/config/providers/simulated.yaml \
+# 1. サンプル設定でゴールデンタスクを収集
+llm-adapter --provider adapter/config/providers/simulated.yaml \
   --prompts datasets/golden/tasks.jsonl \
-  --repeat 2 \
-  --mode sequential
-# => data/runs-metrics.jsonl に追記（プロジェクト直下に data/ が自動生成されます）
+  --format jsonl --out artifacts
+# => artifacts/metrics.jsonl に追記（初回はディレクトリを自動生成）
 
-# 2. 収集したメトリクスを HTML に変換
-python tools/report/metrics/cli.py \
-  --metrics data/runs-metrics.jsonl \
-  --golden datasets/golden/baseline \
-  --out reports/index.html
+# 2. 収集したメトリクスを HTML / Markdown に変換
+just report
 ```
 
 * 実行ごとのレイテンシ/コスト/トークン数を計測し、`eval.diff_rate` などのメトリクスで決定性を評価します。
@@ -283,8 +249,9 @@ python tools/report/metrics/cli.py \
 
 ## 生成物
 
-* `data/runs-metrics.jsonl` : 1リクエスト=1行のメトリクスログ（既定の追記先）。
-* `reports/index.html` : メトリクスを可視化したダッシュボード（Git管理外）。
+* `artifacts/metrics.jsonl` : CLI の `--out` で追記される 1 リクエスト=1 行のメトリクスログ。
+* `artifacts/runs-metrics.jsonl` : `just report` / CI が参照する集計済みログ（存在しない場合は空扱い）。
+* `reports/index.html` : メトリクスを可視化したダッシュボード（Git 管理外）。
 * `datasets/golden/tasks.jsonl` : ゴールデンタスク定義。`baseline/expectations.jsonl` でプロバイダごとの許容差分を保持。
 * `adapter/config/providers/*.yaml` / `adapter/config/budgets.yaml` : プロバイダ別のシード・料金・レート制限と実行予算設定。
 
