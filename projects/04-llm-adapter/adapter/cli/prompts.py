@@ -241,6 +241,7 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     cli_options: dict[str, str] = {}
     for key, value in option_pairs:
         cli_options[key] = value
+    cli_has_credentials = _has_embedded_credentials(cli_options) if cli_options else False
     if cli_options:
         raw_copy: dict[str, object] = dict(deepcopy(config.raw))
         existing_options = raw_copy.get("options")
@@ -277,6 +278,8 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
             resolved_credentials = True
         if not resolved_credentials and isinstance(raw_mapping, Mapping):
             resolved_credentials = _has_embedded_credentials(raw_mapping)
+        if not resolved_credentials and cli_has_credentials:
+            resolved_credentials = True
     if requires_env and not resolved_credentials:
         message = _msg(lang, "api_key_missing", env=auth_env)
         LOGGER.error(_sanitize_message(message))
