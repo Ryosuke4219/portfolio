@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections.abc import Iterable, Mapping
+from copy import deepcopy
+from dataclasses import replace
 import os
 from pathlib import Path
 import socket
@@ -29,6 +31,16 @@ from .utils import (
 )
 
 ProviderFactory = provider_module.ProviderFactory
+
+
+def _parse_provider_option(value: str) -> tuple[str, str]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("--provider-option は KEY=VALUE 形式で指定してください")
+    key, raw_value = value.split("=", 1)
+    key = key.strip()
+    if not key or raw_value == "":
+        raise argparse.ArgumentTypeError("--provider-option は KEY=VALUE 形式で指定してください")
+    return key, raw_value
 
 
 def _looks_like_env_var_name(value: str) -> bool:
@@ -114,6 +126,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--lang",
         choices=("ja", "en"),
         help="エラーメッセージの言語",
+    )
+    parser.add_argument(
+        "--provider-option",
+        action="append",
+        type=_parse_provider_option,
+        metavar="KEY=VALUE",
+        help="プロバイダ設定の options.* を上書き",
     )
     return parser
 
@@ -217,6 +236,22 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
     except Exception as exc:  # pragma: no cover - 設定ファイル不備
         LOGGER.error(_sanitize_message(str(exc)))
         return EXIT_INPUT_ERROR
+
+    option_pairs: Iterable[tuple[str, str]] = args.provider_option or []
+    cli_options: dict[str, str] = {}
+    for key, value in option_pairs:
+        cli_options[key] = value
+    if cli_options:
+        raw_copy: dict[str, object] = dict(deepcopy(config.raw))
+        existing_options = raw_copy.get("options")
+        merged_options: dict[str, object]
+        if isinstance(existing_options, Mapping):
+            merged_options = dict(deepcopy(existing_options))
+        else:
+            merged_options = {}
+        merged_options.update(cli_options)
+        raw_copy["options"] = merged_options
+        config = replace(config, raw=raw_copy)
 
     auth_env = (config.auth_env or "").strip()
     aliases: list[str] = []
