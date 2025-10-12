@@ -30,16 +30,14 @@ from .runner_execution import (
     SingleRunResult,
 )
 
-ParallelExecutionError = cast(
-    type[Exception],
-    getattr(
-        core_errors,
-        "ParallelExecutionError",
-        ExecutionParallelExecutionError,
-    ),
-)
-if not hasattr(core_errors, "ParallelExecutionError"):
-    setattr(core_errors, "ParallelExecutionError", ParallelExecutionError)
+if hasattr(core_errors, "ParallelExecutionError"):
+    ParallelExecutionError = cast(
+        type[Exception],
+        core_errors.ParallelExecutionError,
+    )
+else:
+    ParallelExecutionError = ExecutionParallelExecutionError
+    core_errors.ParallelExecutionError = ParallelExecutionError
 
 if TYPE_CHECKING:  # pragma: no cover - 型補完用
     from .runner_api import RunnerConfig
