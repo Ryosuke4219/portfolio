@@ -87,3 +87,13 @@ report:
         PYTHONPATH=projects/04-llm-adapter \
         ./.venv/bin/pytest --cov=adapter --cov-report=xml --cov-report=term-missing projects/04-llm-adapter/tests
         just weekly-summary
+
+openrouter-stream-probe *args:
+        set -euo pipefail
+        PYTHONPATH=projects/04-llm-adapter \
+        ./.venv/bin/python -m tools.openrouter.stream_probe "$@"
+
+openrouter-stats *args:
+        set -euo pipefail
+        PYTHONPATH=projects/04-llm-adapter \
+        ./.venv/bin/python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter "$@"
