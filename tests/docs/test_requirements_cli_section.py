@@ -15,5 +15,6 @@ def _load_cli_section() -> str:
 def test_cli_section_mentions_single_provider_requirements() -> None:
     section = _load_cli_section()
     assert "--provider <provider.yaml>" in section
-    assert "--out <dir>" in section
+    assert "`--out <dir>` は任意指定" in section
     assert "`metrics.jsonl` を生成・追記する" in section
+    assert "Typer CLI は `run-compare` サブコマンドを提供しない" in section
