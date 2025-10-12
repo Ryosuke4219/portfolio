@@ -354,13 +354,19 @@ class OpenRouterProvider(BaseProvider):
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         options = request.options or {}
         option_api_key = ""
+        sanitized_option_keys: set[str] = set()
         if isinstance(options, Mapping):
             for key in _OPTION_CREDENTIAL_KEYS:
+                if key not in options:
+                    continue
+                sanitized_option_keys.add(key)
                 raw_value = options.get(key)
                 credential = _normalize_option_credential(raw_value)
-                if credential:
+                if credential and not option_api_key:
                     option_api_key = credential
-                    break
+
+        if sanitized_option_keys:
+            _INTERNAL_OPTION_KEYS.update(sanitized_option_keys)
 
         api_key = self._api_key or option_api_key
         if not api_key:
