@@ -53,9 +53,9 @@ Shadow 版(`projects/04-llm-adapter-shadow/`)は`diff_kind`などの比較指標
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
 ## M4 — Parallel & Consensus
-**進捗**: ✅ `projects/04-llm-adapter/adapter/core/runner_execution_parallel.py`と`aggregation_controller.py`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定と`consensus_vote`イベント記録を実装。比較勝者への差分反映テストもCIで緑。
-**成果物**: `runner_execution_parallel.py`・`AggregationController`・`ConsensusConfig`(多数決/スコア重み/低遅延TB/コスト上限)・合議テスト。
-**Exit Criteria**: N並列勝者決定が決定的(seed固定)、多数決/スコア/低遅延TBを設定切替、影実行併用で差分メトリクスJSONL記録。
+**進捗**: ✅ `projects/04-llm-adapter/adapter/core/runner_execution_parallel.py`と`aggregation_controller.py`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定を実装。`AggregationController.apply` が`RunMetrics.ci_meta`へ`aggregate_mode`・`aggregate_votes`・`consensus`を追記し、比較勝者のメタデータ検証もCIで緑。
+**成果物**: `runner_execution_parallel.py`・`AggregationController`・`ConsensusConfig`(多数決/スコア重み/低遅延TB/コスト上限)・合議メタデータテスト。
+**Exit Criteria**: N並列勝者決定が決定的(seed固定)、多数決/スコア/低遅延TBを設定切替、影実行併用で`ci_meta.aggregate_*`と`consensus`を含むメトリクスJSONL記録。
 **タスク**: 完了（合議アルゴリズム／制約評価／残ジョブ中断を網羅）。
 
 ## M5 — Telemetry & QA Integration
