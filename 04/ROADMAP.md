@@ -26,8 +26,9 @@
 
 ## M2 — Shadow Execution & Metrics
 **進捗**: ✅ `projects/04-llm-adapter/adapter/core/execution/shadow_runner.py`と`_shadow_helpers.py`で比較実行とJSONL検証を整備し、影実行ON/OFF同一性テストを完了。
-**成果物**: `ShadowRunner`経由の影計測、`artifacts/runs-metrics.jsonl`(timestamp/provider/latency_ms/token_usage/diff_kind等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、JSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
-メトリクスは`adapter/core/runner_api.py`の`default_metrics_path()`が指す`projects/04-llm-adapter/data/runs-metrics.jsonl`を既定とし、運用上は`just weekly-summary`が`artifacts/runs-metrics.jsonl`を読み取って週次集計を行う。
+**成果物**: `ShadowRunner`経由の影計測、`artifacts/runs-metrics.jsonl`(ts/run_id/provider/model/status/failure_kind/ci_meta.aggregate_latency_ms/eval.diff_rate等)、TIMEOUT/429/フォーマット不正テスト。 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、`RunMetrics.status`/`failure_kind`/`ci_meta.aggregate_*`/`eval.diff_rate` を用いたJSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
+Shadow 版(`projects/04-llm-adapter-shadow/`)の`diff_kind`や`diff_reason`といった比較専用フィールドは廃止し、`RunMetrics`の実フィールドでプライマリ/影双方の状態を追跡するように統合した。
+メトリクスは`adapter/core/runner_api.py`の`default_metrics_path()`が指す`projects/04-llm-adapter/data/runs-metrics.jsonl`へ書き出し、CIや運用集計ではこれを`artifacts/runs-metrics.jsonl`へ同期して`just weekly-summary`で週次集計・Evidence更新を行う。
 
 ## M3 — Provider 実装
 **進捗**: ✅ OpenRouter 429/5xx 週次集計のバッチとダッシュボード反映を完了し、CLI 〜 Provider 経路のストリーミングプローブも本番導入。`test_cli_openrouter_accepts_provider_option_api_key` など既存回帰も緑を維持。[^provider-registry]
