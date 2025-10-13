@@ -143,7 +143,7 @@ _SENSITIVE_ENV_PATTERNS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "BEARER
 class JsonLogFormatter(logging.Formatter):
     """JSON 形式でログを吐き出すフォーマッタ。"""
 
-    def format(self, record: logging.LogRecord) -> str:  # type: ignore[override]
+    def format(self, record: logging.LogRecord) -> str:
         payload = {
             "level": record.levelname.lower(),
             "message": record.getMessage(),
