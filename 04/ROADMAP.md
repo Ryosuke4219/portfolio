@@ -8,7 +8,7 @@
 | **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `ShadowRunner`経由の影計測 / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（比較実行APIとJSONLスキーマv1を`projects/04-llm-adapter`へ反映） |
 | **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト（OpenRouter 429/5xx 週次集計とストリーミングプローブ運用を完了） | ✅ 完了（OpenRouter 429/5xx 週次集計パイプラインとストリーミングプローブを導入し、Evidence を docs/spec/v0.2/TASKS.md に統合済[^provider-registry]） |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_execution_parallel.py` / `AggregationController` / 合議テスト | ✅ 完了（`runner_execution_parallel.py`と`aggregation_controller.py`で多数決・タイブレーク・差分記録を実装しイベント検証も通過） |
-| **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `projects/04-llm-adapter/tools/report/metrics/weekly_summary.py` / Evidence更新 | ✅ 完了（Shadow側の`metrics.py`/`shadow_metrics.py`でイベント整形とJSONL出力を維持しつつ、OTLP JSONエクスポータを`projects/04-llm-adapter-shadow/src/llm_adapter/metrics_otlp.py`に集約し、週次サマリ生成ツールを`projects/04-llm-adapter`の`just report`へ統合） |
+| **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `projects/04-llm-adapter/tools/report/metrics/weekly_summary.py` / Evidence更新 | ✅ 完了（OTLP JSONエクスポータを`projects/04-llm-adapter-shadow/src/llm_adapter/{metrics_otlp.py,metrics.py,shadow_metrics.py}`で維持しつつ、週次サマリ生成ツールを`projects/04-llm-adapter/tools/report/metrics/{data.py,weekly_summary.py}`へ移行して`just report`から実行） |
 | **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済）[^m6-cli-flow] |
 
 ---
@@ -62,7 +62,7 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 **タスク**: 完了（合議アルゴリズム／制約評価／残ジョブ中断を網羅）。
 
 ## M5 — Telemetry & QA Integration
-**進捗**: ✅ Shadow 側では`projects/04-llm-adapter-shadow/src/llm_adapter/{metrics.py,shadow_metrics.py,metrics_otlp.py}`が引き続き`provider_call`/`run_metric`イベントの収集・整形・OTLP(JSON)変換を担い、コア側は`projects/04-llm-adapter/tools/report/metrics/{data.py,weekly_summary.py}`を`just weekly-summary`/`just report`経由で呼び出して週次サマリ生成とEvidence更新を完結させる構成へ統合。両者はOTLP JSONを境界に連携し、Shadow が計測→変換した成果をコアの`tools.report.metrics`が取り込む運用で安定稼働中。
+**進捗**: ✅ `projects/04-llm-adapter-shadow/src/llm_adapter/metrics_otlp.py`で`provider_call`/`run_metric`イベントをOTLP JSONへ変換し、Shadow 側では補助メトリクス処理（`metrics.py`/`shadow_metrics.py`）も維持。週次レポート生成は`projects/04-llm-adapter/tools/report/metrics/{data,weekly_summary}.py`を`just weekly-summary`/`just report`が直接呼び出す構成へ移行し、集計・Evidence更新はコア側ツールで完結。
 **成果物**: メトリクス→OTLP/JSON変換、`tools/report/metrics/weekly_summary.py`による`docs/weekly-summary.md`自動生成、Evidence更新。
 **Exit Criteria**: ローカル/CIでメトリクスがダッシュボード(または静的HTML)へ反映、Evidence/Weekly Summaryリンク整合、CI緑＋`just report`と`just weekly-summary`が`tools.report.metrics`モジュールを通じてレポート生成。
 **タスク**: 完了（OTLPエクスポータと週次サマリ自動化を導入済）。
