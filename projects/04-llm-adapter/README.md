@@ -148,10 +148,12 @@ OpenAI API を利用する場合は、`OPENAI_API_KEY` を設定し OpenAI 用�
 export OPENAI_API_KEY="<取得したAPIキー>"
 llm-adapter --provider adapter/config/providers/openai.yaml \
   --prompts datasets/golden/tasks.jsonl \
+  --provider-option stream=true \
+  --provider-option timeout=60 \
   --json-logs --out artifacts/openai
 ```
 
-`adapter/config/providers/openai.yaml` では `model: gpt-4o-mini` を既定とし、Responses API を優先的に呼び出します。旧 Chat Completion API しか利用できない SDK バージョンでも自動的にフォールバックします。料金やレートリミットは目安値です。Azure OpenAI 等でエンドポイントが異なる場合は `endpoint` や `request_kwargs` を適宜上書きしてください。
+`adapter/config/providers/openai.yaml` では `model: gpt-4o-mini` を既定とし、Responses API を優先的に呼び出します。`--provider-option` で `stream=true` や `timeout=60` のように SDK 引数を一時的に追加でき、`--model` で Azure 専用モデル名に切り替え可能です。旧 Chat Completion API しか利用できない SDK バージョンでも自動フォールバックします。料金やレートリミットは目安値なので、必要に応じて YAML の `endpoint` や `request_kwargs` を編集してください。
 
 ### Ollama を利用する
 
@@ -160,10 +162,13 @@ llm-adapter --provider adapter/config/providers/openai.yaml \
 ```bash
 export OLLAMA_BASE_URL="http://127.0.0.1:11434"
 llm-adapter --provider adapter/config/providers/ollama.yaml \
-  --prompt "モデルの動作確認をしたい" --parallel
+  --prompt "モデルの動作確認をしたい" \
+  --provider-option stream=true \
+  --provider-option request_timeout_s=120 \
+  --parallel
 ```
 
-Ollama はローカル GPU/CPU を直接利用するため、`--parallel` を併用するとマシン負荷が急増します。必要に応じて `--rpm` を下げ、実行中は `ollama list` でモデルの自動ダウンロード状況を確認してください。
+Ollama はローカル GPU/CPU を直接利用するため、`--parallel` を併用するとマシン負荷が急増します。`--provider-option stream=true` でストリーミングを有効化したり、`request_timeout_s` で待ち時間を延長したりできます。必要に応じて `--rpm` を下げ、実行中は `ollama list` でモデルの自動ダウンロード状況を確認してください。
 
 ### OpenRouter を利用する
 
@@ -173,19 +178,22 @@ OpenRouter 経由で各社モデルへアクセスする場合は、`OPENROUTER_
 export OPENROUTER_API_KEY="<取得したAPIキー>"
 llm-adapter --provider adapter/config/providers/openrouter.yaml \
   --prompts datasets/golden/tasks.jsonl \
+  --provider-option stream=true \
+  --provider-option request_timeout_s=90 \
   --format jsonl --out artifacts/openrouter
 ```
 
-`.env` を使わず一時的に呼び出す場合は、CLI から直接キーを渡せます。
+`.env` を使わず一時的に呼び出す場合は、CLI から直接キーや追加オプションを渡せます。
 
 ```bash
 OPENROUTER_API_KEY="sk-..." llm-adapter \
   --provider adapter/config/providers/openrouter.yaml \
   --prompt "モデルの動作確認をしたい" \
-  --provider-option api_key="sk-..."
+  --provider-option api_key="sk-..." \
+  --provider-option stream=true
 ```
 
-CLI で指定した `api_key` は YAML 内の `options.api_key` を上書きし、`.env` や環境変数 (`OPENROUTER_API_KEY`) から解決した値は Authorization ヘッダとして最優先で利用され、両方未設定の場合のみ YAML 直下の `api_key` が参照されます。
+CLI で指定した `api_key` や `stream` は YAML の `options.*` を上書きし、環境変数 (`OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL`) よりも優先して使用されます。ベース URL を切り替える場合は `OPENROUTER_BASE_URL` か YAML の `base_url`/`endpoint` を調整してください。
 
 OpenRouter は中継側と先方ベンダーの両方でレート制限が課されるため、`--parallel` で多数同時実行すると 429 が発生しやすくなります。必要に応じて `--rpm` を調整し、OpenAI など既存プロバイダの設定と重複しないよう `.env` の API キーを整理してください。
 
@@ -228,7 +236,7 @@ OpenRouter は中継側と先方ベンダーの両方でレート制限が課さ
 | コマンド | 説明 |
 | --- | --- |
 | `llm-adapter --provider adapter/config/providers/simulated.yaml --prompts datasets/golden/tasks.jsonl --format jsonl --out artifacts` | ゴールデンタスクを一括実行し、`artifacts/metrics.jsonl` にメトリクスを追記します。 |
-| `llm-adapter --provider adapter/config/providers/openrouter.yaml --prompt "モデルの動作確認をしたい" --provider-option api_key="sk-..."` | OpenRouter へ単発リクエストを送りつつ、CLI から一時的に認証情報を上書きします。 |
+| `llm-adapter --provider adapter/config/providers/openrouter.yaml --prompt "モデルの動作確認をしたい" --provider-option api_key="sk-..." --provider-option stream=true` | OpenRouter へ単発リクエストを送りつつ、CLI から認証情報とストリーミング設定を上書きします。 |
 | `just report` | Node/Python のテストとカバレッジを実行し、`artifacts/runs-metrics.jsonl` を読み込んでレポートを再生成します。 |
 
 ## 代表的な使い方
