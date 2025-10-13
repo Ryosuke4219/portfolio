@@ -13,6 +13,7 @@ from adapter.core.models import (
     RetryConfig,
 )
 from adapter.core.providers import BaseProvider
+from adapter.core.provider_spi import ProviderRequest
 
 
 @dataclass(slots=True)
@@ -28,14 +29,32 @@ class _StubProvider(BaseProvider):
         super().__init__(config)
         self.last_prompt: str | None = None
 
-    def generate(self, prompt: str) -> _StubProviderResponse:  # type: ignore[override]
-        self.last_prompt = prompt
+    def invoke(self, request: ProviderRequest) -> _StubProviderResponse:  # type: ignore[override]
+        self.last_prompt = request.prompt
         return _StubProviderResponse(
             output_text="judge-result",
             latency_ms=123,
             input_tokens=7,
             output_tokens=11,
         )
+
+
+class _InvokeOnlyProvider(BaseProvider):
+    def __init__(self, config: ProviderConfig) -> None:
+        super().__init__(config)
+        self.last_request: ProviderRequest | None = None
+
+    def invoke(self, request: ProviderRequest) -> _StubProviderResponse:  # type: ignore[override]
+        self.last_request = request
+        return _StubProviderResponse(
+            output_text="judge-result",
+            latency_ms=321,
+            input_tokens=13,
+            output_tokens=17,
+        )
+
+    def generate(self, prompt: str) -> _StubProviderResponse:  # type: ignore[override]
+        raise AssertionError("generate must not be called")
 
 
 @pytest.fixture()
@@ -73,4 +92,19 @@ def test_invoke_prefers_mapping_text(judge_provider_config: ProviderConfig) -> N
     assert response.latency_ms == 123
     assert response.tokens_in == 7
     assert response.tokens_out == 11
+    assert response.raw == {"provider": "stub"}
+
+
+def test_invoke_uses_provider_request_path(judge_provider_config: ProviderConfig) -> None:
+    provider = _InvokeOnlyProvider(judge_provider_config)
+    invoker = _JudgeInvoker(provider, judge_provider_config)
+
+    response = invoker.invoke({"prompt": "request-path"})
+
+    assert provider.last_request is not None
+    assert provider.last_request.prompt == "request-path"
+    assert response.text == "judge-result"
+    assert response.latency_ms == 321
+    assert response.tokens_in == 13
+    assert response.tokens_out == 17
     assert response.raw == {"provider": "stub"}

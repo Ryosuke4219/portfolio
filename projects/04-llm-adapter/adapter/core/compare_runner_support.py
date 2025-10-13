@@ -10,7 +10,7 @@ from .budgets import BudgetManager
 from .compare_runner_support.metrics_builder import RunMetricsBuilder
 from .config import ProviderConfig
 from .metrics.models import BudgetSnapshot
-from .provider_spi import TokenUsage
+from .provider_spi import ProviderRequest, TokenUsage
 from .providers import (
     BaseProvider,
     ProviderFactory,
@@ -118,7 +118,30 @@ class _JudgeInvoker:
                 prompt = request.prompt_text or ""
             elif hasattr(request, "prompt"):
                 prompt = request.prompt or ""
-        response = self._provider.generate(prompt)
+        model = (self._config.model or self._config.provider).strip() or self._config.provider
+        timeout: float | None = None
+        if self._config.timeout_s > 0:
+            timeout = float(self._config.timeout_s)
+        raw_config = self._config.raw
+        options_source = raw_config.get("options") if isinstance(raw_config, Mapping) else None
+        metadata_source = raw_config.get("metadata") if isinstance(raw_config, Mapping) else None
+        options: dict[str, Any] = {}
+        if isinstance(options_source, Mapping):
+            options = dict(options_source)
+        metadata: Mapping[str, Any] | None = None
+        if isinstance(metadata_source, Mapping):
+            metadata = dict(metadata_source)
+        provider_request = ProviderRequest(
+            model=model,
+            prompt=prompt,
+            max_tokens=self._config.max_tokens,
+            temperature=self._config.temperature,
+            top_p=self._config.top_p,
+            timeout_s=timeout,
+            options=options,
+            metadata=metadata,
+        )
+        response = self._provider.invoke(provider_request)
         base_response = _coerce_provider_response(response)
         raw_payload = _merge_raw_payload(base_response.raw, self._config.provider)
         return JudgeProviderResponse(
