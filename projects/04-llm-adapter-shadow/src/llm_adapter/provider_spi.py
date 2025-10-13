@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
 import inspect
 from typing import Any, cast, Protocol
 import warnings
+
+from adapter.core import provider_spi as core_provider_spi
 
 from .utils import (
     ensure_str_list,
@@ -17,30 +18,36 @@ normalize_message = _normalize_message
 extract_prompt_from_messages = _extract_prompt_from_messages
 
 
-@dataclass
-class ProviderRequest:
-    model: str = field(default="")
-    prompt: str = ""
-    messages: Sequence[Mapping[str, Any]] | None = None
-    max_tokens: int | None = 256
-    temperature: float | None = None
-    top_p: float | None = None
-    stop: tuple[str, ...] | None = None
-    timeout_s: float | None = 30
-    metadata: Mapping[str, Any] | None = None
-    options: dict[str, Any] = field(default_factory=dict)
+class ProviderRequest(core_provider_spi.ProviderRequest):
+    def __init__(
+        self,
+        model: str = "",
+        *,
+        prompt: str = "",
+        messages: Sequence[Mapping[str, Any]] | None = None,
+        max_tokens: int | None = 256,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        stop: tuple[str, ...] | None = None,
+        timeout_s: float | None = 30,
+        metadata: Mapping[str, Any] | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            model=model,
+            prompt=prompt,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            stop=stop,
+            timeout_s=timeout_s,
+            metadata=metadata,
+            options=options or {},
+        )
 
     def __post_init__(self) -> None:
-        model = (self.model or "").strip()
-        if not model:
-            raise ValueError("ProviderRequest.model must be a non-empty string")
-        self.model = model
-
-        self.prompt = (self.prompt or "").strip()
-
-        if self.options is None:
-            self.options = {}
-
+        super().__post_init__()
         normalized_messages: list[Mapping[str, Any]] = []
         if self.messages:
             for entry in self.messages:
@@ -70,27 +77,10 @@ class ProviderRequest:
         return self.prompt
 
 
-@dataclass
-class TokenUsage:
-    prompt: int = 0
-    completion: int = 0
-
-    @property
-    def total(self) -> int:
-        return self.prompt + self.completion
+TokenUsage = core_provider_spi.TokenUsage
 
 
-@dataclass(init=False)
-class ProviderResponse:
-    text: str
-    latency_ms: int
-    model: str | None = None
-    finish_reason: str | None = None
-    tokens_in: int | None = None
-    tokens_out: int | None = None
-    raw: Any | None = None
-    _token_usage: TokenUsage = field(init=False, repr=False, compare=False)
-
+class ProviderResponse(core_provider_spi.ProviderResponse):
     def __init__(
         self,
         text: str,
