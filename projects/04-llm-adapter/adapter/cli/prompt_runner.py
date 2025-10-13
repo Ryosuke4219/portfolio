@@ -101,13 +101,14 @@ async def _process_prompt(
         loop = asyncio.get_running_loop()
         start = time.perf_counter()
         try:
-            request = _build_request(prompt, config)
             invoke = getattr(provider, "invoke", None)
             if not callable(invoke):
                 raise TypeError("Provider must implement invoke(request).")
-            response = await loop.run_in_executor(  # type: ignore[arg-type]
-                None, invoke, request
+            request = _build_request(prompt, config)
+            bound_invoke = cast(
+                Callable[[ProviderRequest], ProviderResponse], invoke
             )
+            response = await loop.run_in_executor(None, bound_invoke, request)
         except Exception as exc:  # pragma: no cover - 実 API 呼び出し向けの防御
             latency_ms = int((time.perf_counter() - start) * 1000)
             friendly, error_kind = classify_error(exc, config, lang)

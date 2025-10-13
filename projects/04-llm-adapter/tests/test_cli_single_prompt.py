@@ -88,6 +88,32 @@ def test_cli_errors_when_provider_lacks_invoke(
     assert "invoke(request)" in captured.err
 
 
+def test_cli_errors_when_provider_factory_returns_non_invoke_provider(
+    install_provider, tmp_path: Path, capfd
+) -> None:
+    class NoInvokeProvider:
+        def __init__(self, config):
+            self.config = config
+
+    install_provider(NoInvokeProvider)
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        "provider: fake\nmodel: dummy\nauth_env: NONE\n", encoding="utf-8"
+    )
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "legacy",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == cli_module.EXIT_PROVIDER_ERROR
+    assert "Provider must implement invoke(request)." in captured.err
+
+
 def test_cli_help_smoke() -> None:
     env = os.environ.copy()
     project_root = Path(__file__).resolve().parents[1]
