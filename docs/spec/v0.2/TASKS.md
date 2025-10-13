@@ -78,7 +78,7 @@
 - 完了条件:
   - `ProviderRequest.options` の `openai.*` パラメータを OpenAI API へ透過する共通マッピングを整備し、トークン計測やストリーミング挙動を既存実装と揃える。
   - CLI から `--provider openai` 選択時に上記オプションを指定・検証できるよう入力バリデーションとヘルプを更新し、`pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` を含む CLI テスト群を緑化する。
-  - `markdownlint 04/ROADMAP.md` を含む既存のドキュメント整形チェックを通過させ、`docs/spec/v0.2/TASKS.md` の該当節へ進捗リンクを追加する。
+  - `npx --yes markdownlint-cli2 "04/ROADMAP.md"` を含む既存のドキュメント整形チェックを通過させ、`docs/spec/v0.2/TASKS.md` の該当節へ進捗リンクを追加する（例: `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`）。
 
 ### タスク13: OpenRouter ストリーミング実サーバー検証を運用へ組み込む（対応済み）
 - 対応状況: OpenRouter のストリーミングログをプローブする CLI を `projects/04-llm-adapter/tools/openrouter/stream_probe.py` に集約し、`llm-adapter-openrouter-probe` と `just openrouter-stream-probe` が同一エントリポイントを共有する構成へ統一した。【F:projects/04-llm-adapter/tools/openrouter/stream_probe.py†L1-L105】【F:projects/04-llm-adapter/pyproject.toml†L25-L28】【F:justfile†L91-L95】
@@ -113,7 +113,7 @@
   - `adapter/cli/app.py` の `--provider`/`--model` オプションで Ollama/OpenRouter 固有の `options.*` を指定できるよう、`ProviderRequest` の追加フィールドをマッピングする。
   - CLI で `ProviderRequest.options.*` へ OpenAI など汎用プロバイダ設定を伝播させる残課題を解消し、`projects/04-llm-adapter/adapter/cli/prompt_runner.py` から `ProviderSPI.invoke` まで一貫させる。
   - 現状 `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` と `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` は既存だが、`projects/04-llm-adapter/README.md` の [サンプル設定とプロンプト](../../../projects/04-llm-adapter/README.md#サンプル設定とプロンプト) に揃うよう項目を精査し不足分を補う。
-  - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_fake_provider` を含む CLI 系テストが成功し、`markdownlint docs/spec/v0.2/TASKS.md` も通過する。
+  - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_fake_provider` を含む CLI 系テストが成功し、`npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` も通過する（必要に応じて `npx --yes markdownlint-cli2 "04/ROADMAP.md"` を併用）。
 
 ## Docs & Templates
 
@@ -125,7 +125,7 @@
 - 完了条件:
   - `projects/04-llm-adapter/README.md` の最新情報を保ち、Ollama/OpenRouter のセットアップ手順と API キー環境変数を追記する。
   - `projects/04-llm-adapter/adapter/config/providers/*.yaml` に新規テンプレートを追加し、`just lint` と `pytest projects/04-llm-adapter/tests` を通過させる。
-  - 本タスクリストを更新し、`markdownlint` で整形エラーがないことを確認する。
+  - 本タスクリストを更新し、`npx --yes markdownlint-cli2` で整形エラーがないことを確認する（例: `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`）。
 
 ### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する
 - 対象モジュール:
@@ -157,4 +157,4 @@
 - 完了条件:
   1. 391 行の `prompts.py` が単一ファイルで CLI 解析・環境変数解決・ProviderFactory 呼び出し・結果出力まで抱えている現状をカバーする回帰テストを先に追加し、`run_prompts` の代表的な成功/失敗パス（環境変数未設定・`.env` ロード・`--provider-option` マージなど）を明文化する。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L1-L392】
   2. テスト緑を維持したまま、引数パース・設定マージ・エラーハンドリングをそれぞれ新規モジュールへ切り出し、`prompts.py` 側はエントリポイントとログ設定の薄いラッパーに整理する。段階的に切り替えるため、既存関数から新モジュールを呼ぶ TODO チェックリストを追記し、全項目に ✅ を付けてから旧実装ブロックを削除する。
-  3. 既存 CLI 公開 API（`run_prompts` / `ProviderFactory` / 出力形式）はそのまま維持しつつ、`just lint`・`pytest projects/04-llm-adapter/tests` に加えて `markdownlint docs/spec/v0.2/TASKS.md` を実行し、差分を `docs/spec/v0.2/TASKS.md` の進捗欄へ反映する。
+  3. 既存 CLI 公開 API（`run_prompts` / `ProviderFactory` / 出力形式）はそのまま維持しつつ、`just lint`・`pytest projects/04-llm-adapter/tests` に加えて `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` を実行し、差分を `docs/spec/v0.2/TASKS.md` の進捗欄へ反映する（必要に応じて `npx --yes markdownlint-cli2 "04/ROADMAP.md"` を併用）。
