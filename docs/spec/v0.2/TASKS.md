@@ -124,7 +124,7 @@
   - `docs/spec/v0.2/TASKS.md`
 - 完了条件:
   - `projects/04-llm-adapter/README.md` の最新情報を保ち、Ollama/OpenRouter のセットアップ手順と API キー環境変数を追記する。
-  - `projects/04-llm-adapter/adapter/config/providers/*.yaml` に新規テンプレートを追加し、Python 側は `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/src` → Shadow 向け `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` を通過させる。Node 側に影響する場合は `npm run ci:analyze` まで実行し、`pytest projects/04-llm-adapter/tests` と合わせて CI と同一手順で緑化を確認する。
+  - `projects/04-llm-adapter/adapter/config/providers/*.yaml` に新規テンプレートを追加し、Python 側は `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/adapter` → Shadow 向け `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` を通過させる。Node 側に影響する場合は `npm run ci:analyze` まで実行し、`pytest projects/04-llm-adapter-shadow/tests` と合わせて CI と同一手順で緑化を確認する。
   - 本タスクリストを更新し、`npx --yes markdownlint-cli2` で整形エラーがないことを確認する（例: `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`）。
 
 ### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する
@@ -133,7 +133,7 @@
   - `projects/04-llm-adapter/adapter/**`
 - 完了条件:
   1. Shadow 専用の `src.llm_adapter` 参照をコア側へ移行または削除し、`pyproject.toml` の `known-first-party` や `coverage` 設定から除去する。
-  2. Python 静的解析は `ruff check .` と `mypy --config-file pyproject.toml projects/04-llm-adapter/src`、Shadow 側は `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` を順に通過させる。Node 変更があれば `npm run ci:analyze` で差分の影響を確認し、`pytest projects/04-llm-adapter/tests` まで含めて CI と同等の検証を完了する。
+  2. Python 静的解析は `ruff check .` と `mypy --config-file pyproject.toml projects/04-llm-adapter/adapter`、Shadow 側は `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` を順に通過させる。Node 変更があれば `npm run ci:analyze` で差分の影響を確認し、`pytest projects/04-llm-adapter-shadow/tests` まで含めて CI と同等の検証を完了する。
   3. コア実装へ統合された場合は該当モジュールの import 先を更新し、Shadow 側の同名ファイルに deprecation を残すかどうかを判断する。
 
 ## CLI 実行制御
@@ -157,4 +157,4 @@
 - 完了条件:
   1. 391 行の `prompts.py` が単一ファイルで CLI 解析・環境変数解決・ProviderFactory 呼び出し・結果出力まで抱えている現状をカバーする回帰テストを先に追加し、`run_prompts` の代表的な成功/失敗パス（環境変数未設定・`.env` ロード・`--provider-option` マージなど）を明文化する。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L1-L392】
   2. テスト緑を維持したまま、引数パース・設定マージ・エラーハンドリングをそれぞれ新規モジュールへ切り出し、`prompts.py` 側はエントリポイントとログ設定の薄いラッパーに整理する。段階的に切り替えるため、既存関数から新モジュールを呼ぶ TODO チェックリストを追記し、全項目に ✅ を付けてから旧実装ブロックを削除する。
-  3. 既存 CLI 公開 API（`run_prompts` / `ProviderFactory` / 出力形式）はそのまま維持しつつ、Python 側は `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/src` → Shadow 向け `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` を通過させる。Node 関連差分がある場合は `npm run ci:analyze` を併走し、`pytest projects/04-llm-adapter/tests` と `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`（必要なら `npx --yes markdownlint-cli2 "04/ROADMAP.md"`）で再現性と整形を確認してから進捗欄へ反映する。
+  3. 既存 CLI 公開 API（`run_prompts` / `ProviderFactory` / 出力形式）はそのまま維持しつつ、Python 側は `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/adapter` → Shadow 向け `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` を通過させる。Node 関連差分がある場合は `npm run ci:analyze` を併走し、`pytest projects/04-llm-adapter-shadow/tests` と `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`（必要なら `npx --yes markdownlint-cli2 "04/ROADMAP.md"`）で再現性と整形を確認してから進捗欄へ反映する。
