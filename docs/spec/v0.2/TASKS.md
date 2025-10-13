@@ -100,11 +100,12 @@
   - `projects/04-llm-adapter/adapter/cli/prompt_runner.py`
   - `projects/04-llm-adapter/adapter/core/provider_spi.py`
 - 対応状況:
-  - `prompt_runner.execute_prompts` が CLI から渡された `ProviderConfig` を `_build_request` で `ProviderRequest` に正規化し、`invoke` の同期呼び出し結果を `ProviderResponse` として扱う経路へ移行した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L139】
+  - `prompt_runner.execute_prompts` が CLI から渡された `ProviderConfig` を `_build_request` で `ProviderRequest` に正規化し、プロンプト・オプション・メタデータを統合した上で `invoke` の同期呼び出しへ供給する実装に刷新した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L142】
+  - `ProviderCallExecutor.build_request` が CLI 側で構築した `ProviderRequest` と整合するフィールド（`prompt`/`options`/`metadata`）を生成し、CLI/コア間の API 移行を完了させた。【F:projects/04-llm-adapter/adapter/core/provider_spi.py†L63-L118】
   - `prompts.run_prompts` が `ProviderFactory.create` で得たプロバイダへ `execute_prompts` を介して `ProviderRequest` をまとめて投入し、CLI からのオプション上書きやモデル指定を `ProviderConfig` に反映してから渡す構成へ整理された。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L335-L384】
 - 品質エビデンス:
-  - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` — CLI が `invoke` を必須とし、プロンプト入力・オプション上書き・モデル指定を `ProviderRequest` に集約して渡す経路を検証。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L22-L219】
-  - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor` が `ProviderRequest` を生成して `invoke` へ渡し、`options` や `metadata` を保持する回帰テストを継続。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L71-L139】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` — CLI が `_build_request` で構築した `ProviderRequest` に API キーやプロンプト配列を束ね、`prompt_runner.execute_prompts` が `ProviderResponse` を取得する流れを検証。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L22-L219】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.build_request` が `ProviderRequest` を組み立て `invoke` に引き渡し、`options`/`metadata` の往復整合性を担保する回帰テストを継続。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L71-L139】
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する
 - 対象モジュール:
