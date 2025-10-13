@@ -5,10 +5,12 @@ import asyncio
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import replace
+import json
 import os
 from pathlib import Path
 import socket
 import textwrap
+from typing import Any
 
 from adapter.core import providers as provider_module
 from adapter.core.config import load_provider_config, ProviderConfig
@@ -33,14 +35,18 @@ from .utils import (
 ProviderFactory = provider_module.ProviderFactory
 
 
-def _parse_provider_option(value: str) -> tuple[str, str]:
+def _parse_provider_option(value: str) -> tuple[str, object]:
     if "=" not in value:
         raise argparse.ArgumentTypeError("--provider-option は KEY=VALUE 形式で指定してください")
     key, raw_value = value.split("=", 1)
     key = key.strip()
     if not key or raw_value == "":
         raise argparse.ArgumentTypeError("--provider-option は KEY=VALUE 形式で指定してください")
-    return key, raw_value
+    try:
+        coerced: Any = json.loads(raw_value)
+    except ValueError:
+        coerced = raw_value
+    return key, coerced
 
 
 def _looks_like_env_var_name(value: str) -> bool:
@@ -247,8 +253,8 @@ def run_prompts(argv: list[str] | None, provider_factory: object | None = None) 
         LOGGER.error(_sanitize_message(str(exc)))
         return EXIT_INPUT_ERROR
 
-    option_pairs: Iterable[tuple[str, str]] = args.provider_option or []
-    cli_options: dict[str, str] = {}
+    option_pairs: Iterable[tuple[str, object]] = args.provider_option or []
+    cli_options: dict[str, object] = {}
     for key, value in option_pairs:
         cli_options[key] = value
     cli_has_credentials = _has_embedded_credentials(cli_options) if cli_options else False
