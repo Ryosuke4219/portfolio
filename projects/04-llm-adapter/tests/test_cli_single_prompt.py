@@ -393,6 +393,42 @@ def test_cli_literal_api_key_option(
     assert set(request.options) == {"foo", "api_key"}
 
 
+def test_cli_provider_option_coerces_types(
+    echo_provider, tmp_path: Path, capfd
+) -> None:
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        (
+            "provider: fake\n"
+            "model: dummy\n"
+            "auth_env: NONE\n"
+            "max_tokens: 128\n"
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = cli_module.main(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+            "--provider-option",
+            "stream=true",
+            "--provider-option",
+            "max_tokens=42",
+        ]
+    )
+    captured = capfd.readouterr()
+    assert exit_code == 0
+    assert "echo:hello" in captured.out
+    assert len(echo_provider.requests) == 1
+    request = echo_provider.requests[0]
+    assert request.options["stream"] is True
+    assert request.options["max_tokens"] == 42
+    assert isinstance(request.options["max_tokens"], int)
+
+
 def test_cli_json_without_prompts(echo_provider, tmp_path: Path, capfd) -> None:
     config_path = tmp_path / "provider.yml"
     config_path.write_text(
