@@ -25,7 +25,7 @@
 ### タスク4: v0.2 ブランチの CI エラー種に即応する運用タスク
 - 背景: v0.2 でも `ruff`/`mypy`/`pytest` を厳格に維持する必要があるため、失敗種別ごとの調査・修正タスクを常設する。【F:pyproject.toml†L1-L58】
 - 手順:
-  1. CI が赤くなった場合は該当ログを分類し、`just lint`（静的解析）→`pytest projects/04-llm-adapter/tests`（Pythonコア）→必要に応じて `npm run` 系（Node側）の順でローカル再現する。
+  1. CI が赤くなった場合は該当ログを分類し、静的解析は CI と同じく `ruff check .` と `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` を明示的に実行し、続いて `pytest projects/04-llm-adapter/tests`（Python コア）でローカル再現する。JavaScript 側の Lint が失敗した場合は `npm run lint:js`、Python バイトコード検証が必要なケースは `python -m compileall` を追加で走らせ、CI 手順との差異が出ないようログの差分を確認する。
   2. 失敗原因が新規ケースの場合は再発防止のテスト or Lint ルール追加を別チケット化し、本タスクで暫定修正を行う。
   3. 緑化確認後は CI リンクと修正概要を記録し、既存タスクが解消された場合はクローズする。
 
