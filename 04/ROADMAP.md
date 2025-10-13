@@ -12,7 +12,7 @@
 | **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト（OpenRouter 429/5xx 週次集計とストリーミングプローブ運用を完了） | ✅ 完了（OpenRouter 429/5xx 週次集計パイプラインとストリーミングプローブを導入し、Evidence を docs/spec/v0.2/TASKS.md に統合済[^provider-registry]） |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_parallel` / `ConsensusConfig` / 合議テスト | ✅ 完了（`runner_parallel`と`runner_sync_consensus`で多数決・タイブレーク・差分記録を実装しイベント検証も通過） |
 | **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `docs/weekly-summary.md`自動更新 / Evidence更新 | ✅ 完了（OTLP JSONエクスポータと週次サマリ生成ツールを`projects/04-llm-adapter`の`just report`へ統合） |
-| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（v0.1.0 チェックリストと OpenRouter 運用ガイドを公開し、タグ発行手順を整備済） |
+| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済） |
 
 ---
 
@@ -47,7 +47,7 @@
 **成果物**: メトリクス→OTLP/JSON変換、`tools/`による`docs/weekly-summary.md`自動生成、Evidence更新。 **Exit Criteria**: ローカル/CIでメトリクスがダッシュボード(または静的HTML)へ反映、Evidence/Weekly Summaryリンク整合、CI緑＋`just report`でレポート生成。 **タスク**: 完了（OTLPエクスポータと週次サマリ自動化を導入済）。
 
 ## M6 — CLI/Docs/Release 0.1.0
-**進捗**: ✅ `projects/04-llm-adapter`の`pyproject.toml`と`llm_adapter.__init__`を`0.1.0`へ引き上げ、`CHANGELOG.md`にv0.1.0リリースノートを反映。README/justコマンドのCLI導線を整理し、日本語/英語ドキュメントの差分同期と OpenRouter 運用ガイド（`just openrouter-stats` / `llm-adapter-openrouter-probe`）の整備まで完了。
+**進捗**: ✅ `projects/04-llm-adapter`の`pyproject.toml`と`llm_adapter.__init__`を`0.1.0`へ引き上げ、`CHANGELOG.md`にv0.1.0リリースノートを反映。README/justコマンドのCLI導線を整理し、日本語/英語ドキュメントの差分同期と OpenRouter 運用ガイド（`just openrouter-stats -- --since ...` / `llm-adapter-openrouter-probe`）の整備まで完了。
 **成果物**: `just`/CLI(`setup|test|demo|report|bench`)、README(JP/EN)・サンプル・トラブルシュート、セマンティックバージョン・CHANGELOG・`pyproject.toml`・`docs/releases/v0.1.0.md` チェックリスト。 **Exit Criteria**: `pip install -e . && just demo`で比較実行→JSONL→週次サマリを一気通貫、v0.1.0タグと公開API安定宣言、CI緑＋リリースノートにKnown Issues/Next Steps。 **タスク**: 完了（タグ発行手順と Evidence 更新を `docs/releases/v0.1.0.md` / `docs/spec/v0.2/TASKS.md` に反映済）。
 
 ### 移行メモ（Shadow 由来項目）
