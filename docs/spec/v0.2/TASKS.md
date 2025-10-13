@@ -1,5 +1,7 @@
 # LLM Adapter (Core) — v0.2 タスク分解
 
+> 2025-11-09 更新: v0.1.0 リリースチェックリストと OpenRouter 運用ガイドを追加し、M6 Exit Criteria を満たした。以降は v0.2 タスクとして保守・拡張を継続する。
+
 ## CLI / 入力整備
 
 ### タスク1: `--prompt-file` / `--prompts` のCRLF・BOM対応を強化する（対応済み）
@@ -38,7 +40,7 @@
 
 ## Providers
 
-### タスク6: Ollama プロバイダを v0.2 コアへ移植する（対応済み）
+### タスク6: Ollama プロバイダを v0.2 コアへ移植する（進行中）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
@@ -50,8 +52,11 @@
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` が成功し、ストリーミング結合・自動 Pull 無効時の例外・429/5xx 正規化・CI/オフライン分岐を契約テストで担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
   - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI で指定したリテラル API キーが `ProviderRequest.options` へ反映される経路を検証している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L224-L258】
+- 残タスク:
+  - CLI リテラル API キー経路
+  - ストリーミング透過検証
 
-### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
+### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（進行中）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
@@ -63,6 +68,9 @@
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、`ProviderRequest.options` 経由で付与される認証ヘッダが秘匿されたまま HTTP セッションへ反映され、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
   - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けのリテラル API キーが `ProviderRequest.options` で秘匿されたまま CLI からプロバイダへ伝播することを確認済み。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L451-L481】
+- 残タスク:
+  - CLI リテラル API キー経路
+  - ドキュメント整備
 
 #### 継続課題（Providers）
 - 実サーバーでのストリーミング透過性検証と運用フロー整備（タスク13を参照）。
