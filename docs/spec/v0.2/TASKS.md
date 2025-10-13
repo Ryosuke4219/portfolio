@@ -135,3 +135,26 @@
   1. Shadow 専用の `src.llm_adapter` 参照をコア側へ移行または削除し、`pyproject.toml` の `known-first-party` や `coverage` 設定から除去する。
   2. `just lint` と `pytest projects/04-llm-adapter/tests` が成功する。
   3. コア実装へ統合された場合は該当モジュールの import 先を更新し、Shadow 側の同名ファイルに deprecation を残すかどうかを判断する。
+
+## CLI 実行制御
+
+### タスク15: `prompt_runner` の RateLimiter/実行順序をテストでガードする
+- 対象モジュール:
+  - `projects/04-llm-adapter/adapter/cli/prompt_runner.py`
+  - `projects/04-llm-adapter/tests/test_prompt_runner.py`（新規）
+- 完了条件:
+  1. `RateLimiter.wait` と `execute_prompts` が `rpm` や並列数に従って呼び出しを抑制することを再現するテストを先に追加し、現在の 60 秒ウィンドウ制御（`asyncio.Lock` + `deque`）の境界ケース（`rpm=0`・`rpm=1`・短時間で複数投入）を網羅する。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L23-L196】
+  2. スタブプロバイダを用意し、`execute_prompts` が `PromptResult.index` 順でソートされること、および失敗時に `classify_error` の戻り値が `PromptResult.error_kind` に反映されることを検証する。
+  3. 必要に応じて `prompt_runner` 本体をテスタビリティ向上のために小調整する場合は型注釈を維持しつつ最小差分で行い、`pytest projects/04-llm-adapter/tests/test_prompt_runner.py` → `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` の順で緑化する。
+
+## CLI 実装の再構成
+
+### タスク16: `prompts.run_prompts` を責務単位で分割しテスタビリティを改善する
+- 対象モジュール:
+  - `projects/04-llm-adapter/adapter/cli/prompts.py`
+  - `projects/04-llm-adapter/adapter/cli/` 配下の新規モジュール（例: `args.py` / `config_loader.py` など）
+  - `projects/04-llm-adapter/tests/test_cli_prompts_refactor.py`（新規）
+- 完了条件:
+  1. 391 行の `prompts.py` が単一ファイルで CLI 解析・環境変数解決・ProviderFactory 呼び出し・結果出力まで抱えている現状をカバーする回帰テストを先に追加し、`run_prompts` の代表的な成功/失敗パス（環境変数未設定・`.env` ロード・`--provider-option` マージなど）を明文化する。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L1-L392】
+  2. テスト緑を維持したまま、引数パース・設定マージ・エラーハンドリングをそれぞれ新規モジュールへ切り出し、`prompts.py` 側はエントリポイントとログ設定の薄いラッパーに整理する。段階的に切り替えるため、既存関数から新モジュールを呼ぶ TODO チェックリストを追記し、全項目に ✅ を付けてから旧実装ブロックを削除する。
+  3. 既存 CLI 公開 API（`run_prompts` / `ProviderFactory` / 出力形式）はそのまま維持しつつ、`just lint`・`pytest projects/04-llm-adapter/tests` に加えて `markdownlint docs/spec/v0.2/TASKS.md` を実行し、差分を `docs/spec/v0.2/TASKS.md` の進捗欄へ反映する。
