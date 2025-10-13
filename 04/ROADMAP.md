@@ -77,14 +77,22 @@ Milestones: `M0-SRS`, `M1-CoreRunner`, `M2-ShadowMetrics`, `M3-Providers`, `M4-C
   llm-adapter-srs.md
   ROADMAP.md
   diagrams/
-src/llm_adapter/
-  provider_spi.py
-  runner.py
-  runner_parallel.py
-  providers/
-  shadow.py
-artifacts/runs-metrics.jsonl
-docs/weekly-summary.md
+projects/04-llm-adapter/
+  adapter/
+    core/
+      provider_spi.py
+      runner_execution.py
+      execution/
+        shadow_runner.py
+      providers/
+        __init__.py
+        openai.py ...
+  tools/
+    report/
+      metrics/
+        weekly_summary.py
+artifacts/runs-metrics.jsonl          # テレメトリ集計入力（生成物）
+docs/weekly-summary.md                # just weekly-summary で再生成
 ```
 
 ## 進行管理 (共通DoD)
