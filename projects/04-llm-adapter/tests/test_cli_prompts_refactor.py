@@ -134,3 +134,25 @@ def test_run_prompts_provider_failure(tmp_path: Path) -> None:
     )
 
     assert exit_code == cli_module.EXIT_RATE_LIMIT
+
+
+def test_run_prompts_missing_prompt_sources(
+    echo_provider, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        "provider: fake\nmodel: dummy\nauth_env: NONE\nmax_tokens: 32\n",
+        encoding="utf-8",
+    )
+
+    exit_code = cli_module.run_prompts(
+        [
+            "--provider",
+            str(config_path),
+        ],
+        provider_factory=cli_module.ProviderFactory,
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == cli_module.EXIT_INPUT_ERROR
+    assert "--prompt" in captured.err
