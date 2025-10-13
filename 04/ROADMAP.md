@@ -30,11 +30,12 @@
 
 ## M3 — Provider 実装
 **進捗**: ✅ OpenRouter 429/5xx 週次集計のバッチとダッシュボード反映を完了し、CLI 〜 Provider 経路のストリーミングプローブも本番導入。`test_cli_openrouter_accepts_provider_option_api_key` など既存回帰も緑を維持。[^provider-registry]
-**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了に加え、OpenRouter 429/5xx 週次集計レポートと `projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py` によるHTTP失敗分類CLIの集計検証、`test_openrouter_stream_probe.py` とリアルタイムプローブによるストリーミング確認を成果物として更新。
-**タスク**:
-- OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。
-- CLI でリテラル指定された OpenRouter API キーが `ProviderRequest.options["api_key"]` まで透過する経路を整備し、ギャップを再現する回帰テストを追加する。
-- OpenRouter 用の env/CLI マッピングと参照ドキュメントを更新し、`OPENROUTER_API_KEY` などのリテラル指定と必須項目の整合、および `options["api_key"]` 配線手順の明示を保証する。
+**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了に加え、OpenRouter 429/5xx 週次集計レポートと CLI/API 透過・ストリーミング監視まで本番導入済。
+
+- OpenRouter 429/5xx 週次集計 CLI は [`projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py) の集計検証でカバレッジ。
+- CLI からの API キー透過は [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までの経路を回帰確認。
+- ストリーミングプローブ運用は [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) のリアルタイム検証で監視体制を証跡化。
+**タスク**: 完了。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
