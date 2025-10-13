@@ -32,6 +32,7 @@
 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
 Shadow 版(`projects/04-llm-adapter-shadow/`)は`diff_kind`などの比較指標を保持しつつ、`RunMetrics.shadow_*`フィールドへマッピングしてプライマリ/影双方の状態を共通JSONLへ転記する。
 メトリクスは`adapter/core/runner_api.py`の`default_metrics_path()`が指す`projects/04-llm-adapter/data/runs-metrics.jsonl`へ書き出し、CIや運用集計ではこれを`artifacts/runs-metrics.jsonl`へ同期して`just weekly-summary`で週次集計・Evidence更新を行う。
+JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`projects/04-llm-adapter/adapter/core/metrics/update.py`で維持され、Runner実行時に同モジュール経由で最新項目へ更新される。
 
 ## M3 — Provider 実装
 **進捗**: ✅ OpenRouter 429/5xx 週次集計のバッチとダッシュボード反映を完了し、CLI 〜 Provider 経路のストリーミングプローブも本番導入。`test_cli_openrouter_accepts_provider_option_api_key` など既存回帰も緑を維持。[^provider-registry]
