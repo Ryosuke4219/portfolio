@@ -197,6 +197,12 @@ CLI で指定した `api_key` や `stream` は YAML の `options.*` を上書き
 
 OpenRouter は中継側と先方ベンダーの両方でレート制限が課されるため、`--parallel` で多数同時実行すると 429 が発生しやすくなります。必要に応じて `--rpm` を調整し、OpenAI など既存プロバイダの設定と重複しないよう `.env` の API キーを整理してください。
 
+#### OpenRouter 運用チェックリスト
+
+- `just openrouter-stats --since "2025-10-01" --out artifacts/openrouter` で週次レポートを再生成し、`artifacts/openrouter/http_failures.jsonl` と `summary.md` が更新されることを確認します。`--since` を省略すると全期間の集計になるため、運用では直近 1〜2 週の範囲を指定してください。
+- `llm-adapter-openrouter-probe --dry-run` を実行すると、API キー未設定時の診断メッセージを確認できます。`OPENROUTER_API_KEY` を設定したうえで再実行し、ストリーミング応答が 200 系で返ることと、`tokens_in/out` や遅延のメトリクスがログに出力されることを確認してください。
+- 429/5xx が一定数検出された場合は、`artifacts/openrouter/http_failures.jsonl` の `retryable` フラグと `failure_kind` を確認し、`OPENROUTER_RPM_LIMIT`（`.env`）や CLI の `--rpm` を調整します。OpenRouter 側のレート制限と中継先ベンダーの両方を意識し、API キーや `base_url` を混在させないようにしてください。
+
 ## サンプル設定とプロンプト
 
 * `examples/providers/openai.yml` : OpenAI Responses API 用の最小構成。
