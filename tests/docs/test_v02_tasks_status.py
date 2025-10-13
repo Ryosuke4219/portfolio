@@ -54,12 +54,9 @@ def test_task6_section_reflects_completion() -> None:
     )
 
 
-def test_task7_section_reflects_completion() -> None:
+def test_task7_section_marked_completed() -> None:
     section = _load_task_section(7)
-    _assert_task_in_progress_with_todos(
-        section,
-        required_todos=[
-            "CLI リテラル API キー経路",
-            "ドキュメント整備",
-        ],
-    )
+    lines = section.splitlines()
+    assert lines, "タスク7の節が空です"
+    assert "（対応済み）" in lines[0], "タスク7が対応済みとしてマークされていない"
+    assert all("残タスク" not in line for line in lines), "完了済み節に残タスクが残っている"

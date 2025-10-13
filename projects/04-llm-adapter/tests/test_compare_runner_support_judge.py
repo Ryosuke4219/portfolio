@@ -57,6 +57,26 @@ class _InvokeOnlyProvider(BaseProvider):
         raise AssertionError("generate must not be called")
 
 
+class _InvokeOnlyProviderNoGenerate(BaseProvider):
+    def __init__(self, config: ProviderConfig) -> None:
+        super().__init__(config)
+        self.last_request: ProviderRequest | None = None
+
+    def __getattribute__(self, name: str) -> object:  # type: ignore[override]
+        if name == "generate":
+            raise AttributeError("generate is intentionally unavailable")
+        return super().__getattribute__(name)
+
+    def invoke(self, request: ProviderRequest) -> _StubProviderResponse:  # type: ignore[override]
+        self.last_request = request
+        return _StubProviderResponse(
+            output_text="judge-result",
+            latency_ms=777,
+            input_tokens=19,
+            output_tokens=23,
+        )
+
+
 @pytest.fixture()
 def judge_provider_config(tmp_path_factory: pytest.TempPathFactory) -> ProviderConfig:
     path = tmp_path_factory.mktemp("cfg") / "provider.yaml"
@@ -107,4 +127,20 @@ def test_invoke_uses_provider_request_path(judge_provider_config: ProviderConfig
     assert response.latency_ms == 321
     assert response.tokens_in == 13
     assert response.tokens_out == 17
+    assert response.raw == {"provider": "stub"}
+
+
+def test_invoke_handles_provider_without_generate(judge_provider_config: ProviderConfig) -> None:
+    provider = _InvokeOnlyProviderNoGenerate(judge_provider_config)
+    invoker = _JudgeInvoker(provider, judge_provider_config)
+
+    response = invoker.invoke({"text": "request-path"})
+
+    assert not hasattr(provider, "generate")
+    assert provider.last_request is not None
+    assert provider.last_request.prompt == "request-path"
+    assert response.text == "judge-result"
+    assert response.latency_ms == 777
+    assert response.tokens_in == 19
+    assert response.tokens_out == 23
     assert response.raw == {"provider": "stub"}

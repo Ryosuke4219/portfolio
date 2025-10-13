@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import sys
 
-from src.llm_adapter.errors import ProviderSkip
-from src.llm_adapter.metrics import (
+from llm_adapter.errors import ProviderSkip
+from llm_adapter.metrics import (
     PrometheusMetricsExporter,
     register_metrics_exporter,
 )
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.factory import provider_from_environment
-from src.llm_adapter.runner import Runner
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.factory import provider_from_environment
+from llm_adapter.runner import Runner
 
 
 def _resolve_model_name(provider) -> str:
