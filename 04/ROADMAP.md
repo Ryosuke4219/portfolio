@@ -4,7 +4,7 @@
 | Milestone | Week (JST) | 目的 | 主な成果物 | 進捗 |
 | --- | --- | --- | --- | --- |
 | **M0 — SRS確定 & 骨子固定** | Week40: 2025-09-29〜10-05 | SRS最終化 | `04/llm-adapter-srs.md`最終版 / 参照アーキ図 / M1〜M6 Exit Criteria | ✅ 完了（2025-10-04 SRS v1.0確定・用語集統合完了） |
-| **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / `SequentialAttemptExecutor` / 最小UT | ✅ 完了（`projects/04-llm-adapter/adapter/core/runner_execution_attempts.py`でSPI型と直列Executorテストを確定） |
+| **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / `SequentialAttemptExecutor` / 最小UT | ✅ 完了（`projects/04-llm-adapter/tests/runner_retry/test_rate_limit_failover.py`でレート制限リトライとフォールバック遷移を検証済） |
 | **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `ShadowRunner`経由の影計測 / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（比較実行APIとJSONLスキーマv1を`projects/04-llm-adapter`へ反映） |
 | **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト（OpenRouter 429/5xx 週次集計とストリーミングプローブ運用を完了） | ✅ 完了（OpenRouter 429/5xx 週次集計パイプラインとストリーミングプローブを導入し、Evidence を docs/spec/v0.2/TASKS.md に統合済[^provider-registry]） |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_execution_parallel.py` / `AggregationController` / 合議テスト | ✅ 完了（`runner_execution_parallel.py`と`aggregation_controller.py`で多数決・タイブレーク・差分記録を実装しイベント検証も通過） |
@@ -20,7 +20,7 @@
 **タスク**: 用語集統合 / 例外→共通例外マップ表追加 / JSONLスキーマv1＋後方互換方針記述。
 
 ## M1 — Core SPI & Runner
-**進捗**: ✅ ProviderSPI型・例外マッピング・`SequentialAttemptExecutor`のUTを`projects/04-llm-adapter/adapter/core/runner_execution_attempts.py`で整備済。
+**進捗**: ✅ ProviderSPI型・例外マッピング・`SequentialAttemptExecutor`のUTを`projects/04-llm-adapter/tests/runner_retry/test_rate_limit_failover.py`（トークンバケット呼び出し回数とリトライ上限後の次プロバイダ移行を検証）で整備済。
 **成果物**: ProviderSPI/Request/Responseの安定化(`model`必須)・直列Executor・例外マッピングUT。
 **Exit Criteria**: 1次失敗時に2次以降へ確実委譲、共通例外マップ整合、CI緑＋README最小例(`just test`)。
 **タスク**: `ProviderRequest.model`必須化 / 例外→Timeout・RateLimit・Retriable・ProviderSkip整合 / 直列Executor成功・失敗・フェイルオーバーテスト。
