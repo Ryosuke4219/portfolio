@@ -1,33 +1,18 @@
----
-layout: default
-title: Weekly QA Summary — 2025-09-23
-description: 直近7日間のQA状況サマリ
----
+# LLM Adapter 週次サマリ
 
-# Weekly QA Summary — 2025-09-23
+## 2025-10-13 時点の失敗サマリ
 
-## Overview (last 7 days)
-- TotalTests: 126
-- PassRate: 100.00%
-- NewDefects: 0
-- TopFailureKinds: -
+- 失敗総数: 3
 
-## Top Flaky (score)
-| Rank | Canonical ID | Attempts | p_fail | Score |
-|-----:|--------------|---------:|------:|------:|
-| - | データなし | 0 | 0.00 | 0.00 |
+| Rank | Failure Kind | Count |
+| ---: | :----------- | ----: |
+| 1 | rate_limit | 1 |
+| 2 | http_5xx | 1 |
+| 3 | timeout | 1 |
 
-## Week-over-Week
-- PassRate Δ: N/A
-- Entered: なし
-- Exited: なし
+### OpenRouter HTTP Failures
 
-## Notes
-- PassRate: 100.00% (過去週データ不足)
-
-<details><summary>Method</summary>
-データソース: projects/03-ci-flaky/data/runs.jsonl / projects/03-ci-flaky/data/flaky_rank.csv / 欠陥: docs/defect-report-sample.md
-期間: 直近7日 / 比較対象: その前の7日
-再計算: 毎週月曜 09:00 JST (GitHub Actions)
-</details>
-
+| Rank | 種別 | Count | Rate% |
+| ---: | :---- | ----: | ----: |
+| 1 | RateLimitError (429) | 1 | 50.0 |
+| 2 | RetriableError (5xx) | 1 | 50.0 |
