@@ -23,10 +23,11 @@ Classifier = Callable[[Exception, ProviderConfig, str], tuple[str, str]]
 class RateLimiter:
     """簡易 RPM 制御。"""
 
-    def __init__(self, rpm: int) -> None:
+    def __init__(self, rpm: int, *, monotonic: Callable[[], float] | None = None) -> None:
         self._rpm = max(0, int(rpm or 0))
         self._timestamps: deque[float] = deque()
         self._lock = asyncio.Lock()
+        self._monotonic = monotonic or time.monotonic
 
     async def wait(self) -> None:
         if self._rpm <= 0:
@@ -34,7 +35,7 @@ class RateLimiter:
         window = 60.0
         while True:
             async with self._lock:
-                now = time.monotonic()
+                now = self._monotonic()
                 while self._timestamps and now - self._timestamps[0] >= window:
                     self._timestamps.popleft()
                 if len(self._timestamps) < self._rpm:
