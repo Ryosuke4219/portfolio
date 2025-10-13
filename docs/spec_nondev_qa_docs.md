@@ -169,67 +169,71 @@ REQ-REPORT-001,JUnitを解析して失敗傾向を把握できる,M,M,T-03-REPOR
 
 ### E4. 週次自動サマリ（`/docs/weekly-summary.md`）
 
-**目的**: 通過率／新規欠陥／Top失敗原因を自動集計し継続運用の姿を提示
+**目的**: LLM Adapter の失敗傾向・HTTP 障害を自動集計し継続運用の姿を提示
 
 #### 入力データ
 
-- `projects/03-ci-flaky/data/runs.jsonl`
-- `projects/03-ci-flaky/out/flaky_rank.csv`
-- 必要に応じて `junit/**/*.xml`
+- `artifacts/runs-metrics.jsonl`（`just report` / テレメトリ収集フローで生成）
+- 任意: OpenRouter HTTP 失敗率などメタ情報（`runs-metrics.jsonl` に含まれる）
 
-#### 指標（過去7日, デフォルト）
+#### 集計項目
 
-- `TotalTests`: 試行数（skipped除外）
-- `PassRate`: pass / (pass+fail+error)
-- `NewDefects`: 7日以内に作成された欠陥件数
-- `TopFailureKinds`: `failure_kind` 上位3
-- `TopFlaky`: score上位5（ID, score, attempts, p_fail）
+- `FailureTotal`: 失敗総数（`failure_kind` が付与されたイベントの件数）
+- `FailureSummary`: 失敗種別ごとの上位3件（rank, kind, count）
+- `OpenRouterHttpFailures`: OpenRouter プロバイダーで発生した HTTP 障害（RateLimit/Retriable の件数・割合）
 
 #### 出力テンプレート
 
 ```md
-# Weekly QA Summary — <YYYY-MM-DD>
+# LLM Adapter 週次サマリ
 
-## Overview (last 7 days)
-- TotalTests: <N>
-- PassRate: <xx.xx%>
-- NewDefects: <N>
-- TopFailureKinds: <timeout N> / <guard_violation M> / <infra K>
+## <YYYY-MM-DD> 時点の失敗サマリ
+- 失敗総数: <N>  # 失敗が無い場合: 「失敗は記録されていません。」
 
-## Top Flaky (score)
-| Rank | Canonical ID | Attempts | p_fail | Score |
-|-----:|--------------|---------:|------:|------:|
-| 1 | <id> | 20 | 0.40 | 0.74 |
-| ... | ... | ... | ... | ... |
+| Rank | Failure Kind | Count |
+| ---: | :----------- | ----: |
+| 1 | <failure_kind> | <count> |
+| ... | ... | ... |
 
-## Notes
-- <任意メモ：改善・観測事項・次アクション>
+### OpenRouter HTTP Failures  # 対象データが無い場合はセクション非表示
+
+| Rank | 種別 | Count | Rate% |
+| ---: | :---- | ----: | ----: |
+| 1 | <category or label> | <count> | <rate> |
+```
 
 <details><summary>Method</summary>
-データソース: runs.jsonl, flaky_rank.csv / 期間: 直近7日 / 再計算: 毎週月曜 09:00 JST
+`just weekly-summary` が `PYTHONPATH=projects/04-llm-adapter` で `tools.report.metrics.data` を用い、
+`artifacts/runs-metrics.jsonl` から失敗種別サマリと OpenRouter HTTP 失敗を抽出し、
+`tools.report.metrics.weekly_summary.update_weekly_summary` へ渡して Markdown を追記する。
+生成ファイルは既存エントリ（`## <日付>`）を保持したまま、最新日付のブロックを末尾に追加する。
 </details>
-```
 
 #### 自動生成要件
 
-- 週1回（例: 月曜 09:00 JST）に再生成しコミット
-- 過去2週分の差分（PassRate増減、TopFlaky入れ替わり）を簡易表示
-- 入力ファイルが存在しない場合でも失敗せず、前回内容を保持したまま更新日時のみ差し替え
+- 週1回（例: 月曜 09:00 JST）に `just weekly-summary` を実行しコミット
+- `docs/weekly-summary.md` 末尾に最新日付のブロックを追加し、過去ブロックは維持
+- `artifacts/runs-metrics.jsonl` が無い場合も失敗せず、「失敗は記録されていません。」と記録
 
 #### CLI仕様
 
 ```
-weekly_summary.py
-  --runs <path to runs.jsonl>
-  --flaky <path to flaky_rank.csv>
-  --out  <path to weekly-summary.md>
-  --days <int, default=7>
+just weekly-summary
+  # 内部で tools.report.metrics.data / weekly_summary を呼び出し、
+  # artifacts/runs-metrics.jsonl → docs/weekly-summary.md を更新
+
+python -m tools.report.metrics.cli \
+  --metrics artifacts/runs-metrics.jsonl \
+  --out reports/index.html \
+  --weekly-summary docs/weekly-summary.md
 ```
 
 **DoD**
 
-- `docs/weekly-summary.md` を自動生成し直近2週の差分を確認可能
-- 入力欠如時もエラーにならず、直前の内容を保持した上で更新日時を差し替える
+- `docs/weekly-summary.md` に `# LLM Adapter 週次サマリ` が存在し、末尾ブロックが `## <YYYY-MM-DD> 時点の失敗サマリ`
+- 失敗があれば順位付き表、無ければ「失敗は記録されていません。」を出力
+- OpenRouter HTTP 失敗が存在する場合は `### OpenRouter HTTP Failures` 表を含む
+- 入力欠如時もエラーにならず、最新ブロックが追加される
 
 ---
 
@@ -252,7 +256,7 @@ weekly_summary.py
 - **E1**: A4・1枚、数値基準付きQuality Gates、RTMリンク有効
 - **E2**: 10行以上、`01〜03` のテストIDを10件以上、EvidenceLink有効
 - **E3**: テンプレ＋具体例1件、証拠リンク有効
-- **E4**: Actionsで週次自動更新、直近2週差分が確認できる
+- **E4**: Actionsで週次自動更新し、最新ブロックに失敗サマリ／HTTP障害を記録
 
 ---
 
@@ -273,7 +277,8 @@ weekly_summary.py
   ├─ rtm.csv
   ├─ defect-report-sample.md
   ├─ weekly-summary.md
-/tools/
+/projects/04-llm-adapter/tools/report/metrics/
+  ├─ cli.py
   └─ weekly_summary.py
 /assets/
   └─ ...
