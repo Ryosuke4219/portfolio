@@ -27,10 +27,10 @@
 
 ## M2 — Shadow Execution & Metrics
 **進捗**: ✅ `projects/04-llm-adapter/adapter/core/execution/shadow_runner.py`と`_shadow_helpers.py`で比較実行とJSONL検証を整備し、実行ON/OFF同一性テストを完了。
-**成果物**: `ShadowRunner`経由の影計測、`artifacts/runs-metrics.jsonl`(ts/run_id/provider/model/status/failure_kind/shadow_provider_id/shadow_status/shadow_latency_ms/ci_meta.aggregate_mode・aggregate_strategy・aggregate_votes・consensus/eval.diff_rate等)、TIMEOUT/429/フォーマット不正テスト。
+**成果物**: `ShadowRunner`経由の影計測、`artifacts/runs-metrics.jsonl`(ts/run_id/provider/model/status/failure_kind/shadow_provider_id/shadow_status/shadow_latency_ms/shadow_outcome/shadow_error_message/ci_meta.aggregate_mode・aggregate_strategy・aggregate_votes・consensus/eval.diff_rate等)、TIMEOUT/429/フォーマット不正テスト。
 **Exit Criteria**: 影実行ON/OFFでプライマリ応答不変、`RunMetrics.status`/`failure_kind`/`ci_meta.aggregate_*`/`eval.diff_rate` を用いたJSONLスキーマ検証通過、破壊変更時にスキーマバージョン更新。
 **タスク**: 比較並走のキャンセル/タイムアウト安全化 / JSONL追記リトライ / スキーマ検証とE2Eデモ。
-Shadow 版(`projects/04-llm-adapter-shadow/`)は`diff_kind`などの比較指標を保持しつつ、`RunMetrics.shadow_*`フィールドへマッピングしてプライマリ/影双方の状態を共通JSONLへ転記する。
+Shadow 版(`projects/04-llm-adapter-shadow/`)は`diff_kind`などの比較指標を保持しつつ、`RunMetrics.shadow_*`フィールド（`shadow_outcome`/`shadow_error_message`含む）へマッピングしてプライマリ/影双方の状態を共通JSONLへ転記する。
 メトリクスは`adapter/core/runner_api.py`の`default_metrics_path()`が指す`projects/04-llm-adapter/data/runs-metrics.jsonl`へ書き出し、CIや運用集計ではこれを`artifacts/runs-metrics.jsonl`へ同期して`just weekly-summary`で週次集計・Evidence更新を行う。
 
 ## M3 — Provider 実装
