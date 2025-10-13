@@ -9,7 +9,7 @@
 | **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト（OpenRouter 429/5xx 週次集計とストリーミングプローブ運用を完了） | ✅ 完了（OpenRouter 429/5xx 週次集計パイプラインとストリーミングプローブを導入し、Evidence を docs/spec/v0.2/TASKS.md に統合済[^provider-registry]） |
 | **M4 — Parallel & Consensus** | Week43: 10-20〜10-26 | 並列実行＋合議 | `runner_execution_parallel.py` / `AggregationController` / 合議テスト | ✅ 完了（`runner_execution_parallel.py`と`aggregation_controller.py`で多数決・タイブレーク・差分記録を実装しイベント検証も通過） |
 | **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `projects/04-llm-adapter/tools/report/metrics/weekly_summary.py` / Evidence更新 | ✅ 完了（OTLP JSONエクスポータを`projects/04-llm-adapter-shadow/src/llm_adapter/metrics_otlp.py`に集約し、週次サマリ生成ツールを`projects/04-llm-adapter`の`just report`へ統合） |
-| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済） |
+| **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済）[^m6-cli-flow] |
 
 ---
 
@@ -52,6 +52,8 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 **タスク**: 完了。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
+
+[^m6-cli-flow]: CLI は [`projects/04-llm-adapter/adapter/cli/prompt_runner.py`](../projects/04-llm-adapter/adapter/cli/prompt_runner.py) で `ProviderRequest` を構築し `ProviderSPI.invoke` を呼び出す流れを採用し、[`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) で同経路を回帰確認している。代表テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_errors_when_provider_lacks_invoke` / `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_invokes_provider_with_request`。
 
 ## M4 — Parallel & Consensus
 **進捗**: ✅ `projects/04-llm-adapter/adapter/core/runner_execution_parallel.py`と`aggregation_controller.py`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定を実装。`AggregationController.apply` が`RunMetrics.ci_meta`へ`aggregate_mode`・`aggregate_votes`・`consensus`を追記し、比較勝者のメタデータ検証もCIで緑。
