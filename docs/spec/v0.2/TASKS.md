@@ -31,7 +31,8 @@
 
 ## Refactoring
 
-### タスク5: `runner_execution.py` を責務単位で分割し可読性を向上させる
+### タスク5: `runner_execution.py` を責務単位で分割し可読性を向上させる（未完了）
+- 進捗: 未着手。v0.2 でのリファクタリング計画のみ策定済み。
 - 背景: `RunnerExecution` は 280 行超の大型クラスで、プロバイダ呼び出し・シャドウ制御・メトリクス生成・スキーマ検証が一箇所に詰め込まれている。【F:projects/04-llm-adapter/adapter/core/runner_execution.py†L1-L276】 保守性向上のため責務分割が必要。
 - 手順:
   1. 既存ユニットテストを調査し、`SequentialAttemptExecutor`/`ParallelAttemptExecutor` の振る舞いをカバーする回帰テスト（不足していれば追加）を先に用意する。
@@ -70,7 +71,8 @@
 - 実サーバーでのストリーミング透過性検証と運用フロー整備（タスク13を参照）。
 - OpenRouter 429/5xx 発生状況の集計とドキュメント拡充（タスク14を参照）。
 
-### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する
+### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（未完了）
+- 進捗: 未着手。`ProviderRequest.options` 伝播と CLI 検証が未完。
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openai.py`
   - `projects/04-llm-adapter/adapter/config/providers/openai.yaml`
@@ -107,7 +109,8 @@
   - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` — CLI が `_build_request` で構築した `ProviderRequest` に API キーやプロンプト配列を束ね、`prompt_runner.execute_prompts` が `ProviderResponse` を取得する流れを検証。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L22-L219】
   - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.build_request` が `ProviderRequest` を組み立て `invoke` に引き渡し、`options`/`metadata` の往復整合性を担保する回帰テストを継続。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L71-L139】
 
-### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する
+### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する（未完了）
+- 進捗: 未着手。CLI オプションと `ProviderRequest` マッピングが未整備。
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/cli/app.py`
   - `projects/04-llm-adapter/adapter/cli/utils.py`
@@ -120,7 +123,8 @@
 
 ## Docs & Templates
 
-### タスク10: コア README と設定テンプレートを v0.2 用に同期する
+### タスク10: コア README と設定テンプレートを v0.2 用に同期する（未完了）
+- 進捗: 未着手。README・設定テンプレートの更新が未反映。
 - 対象モジュール:
   - `projects/04-llm-adapter/README.md`
   - `projects/04-llm-adapter/adapter/config/providers/*.yaml`
@@ -130,7 +134,8 @@
   - `projects/04-llm-adapter/adapter/config/providers/*.yaml` に新規テンプレートを追加し、Python/Node の静的解析は CI と同じ順序で `npm run lint:js` → `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/adapter` → `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` → `python -m compileall projects/04-llm-adapter-shadow` を通過させる。Node 側に影響する場合は `npm run ci:analyze` まで実行し、`pytest projects/04-llm-adapter-shadow/tests` と合わせて CI と同一手順で緑化を確認する。
   - 本タスクリストを更新し、`npx --yes markdownlint-cli2` で整形エラーがないことを確認する（例: `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`）。
 
-### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する
+### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する（未完了）
+- 進捗: 未着手。依存除去と CI 手順の緑化確認が未実行。
 - 対象モジュール:
   - `pyproject.toml`
   - `projects/04-llm-adapter/adapter/**`
@@ -141,7 +146,8 @@
 
 ## CLI 実行制御
 
-### タスク15: `prompt_runner` の RateLimiter/実行順序をテストでガードする
+### タスク15: `prompt_runner` の RateLimiter/実行順序をテストでガードする（未完了）
+- 進捗: 未着手。RateLimiter の境界テストが未追加。
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/cli/prompt_runner.py`
   - `projects/04-llm-adapter/tests/test_prompt_runner.py`（新規）
@@ -152,7 +158,8 @@
 
 ## CLI 実装の再構成
 
-### タスク16: `prompts.run_prompts` を責務単位で分割しテスタビリティを改善する
+### タスク16: `prompts.run_prompts` を責務単位で分割しテスタビリティを改善する（未完了）
+- 進捗: 未着手。回帰テストとファイル分割が未実施。
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/cli/prompts.py`
   - `projects/04-llm-adapter/adapter/cli/` 配下の新規モジュール（例: `args.py` / `config_loader.py` など）
