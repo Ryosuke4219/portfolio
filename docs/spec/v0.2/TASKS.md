@@ -113,12 +113,10 @@
 ## Docs & Templates
 
 ### タスク10: コア README と設定テンプレートを v0.2 用に同期する（対応済み）
-- 対応状況: README・テンプレート双方を v0.2 の Ollama/OpenRouter 手順に合わせて更新し、CLI からの追加オプション伝播手順も反映した。
-- 対象モジュール:
-  - `projects/04-llm-adapter/README.md` — Ollama の `--provider-option` 例と OpenRouter の `.env`/CLI 併用手順、運用チェックリストを追記した。【F:projects/04-llm-adapter/README.md†L160-L205】
-  - `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` — ローカル向けの既定エンドポイントやレート制御をテンプレート化した。【F:projects/04-llm-adapter/adapter/config/providers/ollama.yaml†L1-L22】
-  - `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` — API キー/ベース URL のエイリアスと推奨オプションをテンプレート化した。【F:projects/04-llm-adapter/adapter/config/providers/openrouter.yaml†L1-L27】
-- 検証テスト: `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` でタスクリストの整形を確認済み（本タスクの確認手順として継続）。
+- 対応状況:
+  - README: Ollama/Ollama 並列実行時のストリーミング設定や OpenRouter の `.env`・CLI 併用手順、運用チェックリストを追記し、タスク要件の手順差分を反映済み。【F:projects/04-llm-adapter/README.md†L160-L214】
+  - 設定テンプレート: Ollama 向けテンプレートでローカルエンドポイントとレート制御を明示し、OpenRouter 向けテンプレートで API キー・ベース URL のエイリアスや料金目安を定義した。【F:projects/04-llm-adapter/adapter/config/providers/ollama.yaml†L1-L22】【F:projects/04-llm-adapter/adapter/config/providers/openrouter.yaml†L1-L38】
+  - テスト/手順: README 更新にあわせ、タスク確認用の `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` 実行手順を整備し、Ollama/OpenRouter 専用 CLI 例が `projects/04-llm-adapter/tests/test_cli_single_prompt.py` で回帰される構成を維持している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L359-L460】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L604-L693】
 
 ### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する（未完了）
 - 進捗: 未着手。依存除去と CI 手順の緑化確認が未実行。
