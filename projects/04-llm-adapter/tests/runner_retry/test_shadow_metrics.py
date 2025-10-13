@@ -26,6 +26,12 @@ class _ShadowProvider:
         return SimpleNamespace(latency_ms=self._latency_ms)
 
 
+class _InvokeTrackingProvider(TrackingProvider):
+    def invoke(self, request: object) -> ProviderResponse:
+        prompt = getattr(request, "prompt", "")
+        return self.generate(str(prompt))
+
+
 def _evaluate_budget(
     provider_config: ProviderConfig,
     cost_usd: float,
@@ -86,7 +92,7 @@ def test_run_sequential_attempt_updates_metrics_and_shadow(tmp_path) -> None:
         latency_ms=17,
         token_usage=TokenUsage(prompt=3, completion=2),
     )
-    primary_provider = TrackingProvider(primary_config, provider_response)
+    primary_provider = _InvokeTrackingProvider(primary_config, provider_response)
     backup_provider = UnusedProvider(backup_config)
     shadow_latency = 9
 
@@ -129,4 +135,58 @@ def test_run_sequential_attempt_updates_metrics_and_shadow(tmp_path) -> None:
     assert metrics.shadow_error_message is None
 
 
-__all__ = ["test_run_sequential_attempt_updates_metrics_and_shadow"]
+def test_run_single_updates_metrics_and_shadow(tmp_path) -> None:
+    primary_config = make_provider_config(tmp_path, "primary")
+    make_provider_config(tmp_path, "backup")
+    task = make_task()
+    provider_response = ProviderResponse(
+        output_text="primary-single",
+        input_tokens=4,
+        output_tokens=3,
+        latency_ms=15,
+        token_usage=TokenUsage(prompt=4, completion=3),
+    )
+    primary_provider = _InvokeTrackingProvider(primary_config, provider_response)
+    shadow_latency = 11
+
+    execution = RunnerExecution(
+        token_bucket=None,
+        schema_validator=None,
+        evaluate_budget=_evaluate_budget,
+        build_metrics=_build_metrics,
+        normalize_concurrency=lambda count, limit: count,
+        backoff=None,
+        shadow_provider=_ShadowProvider(shadow_latency),
+        metrics_path=None,
+        provider_weights=None,
+    )
+
+    execution._active_provider_ids = ("primary", "backup")
+    execution._current_attempt_index = 1
+
+    result = execution._run_single(
+        primary_config,
+        primary_provider,
+        task,
+        attempt_index=1,
+        mode="retry",
+    )
+
+    metrics = result.metrics
+    assert metrics.providers == ["primary", "backup"]
+    assert metrics.token_usage == {"prompt": 4, "completion": 3, "total": 7}
+    assert metrics.attempts == 2
+    assert metrics.retries == 1
+    assert metrics.outcome == "success"
+    assert metrics.shadow_provider_id == "shadow-test"
+    assert metrics.shadow_latency_ms == shadow_latency
+    assert metrics.shadow_status == "ok"
+    assert metrics.shadow_outcome == "success"
+    assert metrics.shadow_error_message is None
+    assert result.raw_output == "primary-single"
+
+
+__all__ = [
+    "test_run_sequential_attempt_updates_metrics_and_shadow",
+    "test_run_single_updates_metrics_and_shadow",
+]
