@@ -32,9 +32,11 @@
 **進捗**: ✅ OpenRouter 429/5xx 週次集計のバッチとダッシュボード反映を完了し、CLI 〜 Provider 経路のストリーミングプローブも本番導入。`test_cli_openrouter_accepts_provider_option_api_key` など既存回帰も緑を維持。[^provider-registry]
 **成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了に加え、OpenRouter 429/5xx 週次集計レポートと CLI/API 透過・ストリーミング監視まで本番導入済。
 
-- OpenRouter 429/5xx 週次集計 CLI は [`projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py) の集計検証でカバレッジ。
-- CLI からの API キー透過は [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までの経路を回帰確認。
-- ストリーミングプローブ運用は [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) のリアルタイム検証で監視体制を証跡化。
+**完了成果物**:
+
+1. OpenRouter 429/5xx 週次集計 CLI — [`projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py) の集計検証で本番データ反映経路を担保。
+2. CLI からの API キー透過 — [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までのエンドツーエンド経路を回帰確認。
+3. ストリーミングプローブ運用 — [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) のリアルタイム検証で監視体制を証跡化。
 **タスク**: 完了。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
