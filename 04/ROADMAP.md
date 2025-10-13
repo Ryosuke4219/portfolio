@@ -62,7 +62,7 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 **タスク**: 完了（合議アルゴリズム／制約評価／残ジョブ中断を網羅）。
 
 ## M5 — Telemetry & QA Integration
-**進捗**: ✅ Shadow 側では`projects/04-llm-adapter-shadow/src/llm_adapter/{metrics.py,shadow_metrics.py,metrics_otlp.py}`を維持してJSONL記録・差分整形・OTLP JSON変換を担当し、週次レポート生成は`projects/04-llm-adapter/tools/report/metrics/{data,weekly_summary}.py`を`just weekly-summary`/`just report`が直接呼び出す構成へ移行。集計・Evidence更新はコア側の`tools.report.metrics`モジュールで完結し、Shadow 出力を`data.load_metrics()`で読み込んで連携する。
+**進捗**: ✅ Shadow 側では`projects/04-llm-adapter-shadow/src/llm_adapter/{metrics.py,shadow_metrics.py,metrics_otlp.py}`が引き続き`provider_call`/`run_metric`イベントの収集・整形・OTLP(JSON)変換を担い、コア側は`projects/04-llm-adapter/tools/report/metrics/{data.py,weekly_summary.py}`を`just weekly-summary`/`just report`経由で呼び出して週次サマリ生成とEvidence更新を完結させる構成へ統合。両者はOTLP JSONを境界に連携し、Shadow が計測→変換した成果をコアの`tools.report.metrics`が取り込む運用で安定稼働中。
 **成果物**: メトリクス→OTLP/JSON変換、`tools/report/metrics/weekly_summary.py`による`docs/weekly-summary.md`自動生成、Evidence更新。
 **Exit Criteria**: ローカル/CIでメトリクスがダッシュボード(または静的HTML)へ反映、Evidence/Weekly Summaryリンク整合、CI緑＋`just report`と`just weekly-summary`が`tools.report.metrics`モジュールを通じてレポート生成。
 **タスク**: 完了（OTLPエクスポータと週次サマリ自動化を導入済）。
