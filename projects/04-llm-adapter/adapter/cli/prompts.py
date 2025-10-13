@@ -35,6 +35,16 @@ from .utils import (
 ProviderFactory = provider_module.ProviderFactory
 
 
+def _coerce_provider_option_value(raw_value: str) -> object:
+    text = raw_value.strip()
+    if not text:
+        return raw_value
+    try:
+        return json.loads(text)
+    except ValueError:
+        return raw_value
+
+
 def _parse_provider_option(value: str) -> tuple[str, object]:
     if "=" not in value:
         raise argparse.ArgumentTypeError("--provider-option は KEY=VALUE 形式で指定してください")
@@ -42,10 +52,7 @@ def _parse_provider_option(value: str) -> tuple[str, object]:
     key = key.strip()
     if not key or raw_value == "":
         raise argparse.ArgumentTypeError("--provider-option は KEY=VALUE 形式で指定してください")
-    try:
-        coerced: Any = json.loads(raw_value)
-    except ValueError:
-        coerced = raw_value
+    coerced = _coerce_provider_option_value(raw_value)
     return key, coerced
 
 
