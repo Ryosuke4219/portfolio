@@ -5,7 +5,7 @@ from functools import lru_cache
 from importlib import import_module
 import sys
 from types import ModuleType
-from typing import TypeVar
+from typing import cast, TypeVar
 
 try:  # pragma: no cover - optional dependency
     import typer
@@ -14,6 +14,7 @@ except ModuleNotFoundError:  # pragma: no cover - runtime fallback
 
 from .doctor import run_doctor
 from .prompts import run_prompts
+from .runner import ProviderFactoryLike
 
 
 @lru_cache(maxsize=1)
@@ -29,9 +30,9 @@ def _with_cli_namespace(accessor: Callable[[ModuleType], T]) -> T:
     return accessor(namespace)
 
 
-def _provider_factory() -> object:
-    def resolve(namespace: ModuleType) -> object:
-        return namespace.ProviderFactory
+def _provider_factory() -> ProviderFactoryLike:
+    def resolve(namespace: ModuleType) -> ProviderFactoryLike:
+        return cast(ProviderFactoryLike, namespace.ProviderFactory)
 
     return _with_cli_namespace(resolve)
 
@@ -55,7 +56,8 @@ def _http_module() -> ModuleType:
 
 
 def _run_prompts_from_iterable(args: Iterable[str]) -> int:
-    return run_prompts(list(args), provider_factory=_provider_factory())
+    factory = _provider_factory()
+    return run_prompts(list(args), provider_factory=factory)
 
 
 def _run_doctor_from_iterable(args: Iterable[str]) -> int:

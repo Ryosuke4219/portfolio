@@ -717,6 +717,9 @@ def test_cli_rate_limit_exit_code(install_provider, tmp_path: Path, capfd) -> No
         def __init__(self, config):
             self.config = config
 
+        def invoke(self, request):  # pragma: no cover - テスト用の疑似プロバイダ
+            raise RuntimeError("429 rate limit exceeded")
+
         def generate(self, prompt):  # pragma: no cover - 呼ばれない
             raise RuntimeError("429 rate limit exceeded")
 

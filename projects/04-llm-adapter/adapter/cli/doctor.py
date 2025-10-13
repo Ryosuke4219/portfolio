@@ -35,7 +35,7 @@ def _doctor_check_python(lang: str) -> tuple[str, str, str]:
 def _doctor_check_os(lang: str) -> tuple[str, str, str]:
     base_prefix = sys.prefix
     if hasattr(sys, "base_prefix"):
-        base_prefix = sys.base_prefix  # type: ignore[attr-defined]
+        base_prefix = sys.base_prefix
     venv_active = sys.prefix != base_prefix
     detail = _msg(
         lang,
@@ -154,7 +154,9 @@ def run_doctor(
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
-        return _coerce_exit_code(exc.code)
+        raw_code = exc.code
+        normalized = raw_code if isinstance(raw_code, int) or raw_code is None else None
+        return _coerce_exit_code(normalized)
 
     lang_value = args.lang if hasattr(args, "lang") else None
     lang = _resolve_lang(lang_value)
