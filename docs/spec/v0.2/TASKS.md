@@ -86,11 +86,11 @@
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` が成功し、OpenRouter 前提のストリーミングイベントが `ProviderResponse` へ透過することを確認している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
 
 ### タスク14: OpenRouter ドキュメントと 429/5xx ガードを拡充する（対応済み）
-- 対応状況: `tools/report/metrics` に `openrouter-stats` サブコマンドを追加し、`artifacts/openrouter/` へ 429/5xx 集計 JSONL を保存。API キー/ベース URL の伝播手順と集計の運用フローを README・CLI ガイドおよび本タスクに反映した。【F:docs/spec/v0.2/TASKS.md†L78-L81】
+- 対応状況: `projects/04-llm-adapter/tools/report/metrics/openrouter_stats.py` を `python -m tools.report.metrics.openrouter_stats` で呼び出す CLI として整備し、`artifacts/openrouter/` に `openrouter_http_failures.json`/`openrouter_http_failures.jsonl` を出力する運用を確立。API キー/ベース URL の伝播手順と集計の運用フローを README・CLI ガイドおよび本タスクに反映した。【F:projects/04-llm-adapter/tools/report/metrics/openrouter_stats.py†L1-L55】
 - 成果/エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py` で 429/5xx の正規化と週次スライスが検証されている。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py†L1-L52】
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` でストリーミングプローブとメトリクス収集の互換性を担保している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
-  - ✅ `just openrouter-stats -- --since 2025-10-01` の実行手順と CI スケジュールを本タスクへ記録し、運用ログを共有している。【F:docs/spec/v0.2/TASKS.md†L82-L84】
+  - ✅ `just openrouter-stats -- --since 2025-10-01` の実行手順と CI スケジュールを本タスクへ記録し、`artifacts/openrouter/` に最新集計を生成する運用ログを共有している。【F:justfile†L96-L101】
 
 ## CLI Request Pipeline
 
