@@ -6,7 +6,7 @@
 - 自動集計スクリプトの運用準備完了を確認し、面談・評価時に再現できる状態を確保する。
 
 ## 2. 対象と範囲（Scope / Out of Scope）
-- Scope: `/docs` 配下のQA資産（テスト計画、RTM、欠陥レポ、週次サマリ）、`/tools/weekly_summary.py`、サンプルデータ、GitHub Actionsワークフロー。
+- Scope: `/docs` 配下のQA資産（テスト計画、RTM、欠陥レポ、週次サマリ）、`projects/04-llm-adapter/tools/report/metrics/weekly_summary.py`（`just weekly-summary` エントリポイント経由）、サンプルデータ、GitHub Actionsワークフロー。
 - Out of Scope: 実際の本番サービス機能検証、04-shadow プロジェクトの詳細仕様、UIデモの視覚確認。
 
 ## 3. 品質基準（Quality Gates）
@@ -18,7 +18,7 @@
 - 文書整合性: 各成果物間のリンク・バージョン整合性。
 - トレーサビリティ: RTMとテスト計画の要求対応状況。
 - 欠陥レポ品質: テンプレ適用、証跡リンクの有効性。
-- 自動化: weekly_summary スクリプトの入出力、エラー時のフォールバック。
+- 自動化: `projects/04-llm-adapter/tools/report/metrics/weekly_summary.py`（`just weekly-summary` 実行）スクリプトの入出力、エラー時のフォールバック。
 - データ品質: runs.jsonl / flaky_rank.csv の期間・フォーマット妥当性。
 - ガバナンス: GitHub Actionsのスケジュール、権限、コミットポリシー。
 
