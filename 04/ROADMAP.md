@@ -30,7 +30,7 @@
 
 ## M3 — Provider 実装
 **進捗**: ✅ OpenRouter 429/5xx 週次集計のバッチとダッシュボード反映を完了し、CLI 〜 Provider 経路のストリーミングプローブも本番導入。`test_cli_openrouter_accepts_provider_option_api_key` など既存回帰も緑を維持。[^provider-registry]
-**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了に加え、OpenRouter 429/5xx 週次集計レポートと `test_metrics_openrouter_stats.py` による統計検証、`test_openrouter_stream_probe.py` とリアルタイムプローブによるストリーミング確認を成果物として更新。
+**成果物**: `projects/04-llm-adapter/adapter/core/providers/`にSimulated・OpenAI互換・Gemini・Ollama・OpenRouter、共通ストリーミング透過、レート制限/再試行/タイムアウト統一、契約テスト(現状4種)、OpenRouter 401/429/5xx/ネットワーク例外の正規化完了に加え、OpenRouter 429/5xx 週次集計レポートと `projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py` によるHTTP失敗分類CLIの集計検証、`test_openrouter_stream_probe.py` とリアルタイムプローブによるストリーミング確認を成果物として更新。
 **タスク**:
 - 完了。
 

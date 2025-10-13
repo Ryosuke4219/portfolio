@@ -83,11 +83,16 @@
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` が成功し、CLI からのストリーミングイベントが `ProviderResponse` へ透過することを確認している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
   - ✅ `llm-adapter-openrouter-probe --dry-run` と `just openrouter-stream-probe -- --dry-run` の実行手順を CI 手順に組み込み、OpenRouter のログ生成と失敗時の再試行挙動を本タスクへ反映済み。【F:projects/04-llm-adapter/tools/openrouter/stream_probe.py†L88-L105】【F:justfile†L91-L95】
+- 対応状況: OpenRouter のストリーミングログをプローブする CLI を `tools/openrouter/stream_probe.py` に集約し、`llm-adapter-openrouter-probe` と `just openrouter-stream-probe` から共通エントリポイントを呼び出してリアルタイム確認できるようにした。【F:projects/04-llm-adapter/tools/openrouter/stream_probe.py†L1-L105】【F:projects/04-llm-adapter/pyproject.toml†L25-L28】【F:justfile†L91-L95】
+- 品質エビデンス:
+  - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` が成功し、CLI からのストリーミングイベントが `ProviderResponse` へ透過することを確認している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
+  - ✅ `llm-adapter-openrouter-probe --dry-run` と `just openrouter-stream-probe -- --dry-run` の実行手順を CI 手順に組み込み、OpenRouter 前提のログ生成と失敗時の再試行挙動を運用タスクへ反映済み。【F:projects/04-llm-adapter/tools/openrouter/stream_probe.py†L88-L104】【F:justfile†L91-L95】
 
 ### タスク14: OpenRouter ドキュメントと 429/5xx ガードを拡充する（対応済み）
 - 対応状況: `tools/report/metrics` に `openrouter-stats` サブコマンドを追加し、`artifacts/openrouter/` へ 429/5xx 集計 JSONL を保存。API キー/ベース URL の伝播手順と集計の運用フローを README・CLI ガイドおよび本タスクに反映した。【F:docs/spec/v0.2/TASKS.md†L78-L81】
 - 成果/エビデンス:
-  - ✅ `pytest projects/04-llm-adapter/tests/test_metrics_openrouter_stats.py` で 429/5xx の正規化と週次スライスが検証されている。【F:docs/spec/v0.2/TASKS.md†L81-L82】
+  - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py` で 429/5xx の正規化と週次スライスが検証されている。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py†L1-L52】
+  - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` でストリーミングプローブとメトリクス収集の互換性を担保している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
   - ✅ `just openrouter-stats --since 2025-10-01` の実行手順と CI スケジュールを本タスクへ記録し、運用ログを共有している。【F:docs/spec/v0.2/TASKS.md†L82-L84】
 
 ## CLI Request Pipeline
