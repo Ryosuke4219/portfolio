@@ -82,18 +82,23 @@ projects/04-llm-adapter/
     core/
       provider_spi.py
       runner_execution.py
+      runner_execution_parallel.py
       execution/
         shadow_runner.py
       providers/
         __init__.py
         openai.py ...
+  data/
+    runs-metrics.jsonl               # runner_api.default_metrics_path() の既定出力
   tools/
     report/
       metrics/
         weekly_summary.py
-artifacts/runs-metrics.jsonl          # テレメトリ集計入力（生成物）
 docs/weekly-summary.md                # just weekly-summary で再生成
+artifacts/runs-metrics.jsonl          # CI 取り込み用のステージング[^metrics-layout]
 ```
+
+[^metrics-layout]: `projects/04-llm-adapter/data/runs-metrics.jsonl` はコードベース内の既定シンク。CI やローカル集計では `artifacts/runs-metrics.jsonl` にメトリクスを収集した後、`just weekly-summary` / `just report` で週次サマリと Evidence を更新する。
 
 ## 進行管理 (共通DoD)
 CI緑(ruff/mypy/pytest/node:test) / Repro手順(`just`コマンド)をREADME反映 / Evidence更新 / リリースノート&CHANGELOG更新。
