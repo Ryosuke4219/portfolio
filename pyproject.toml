@@ -14,7 +14,7 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-single-line = false
-known-first-party = ["adapter", "llm_adapter", "tests"]
+known-first-party = ["adapter", "llm_adapter", "llm_generic_bot", "tests"]
 order-by-type = false
 force-sort-within-sections = true
 
@@ -24,7 +24,7 @@ warn_unused_configs = true
 warn_unused_ignores = true
 ignore_missing_imports = true
 namespace_packages = true
-mypy_path = ["projects/04-llm-adapter"]
+mypy_path = ["projects/04-llm-adapter", "src"]
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
@@ -49,6 +49,7 @@ markers = [
 ]
 pythonpath = [
     ".",
+    "src",
 ]
 
 [tool.coverage.run]
