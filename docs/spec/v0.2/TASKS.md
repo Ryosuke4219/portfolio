@@ -72,9 +72,8 @@
 - OpenRouter 429/5xx 発生状況の集計とドキュメント拡充（タスク14を参照）。
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
-- 完了内容: `ProviderRequest.options` や温度・停止語などの CLI 上書きを OpenAI SDK 呼び出し引数へ集約し、レスポンス形式やストリーミング処理を含めた v0.2 コア仕様に沿う共通化を完了した。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L200-L296】
-- 主要モジュール: `adapter/core/providers/openai.py` の `_prepare_request_kwargs` がリクエスト上書きを統合し、各エンドポイント呼び出しがストリーム展開と最大トークン設定を処理する。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L200-L296】
-- テストケース: `test_openai_provider_applies_request_overrides` が `ProviderRequest` から渡された `options`/温度/停止語が OpenAI 呼び出しへ反映されること、ストリーム結果の正規化を検証している。【F:projects/04-llm-adapter/tests/providers/test_openai_provider_request_overrides.py†L1-L122】
+- 主要モジュール: `adapter/core/providers/openai.py` が `_prepare_request_kwargs` で `ProviderRequest.options`・温度・停止語・タイムアウトを統合し、`responses`/`chat.completions`/`completions` それぞれの呼び出しでストリーミングと `max_tokens` の上書きを一貫化した。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L200-L296】
+- 検証テスト: `test_openai_provider_applies_request_overrides` が CLI から渡されるオプションを通じて `stream`/`seed`/`response_format` が SDK 呼び出しへ渡ること、ストリーム結果が `ProviderResponse` に正規化されることを確認する。【F:projects/04-llm-adapter/tests/providers/test_openai_provider_request_overrides.py†L1-L158】
 
 ### タスク13: OpenRouter ストリーミング実サーバー検証を運用へ組み込む（対応済み）
 - 対応状況: OpenRouter のストリーミングログをプローブする CLI を `projects/04-llm-adapter/tools/openrouter/stream_probe.py` に集約し、`llm-adapter-openrouter-probe` と `just openrouter-stream-probe` が同一エントリポイントを共有する構成へ統一した。【F:projects/04-llm-adapter/tools/openrouter/stream_probe.py†L1-L105】【F:projects/04-llm-adapter/pyproject.toml†L25-L28】【F:justfile†L91-L95】
@@ -104,22 +103,22 @@
   - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.build_request` が `ProviderRequest` を組み立て `invoke` に引き渡し、`options`/`metadata` の往復整合性を担保する回帰テストを継続。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L71-L139】
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する（対応済み）
-- 完了内容: CLI で受け取った `--provider-option` を設定 YAML の `options` とマージし、`ProviderRequest` へ一貫して引き渡すことで Ollama/OpenRouter 向けの追加パラメータや API キーを CLI から直接注入できるようにした。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L242-L286】【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L1-L48】
-- 主要モジュール: `adapter/cli/prompts.py` のオプション統合ロジックと `adapter/cli/prompt_runner.py` の `_build_request` が CLI からの `options` を `ProviderRequest` に束ねる責務を担う。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L242-L286】【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L1-L48】
-- テストケース: CLI からの `--provider-option` による型変換と OpenRouter への API キー透過を `test_cli_provider_option_coerces_types` / `test_run_prompts_provider_option_coerces_types` / `test_cli_openrouter_accepts_provider_option_api_key` が回帰テスト化している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L396-L460】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L662-L692】
+- 主要モジュール:
+  - `adapter/cli/prompts.py` が CLI 引数で受けた `--provider-option` を設定 YAML の `options` とマージし、`ProviderConfig.raw` を差し替えて `api_key` などのリテラル値を統合する。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L242-L331】
+  - `adapter/cli/prompt_runner.py` の `_build_request` が統合済み `ProviderConfig` から `options`/`metadata` を抽出し、`ProviderRequest` へ確実に反映する。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】
+- 検証テスト:
+  - `test_cli_provider_option_coerces_types` / `test_run_prompts_provider_option_coerces_types` が `--provider-option` の文字列を型変換して `ProviderRequest.options` に伝播することを検証する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L396-L460】
+  - `test_cli_openrouter_accepts_provider_option_api_key` が CLI から渡した OpenRouter の `api_key` が `ProviderRequest.options` 経由でプロバイダへ届くことを確認する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L662-L692】
 
 ## Docs & Templates
 
-### タスク10: コア README と設定テンプレートを v0.2 用に同期する（未完了）
-- 進捗: 未着手。README・設定テンプレートの更新が未反映。
+### タスク10: コア README と設定テンプレートを v0.2 用に同期する（対応済み）
+- 対応状況: README・テンプレート双方を v0.2 の Ollama/OpenRouter 手順に合わせて更新し、CLI からの追加オプション伝播手順も反映した。
 - 対象モジュール:
-  - `projects/04-llm-adapter/README.md`
-  - `projects/04-llm-adapter/adapter/config/providers/*.yaml`
-  - `docs/spec/v0.2/TASKS.md`
-- 完了条件:
-  - `projects/04-llm-adapter/README.md` の最新情報を保ち、Ollama/OpenRouter のセットアップ手順と API キー環境変数を追記する。
-  - `projects/04-llm-adapter/adapter/config/providers/*.yaml` に新規テンプレートを追加し、Python/Node の静的解析は CI と同じ順序で `npm run lint:js` → `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/adapter` → `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` → `python -m compileall projects/04-llm-adapter-shadow` を通過させる。Node 側に影響する場合は `npm run ci:analyze` まで実行し、`pytest projects/04-llm-adapter-shadow/tests` と合わせて CI と同一手順で緑化を確認する。
-  - 本タスクリストを更新し、`npx --yes markdownlint-cli2` で整形エラーがないことを確認する（例: `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`）。
+  - `projects/04-llm-adapter/README.md` — Ollama の `--provider-option` 例と OpenRouter の `.env`/CLI 併用手順、運用チェックリストを追記した。【F:projects/04-llm-adapter/README.md†L160-L205】
+  - `projects/04-llm-adapter/adapter/config/providers/ollama.yaml` — ローカル向けの既定エンドポイントやレート制御をテンプレート化した。【F:projects/04-llm-adapter/adapter/config/providers/ollama.yaml†L1-L22】
+  - `projects/04-llm-adapter/adapter/config/providers/openrouter.yaml` — API キー/ベース URL のエイリアスと推奨オプションをテンプレート化した。【F:projects/04-llm-adapter/adapter/config/providers/openrouter.yaml†L1-L27】
+- 検証テスト: `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` でタスクリストの整形を確認済み（本タスクの確認手順として継続）。
 
 ### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する（未完了）
 - 進捗: 未着手。依存除去と CI 手順の緑化確認が未実行。
