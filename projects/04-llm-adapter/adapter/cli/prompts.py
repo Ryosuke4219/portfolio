@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 import socket
 import textwrap
-from typing import Any
 
 from adapter.core import providers as provider_module
 from adapter.core.config import load_provider_config, ProviderConfig

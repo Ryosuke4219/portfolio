@@ -12,8 +12,8 @@ from adapter.core.models import (
     RateLimitConfig,
     RetryConfig,
 )
-from adapter.core.providers import BaseProvider
 from adapter.core.provider_spi import ProviderRequest
+from adapter.core.providers import BaseProvider
 
 
 @dataclass(slots=True)
