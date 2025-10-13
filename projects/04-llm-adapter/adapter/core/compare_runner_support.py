@@ -16,6 +16,7 @@ from .providers import (
     ProviderFactory,
     ProviderResponse,
 )
+from .runner_execution_call import ensure_invoke_compat
 
 JudgeProviderResponse = ProviderResponse
 
@@ -104,6 +105,7 @@ class _JudgeInvoker:
         self._config = config
 
     def invoke(self, request: object) -> JudgeProviderResponse:
+        ensure_invoke_compat(self._provider)
         provider_request = self._build_provider_request(request)
         response = self._provider.invoke(provider_request)
         base_response = _coerce_provider_response(response)
