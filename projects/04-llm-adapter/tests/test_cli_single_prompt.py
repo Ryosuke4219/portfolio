@@ -8,6 +8,7 @@ import pytest
 
 import adapter.cli as cli_module
 from adapter.core import providers as provider_module
+from adapter.core.config import ProviderConfig
 
 
 def _install_provider_factory(monkeypatch, provider_cls: type) -> None:
@@ -20,9 +21,11 @@ def _install_provider_factory(monkeypatch, provider_cls: type) -> None:
 
 class EchoProvider:
     requests: list[provider_module.ProviderRequest] = []
+    configs: list[ProviderConfig] = []
 
-    def __init__(self, config):
+    def __init__(self, config: ProviderConfig):
         self.config = config
+        self.__class__.configs.append(config)
 
     def generate(self, prompt: str) -> provider_module.ProviderResponse:  # pragma: no cover - 旧 API 経由
         raise AssertionError("generate() は使用しないでください")
@@ -42,6 +45,7 @@ class EchoProvider:
 @pytest.fixture
 def echo_provider(monkeypatch):
     EchoProvider.requests = []
+    EchoProvider.configs = []
     _install_provider_factory(monkeypatch, EchoProvider)
     return EchoProvider
 
@@ -154,6 +158,44 @@ def test_cli_model_override_argument(
     request = echo_provider.requests[0]
     assert request.prompt == "hello"
     assert request.model == "cli-model"
+
+
+def test_run_prompts_model_override_argument(
+    echo_provider, tmp_path: Path, capfd
+) -> None:
+    config_path = tmp_path / "provider.yml"
+    config_path.write_text(
+        (
+            "provider: fake\n"
+            "model: dummy-config\n"
+            "auth_env: NONE\n"
+            "max_tokens: 64\n"
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = cli_module.run_prompts(
+        [
+            "--provider",
+            str(config_path),
+            "--prompt",
+            "hello",
+            "--model",
+            "cli-model",
+        ],
+        provider_factory=cli_module.ProviderFactory,
+    )
+    captured = capfd.readouterr()
+    assert exit_code == 0
+    assert "echo:hello" in captured.out
+    assert len(echo_provider.requests) == 1
+    request = echo_provider.requests[0]
+    assert request.prompt == "hello"
+    assert request.model == "cli-model"
+    assert len(echo_provider.configs) == 1
+    config = echo_provider.configs[0]
+    assert config.model == "cli-model"
+    assert config.raw.get("model") == "cli-model"
 
 
 @pytest.mark.parametrize(
