@@ -62,7 +62,7 @@
   - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
   - CLI からのリテラル API キー指定や設定ファイルの `api_key`/`env` を `ProviderRequest.options["api_key"]` へ結線し、OpenRouter でも CLI からの入力が確実に伝播する完了経路として整理した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L105】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L393-L481】
-  - OpenRouter 運用ドキュメントを `projects/04-llm-adapter/README.md` と `docs/releases/v0.1.0.md` に同期し、`just openrouter-stats -- --since ...` と `llm-adapter-openrouter-probe` の手順を最新化した。【F:projects/04-llm-adapter/README.md†L198-L206】【F:docs/releases/v0.1.0.md†L1-L23】
+  - OpenRouter 運用ドキュメントを `projects/04-llm-adapter/README.md` と `docs/releases/v0.1.0.md` に同期し、`python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter --since ...`（`just openrouter-stats -- --since ...` 経由でも同等）と `llm-adapter-openrouter-probe` の手順を最新化した。【F:projects/04-llm-adapter/README.md†L198-L206】【F:docs/releases/v0.1.0.md†L1-L23】
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、`ProviderRequest.options` 経由で付与される認証ヘッダが秘匿されたまま HTTP セッションへ反映され、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
   - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けのリテラル API キーが `ProviderRequest.options` で秘匿されたまま CLI からプロバイダへ伝播することを確認済み。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L451-L481】
@@ -86,11 +86,11 @@
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` が成功し、OpenRouter 前提のストリーミングイベントが `ProviderResponse` へ透過することを確認している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
 
 ### タスク14: OpenRouter ドキュメントと 429/5xx ガードを拡充する（対応済み）
-- 対応状況: `projects/04-llm-adapter/tools/report/metrics/openrouter_stats.py` を `python -m tools.report.metrics.openrouter_stats` で呼び出す CLI として整備し、`artifacts/openrouter/` に `openrouter_http_failures.json`/`openrouter_http_failures.jsonl` を出力する運用を確立。API キー/ベース URL の伝播手順と集計の運用フローを README・CLI ガイドおよび本タスクに反映した。【F:projects/04-llm-adapter/tools/report/metrics/openrouter_stats.py†L1-L55】
+- 対応状況: `projects/04-llm-adapter/tools/report/metrics/openrouter_stats.py` をエントリポイントに据え、`python -m tools.report.metrics.openrouter_stats --metrics <runs-metrics.jsonl> --out <出力ディレクトリ> [--since <ISO日時>]`（`just openrouter-stats` 経由では `--metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter` を既定で付与）で 429/5xx を集計する運用を整備。`--out` で指定したディレクトリに `openrouter_http_failures.json` と `openrouter_http_failures.jsonl` を生成し、API キー/ベース URL の伝播手順と集計の運用フローを README・CLI ガイドおよび本タスクに反映した。【F:projects/04-llm-adapter/tools/report/metrics/openrouter_stats.py†L1-L55】
 - 成果/エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py` で 429/5xx の正規化と週次スライスが検証されている。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py†L1-L52】
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` でストリーミングプローブとメトリクス収集の互換性を担保している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
-  - ✅ `just openrouter-stats -- --since 2025-10-01` の実行手順と CI スケジュールを本タスクへ記録し、`artifacts/openrouter/` に最新集計を生成する運用ログを共有している。【F:justfile†L96-L101】
+- ✅ `python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter --since 2025-10-01`（`just openrouter-stats -- --since 2025-10-01` 相当）の実行手順と CI スケジュールを本タスクへ記録し、`--out` で指定した `artifacts/openrouter/` に最新集計を生成する運用ログを共有している。【F:justfile†L96-L101】
 
 ## CLI Request Pipeline
 
