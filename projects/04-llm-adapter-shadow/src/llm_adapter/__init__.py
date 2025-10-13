@@ -1,4 +1,56 @@
+import importlib
+import importlib.abc
+import importlib.util
+import sys
+from importlib.machinery import ModuleSpec
+from types import ModuleType
+
 __version__ = "0.1.0"
+
+_module = sys.modules[__name__]
+sys.modules["llm_adapter"] = _module
+_package_name = __name__.split(".", 1)[-1]
+_src_package = ".".join(("src", _package_name))
+sys.modules[_src_package] = _module
+
+
+class _AliasLoader(importlib.abc.Loader):
+    def __init__(self, alias_name: str, actual_name: str) -> None:
+        self._alias_name = alias_name
+        self._actual_name = actual_name
+
+    def create_module(self, spec: ModuleSpec) -> ModuleType | None:
+        return None
+
+    def exec_module(self, module: ModuleType) -> None:
+        actual = importlib.import_module(self._actual_name)
+        sys.modules[self._alias_name] = actual
+
+
+class _AliasFinder(importlib.abc.MetaPathFinder):
+    def find_spec(
+        self,
+        fullname: str,
+        path: object,
+        target: ModuleType | None = None,
+    ) -> ModuleSpec | None:
+        if not fullname.startswith("llm_adapter."):
+            return None
+        actual_name = ".".join(("src", fullname))
+        actual_spec = importlib.util.find_spec(actual_name)
+        if actual_spec is None:
+            return None
+        return importlib.util.spec_from_loader(
+            fullname,
+            _AliasLoader(fullname, actual_name),
+            origin=actual_spec.origin,
+            is_package=actual_spec.submodule_search_locations is not None,
+        )
+
+
+_alias_finder = _AliasFinder()
+if not any(isinstance(finder, _AliasFinder) for finder in sys.meta_path):
+    sys.meta_path.insert(0, _alias_finder)
 
 from .errors import (
     AuthError as AuthError,
