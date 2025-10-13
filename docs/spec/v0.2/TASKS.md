@@ -94,15 +94,17 @@
 
 ## CLI Request Pipeline
 
-### タスク8: CLI から `ProviderRequest` への移行を完了する
+### タスク8: CLI から `ProviderRequest` への移行を完了する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/cli/app.py`
   - `projects/04-llm-adapter/adapter/cli/prompt_runner.py`
   - `projects/04-llm-adapter/adapter/core/provider_spi.py`
-- 完了条件:
-  - [CLI runner](../../../projects/04-llm-adapter/adapter/cli/prompt_runner.py) が CLI 引数から `ProviderRequest` を構築し、`ProviderSPI.invoke` へ渡す流れを `projects/04-llm-adapter/adapter/cli/app.py` から呼び出す形へ統一する。
-  - `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` と `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` が成功し、`generate` API を経由するコードは残さない。
-  - `docs/spec/v0.2/ROADMAP.md` に CLI 移行状況の脚注を追記する。
+- 対応状況:
+  - `prompt_runner.execute_prompts` が CLI から渡された `ProviderConfig` を `_build_request` で `ProviderRequest` に正規化し、`invoke` の同期呼び出し結果を `ProviderResponse` として扱う経路へ移行した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L139】
+  - `prompts.run_prompts` が `ProviderFactory.create` で得たプロバイダへ `execute_prompts` を介して `ProviderRequest` をまとめて投入し、CLI からのオプション上書きやモデル指定を `ProviderConfig` に反映してから渡す構成へ整理された。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L335-L384】
+- 品質エビデンス:
+  - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` — CLI が `invoke` を必須とし、プロンプト入力・オプション上書き・モデル指定を `ProviderRequest` に集約して渡す経路を検証。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L22-L219】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor` が `ProviderRequest` を生成して `invoke` へ渡し、`options` や `metadata` を保持する回帰テストを継続。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L71-L139】
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する
 - 対象モジュール:
