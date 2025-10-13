@@ -53,7 +53,7 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
-[^m6-cli-flow]: CLI は [`projects/04-llm-adapter/adapter/cli/prompt_runner.py`](../projects/04-llm-adapter/adapter/cli/prompt_runner.py) で `ProviderRequest` を構築し `ProviderSPI.invoke` を呼び出す流れを採用し、[`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) で同経路を回帰確認している。代表テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_errors_when_provider_lacks_invoke` / `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_invokes_provider_with_request`。
+[^m6-cli-flow]: CLI は [`projects/04-llm-adapter/adapter/cli/prompt_runner.py`](../projects/04-llm-adapter/adapter/cli/prompt_runner.py) の `_build_request` で `ProviderRequest` を生成し、`getattr(provider, "invoke")` で取得したシンク呼び出しを `run_in_executor` へ委譲して同期的に `invoke(request)` を実行する。`ProviderRequest` を必須とする挙動は [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) の `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_errors_when_provider_lacks_invoke` および `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_invokes_provider_with_request` で回帰証跡化済。
 
 ## M4 — Parallel & Consensus
 **進捗**: ✅ `projects/04-llm-adapter/adapter/core/runner_execution_parallel.py`と`aggregation_controller.py`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定を実装。`AggregationController.apply` が`RunMetrics.ci_meta`へ`aggregate_mode`・`aggregate_votes`・`consensus`を追記し、比較勝者のメタデータ検証もCIで緑。
