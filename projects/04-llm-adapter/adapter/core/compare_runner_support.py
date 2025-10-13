@@ -104,6 +104,50 @@ class _JudgeInvoker:
         self._config = config
 
     def invoke(self, request: object) -> JudgeProviderResponse:
+        provider_request = self._build_provider_request(request)
+        response = self._provider.invoke(provider_request)
+        base_response = _coerce_provider_response(response)
+        raw_payload = _merge_raw_payload(base_response.raw, self._config.provider)
+        return JudgeProviderResponse(
+            text=base_response.text,
+            latency_ms=base_response.latency_ms,
+            token_usage=base_response.token_usage,
+            model=base_response.model,
+            finish_reason=base_response.finish_reason,
+            raw=raw_payload,
+        )
+
+    def _build_provider_request(self, request: object) -> ProviderRequest:
+        if isinstance(request, ProviderRequest):
+            return request
+
+        prompt = self._extract_prompt(request)
+        model = (self._config.model or self._config.provider).strip() or self._config.provider
+        timeout: float | None = None
+        if self._config.timeout_s > 0:
+            timeout = float(self._config.timeout_s)
+        raw_config = self._config.raw
+        options_source = raw_config.get("options") if isinstance(raw_config, Mapping) else None
+        metadata_source = raw_config.get("metadata") if isinstance(raw_config, Mapping) else None
+        options: dict[str, Any] = {}
+        if isinstance(options_source, Mapping):
+            options = dict(options_source)
+        metadata: Mapping[str, Any] | None = None
+        if isinstance(metadata_source, Mapping):
+            metadata = dict(metadata_source)
+        return ProviderRequest(
+            model=model,
+            prompt=prompt,
+            max_tokens=self._config.max_tokens,
+            temperature=self._config.temperature,
+            top_p=self._config.top_p,
+            timeout_s=timeout,
+            options=options,
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _extract_prompt(request: object) -> str:
         prompt = ""
         if isinstance(request, Mapping):
             mapping_value = request.get("text")
@@ -118,40 +162,7 @@ class _JudgeInvoker:
                 prompt = request.prompt_text or ""
             elif hasattr(request, "prompt"):
                 prompt = request.prompt or ""
-        model = (self._config.model or self._config.provider).strip() or self._config.provider
-        timeout: float | None = None
-        if self._config.timeout_s > 0:
-            timeout = float(self._config.timeout_s)
-        raw_config = self._config.raw
-        options_source = raw_config.get("options") if isinstance(raw_config, Mapping) else None
-        metadata_source = raw_config.get("metadata") if isinstance(raw_config, Mapping) else None
-        options: dict[str, Any] = {}
-        if isinstance(options_source, Mapping):
-            options = dict(options_source)
-        metadata: Mapping[str, Any] | None = None
-        if isinstance(metadata_source, Mapping):
-            metadata = dict(metadata_source)
-        provider_request = ProviderRequest(
-            model=model,
-            prompt=prompt,
-            max_tokens=self._config.max_tokens,
-            temperature=self._config.temperature,
-            top_p=self._config.top_p,
-            timeout_s=timeout,
-            options=options,
-            metadata=metadata,
-        )
-        response = self._provider.invoke(provider_request)
-        base_response = _coerce_provider_response(response)
-        raw_payload = _merge_raw_payload(base_response.raw, self._config.provider)
-        return JudgeProviderResponse(
-            text=base_response.text,
-            latency_ms=base_response.latency_ms,
-            token_usage=base_response.token_usage,
-            model=base_response.model,
-            finish_reason=base_response.finish_reason,
-            raw=raw_payload,
-        )
+        return prompt
 
 
 class _JudgeProviderFactoryAdapter:
