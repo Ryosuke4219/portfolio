@@ -96,11 +96,11 @@
   - `projects/04-llm-adapter/adapter/core/provider_spi.py`
 - 対応状況:
   - `prompt_runner.execute_prompts` が CLI から渡された `ProviderConfig` を `_build_request` で `ProviderRequest` に正規化し、プロンプト・オプション・メタデータを統合した上で `invoke` の同期呼び出しへ供給する実装に刷新した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L142】
-  - `ProviderCallExecutor.build_request` が CLI 側で構築した `ProviderRequest` と整合するフィールド（`prompt`/`options`/`metadata`）を生成し、CLI/コア間の API 移行を完了させた。【F:projects/04-llm-adapter/adapter/core/provider_spi.py†L63-L118】
+  - `ProviderCallExecutor.execute` / `_invoke_provider` が `ProviderRequest` を `adapter/core/_provider_execution.py` で構築し、CLI 側 `_build_request` と同一のフィールド構成（`prompt`/`options`/`metadata`）を共有して API 移行を完了させた。【F:projects/04-llm-adapter/adapter/core/_provider_execution.py†L40-L139】
   - `prompts.run_prompts` が `ProviderFactory.create` で得たプロバイダへ `execute_prompts` を介して `ProviderRequest` をまとめて投入し、CLI からのオプション上書きやモデル指定を `ProviderConfig` に反映してから渡す構成へ整理された。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L335-L384】
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` — CLI が `_build_request` で構築した `ProviderRequest` に API キーやプロンプト配列を束ね、`prompt_runner.execute_prompts` が `ProviderResponse` を取得する流れを検証。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L22-L219】
-  - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.build_request` が `ProviderRequest` を組み立て `invoke` に引き渡し、`options`/`metadata` の往復整合性を担保する回帰テストを継続。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L71-L139】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.execute` が `ProviderRequest` 構築から `invoke` までのフローを検証し、`options`/`metadata` の整合性を担保する回帰テストを維持。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L71-L140】
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する（対応済み）
 - 主要モジュール:
