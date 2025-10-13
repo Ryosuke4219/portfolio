@@ -37,6 +37,10 @@
 1. OpenRouter 429/5xx 週次集計 CLI — [`projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py) の集計検証で本番データ反映経路を担保。
 2. CLI からの API キー透過 — [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までのエンドツーエンド経路を回帰確認。
 3. ストリーミングプローブ運用 — [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) のリアルタイム検証で監視体制を証跡化。
+**完了した成果物のエビデンス**:
+- 429/5xx 集計 CLI は [`projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py) で週次集計フローを検証済。
+- CLI API キー透過は [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までの経路を回帰確認。
+- ストリーミングプローブ検証は [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) でリアルタイム監視フローを証跡化。
 **タスク**: 完了。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は `projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
