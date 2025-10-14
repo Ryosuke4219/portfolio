@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from src.llm_adapter.providers.ollama import OllamaProvider
+from llm_adapter.providers.ollama import OllamaProvider
 
 from tests.helpers.fakes import FakeSession
 
