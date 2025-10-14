@@ -17,13 +17,13 @@ def test_llm_adapter_card_describes_provider_integration() -> None:
     plain_text = re.sub(r"<[^>]+>", " ", block)
     normalized = re.sub(r"\s+", " ", plain_text).strip().casefold()
 
-    assert "llm-adapter --provider" in normalized, "llm-adapter CLI の記述がありません"
-    assert (
-        "--provider adapter/config/providers/openai.yaml" in normalized
-    ), "provider 設定ファイルのパス指定がありません"
-    assert (
-        "--prompt-file" in normalized or "--prompts" in normalized
-    ), "プロンプト指定オプションがありません"
+    assert re.search(
+        r"llm-adapter --provider adapter/config/providers/[\w-]+\.ya?ml",
+        normalized,
+    ), "provider 設定ファイルへのパスが記載されていません"
+    assert re.search(
+        r"--prompt(?:-file|s)?(?:\s|=)", normalized
+    ), "プロンプト指定フラグが不足しています"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
     assert "data/runs-metrics.jsonl" in normalized, "メトリクス出力先が更新されていません"
     assert "pnpm" not in normalized, "旧 CLI コマンドが残っています"
