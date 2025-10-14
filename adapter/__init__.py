@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from types import ModuleType
-from typing import Any, Mapping, Protocol
 import sys
+from types import ModuleType
+from typing import Any, Protocol
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _TARGET_DIR = _REPO_ROOT / "projects" / "04-llm-adapter" / "adapter"
@@ -90,7 +91,7 @@ def _install_structured_logging_module() -> None:
 
     core_module = sys.modules.get("adapter.core")
     if core_module is not None:
-        setattr(core_module, "observability", observability)
+        core_module.observability = observability
 
 
 def _install_weather_module() -> None:
@@ -173,7 +174,7 @@ def _install_weather_module() -> None:
 
     providers_module = sys.modules.get("adapter.core.providers")
     if providers_module is not None:
-        setattr(providers_module, "weather", weather)
+        providers_module.weather = weather
 
 
 def _install_compat_shims() -> None:
