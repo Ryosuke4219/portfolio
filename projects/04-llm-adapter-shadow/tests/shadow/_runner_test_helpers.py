@@ -4,11 +4,11 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import ProviderSkip
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from src.llm_adapter.runner import ParallelAllResult, Runner
-from src.llm_adapter.runner_config import RunnerConfig
-from src.llm_adapter.runner_sync import ProviderInvocationResult
+from llm_adapter.errors import ProviderSkip
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from llm_adapter.runner import ParallelAllResult, Runner
+from llm_adapter.runner_config import RunnerConfig
+from llm_adapter.runner_sync import ProviderInvocationResult
 
 
 class FakeLogger:
