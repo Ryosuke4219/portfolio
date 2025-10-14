@@ -8,18 +8,13 @@ CLI_PROVIDER_PATTERN = re.compile(
     r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
     re.IGNORECASE,
 )
-CLI_PROMPT_PATTERNS = tuple(
-    re.compile(pattern, re.IGNORECASE)
-    for pattern in (
-        r"--prompt(?:\s|=)",
-        r"--prompt-file(?:\s|=)",
-        r"--prompts(?:\s|=)",
-    )
+PROMPTS_FLAG_PATTERNS = (
+    re.compile(r"--prompts(?:\s+|=)([^\s]+)", re.IGNORECASE),
+    re.compile(r"--prompt-file(?:\s+|=)([^\s]+)", re.IGNORECASE),
 )
-PROMPTS_DATASET_PATH = "examples/prompts/ja_one_liner.jsonl"
-
-
-PROMPTS_PATH = Path("examples/prompts/ja_one_liner.jsonl")
+PROMPTS_DATASET_PATH = Path(
+    "projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl"
+)
 
 
 def _normalize_text(value: str) -> str:
@@ -27,18 +22,25 @@ def _normalize_text(value: str) -> str:
 
 
 def _assert_cli_flags(snippet: str) -> None:
-    normalized = _normalize_text(re.sub(r"<[^>]+>", " ", snippet))
+    sanitized = re.sub(r"<[^>]+>", " ", snippet)
+    normalized = _normalize_text(sanitized)
     assert CLI_PROVIDER_PATTERN.search(
         normalized
     ), "Missing --provider adapter/config/providers/*.yaml"
-    assert any(pattern.search(normalized) for pattern in CLI_PROMPT_PATTERNS), (
-        "One of --prompt / --prompt-file / --prompts is required"
-    )
-    expected_prompts_arg = f"--prompts {PROMPTS_PATH.as_posix()}".casefold()
+    prompt_match = None
+    for pattern in PROMPTS_FLAG_PATTERNS:
+        prompt_match = pattern.search(sanitized)
+        if prompt_match:
+            break
+    assert prompt_match, "Either --prompts or --prompt-file must be provided"
+    prompt_path = prompt_match.group(1).strip().strip("`'\"")
     assert (
-        expected_prompts_arg in normalized
-    ), f"CLI は {PROMPTS_PATH} を参照してください"
-    assert PROMPTS_PATH.exists(), f"{PROMPTS_PATH} が存在しません"
+        prompt_path == PROMPTS_DATASET_PATH.as_posix()
+    ), "Use projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl for prompts"
+    assert PROMPTS_DATASET_PATH.exists(), (
+        f"{PROMPTS_DATASET_PATH} is missing"
+    )
+    assert "--prompt " not in normalized, "Avoid legacy --prompt flag"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
@@ -52,10 +54,9 @@ def _extract_weekly_summary_block(content: str) -> str:
 
 
 def test_llm_adapter_card_describes_provider_integration() -> None:
-    prompt_path = Path(PROMPTS_DATASET_PATH)
-    if not prompt_path.exists():
-        prompt_path = Path("projects/04-llm-adapter") / PROMPTS_DATASET_PATH
-    assert prompt_path.exists(), f"{PROMPTS_DATASET_PATH} が存在しません"
+    assert PROMPTS_DATASET_PATH.exists(), (
+        f"{PROMPTS_DATASET_PATH} が存在しません"
+    )
     content = Path("docs/en/index.md").read_text(encoding="utf-8")
 
     card_match = re.search(

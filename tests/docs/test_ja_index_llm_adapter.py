@@ -9,11 +9,13 @@ CLI_PROVIDER_PATTERN = re.compile(
     r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
     re.IGNORECASE,
 )
-CLI_PROMPT_FLAG_PATTERN = re.compile(
-    r"--prompts?(?:-file)?(?:\s+|=)([^\s]+)",
-    re.IGNORECASE,
+PROMPTS_FLAG_PATTERNS = (
+    re.compile(r"--prompts(?:\s+|=)([^\s]+)", re.IGNORECASE),
+    re.compile(r"--prompt-file(?:\s+|=)([^\s]+)", re.IGNORECASE),
 )
-PROMPT_SUFFIX = "examples/prompts/ja_one_liner.jsonl"
+PROMPTS_DATASET_PATH = Path(
+    "projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl"
+)
 
 
 def _normalize_text(value: str) -> str:
@@ -26,27 +28,20 @@ def _assert_cli_flags(snippet: str) -> None:
     assert CLI_PROVIDER_PATTERN.search(
         normalized
     ), "--provider adapter/config/providers/*.yaml が不足しています"
-    prompt_match = CLI_PROMPT_FLAG_PATTERN.search(sanitized)
-    assert prompt_match, "--prompt / --prompt-file / --prompts のいずれかが不足しています"
+    prompt_match = None
+    for pattern in PROMPTS_FLAG_PATTERNS:
+        prompt_match = pattern.search(sanitized)
+        if prompt_match:
+            break
+    assert prompt_match, "--prompts または --prompt-file が不足しています"
     prompt_path = prompt_match.group(1).strip().strip("`'\"")
-    assert prompt_path.casefold().endswith(PROMPT_SUFFIX), (
-        f"{PROMPT_SUFFIX} を指していません: {prompt_path}"
-    )
-    candidate_paths = (
-        Path(prompt_path),
-        Path("projects/04-llm-adapter") / prompt_path,
-    )
-    assert any(path.exists() for path in candidate_paths), (
-        f"{prompt_path} の実体が存在しません"
-    )
-    prompt_match = PROMPT_FLAG_PATTERN.search(snippet_without_tags)
-    assert prompt_match, "--prompt 系フラグからパスを抽出できません"
-    prompt_path = prompt_match.group(1)
     assert (
-        prompt_path == EXPECTED_PROMPT_PATH.as_posix()
-    ), "--prompt 系フラグが examples/prompts/ja_one_liner.jsonl を指していません"
-    resolved = _resolve_prompt_path(prompt_path)
-    assert resolved.exists(), f"{resolved} が存在しません"
+        prompt_path == PROMPTS_DATASET_PATH.as_posix()
+    ), "--prompts / --prompt-file は projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl を指してください"
+    assert PROMPTS_DATASET_PATH.exists(), (
+        f"{PROMPTS_DATASET_PATH} の実体が存在しません"
+    )
+    assert "--prompt " not in normalized, "旧 --prompt フラグを使用しないでください"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
