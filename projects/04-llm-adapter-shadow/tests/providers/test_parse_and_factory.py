@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from llm_adapter.provider_spi import ProviderSPI
 from llm_adapter.providers import factory as providers_factory
 

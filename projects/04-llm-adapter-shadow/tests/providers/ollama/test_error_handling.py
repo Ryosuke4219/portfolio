@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import pytest
+
 from llm_adapter.errors import AuthError, RateLimitError, TimeoutError
 from llm_adapter.provider_spi import ProviderRequest
 from llm_adapter.providers.ollama import OllamaProvider
-
 from tests.helpers.fakes import FakeResponse
 
 from .conftest import BaseChatSession
