@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from llm_adapter.errors import AllFailedError, TimeoutError
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from llm_adapter.providers.mock import MockProvider
