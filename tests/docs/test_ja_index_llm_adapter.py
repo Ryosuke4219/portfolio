@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import re
-
 from pathlib import Path
-
+import re
 
 CLI_PROVIDER_PATTERN = re.compile(
     r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
