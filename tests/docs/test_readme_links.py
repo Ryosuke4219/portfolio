@@ -54,3 +54,25 @@ def test_readme_shadow_references_stay_within_allowlist() -> None:
             "README.md に禁止ワード {word!r} が含まれています。"
             "shadow に関する説明は {allowed} などの表記に揃えてください。"
         ).format(word=red_word, allowed=", ".join(ALLOWED_SHADOW_TERMS))
+
+
+def test_readme_quick_start_is_single_section() -> None:
+    readme_lines = Path("README.md").read_text(encoding="utf-8").splitlines()
+
+    quick_start_headings = [
+        line for line in readme_lines if line.lower().startswith("### quick start")
+    ]
+
+    assert (
+        len(quick_start_headings) == 1
+    ), "README.md の Quick Start 見出しは単一のセクションに揃えてください。"
+
+    duplicate_quick_start_bullets = [
+        line
+        for line in readme_lines
+        if line.startswith("- ") and "Quick Start" in line
+    ]
+
+    assert not duplicate_quick_start_bullets, (
+        "Quick Start 情報は箇条書きではなく Quick Start セクションに集約してください。"
+    )
