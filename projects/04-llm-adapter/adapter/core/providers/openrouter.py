@@ -368,7 +368,7 @@ class OpenRouterProvider(BaseProvider):
         if sanitized_option_keys:
             _INTERNAL_OPTION_KEYS.update(sanitized_option_keys)
 
-        api_key = self._api_key or option_api_key
+        api_key = option_api_key or self._api_key
         if not api_key:
             resolved_env = self._auth_env_name or "OPENROUTER_API_KEY"
             configured_env = self._configured_auth_env or resolved_env
