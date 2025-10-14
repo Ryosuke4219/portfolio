@@ -12,7 +12,7 @@ SOURCE_ROOT = PROJECT_ROOT / "src"
 TEST_TARGETS: tuple[Path, ...] = (
     PROJECT_ROOT / "tests",
 )
-FORBIDDEN = "src.llm_adapter"
+FORBIDDEN = ".".join(("src", "llm_adapter"))
 
 
 def _collect_references(targets: Iterable[Path]) -> OrderedDict[str, int]:

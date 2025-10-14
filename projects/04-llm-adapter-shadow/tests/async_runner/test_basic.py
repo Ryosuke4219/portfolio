@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import AllFailedError, TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import AsyncRunner, Runner
-import src.llm_adapter.runner_async_modes as runner_async_modes
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from llm_adapter.errors import AllFailedError, TimeoutError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import AsyncRunner, Runner
+import llm_adapter.runner_async_modes as runner_async_modes
+from llm_adapter.runner_config import RunnerConfig, RunnerMode
 
 from .conftest import _AsyncProbeProvider, _CapturingLogger, _FakeClock
 
@@ -18,9 +18,9 @@ from .conftest import _AsyncProbeProvider, _CapturingLogger, _FakeClock
 def test_async_runner_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
     request = ProviderRequest(model="gpt-test", prompt="hi")
     clock = _FakeClock()
-    monkeypatch.setattr("src.llm_adapter.runner_shared.time.monotonic", clock.monotonic)
-    monkeypatch.setattr("src.llm_adapter.runner_shared.time.sleep", clock.sleep)
-    monkeypatch.setattr("src.llm_adapter.runner_shared.asyncio.sleep", clock.async_sleep)
+    monkeypatch.setattr("llm_adapter.runner_shared.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("llm_adapter.runner_shared.time.sleep", clock.sleep)
+    monkeypatch.setattr("llm_adapter.runner_shared.asyncio.sleep", clock.async_sleep)
 
     call_times: list[float] = []
 
@@ -111,7 +111,7 @@ def test_async_runner_strategy_selection(
     ]
     config_kwargs: dict[str, Any] = {"mode": mode}
     if mode == RunnerMode.CONSENSUS:
-        from src.llm_adapter.runner_config import ConsensusConfig
+        from llm_adapter.runner_config import ConsensusConfig
 
         config_kwargs["consensus"] = ConsensusConfig()
     runner = AsyncRunner(providers, config=RunnerConfig(**config_kwargs))
@@ -202,7 +202,7 @@ def test_async_runner_run_metric_uses_response_latency(
     request = ProviderRequest(model="gpt-test", prompt="hello")
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_async_modes.sequential.elapsed_ms",
+        "llm_adapter.runner_async_modes.sequential.elapsed_ms",
         lambda start: 999,
     )
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from src.llm_adapter.observability import EventLogger
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
-from src.llm_adapter.runner_sync import Runner
-from src.llm_adapter.runner_sync_modes import SyncRunContext
+from llm_adapter.observability import EventLogger
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+from llm_adapter.runner_sync import Runner
+from llm_adapter.runner_sync_modes import SyncRunContext
 
 
 class _FailingProvider:

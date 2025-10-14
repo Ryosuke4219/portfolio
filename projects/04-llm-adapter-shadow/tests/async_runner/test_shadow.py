@@ -4,9 +4,9 @@ import asyncio
 import json
 from pathlib import Path
 
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import AsyncRunner
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import AsyncRunner
 
 from .conftest import _CapturingLogger, _run_without_warnings
 

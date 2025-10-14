@@ -4,12 +4,12 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from src.llm_adapter.errors import TimeoutError
-from src.llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_all_sync
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import AsyncRunner, ParallelAllResult, Runner
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
+from llm_adapter.errors import TimeoutError
+from llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_all_sync
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import AsyncRunner, ParallelAllResult, Runner
+from llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 
 from ..parallel_helpers import (
     _install_recording_executor,
@@ -23,7 +23,7 @@ from ..parallel_helpers import (
 
 
 def test_parallel_all_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+    monkeypatch.setattr("llm_adapter.providers.mock.random.random", lambda: 0.0)
     request = ProviderRequest(prompt="hello", model="m")
     providers = [
         MockProvider("p1", base_latency_ms=1, error_markers=set()),

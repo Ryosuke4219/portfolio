@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.ollama import OllamaProvider
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.ollama import OllamaProvider
 
 from tests.helpers.fakes import FakeResponse
 

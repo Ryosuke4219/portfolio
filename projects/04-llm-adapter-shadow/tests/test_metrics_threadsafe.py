@@ -7,7 +7,7 @@ import threading
 from types import SimpleNamespace
 
 import pytest
-from src.llm_adapter.metrics import log_event, PrometheusMetricsExporter
+from llm_adapter.metrics import log_event, PrometheusMetricsExporter
 
 
 @pytest.mark.parametrize("thread_count,event_per_thread", [(8, 200)])

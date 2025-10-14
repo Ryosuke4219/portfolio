@@ -1,7 +1,7 @@
 import dataclasses
 
 import pytest
-from src.llm_adapter.runner_config import ConsensusConfig
+from llm_adapter.runner_config import ConsensusConfig
 
 
 def test_consensus_config_defaults_include_constraints() -> None:
