@@ -5,9 +5,9 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.gemini import GeminiProvider
-from src.llm_adapter.providers.gemini_client import (
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.gemini import GeminiProvider
+from llm_adapter.providers.gemini_client import (
     GeminiModelsAPI,
     GeminiResponsesAPI,
 )
