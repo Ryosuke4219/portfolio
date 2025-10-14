@@ -20,6 +20,12 @@ This catalog lists the primary sources referenced by the `EvidenceLink` entries 
 - Analysis store: `../../projects/03-ci-flaky/data/runs.jsonl` — append with `npx flaky parse --input <junit-xml>`
 - Summary HTML: `npx flaky analyze` generates `../../projects/03-ci-flaky/out/index.html` (downloadable from CI)
 
+## 04. LLM Adapter
+- Product README: `../../projects/04-llm-adapter/README.md`
+- Evidence details: `./llm-adapter.md`
+- Provider configurations: `../../projects/04-llm-adapter/adapter/config/providers`
+- Golden tasks: `../../projects/04-llm-adapter/datasets/golden`
+
 ## Docs Cross Reference
 - Test plan: `../test-plan.md`
 - Defect report sample: `../defect-report-sample.md`
