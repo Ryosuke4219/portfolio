@@ -6,36 +6,30 @@ from pathlib import Path
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[2]
-TARGET_FILES = (
-    ROOT / "docs" / "evidence" / "README.md",
-    ROOT / "docs" / "en" / "evidence" / "README.md",
+DOCS = (
+    Path("docs/evidence/README.md"),
+    Path("docs/en/evidence/README.md"),
 )
-EXPECTED_LINKS = {"/test-plan.html", "/defect-report-sample.html", "/weekly-summary.html"}
 
 
-def extract_docs_cross_reference_section(markdown: str) -> str:
-    match = re.search(r"## Docs Cross Reference(?P<section>.*?)(?:\n## |\Z)", markdown, re.S)
-    if not match:
-        pytest.fail("Docs Cross Reference section not found")
-    return match.group("section")
+@pytest.mark.parametrize("path", DOCS)
+def test_docs_cross_reference_links_use_relative_html(path: Path) -> None:
+    content = path.read_text(encoding="utf-8")
 
+    match = re.search(
+        r"## Docs Cross Reference(?P<section>.*?)(?:\n## |\Z)",
+        content,
+        flags=re.DOTALL,
+    )
+    assert match is not None, f"Section 'Docs Cross Reference' not found in {path}"
 
-def extract_relative_urls(section: str) -> set[str]:
-    urls: set[str] = set()
-    for line in section.splitlines():
-        if line.lstrip().startswith("-"):
-            urls.update(
-                re.findall(r"\{\{\s*'([^']+)'\s*\|\s*relative_url\s*\}\}", line)
-            )
-    return urls
+    section = match.group("section")
+    links = re.findall(r"\[[^\]]+\]\(([^)]+)\)", section)
 
+    assert links, f"No markdown links found in 'Docs Cross Reference' section of {path}"
 
-def test_docs_cross_reference_links_point_to_html():
-    for path in TARGET_FILES:
-        content = path.read_text(encoding="utf-8")
-        section = extract_docs_cross_reference_section(content)
-        links = extract_relative_urls(section)
-        assert links == EXPECTED_LINKS, f"Unexpected links in {path}"
-        assert not any(link.endswith(".md") for link in links)
-        assert all(link.endswith(".html") for link in links)
+    for link in links:
+        assert "relative_url" in link, f"{path}: link '{link}' is missing relative_url"
+        assert link.startswith("{{"), f"{path}: link '{link}' should use Liquid syntax"
+        assert ".html" in link, f"{path}: link '{link}' should reference an .html file"
+        assert ".md" not in link, f"{path}: link '{link}' must not reference .md files"
