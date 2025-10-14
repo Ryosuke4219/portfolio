@@ -1,63 +1,56 @@
-"""docs/development-log-hub.md 内部リンク形式のガードレール。"""
+"""Guardrails for Development Log Hub link formats."""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
-INTERNAL_LINK_PATTERN = re.compile(
-    r"\{\{\s*'/[\w\-/]+\.html'\s*\|\s*relative_url\s*\}\}"
-)
+TARGET_LINKS: dict[str, str] = {
+    "週次サマリ": "/weekly-summary.html",
+    "最新の CI 信頼性レポート": "/reports/latest.html",
+    "コミットサマリ 610-776": "/reports/commit-summary-610-776.html",
+    "Shadow Roadmap": "/04-llm-adapter-shadow-roadmap.html",
+    "Daily Review Checklist": "/daily-review-checklist.html",
+}
 
 
-SECTION_HEADINGS: tuple[str, ...] = (
-    "## 注目ログ",
-    "### 外部配置ログ",
-)
+SECTION_HEADINGS: tuple[str, ...] = ("## 注目ログ", "### 外部配置ログ")
 
 
-def _collect_section_lines(lines: list[str], heading: str) -> list[str]:
-    start_index = next(
-        index for index, line in enumerate(lines) if line.strip() == heading
-    )
+def _iter_section_bullet_lines(lines: list[str], heading: str) -> list[str]:
+    """Return bullet lines that belong to a given heading."""
 
-    collected: list[str] = []
-    heading_level = heading.count("#")
+    try:
+        start_index = lines.index(heading)
+    except ValueError as error:  # pragma: no cover - guard via assertion in caller.
+        raise AssertionError(f"{heading} が docs/development-log-hub.md に見つかりません。") from error
 
+    bullet_lines: list[str] = []
     for line in lines[start_index + 1 :]:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            level = stripped.count("#")
-            if level <= heading_level:
-                break
-        collected.append(line)
-
-    return collected
-
-
-def _extract_link_targets(lines: list[str]) -> list[str]:
-    targets: list[str] = []
-    for line in lines:
-        match = re.search(r"\[[^\]]+\]\(([^)]+)\)", line)
-        if not match:
-            continue
-        target = match.group(1)
-        if target.startswith("http://") or target.startswith("https://"):
-            continue
-        targets.append(target)
-    return targets
+        if heading.startswith("### ") and line.startswith("## "):
+            break
+        if heading.startswith("## ") and line.startswith("## ") and line != heading:
+            break
+        if heading.startswith("### ") and line.startswith("### ") and line != heading:
+            break
+        if line.startswith("- "):
+            bullet_lines.append(line)
+    return bullet_lines
 
 
-def test_development_log_hub_internal_links_use_relative_url_html() -> None:
-    doc_lines = Path("docs/development-log-hub.md").read_text(encoding="utf-8").splitlines()
+def test_development_log_hub_highlight_links_use_relative_url() -> None:
+    content = Path("docs/development-log-hub.md").read_text(encoding="utf-8")
+    lines = content.splitlines()
 
-    offenders: list[str] = []
     for heading in SECTION_HEADINGS:
-        section_lines = _collect_section_lines(doc_lines, heading)
-        for target in _extract_link_targets(section_lines):
-            if not INTERNAL_LINK_PATTERN.fullmatch(target):
-                offenders.append(f"{heading}: {target}")
+        section_bullets = _iter_section_bullet_lines(lines, heading)
+        assert section_bullets, f"{heading} セクションに箇条書きリンクが見つかりません。"
+        for bullet in section_bullets:
+            if "://" in bullet:
+                continue
+            assert ".md" not in bullet, f"{heading} の箇条書きリンクを .html 形式に揃えてください: {bullet}"
 
-    assert not offenders, (
-        "docs/development-log-hub.md の内部リンクは {{ '/path.html' | relative_url }} 形式に統一してください: {targets}"
-    ).format(targets=", ".join(offenders))
+    for label, href in TARGET_LINKS.items():
+        expected = f"[{label}]({{{{ '{href}' | relative_url }}}})"
+        assert expected in content, (
+            "docs/development-log-hub.md の {label} リンクは {{ '/path.html' | relative_url }} 形式に統一してください。"
+        )
