@@ -35,12 +35,11 @@ def _assert_cli_flags(snippet: str) -> None:
     assert prompt_match, "Either --prompts or --prompt-file must be provided"
     prompt_path = prompt_match.group(1).strip().strip("`'\"")
     assert (
-        prompt_path == PROMPTS_DATASET_PATH.as_posix()
-    ), "Use projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl for prompts"
-    assert PROMPTS_DATASET_PATH.exists(), (
-        f"{PROMPTS_DATASET_PATH} is missing"
-    )
-    assert "--prompt " not in normalized, "Avoid legacy --prompt flag"
+        expected_prompts_arg in normalized
+    ), f"CLI は {PROMPTS_PATH} を参照してください"
+    assert "adapter/prompts/demo-04.yaml" not in normalized, "adapter/prompts/demo-04.yaml は存在しません"
+    assert "adapter/prompts/" not in normalized, "adapter/prompts/ ディレクトリは存在しません"
+    assert PROMPTS_PATH.exists(), f"{PROMPTS_PATH} が存在しません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
