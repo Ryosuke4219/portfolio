@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 
-from src.llm_adapter.errors import TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from llm_adapter.errors import TimeoutError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.runner import AsyncRunner, ParallelAllResult
+from llm_adapter.runner_config import RunnerConfig, RunnerMode
 
 from .conftest import (
     _AsyncProbeProvider,
