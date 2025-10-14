@@ -89,7 +89,7 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 - `llm-adapter --provider openai prompt.yaml` runs a single provider, while `python adapter/run_compare.py` records comparison metrics for audits.
 - Reference: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
-[View all weekly summaries &rarr;]({{ '/weekly-summary.html' | relative_url }})
+[View all weekly summaries &rarr;]({{ '/en/weekly-summary.html' | relative_url }})
 
 ## Evidence Library
 
