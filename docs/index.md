@@ -140,7 +140,8 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
     <p>OpenAI / Azure / ローカルモックを統合し、比較ランと本番フォールバックを両立する LLM アダプタ。</p>
     <ul>
       <li>プロバイダ統合レイヤーでトレースを共通化し、切替や多重呼び出しを安全に制御。</li>
-      <li>比較 CLI <code>pnpm llm-adapter compare</code> が差分メトリクスを JSONL に出力し監査ログへ接続。</li>
+      <li><code>llm-adapter --provider openai prompt.yaml</code> で単発実行し、<code>python adapter/run_compare.py</code> が比較ランを一括管理。</li>
+      <li>差分メトリクスは <code>data/runs-metrics.jsonl</code> に JSONL で蓄積し、監査ログへ接続。</li>
     </ul>
     <p><a class="demo-card__link" href="{{ '/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
@@ -172,7 +173,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 
 ### 04. LLM Adapter — Provider Orchestration
 - OpenAI / Azure / ローカルモックを共通トレースで束ね、フォールバック設計と多重呼び出しを両立。
-- `pnpm llm-adapter compare` でプロバイダ比較を実行し、差分メトリクスを JSONL にエクスポート。
+- `llm-adapter --provider openai prompt.yaml` で単発実行し、`python adapter/run_compare.py` が比較ランを `data/runs-metrics.jsonl` に記録。
 - 参考資料: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
 [週次サマリの一覧を見る &rarr;]({{ '/weekly-summary.html' | relative_url }})
