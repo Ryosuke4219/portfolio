@@ -183,7 +183,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 ## Evidence Library {#evidence-library}
 
 - [QA Evidence Catalog](./evidence/README.md)
-- [テスト計画書](./test-plan.md)
+- [テスト計画書]({{ '/test-plan.html' | relative_url }})
 - [欠陥レポートサンプル](./defect-report-sample.md)
 
 ## 運用メモ {#operations-notes}

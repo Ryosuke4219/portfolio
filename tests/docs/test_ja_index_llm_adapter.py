@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
+
+from pathlib import Path
 
 
 CLI_PROVIDER_PATTERN = re.compile(
@@ -38,6 +39,14 @@ def _assert_cli_flags(snippet: str) -> None:
     assert any(path.exists() for path in candidate_paths), (
         f"{prompt_path} の実体が存在しません"
     )
+    prompt_match = PROMPT_FLAG_PATTERN.search(snippet_without_tags)
+    assert prompt_match, "--prompt 系フラグからパスを抽出できません"
+    prompt_path = prompt_match.group(1)
+    assert (
+        prompt_path == EXPECTED_PROMPT_PATH.as_posix()
+    ), "--prompt 系フラグが examples/prompts/ja_one_liner.jsonl を指していません"
+    resolved = _resolve_prompt_path(prompt_path)
+    assert resolved.exists(), f"{resolved} が存在しません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
