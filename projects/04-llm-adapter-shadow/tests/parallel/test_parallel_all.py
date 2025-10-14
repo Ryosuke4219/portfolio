@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+
 from llm_adapter.errors import TimeoutError
 from llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_all_sync
 from llm_adapter.provider_spi import ProviderRequest
