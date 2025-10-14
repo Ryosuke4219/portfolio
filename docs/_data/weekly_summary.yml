@@ -1,0 +1,19 @@
+report_date: 2025-10-13
+total_tests: 126
+pass_rate_percent: "97.62%"
+new_defects: 0
+total_failures: 3
+top_failure_kinds:
+  - name: rate_limit
+    count: 1
+  - name: http_5xx
+    count: 1
+  - name: timeout
+    count: 1
+openrouter_failures:
+  - label: "RateLimitError (429)"
+    count: 1
+    rate_percent: "50.0"
+  - label: "RetriableError (5xx)"
+    count: 1
+    rate_percent: "50.0"
