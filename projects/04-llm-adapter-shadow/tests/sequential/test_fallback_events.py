@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import AuthError, TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.runner_config import RunnerConfig
-from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
-from src.llm_adapter.runner_sync_modes import SequentialStrategy
+from llm_adapter.errors import AuthError, TimeoutError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.runner_config import RunnerConfig
+from llm_adapter.runner_sync import ProviderInvocationResult, Runner
+from llm_adapter.runner_sync_modes import SequentialStrategy
 
 from .conftest import _FailingProvider, _make_context, _RecordingLogger
 

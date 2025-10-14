@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import AllFailedError, TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.runner_config import RunnerConfig
-from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
-from src.llm_adapter.runner_sync_modes import SequentialStrategy
+from llm_adapter.errors import AllFailedError, TimeoutError
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.runner_config import RunnerConfig
+from llm_adapter.runner_sync import ProviderInvocationResult, Runner
+from llm_adapter.runner_sync_modes import SequentialStrategy
 
 from .conftest import _FailingProvider, _make_context, _RecordingLogger
 
@@ -77,7 +77,7 @@ def test_sequential_strategy_all_failed_logs_once(monkeypatch: pytest.MonkeyPatc
         log_calls.append((args, kwargs))
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync_sequential.log_run_metric",
+        "llm_adapter.runner_sync_sequential.log_run_metric",
         fake_log_run_metric,
     )
 
