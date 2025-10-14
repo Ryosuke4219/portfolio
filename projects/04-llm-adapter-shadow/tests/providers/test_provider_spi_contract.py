@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from llm_adapter.provider_spi import (
     ProviderRequest,
     ProviderResponse,
