@@ -1,57 +1,59 @@
-"""Guardrails for Development Log Hub link formats."""
+"""開発ログハブの内部リンク形式を検証するテスト。"""
 
 from __future__ import annotations
 
 from pathlib import Path
 import re
 
-TARGET_LINKS: dict[str, str] = {
-    "週次サマリ": "/weekly-summary.html",
-    "最新の CI 信頼性レポート": "/reports/latest.html",
-    "コミットサマリ 610-776": "/reports/commit-summary-610-776.html",
-    "Shadow Roadmap": "/04-llm-adapter-shadow-roadmap.html",
-    "Daily Review Checklist": "/daily-review-checklist.html",
-}
+
+DOC_PATH = Path("docs/development-log-hub.md")
 
 
-SECTION_HEADINGS: tuple[str, ...] = ("## 注目ログ", "### 外部配置ログ")
+def _extract_section(text: str, start_marker: str, end_markers: tuple[str, ...]) -> str:
+    start_index = text.find(start_marker)
+    if start_index == -1:
+        raise AssertionError(f"section start marker not found: {start_marker!r}")
+
+    end_index = len(text)
+    for marker in end_markers:
+        marker_index = text.find(marker, start_index + len(start_marker))
+        if marker_index != -1:
+            end_index = min(end_index, marker_index)
+
+    return text[start_index:end_index]
 
 
-def _iter_section_bullet_lines(lines: list[str], heading: str) -> list[str]:
-    """Return bullet lines that belong to a given heading."""
-
-    try:
-        start_index = lines.index(heading)
-    except ValueError as error:  # pragma: no cover - guard via assertion in caller.
-        raise AssertionError(f"{heading} が docs/development-log-hub.md に見つかりません。") from error
-
-    bullet_lines: list[str] = []
-    for line in lines[start_index + 1 :]:
-        if heading.startswith("### ") and line.startswith("## "):
-            break
-        if heading.startswith("## ") and line.startswith("## ") and line != heading:
-            break
-        if heading.startswith("### ") and line.startswith("### ") and line != heading:
-            break
-        if line.startswith("- "):
-            bullet_lines.append(line)
-    return bullet_lines
+def _relative_links(section: str) -> set[str]:
+    pattern = re.compile(r"\{\{\s*['\"]([^'\"]+)['\"]\s*\|\s*relative_url\s*\}\}")
+    return {match.group(1) for match in pattern.finditer(section)}
 
 
-def test_development_log_hub_highlight_links_use_relative_url() -> None:
-    content = Path("docs/development-log-hub.md").read_text(encoding="utf-8")
-    lines = content.splitlines()
+def test_featured_logs_use_relative_html_links() -> None:
+    text = DOC_PATH.read_text(encoding="utf-8")
+    section = _extract_section(text, "## 注目ログ", ("\n## ",))
+    links = _relative_links(section)
 
-    for heading in SECTION_HEADINGS:
-        section_bullets = _iter_section_bullet_lines(lines, heading)
-        assert section_bullets, f"{heading} セクションに箇条書きリンクが見つかりません。"
-        for bullet in section_bullets:
-            if "://" in bullet:
-                continue
-            assert ".md" not in bullet, f"{heading} の箇条書きリンクを .html 形式に揃えてください: {bullet}"
+    expected = {
+        "/weekly-summary.html",
+        "/reports/latest.html",
+        "/reports/commit-summary-610-776.html",
+        "/04/progress-2025-10-04.html",
+    }
 
-    for label, href in TARGET_LINKS.items():
-        expected = f"[{label}]({{{{ '{href}' | relative_url }}}})"
-        assert expected in content, (
-            "docs/development-log-hub.md の {label} リンクは {{ '/path.html' | relative_url }} 形式に統一してください。"
-        )
+    assert links == expected
+    assert not any(link.endswith(".md") for link in links)
+
+
+def test_external_storage_logs_use_relative_html_links() -> None:
+    text = DOC_PATH.read_text(encoding="utf-8")
+    section = _extract_section(text, "### 外部配置ログ", tuple())
+    links = _relative_links(section)
+
+    expected = {
+        "/04-llm-adapter-shadow-roadmap.html",
+        "/daily-review-checklist.html",
+        "/04/progress-2025-10-04.html",
+    }
+
+    assert links == expected
+    assert not any(link.endswith(".md") for link in links)

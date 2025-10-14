@@ -22,7 +22,7 @@ hub_sections:
 
 - [週次サマリ]({{ '/weekly-summary.html' | relative_url }}): `just weekly-summary` で生成される障害サマリと KPI ハイライト。
 - [最新の CI 信頼性レポート]({{ '/reports/latest.html' | relative_url }}): 直近 7 日間のパスレートとフレークテストランキング、ソース JSON へのリンク付き。
-- [進捗レビュー（2025-10-04）](https://github.com/Ryosuke4219/portfolio/blob/main/docs/04/progress-2025-10-04.md): Provider 統合や影計測の検証ログをまとめた進捗ノート。
+- [進捗レビュー（2025-10-04）]({{ '/04/progress-2025-10-04.html' | relative_url }}): Provider 統合や影計測の検証ログをまとめた進捗ノート。
 - [コミットサマリ 610-776]({{ '/reports/commit-summary-610-776.html' | relative_url }}): 直近 PR 群の変更要約とフォローアップタスク。
 
 ## カテゴリ別インデックス
@@ -50,4 +50,4 @@ hub_sections:
 
 - [Shadow Roadmap]({{ '/04-llm-adapter-shadow-roadmap.html' | relative_url }}): LLM Adapter のマイルストーンとリスク整理。
 - [Daily Review Checklist]({{ '/daily-review-checklist.html' | relative_url }}): 日次レビュー用のチェックリスト。
-- [04 LLM Adapter 進捗レビュー（2025-10-04）](https://github.com/Ryosuke4219/portfolio/blob/main/docs/04/progress-2025-10-04.md): レポジトリ外配置のため外部参照で提供。
+- [04 LLM Adapter 進捗レビュー（2025-10-04）]({{ '/04/progress-2025-10-04.html' | relative_url }}): サイト内ビルドされた検証ログを参照。
