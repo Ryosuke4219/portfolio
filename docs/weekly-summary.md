@@ -1,9 +1,15 @@
 {% assign summary = site.data.weekly_summary %}
 # LLM Adapter 週次サマリ
 
+## {{ summary.report_date }} 時点の主要KPI
+
+- 総テスト数: {{ summary.total_tests }}
+- 成功率: {{ summary.pass_rate_percent }}
+- 新規欠陥数: {{ summary.new_defects }}
+
 ## {{ summary.report_date }} 時点の失敗サマリ
 
-- 失敗総数: {{ summary.total_failures }}
+- 失敗件数: {{ summary.total_failures }}
 
 | Rank | Failure Kind | Count |
 | ---: | :----------- | ----: |
