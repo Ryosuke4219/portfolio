@@ -32,6 +32,9 @@ def _register_module_alias(actual_name: str, alias_name: str) -> ModuleType:
 
 
 _SRC_PREFIX = "src."
+_PACKAGE_NAME = __name__.split(".", 1)[-1]
+_SHADOW_PACKAGE = f"{_SRC_PREFIX}{_PACKAGE_NAME}"
+_SHADOW_PREFIX = f"{_SHADOW_PACKAGE}."
 
 
 def _strip_src_prefix(name: str) -> str:
@@ -110,7 +113,7 @@ class _AliasFinder(importlib.abc.MetaPathFinder):
     ) -> ModuleSpec | None:
         if not fullname.startswith("llm_adapter."):
             return None
-        actual_name = ".".join(("src", fullname))
+        actual_name = f"{_SRC_PREFIX}{fullname}"
         actual_spec = importlib.util.find_spec(actual_name)
         if actual_spec is None:
             return None
@@ -131,7 +134,7 @@ class _ActualAliasFinder(importlib.abc.MetaPathFinder):
         path: object,
         target: ModuleType | None = None,
     ) -> ModuleSpec | None:
-        if not fullname.startswith("src.llm_adapter."):
+        if not fullname.startswith(_SHADOW_PREFIX):
             return None
         alias_name = _strip_src_prefix(fullname)
         alias_module = sys.modules.get(alias_name)
