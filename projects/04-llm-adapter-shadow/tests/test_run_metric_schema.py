@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from llm_adapter.provider_spi import ProviderRequest
 from llm_adapter.runner import Runner, RunnerConfig
 from llm_adapter.runner_config import RunnerMode
+import pytest
 
 from .shadow._runner_test_helpers import _SuccessProvider, FakeLogger
 
