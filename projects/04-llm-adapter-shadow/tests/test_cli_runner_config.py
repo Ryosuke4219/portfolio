@@ -4,15 +4,16 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from src.llm_adapter import cli
-from src.llm_adapter.runner import AsyncRunner, Runner
-from src.llm_adapter.runner_config import (
+
+from llm_adapter import cli
+from llm_adapter.runner import AsyncRunner, Runner
+from llm_adapter.runner_config import (
     ConsensusConfig,
     DEFAULT_MAX_CONCURRENCY,
     RunnerConfig,
     RunnerMode,
 )
-from src.llm_adapter.shadow import DEFAULT_METRICS_PATH
+from llm_adapter.shadow import DEFAULT_METRICS_PATH
 
 
 @pytest.mark.parametrize(

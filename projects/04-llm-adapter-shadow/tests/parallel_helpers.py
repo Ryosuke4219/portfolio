@@ -8,8 +8,8 @@ import time
 from typing import Any
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.providers.mock import MockProvider
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.providers.mock import MockProvider
 
 __all__ = [
     "RecordingLogger",
@@ -124,7 +124,7 @@ def _install_recording_executor(
             created.append(self)
 
     monkeypatch.setattr(
-        "src.llm_adapter.parallel_exec.ThreadPoolExecutor",
+        "llm_adapter.parallel_exec.ThreadPoolExecutor",
         _Factory,
     )
     return created

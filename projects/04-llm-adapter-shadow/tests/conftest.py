@@ -13,10 +13,14 @@ CORE_ROOT = PROJECT_ROOT.parent / "04-llm-adapter"
 if str(CORE_ROOT) not in sys.path:
     sys.path.insert(0, str(CORE_ROOT))
 
+SHADOW_SRC_ROOT = PROJECT_ROOT / "src"
+if str(SHADOW_SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SHADOW_SRC_ROOT))
+
 
 @pytest.fixture(autouse=True)
 def _fast_mock_provider_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.llm_adapter.providers.mock.time.sleep", lambda *args, **kwargs: None)
+    monkeypatch.setattr("llm_adapter.providers.mock.time.sleep", lambda *args, **kwargs: None)
 
 
 @pytest.fixture(autouse=True)
