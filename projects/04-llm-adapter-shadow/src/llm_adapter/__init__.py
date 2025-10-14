@@ -31,6 +31,15 @@ def _register_module_alias(actual_name: str, alias_name: str) -> ModuleType:
     return actual_module
 
 
+_SRC_PREFIX = "src."
+
+
+def _strip_src_prefix(name: str) -> str:
+    if name.startswith(_SRC_PREFIX):
+        return name[len(_SRC_PREFIX):]
+    return name
+
+
 class _AliasLoader(importlib.abc.Loader):
     def __init__(self, alias_name: str, actual_name: str) -> None:
         self._alias_name = alias_name
@@ -124,7 +133,7 @@ class _ActualAliasFinder(importlib.abc.MetaPathFinder):
     ) -> ModuleSpec | None:
         if not fullname.startswith("src.llm_adapter."):
             return None
-        alias_name = fullname.removeprefix("src.")
+        alias_name = _strip_src_prefix(fullname)
         alias_module = sys.modules.get(alias_name)
         if alias_module is not None:
             spec = ModuleSpec(
@@ -165,7 +174,7 @@ def _install_aliases() -> None:
     public_prefix = f"{package_name}."
     for name in list(sys.modules):
         if name == src_package or name.startswith(shadow_prefix):
-            _register_module_alias(name, name.removeprefix("src."))
+            _register_module_alias(name, _strip_src_prefix(name))
         if name == package_name or name.startswith(public_prefix):
             _register_module_alias(name, ".".join(("src", name)))
 
