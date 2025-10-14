@@ -67,7 +67,7 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 
 ## Weekly Summary
 
-{% include weekly-summary-card.md link_text="Read the weekly summary" link_url="/en/weekly-summary.html" %}
+{% include weekly-summary-card.md locale="en" %}
 
 ### 01. Spec to Cases
 - Minimal pipeline that generates test cases from specification Markdown.
