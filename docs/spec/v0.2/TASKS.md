@@ -8,6 +8,13 @@
 - 対応状況: `collect_prompts` は `prompt_file` を UTF-8 で読み込み、末尾の `\r\n` を除去してからプロンプト一覧に追加する。`read_jsonl_prompts` も BOM 付き JSONL 行を `lstrip("\ufeff")` で正規化してから `json.loads` を実行し、辞書・文字列のどちらも既存キー順で解決している。【F:projects/04-llm-adapter/adapter/cli/prompt_io.py†L18-L71】
 - 品質エビデンス: `projects/04-llm-adapter/tests/test_cli_prompt_io.py` が CRLF 付きテキストと BOM 付き JSONL の双方を読み込めることを回帰テストとして検証済み。【F:projects/04-llm-adapter/tests/test_cli_prompt_io.py†L1-L21】
 
+### タスク17: CLI 単発プロンプトテスト分割チェックリスト（進行中）
+- [x] `test_prompt_flow.py` へ基本フロー系テストを移設し、従来の CLI 期待値を維持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L1-L198】
+- [x] `test_provider_errors.py` へエラー種別テストを移設し、終了コードの回帰を担保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py†L1-L94】
+- [x] `test_credentials.py` へ資格情報関連テストを集約し、API キー伝播の整合性を確保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L172】
+- [x] `test_openrouter_flow.py` へ OpenRouter 専用テストを分離し、認証パスの回帰を保持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L1-L74】
+- [ ] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L6】
+
 ## Datasets / ゴールデン検証
 
 ### タスク2: `load_golden_tasks` を UTF-8 BOM と行番号付きエラーへ対応させる（対応済み）
