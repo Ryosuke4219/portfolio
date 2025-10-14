@@ -3,7 +3,7 @@
 ## ✔ Milestone Overview
 | Milestone | Week (JST) | 目的 | 主な成果物 | 進捗 |
 | --- | --- | --- | --- | --- |
-| **M0 — SRS確定 & 骨子固定** | Week40: 2025-09-29〜10-05 | SRS最終化 | `04/llm-adapter-srs.md`最終版 / 参照アーキ図 / M1〜M6 Exit Criteria | ✅ 完了（2025-10-04 SRS v1.0確定・用語集統合完了） |
+| **M0 — SRS確定 & 骨子固定** | Week40: 2025-09-29〜10-05 | SRS最終化 | `docs/04/llm-adapter-srs.md`最終版 / 参照アーキ図 / M1〜M6 Exit Criteria | ✅ 完了（2025-10-04 SRS v1.0確定・用語集統合完了） |
 | **M1 — Core SPI & Runner** | Week40-41: 〜10-12 | SPI/Runner骨格 | ProviderSPI/Request/Response安定化 / `SequentialAttemptExecutor` / 最小UT | ✅ 完了（`projects/04-llm-adapter/tests/runner_retry/test_rate_limit_failover.py`でレート制限リトライとフォールバック遷移を検証済） |
 | **M2 — Shadow & Metrics** | Week41: 10-06〜10-12 | 影実行+計測 | `ShadowRunner`経由の影計測 / `artifacts/runs-metrics.jsonl`スキーマ / 異常系テスト | ✅ 完了（比較実行APIとJSONLスキーマv1を`projects/04-llm-adapter`へ反映） |
 | **M3 — Providers** | Week42: 10-13〜10-19 | 実プロバイダ実装 | Simulated/OpenAI/Gemini登録 / ストリーミング透過 / 契約テスト（OpenRouter 429/5xx 週次集計とストリーミングプローブ運用を完了） | ✅ 完了（OpenRouter 429/5xx 週次集計パイプラインとストリーミングプローブを導入し、Evidence を docs/spec/v0.2/TASKS.md に統合済[^provider-registry]） |
@@ -14,9 +14,9 @@
 ---
 
 ## M0 — SRS確定 & 骨子固定
-**進捗**: ✅ SRS v1.0（2025-09-30）を公開し、用語集・JSONL互換方針を`04/llm-adapter-srs.md`へ反映済。
+**進捗**: ✅ SRS v1.0（2025-09-30）を公開し、用語集・JSONL互換方針を`docs/04/llm-adapter-srs.md`へ反映済。
 **成果物**: SRS最終版・参照アーキ図・Exit Criteria併記。
-**Exit Criteria**: 用語(Shadow/フォールバック/JSONL/異常)を一意定義、M1〜M6受け入れ条件を明文化、`04/`にSRSと図版格納・リンク健全。
+**Exit Criteria**: 用語(Shadow/フォールバック/JSONL/異常)を一意定義、M1〜M6受け入れ条件を明文化、`docs/04/`にSRSと図版格納・リンク健全。
 **タスク**: 用語集統合 / 例外→共通例外マップ表追加 / JSONLスキーマv1＋後方互換方針記述。
 
 ## M1 — Core SPI & Runner
@@ -49,7 +49,10 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 - CLI API キー透過は [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までの経路を回帰確認。
 - ストリーミングプローブ検証は [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) でリアルタイム監視フローを証跡化。
 
-**タスク**: 完了。
+**タスク**:
+- OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。
+- CLI でリテラル指定された OpenRouter API キーが `ProviderRequest.options["api_key"]` まで透過する経路を整備し、ギャップを再現する回帰テストを追加する。
+- OpenRouter 用の env/CLI マッピングと参照ドキュメントを更新し、`OPENROUTER_API_KEY` などのリテラル指定と必須項目の整合、および `options["api_key"]` 配線手順の明示を保証する。
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
