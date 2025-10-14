@@ -7,12 +7,11 @@ import pytest
 
 pytest.importorskip("src.llm_adapter.errors")
 
-from src.llm_adapter.errors import AllFailedError as ShadowAllFailedError
-
 from adapter.core.datasets import GoldenTask
 from adapter.core.errors import AllFailedError as AdapterAllFailedError
 from adapter.core.runner_execution import SingleRunResult
 from adapter.core.runner_execution_parallel import ParallelAttemptExecutor
+from src.llm_adapter.errors import AllFailedError as ShadowAllFailedError
 
 try:  # pragma: no cover - 型補完と後方互換用
     from adapter.core.runner_api import RunnerConfig, RunnerMode
