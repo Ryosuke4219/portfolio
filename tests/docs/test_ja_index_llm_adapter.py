@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
+
+from pathlib import Path
 
 
 CLI_PROVIDER_PATTERN = re.compile(
@@ -16,6 +17,19 @@ CLI_PROMPT_PATTERNS = tuple(
         r"--prompts(?:\s|=)",
     )
 )
+PROMPT_FLAG_PATTERN = re.compile(
+    r"--(?:prompt|prompt-file|prompts)(?:\s+|=)([^\s`]+)",
+    re.IGNORECASE,
+)
+EXPECTED_PROMPT_PATH = Path("examples/prompts/ja_one_liner.jsonl")
+
+
+def _resolve_prompt_path(prompt_path: str) -> Path:
+    path = Path(prompt_path)
+    if path.exists():
+        return path
+    candidate = Path("projects/04-llm-adapter") / path
+    return candidate
 
 
 def _normalize_text(value: str) -> str:
@@ -23,13 +37,22 @@ def _normalize_text(value: str) -> str:
 
 
 def _assert_cli_flags(snippet: str) -> None:
-    normalized = _normalize_text(re.sub(r"<[^>]+>", " ", snippet))
+    snippet_without_tags = re.sub(r"<[^>]+>", " ", snippet)
+    normalized = _normalize_text(snippet_without_tags)
     assert CLI_PROVIDER_PATTERN.search(
         normalized
     ), "--provider adapter/config/providers/*.yaml が不足しています"
     assert any(pattern.search(normalized) for pattern in CLI_PROMPT_PATTERNS), (
         "--prompt / --prompt-file / --prompts のいずれかが不足しています"
     )
+    prompt_match = PROMPT_FLAG_PATTERN.search(snippet_without_tags)
+    assert prompt_match, "--prompt 系フラグからパスを抽出できません"
+    prompt_path = prompt_match.group(1)
+    assert (
+        prompt_path == EXPECTED_PROMPT_PATH.as_posix()
+    ), "--prompt 系フラグが examples/prompts/ja_one_liner.jsonl を指していません"
+    resolved = _resolve_prompt_path(prompt_path)
+    assert resolved.exists(), f"{resolved} が存在しません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
