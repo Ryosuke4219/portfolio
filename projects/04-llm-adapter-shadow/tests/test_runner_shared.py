@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import pytest
+
 from llm_adapter.errors import ProviderSkip
 from llm_adapter.observability import EventLogger
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from llm_adapter.runner_shared import log_provider_call, log_run_metric
-import pytest
 
 
 class _RecordingLogger(EventLogger):
