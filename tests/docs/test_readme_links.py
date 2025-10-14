@@ -56,6 +56,27 @@ def test_readme_shadow_references_stay_within_allowlist() -> None:
         ).format(word=red_word, allowed=", ".join(ALLOWED_SHADOW_TERMS))
 
 
+def test_readme_quick_start_commands_are_scoped_to_section() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    heading = "### Quick Start (JA / EN)"
+    assert readme.count(heading) == 1, "Quick Start セクション見出しを1箇所に統一してください。"
+
+    heading_position = readme.index(heading)
+    quick_start_commands = (
+        "just setup",
+        "just test",
+        "just lint",
+        "just report",
+        "just openrouter-stream-probe",
+        "just openrouter-stats",
+    )
+
+    for command in quick_start_commands:
+        assert command in readme, f"Quick Start セクションから {command!r} が見つかりません。"
+        assert (
+            readme.index(command) > heading_position
+        ), f"Quick Start コマンド {command!r} は {heading!r} セクション以外に記載しないでください。"
 def test_readme_quick_start_is_single_section() -> None:
     readme_lines = Path("README.md").read_text(encoding="utf-8").splitlines()
 
