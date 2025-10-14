@@ -1,63 +1,59 @@
-"""docs/development-log-hub.md 内部リンク形式のガードレール。"""
+"""開発ログハブの内部リンク形式を検証するテスト。"""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
-
-INTERNAL_LINK_PATTERN = re.compile(
-    r"\{\{\s*'/[\w\-/]+\.html'\s*\|\s*relative_url\s*\}\}"
-)
+import re
 
 
-SECTION_HEADINGS: tuple[str, ...] = (
-    "## 注目ログ",
-    "### 外部配置ログ",
-)
+DOC_PATH = Path("docs/development-log-hub.md")
 
 
-def _collect_section_lines(lines: list[str], heading: str) -> list[str]:
-    start_index = next(
-        index for index, line in enumerate(lines) if line.strip() == heading
-    )
+def _extract_section(text: str, start_marker: str, end_markers: tuple[str, ...]) -> str:
+    start_index = text.find(start_marker)
+    if start_index == -1:
+        raise AssertionError(f"section start marker not found: {start_marker!r}")
 
-    collected: list[str] = []
-    heading_level = heading.count("#")
+    end_index = len(text)
+    for marker in end_markers:
+        marker_index = text.find(marker, start_index + len(start_marker))
+        if marker_index != -1:
+            end_index = min(end_index, marker_index)
 
-    for line in lines[start_index + 1 :]:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            level = stripped.count("#")
-            if level <= heading_level:
-                break
-        collected.append(line)
-
-    return collected
+    return text[start_index:end_index]
 
 
-def _extract_link_targets(lines: list[str]) -> list[str]:
-    targets: list[str] = []
-    for line in lines:
-        match = re.search(r"\[[^\]]+\]\(([^)]+)\)", line)
-        if not match:
-            continue
-        target = match.group(1)
-        if target.startswith("http://") or target.startswith("https://"):
-            continue
-        targets.append(target)
-    return targets
+def _relative_links(section: str) -> set[str]:
+    pattern = re.compile(r"\{\{\s*['\"]([^'\"]+)['\"]\s*\|\s*relative_url\s*\}\}")
+    return {match.group(1) for match in pattern.finditer(section)}
 
 
-def test_development_log_hub_internal_links_use_relative_url_html() -> None:
-    doc_lines = Path("docs/development-log-hub.md").read_text(encoding="utf-8").splitlines()
+def test_featured_logs_use_relative_html_links() -> None:
+    text = DOC_PATH.read_text(encoding="utf-8")
+    section = _extract_section(text, "## 注目ログ", ("\n## ",))
+    links = _relative_links(section)
 
-    offenders: list[str] = []
-    for heading in SECTION_HEADINGS:
-        section_lines = _collect_section_lines(doc_lines, heading)
-        for target in _extract_link_targets(section_lines):
-            if not INTERNAL_LINK_PATTERN.fullmatch(target):
-                offenders.append(f"{heading}: {target}")
+    expected = {
+        "/weekly-summary.html",
+        "/reports/latest.html",
+        "/reports/commit-summary-610-776.html",
+        "/04/progress-2025-10-04.html",
+    }
 
-    assert not offenders, (
-        "docs/development-log-hub.md の内部リンクは {{ '/path.html' | relative_url }} 形式に統一してください: {targets}"
-    ).format(targets=", ".join(offenders))
+    assert links == expected
+    assert not any(link.endswith(".md") for link in links)
+
+
+def test_external_storage_logs_use_relative_html_links() -> None:
+    text = DOC_PATH.read_text(encoding="utf-8")
+    section = _extract_section(text, "### 外部配置ログ", tuple())
+    links = _relative_links(section)
+
+    expected = {
+        "/04-llm-adapter-shadow-roadmap.html",
+        "/daily-review-checklist.html",
+        "/04/progress-2025-10-04.html",
+    }
+
+    assert links == expected
+    assert not any(link.endswith(".md") for link in links)
