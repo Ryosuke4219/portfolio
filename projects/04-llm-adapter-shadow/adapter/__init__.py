@@ -19,6 +19,6 @@ if _CORE_REPO_ADAPTER.exists():
     _spec.loader.exec_module(_module)
     globals().update({k: v for k, v in _module.__dict__.items() if k != "__dict__"})
 else:
-    from .core.config import ConfigError, ProviderConfig, load_provider_config
+    from .core.config import ConfigError, load_provider_config, ProviderConfig
 
     __all__ = ["ConfigError", "ProviderConfig", "load_provider_config"]
