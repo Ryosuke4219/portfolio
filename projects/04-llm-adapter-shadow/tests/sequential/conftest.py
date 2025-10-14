@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
+import time
 from typing import Any
 
 from llm_adapter.observability import EventLogger
