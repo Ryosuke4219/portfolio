@@ -97,3 +97,14 @@ def test_readme_quick_start_is_single_section() -> None:
     assert not duplicate_quick_start_bullets, (
         "Quick Start 情報は箇条書きではなく Quick Start セクションに集約してください。"
     )
+
+    intro_lines = readme_lines[:40]
+    intro_mentions = [
+        line
+        for line in intro_lines
+        if "Quick Start" in line and line.strip().startswith("- ")
+    ]
+
+    assert not intro_mentions, (
+        "README.md 冒頭は Quick Start 箇条書きではなく Quick Start セクションへの導線に統一してください。"
+    )
