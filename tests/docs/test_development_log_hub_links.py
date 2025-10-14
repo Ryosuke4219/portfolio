@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 TARGET_LINKS: dict[str, str] = {
     "週次サマリ": "/weekly-summary.html",

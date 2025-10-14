@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-
 CLI_PROVIDER_PATTERN = re.compile(
     r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
     re.IGNORECASE,
@@ -35,7 +34,6 @@ def _assert_cli_flags(snippet: str) -> None:
         if prompt_match:
             break
     assert prompt_match, "Either --prompts or --prompt-file must be provided"
-    prompt_path = prompt_match.group(1).strip().strip("`'\"")
     assert (
         expected_prompts_arg in normalized
     ), f"CLI は {PROMPTS_PATH} を参照してください"
