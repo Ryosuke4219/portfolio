@@ -1,11 +1,11 @@
+import pytest
+
 from llm_adapter.errors import RetriableError, TimeoutError
 from llm_adapter.parallel_exec import ParallelExecutionError
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from llm_adapter.providers.mock import MockProvider
 from llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from llm_adapter.runner_sync import ProviderInvocationResult, Runner
-import pytest
-
 from tests.shadow._runner_test_helpers import _SuccessProvider
 
 
