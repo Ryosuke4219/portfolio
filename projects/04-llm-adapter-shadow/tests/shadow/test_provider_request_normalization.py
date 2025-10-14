@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, TYPE_CHECKING
 
+import pytest
+
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
-
-import pytest
 from llm_adapter import provider_spi as provider_spi_module
 from llm_adapter.provider_spi import ProviderRequest
 

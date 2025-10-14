@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import pytest
+
 from llm_adapter.errors import (
     AllFailedError,
     AuthError,
