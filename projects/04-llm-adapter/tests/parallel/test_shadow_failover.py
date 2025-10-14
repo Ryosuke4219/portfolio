@@ -5,13 +5,16 @@ from enum import Enum
 
 import pytest
 
-pytest.importorskip("src.llm_adapter.errors")
-
 from adapter.core.datasets import GoldenTask
 from adapter.core.errors import AllFailedError as AdapterAllFailedError
 from adapter.core.runner_execution import SingleRunResult
 from adapter.core.runner_execution_parallel import ParallelAttemptExecutor
-from src.llm_adapter.errors import AllFailedError as ShadowAllFailedError
+
+try:
+    from src.llm_adapter.errors import AllFailedError as ShadowAllFailedError
+except ImportError:  # pragma: no cover - Shadow adapter 未導入環境向け
+    ShadowAllFailedError = AdapterAllFailedError  # type: ignore[assignment]
+    pytest.importorskip("src.llm_adapter.errors")
 
 try:  # pragma: no cover - 型補完と後方互換用
     from adapter.core.runner_api import RunnerConfig, RunnerMode
