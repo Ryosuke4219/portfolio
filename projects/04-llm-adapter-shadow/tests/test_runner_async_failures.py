@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 from llm_adapter.errors import RetriableError
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from llm_adapter.runner_async import AllFailedError, AsyncRunner
 from llm_adapter.runner_config import RunnerConfig, RunnerMode
+import pytest
 
 from tests.shadow._runner_test_helpers import _ErrorProvider, _SuccessProvider, FakeLogger
 
