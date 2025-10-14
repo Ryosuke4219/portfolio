@@ -1,6 +1,7 @@
 import dataclasses
 
 import pytest
+
 from llm_adapter.runner_config import ConsensusConfig
 
 
