@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+
 from llm_adapter.parallel_exec import (
     ParallelExecutionError,
     run_parallel_any_sync,
