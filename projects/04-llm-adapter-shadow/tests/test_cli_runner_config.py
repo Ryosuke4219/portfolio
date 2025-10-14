@@ -71,6 +71,7 @@ def test_build_runner_config_uses_defaults(tmp_path: Path) -> None:
 
     config = cli.build_runner_config(args)
 
+    assert config.__class__ is RunnerConfig
     assert config == RunnerConfig(mode=RunnerMode.SEQUENTIAL)
     assert config.max_concurrency == DEFAULT_MAX_CONCURRENCY
     assert config.metrics_path == DEFAULT_METRICS_PATH
