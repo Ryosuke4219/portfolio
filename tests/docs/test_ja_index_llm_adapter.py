@@ -5,10 +5,17 @@ import re
 
 
 CLI_PROVIDER_PATTERN = re.compile(
-    r"llm-adapter[^\n`]*--provider\s+adapter/config/providers/[\w-]+\.ya?ml",
+    r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
     re.IGNORECASE,
 )
-CLI_PROMPT_PATTERN = re.compile(r"--prompt(?:-file|s)?(?:\s|=)", re.IGNORECASE)
+CLI_PROMPT_PATTERNS = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"--prompt(?:\s|=)",
+        r"--prompt-file(?:\s|=)",
+        r"--prompts(?:\s|=)",
+    )
+)
 
 
 def _normalize_text(value: str) -> str:
@@ -19,8 +26,10 @@ def _assert_cli_flags(snippet: str) -> None:
     normalized = _normalize_text(re.sub(r"<[^>]+>", " ", snippet))
     assert CLI_PROVIDER_PATTERN.search(
         normalized
-    ), "provider 設定ファイルへのパスが記載されていません"
-    assert CLI_PROMPT_PATTERN.search(normalized), "プロンプト指定フラグが不足しています"
+    ), "--provider adapter/config/providers/*.yaml が不足しています"
+    assert any(pattern.search(normalized) for pattern in CLI_PROMPT_PATTERNS), (
+        "--prompt / --prompt-file / --prompts のいずれかが不足しています"
+    )
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 

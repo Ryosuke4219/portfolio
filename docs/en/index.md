@@ -58,7 +58,8 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
     <p>An adapter that orchestrates provider calls and comparison runs while keeping production fallbacks intact.</p>
     <ul>
       <li>Supports OpenAI, Gemini, Ollama, and OpenRouter behind a unified tracing layer.</li>
-      <li>Run prompts with <code>llm-adapter --provider adapter/config/providers/openai.yaml --prompt-file adapter/prompts/demo-04.yaml</code> or launch batch comparisons via <code>python adapter/run_compare.py --prompts datasets/golden/tasks.jsonl</code>.</li>
+      <li>Run prompts with <code>llm-adapter --provider adapter/config/providers/openai.yaml --prompt-file adapter/prompts/demo-04.yaml</code>.</li>
+      <li>Launch batch comparisons via <code>python adapter/run_compare.py --prompts datasets/golden/tasks.jsonl</code>.</li>
     </ul>
     <p><a class="demo-card__link" href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
@@ -86,7 +87,8 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 
 ### 04. LLM Adapter — Provider Orchestration
 - Connects OpenAI, Gemini, Ollama, and OpenRouter with resilient fallback strategies and shared telemetry hooks.
-- `llm-adapter --provider adapter/config/providers/openai.yaml --prompt-file adapter/prompts/demo-04.yaml` runs a single provider, while `python adapter/run_compare.py --prompts datasets/golden/tasks.jsonl` records comparison metrics for audits.
+- `llm-adapter --provider adapter/config/providers/openai.yaml --prompt-file adapter/prompts/demo-04.yaml` runs a single provider.
+- `python adapter/run_compare.py --prompts datasets/golden/tasks.jsonl` records comparison metrics for audits.
 - Reference: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
 [View all weekly summaries &rarr;]({{ '/en/weekly-summary.html' | relative_url }})
