@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import pytest
+
 from llm_adapter.errors import ProviderSkip
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
 from llm_adapter.runner import ParallelAllResult, Runner
