@@ -27,8 +27,8 @@ This catalog lists the primary sources referenced by the `EvidenceLink` entries 
 - Golden tasks: `../../projects/04-llm-adapter/datasets/golden`
 
 ## Docs Cross Reference
-- Test plan: `../test-plan.md`
-- Defect report sample: `../defect-report-sample.md`
-- Weekly summary: `../weekly-summary.md`
+- Test plan: [Test plan]({{ '/test-plan.html' | relative_url }})
+- Defect report sample: [Defect report sample]({{ '/defect-report-sample.html' | relative_url }})
+- Weekly summary: [Weekly summary]({{ '/weekly-summary.html' | relative_url }})
 
 > [日本語版カタログ]({{ '/evidence/README.html' | relative_url }})
