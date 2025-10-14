@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from src.llm_adapter.errors import RetriableError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.runner_async import AllFailedError, AsyncRunner
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from llm_adapter.errors import RetriableError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.runner_async import AllFailedError, AsyncRunner
+from llm_adapter.runner_config import RunnerConfig, RunnerMode
 
 from tests.shadow._runner_test_helpers import _ErrorProvider, _SuccessProvider, FakeLogger
 
