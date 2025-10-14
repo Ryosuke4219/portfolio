@@ -13,7 +13,7 @@ class RecorderLogger(EventLogger):
     def __init__(self) -> None:
         self.events: list[tuple[str, dict[str, Any]]] = []
 
-    def emit(self, event_type: str, record: dict[str, Any]) -> None:  # type: ignore[override]
+    def emit(self, event_type: str, record: Mapping[str, Any]) -> None:
         self.events.append((event_type, dict(record)))
 
 
