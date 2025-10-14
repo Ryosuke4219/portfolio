@@ -4,8 +4,9 @@ import sys
 import types
 from typing import cast, TYPE_CHECKING
 
-from llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_any_async
 import pytest
+
+from llm_adapter.parallel_exec import run_parallel_all_async, run_parallel_any_async
 
 ADAPTER_ROOT = Path(__file__).resolve().parents[2] / "04-llm-adapter"
 if (adapter_root_str := str(ADAPTER_ROOT)) not in sys.path:
