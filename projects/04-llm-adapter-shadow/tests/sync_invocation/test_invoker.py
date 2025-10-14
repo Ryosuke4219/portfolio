@@ -6,10 +6,10 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from src.llm_adapter.errors import ProviderSkip
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
-from src.llm_adapter.runner_shared import RateLimiter
-from src.llm_adapter.runner_sync_invocation import ProviderInvoker
+from llm_adapter.errors import ProviderSkip
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+from llm_adapter.runner_shared import RateLimiter
+from llm_adapter.runner_sync_invocation import ProviderInvoker
 
 from .conftest import FakeMetrics, RecorderLogger, StubProvider
 
