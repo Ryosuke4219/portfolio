@@ -50,6 +50,12 @@
 - ✅ CLI API キー透過テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI で指定したリテラル API キーが `ProviderRequest.options` を介して Ollama へ伝播する経路を検証している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L359-L392】
   - ✅ ストリーミング・429/5xx 検証テスト: `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` がストリーミング結合と 429/5xx 正規化を含むケースを通過し、`ProviderResponse` 正規化とリトライ戦略を担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
 
+#### Ollama テスト分割チェックリスト
+- [x] 成功系テストを `projects/04-llm-adapter/tests/providers/ollama/test_success.py` へ移行する。
+- [x] ストリーミング系テストを `projects/04-llm-adapter/tests/providers/ollama/test_streaming.py` へ移行する。
+- [x] 429/5xx・自動 Pull 異常系テストを `projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py` へ移行する。
+- [ ] 旧 `projects/04-llm-adapter/tests/providers/test_ollama_provider.py` のブリッジを削除し、新ディレクトリのみで運用する。
+
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
