@@ -31,13 +31,9 @@
 
 ## Refactoring
 
-### タスク5: `runner_execution.py` を責務単位で分割し可読性を向上させる（未完了）
-- 進捗: 未着手。v0.2 でのリファクタリング計画のみ策定済み。
-- 背景: `RunnerExecution` は 280 行超の大型クラスで、プロバイダ呼び出し・シャドウ制御・メトリクス生成・スキーマ検証が一箇所に詰め込まれている。【F:projects/04-llm-adapter/adapter/core/runner_execution.py†L1-L276】 保守性向上のため責務分割が必要。
-- 手順:
-  1. 既存ユニットテストを調査し、`SequentialAttemptExecutor`/`ParallelAttemptExecutor` の振る舞いをカバーする回帰テスト（不足していれば追加）を先に用意する。
-  2. `_run_single` のプロバイダ呼び出し・メトリクス構築・シャドウ処理をそれぞれ専用モジュール/クラスへ切り出し、公開API（シグネチャ）を維持したままファイル分割する。
-  3. `pytest projects/04-llm-adapter/tests/test_compare_runner_orchestration.py` など既存スイートを実行し、リファクタ後も挙動が変わらないことを確認する。
+### タスク5: `runner_execution.py` を責務単位で分割し可読性を向上させる（完了）
+- 進捗: RunnerExecution 本体を 6 モジュールへ再構成し、プロバイダ呼び出し・再試行・並列実行・メトリクス確定・シャドウ連携を専用モジュールで管理する構成に移行した。【F:projects/04-llm-adapter/adapter/core/runner_execution.py†L1-L170】【F:projects/04-llm-adapter/adapter/core/runner_execution_call.py†L1-L69】【F:projects/04-llm-adapter/adapter/core/runner_execution_metrics.py†L1-L85】【F:projects/04-llm-adapter/adapter/core/runner_execution_attempts.py†L1-L71】【F:projects/04-llm-adapter/adapter/core/runner_execution_parallel.py†L1-L90】【F:projects/04-llm-adapter/adapter/core/runner_execution_shadow.py†L1-L94】
+- 品質エビデンス: 直列/並列の双方で `RunnerExecution` 公開 API を通じた既存テストが緑を維持し、再試行処理と影実行メトリクスを個別に検証している（再試行: `pytest projects/04-llm-adapter/tests/runner_retry/test_runner_execution_retries.py`、影付き並列: `pytest projects/04-llm-adapter/tests/parallel/test_runner_execution_parallel_metrics.py`）。【F:projects/04-llm-adapter/tests/runner_retry/test_runner_execution_retries.py†L1-L156】【F:projects/04-llm-adapter/tests/parallel/test_runner_execution_parallel_metrics.py†L1-L180】
 
 ## Providers
 
@@ -130,25 +126,12 @@
 
 ## CLI 実行制御
 
-### タスク15: `prompt_runner` の RateLimiter/実行順序をテストでガードする（未完了）
-- 進捗: 未着手。RateLimiter の境界テストが未追加。
-- 対象モジュール:
-  - `projects/04-llm-adapter/adapter/cli/prompt_runner.py`
-  - `projects/04-llm-adapter/tests/test_prompt_runner.py`（新規）
-- 完了条件:
-  1. `RateLimiter.wait` と `execute_prompts` が `rpm` や並列数に従って呼び出しを抑制することを再現するテストを先に追加し、現在の 60 秒ウィンドウ制御（`asyncio.Lock` + `deque`）の境界ケース（`rpm=0`・`rpm=1`・短時間で複数投入）を網羅する。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L23-L196】
-  2. スタブプロバイダを用意し、`execute_prompts` が `PromptResult.index` 順でソートされること、および失敗時に `classify_error` の戻り値が `PromptResult.error_kind` に反映されることを検証する。
-  3. 必要に応じて `prompt_runner` 本体をテスタビリティ向上のために小調整する場合は型注釈を維持しつつ最小差分で行い、`pytest projects/04-llm-adapter/tests/test_prompt_runner.py` → `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` の順で緑化する。
+### タスク15: `prompt_runner` の RateLimiter/実行順序をテストでガードする（完了）
+- 進捗: `RateLimiter.wait` の 60 秒ウィンドウ処理と `execute_prompts` の並列制御/エラー種別伝搬を回帰テスト化し、CLI 実装のロック・セマフォ制御と整合することを確認した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L1-L154】【F:projects/04-llm-adapter/tests/test_prompt_runner_rate_limit.py†L1-L117】
+- 品質エビデンス: `pytest projects/04-llm-adapter/tests/test_prompt_runner_rate_limit.py` が `rpm=0/1` の境界と gather 戻り順逆転を模擬するケースで `PromptResult.index` ソートと `error_kind` 伝搬を検証し、RateLimiter 実装の破壊を防いでいる。 【F:projects/04-llm-adapter/tests/test_prompt_runner_rate_limit.py†L31-L117】
 
 ## CLI 実装の再構成
 
-### タスク16: `prompts.run_prompts` を責務単位で分割しテスタビリティを改善する（未完了）
-- 進捗: 未着手。回帰テストとファイル分割が未実施。
-- 対象モジュール:
-  - `projects/04-llm-adapter/adapter/cli/prompts.py`
-  - `projects/04-llm-adapter/adapter/cli/` 配下の新規モジュール（例: `args.py` / `config_loader.py` など）
-  - `projects/04-llm-adapter/tests/test_cli_prompts_refactor.py`（新規）
-- 完了条件:
-  1. 391 行の `prompts.py` が単一ファイルで CLI 解析・環境変数解決・ProviderFactory 呼び出し・結果出力まで抱えている現状をカバーする回帰テストを先に追加し、`run_prompts` の代表的な成功/失敗パス（環境変数未設定・`.env` ロード・`--provider-option` マージなど）を明文化する。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L1-L392】
-  2. テスト緑を維持したまま、引数パース・設定マージ・エラーハンドリングをそれぞれ新規モジュールへ切り出し、`prompts.py` 側はエントリポイントとログ設定の薄いラッパーに整理する。段階的に切り替えるため、既存関数から新モジュールを呼ぶ TODO チェックリストを追記し、全項目に ✅ を付けてから旧実装ブロックを削除する。
-  3. 既存 CLI 公開 API（`run_prompts` / `ProviderFactory` / 出力形式）はそのまま維持しつつ、Python/Node の静的解析は CI と同じ順序で `npm run lint:js` → `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/adapter` → `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` → `python -m compileall projects/04-llm-adapter-shadow` を通過させる。Node 関連差分がある場合は `npm run ci:analyze` を併走し、`pytest projects/04-llm-adapter-shadow/tests` と `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"`（必要なら `npx --yes markdownlint-cli2 "04/ROADMAP.md"`）で再現性と整形を確認してから進捗欄へ反映する。
+### タスク16: `prompts.run_prompts` を責務単位で分割しテスタビリティを改善する（完了）
+- 進捗: `run_prompts` を薄いオーケストレータに整理し、引数解析・設定統合・実行/エラー制御を `args.py`・`config_loader.py`・`runner.py` へ移譲した。CLI API は維持しつつ ProviderFactory 連携と RateLimiter 公開を再利用できる構造になった。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L1-L67】【F:projects/04-llm-adapter/adapter/cli/args.py†L1-L113】【F:projects/04-llm-adapter/adapter/cli/config_loader.py†L1-L172】【F:projects/04-llm-adapter/adapter/cli/runner.py†L1-L178】
+- 品質エビデンス: `pytest projects/04-llm-adapter/tests/test_cli_prompts_refactor.py` が環境変数未設定・`.env` ロード・`--provider-option` マージ・RateLimit 例外などの主要パスを網羅し、再構成後も出力/終了コードが変わらないことを確認する。 【F:projects/04-llm-adapter/tests/test_cli_prompts_refactor.py†L1-L158】
