@@ -1,5 +1,6 @@
 import importlib
 import importlib.abc
+from importlib.machinery import ModuleSpec, PathFinder
 import importlib.util
 import sys
 from collections.abc import Sequence
