@@ -2,6 +2,7 @@ from collections.abc import Callable
 import dataclasses
 
 import pytest
+
 from llm_adapter.parallel_exec import ParallelExecutionError
 from llm_adapter.provider_spi import ProviderResponse
 from llm_adapter.runner_config import ConsensusConfig
