@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.runner_config import RunnerConfig
-from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
-from src.llm_adapter.runner_sync_modes import SequentialStrategy
+from llm_adapter.errors import TimeoutError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.runner_config import RunnerConfig
+from llm_adapter.runner_sync import ProviderInvocationResult, Runner
+from llm_adapter.runner_sync_modes import SequentialStrategy
 
 from .conftest import (
     _make_context,
@@ -105,7 +105,7 @@ def test_sequential_run_metric_reports_response_latency(
 
     monkeypatch.setattr(runner, "_invoke_provider_sync", fake_invoke)
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync_sequential.elapsed_ms",
+        "llm_adapter.runner_sync_sequential.elapsed_ms",
         lambda _: 99,
     )
 
