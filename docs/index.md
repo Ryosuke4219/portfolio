@@ -154,7 +154,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 
 ## Weekly Summary {#weekly-summary}
 
-{% include weekly-summary-card.md %}
+{% include weekly-summary-card.md locale="ja" %}
 
 ### 01. Spec to Cases
 - 仕様書からテストケースを自動生成するパイプラインの最小構成。
