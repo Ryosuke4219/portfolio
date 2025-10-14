@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import AllFailedError, TimeoutError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import Runner
+from llm_adapter.errors import AllFailedError, TimeoutError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import Runner
 
 
 def _providers_for(marker: str) -> tuple[MockProvider, MockProvider]:
