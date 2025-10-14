@@ -5,19 +5,19 @@ from pathlib import Path
 import time
 from typing import Any, cast, NamedTuple
 
-from src.llm_adapter.observability import CompositeLogger, EventLogger, JsonlLogger
-from src.llm_adapter.parallel_exec import (
+from llm_adapter.observability import CompositeLogger, EventLogger, JsonlLogger
+from llm_adapter.parallel_exec import (
     ParallelAllResult,
     run_parallel_all_sync,
     run_parallel_any_sync,
 )
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
-from src.llm_adapter.runner_shared import MetricsPath
-from src.llm_adapter.runner_sync import Runner
-from src.llm_adapter.runner_sync_invocation import ProviderInvocationResult
-from src.llm_adapter.runner_sync_modes import get_sync_strategy, SyncRunContext
-from src.llm_adapter.utils import content_hash
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from llm_adapter.runner_config import RunnerConfig, RunnerMode
+from llm_adapter.runner_shared import MetricsPath
+from llm_adapter.runner_sync import Runner
+from llm_adapter.runner_sync_invocation import ProviderInvocationResult
+from llm_adapter.runner_sync_modes import get_sync_strategy, SyncRunContext
+from llm_adapter.utils import content_hash
 
 from ..parallel_helpers import _read_metrics, RecordingLogger
 
