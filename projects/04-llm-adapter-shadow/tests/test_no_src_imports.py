@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import pytest
 
@@ -42,4 +42,4 @@ def test_no_src_llm_adapter_in_source(path: Path) -> None:
 
 
 def test_src_llm_adapter_references_snapshot() -> None:
-    assert _collect_references(TEST_TARGETS) == OrderedDict()
+    assert _collect_references(TEST_TARGETS) == {}
