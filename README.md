@@ -37,7 +37,7 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **CI:** `.github/workflows/ci.yml` が Node/Python の回帰と LLM Adapter Shadow を `push`／`pull_request`／`workflow_dispatch` で実行。
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
-- **Quick Start:** `just setup && just test && just report`
+- **Quick Start:** [Quick Start (JA / EN)](#quick-start-ja--en)
 
 ### Quick Start (JA / EN)
 
