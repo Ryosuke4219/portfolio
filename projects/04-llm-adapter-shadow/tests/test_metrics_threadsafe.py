@@ -7,6 +7,7 @@ import threading
 from types import SimpleNamespace
 
 import pytest
+
 from llm_adapter.metrics import log_event, PrometheusMetricsExporter
 
 
