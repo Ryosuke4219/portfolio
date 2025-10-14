@@ -27,8 +27,8 @@
 - ゴールデンタスク: `../../projects/04-llm-adapter/datasets/golden`
 
 ## Docs Cross Reference
-- テスト計画: `../test-plan.md`
-- 欠陥レポ例: `../defect-report-sample.md`
-- 週次サマリ: `../weekly-summary.md`
+- テスト計画: [テスト計画]({{ '/test-plan.html' | relative_url }})
+- 欠陥レポ例: [欠陥レポ例]({{ '/defect-report-sample.html' | relative_url }})
+- 週次サマリ: [週次サマリ]({{ '/weekly-summary.html' | relative_url }})
 
 > [English version]({{ '/en/evidence/README.html' | relative_url }})
