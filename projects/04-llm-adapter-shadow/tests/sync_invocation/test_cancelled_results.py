@@ -5,8 +5,8 @@ from concurrent.futures import CancelledError
 from typing import Any
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.runner_sync_invocation import (
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.runner_sync_invocation import (
     CancelledResultsBuilder,
     ParallelResultLogger,
     ProviderInvocationResult,

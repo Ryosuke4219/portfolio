@@ -23,11 +23,6 @@ def _collect_references(root: Path) -> OrderedDict[str, int]:
     return result
 
 
-@pytest.fixture(scope="session")
-def src_llm_adapter_test_references() -> OrderedDict[str, int]:
-    return _collect_references(TESTS_ROOT)
-
-
 @pytest.mark.parametrize("path", sorted(SOURCE_ROOT.rglob("*.py")))
 def test_no_src_llm_adapter_in_source(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
@@ -37,6 +32,5 @@ def test_no_src_llm_adapter_in_source(path: Path) -> None:
 
 
 def test_src_llm_adapter_references_snapshot(
-    src_llm_adapter_test_references: OrderedDict[str, int],
 ) -> None:
-    assert src_llm_adapter_test_references == OrderedDict()
+    assert _collect_references(TESTS_ROOT) == OrderedDict()
