@@ -5,10 +5,10 @@ from enum import Enum
 import time
 
 import pytest
-from src.llm_adapter.parallel_exec import ParallelExecutionError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
-from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
-from src.llm_adapter.runner_sync import Runner
+from llm_adapter.parallel_exec import ParallelExecutionError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+from llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
+from llm_adapter.runner_sync import Runner
 
 
 class _ExternalRunnerMode(Enum):
@@ -79,11 +79,11 @@ def test_runner_initializes_with_dummy_shadow(monkeypatch: pytest.MonkeyPatch) -
         return response
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync_invocation._DEFAULT_RUN_WITH_SHADOW",
+        "llm_adapter.runner_sync_invocation._DEFAULT_RUN_WITH_SHADOW",
         _dummy_run_with_shadow,
     )
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync._DEFAULT_RUN_WITH_SHADOW",
+        "llm_adapter.runner_sync._DEFAULT_RUN_WITH_SHADOW",
         _dummy_run_with_shadow,
     )
 
@@ -212,8 +212,8 @@ def test_runner_consensus_quorum_failure() -> None:
 def test_runner_sequential_enforces_rpm(monkeypatch: pytest.MonkeyPatch) -> None:
     request = ProviderRequest(model="gpt-test", prompt="hi")
     clock = _FakeClock()
-    monkeypatch.setattr("src.llm_adapter.runner_shared.time.monotonic", clock.monotonic)
-    monkeypatch.setattr("src.llm_adapter.runner_shared.time.sleep", clock.sleep)
+    monkeypatch.setattr("llm_adapter.runner_shared.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("llm_adapter.runner_shared.time.sleep", clock.sleep)
 
     call_times: list[float] = []
 
