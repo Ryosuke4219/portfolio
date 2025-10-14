@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import sys
+from collections.abc import Iterable
 from pathlib import Path
+import sys
 from types import ModuleType
-from typing import Iterable
 
 _TARGET = Path(__file__).name
 
@@ -15,8 +15,12 @@ def _should_bridge(argv: Iterable[str]) -> bool:
 __all__: list[str] = []
 
 if _should_bridge(sys.argv):
-    from .ollama import conftest as _ollama_conftest
-    from .ollama import test_retriable_errors, test_streaming, test_success
+    from .ollama import (
+        conftest as _ollama_conftest,
+        test_retriable_errors,
+        test_streaming,
+        test_success,
+    )
 
     def _forward(module: ModuleType) -> None:
         for name in dir(module):
