@@ -39,17 +39,17 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 - **Topics:** `qa`, `sdet`, `playwright`, `llm`, `pytest`, `github-actions`, `devcontainers`, `codeql`
 - **Quick Start:** `just setup && just test && just report`
 
-### Quick glance (EN)
+### Quick Start (JA / EN)
 
-Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuously published via GitHub Pages.
+ハンズオンな QA × SDET × LLM パイプラインを継続公開しています。 / Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuously published via GitHub Pages.
 
-- `just setup` — Initialize Node.js/Python dependencies and Playwright stubs.
-- `just test` — Execute combined regression across Node and Python projects.
-- `just lint` — Run JavaScript linting and Python bytecode validation.
-- `just report` — Generate pytest coverage reports for the Python adapter.
-- `just openrouter-stream-probe -- --dry-run` — Launch the OpenRouter streaming probe with passthrough CLI flags.
-- `just openrouter-stats -- --since 2024-01-01` — Export OpenRouter failure metrics into `artifacts/openrouter`.
-- GitHub Pages: <https://ryosuke4219.github.io/portfolio/>
+- **`just setup`** — Node.js / Python 依存と Playwright スタブを初期化します。 / Initialize Node.js & Python dependencies alongside Playwright stubs.
+- **`just test`** — Node＋Python の回帰テストを一括で実行します。 / Run combined regression across Node and Python projects.
+- **`just lint`** — JavaScript の構文チェックと Python バイトコード検証を行います。 / Execute JavaScript linting and Python bytecode validation.
+- **`just report`** — Python プロジェクトのテスト＋カバレッジレポートを生成します。 / Produce pytest coverage reports for the Python adapter.
+- **`just openrouter-stream-probe -- --dry-run`** — OpenRouter のストリーミングプローブを CLI 引数付きで実行します。 / Launch the OpenRouter streaming probe with passthrough CLI flags.
+- **`just openrouter-stats -- --since 2024-01-01`** — OpenRouter 障害メトリクスを `artifacts/openrouter` に出力します。 / Export OpenRouter failure metrics into `artifacts/openrouter`.
+- **GitHub Pages** — <https://ryosuke4219.github.io/portfolio/> — 公開ギャラリー。 / Public gallery on GitHub Pages.
 
 ### GitHub Pages 公開 / 復旧手順
 
@@ -62,14 +62,9 @@ Hands-on portfolio showcasing QA × SDET × LLM automation pipelines, continuous
 ---
 
 > [!TIP] Quick Start
-> `just setup` — Node.js / Python 依存と Playwright スタブを初期化します。
-> `just test` — Node＋Python の回帰テストを一括で実行します。
-> `just lint` — JavaScript の構文チェックと Python バイトコード検証を行います。
-> `just report` — Python プロジェクトのテスト＋カバレッジレポートを生成します。
-> `just openrouter-stream-probe -- --dry-run` — OpenRouter のストリーミングプローブを CLI 引数付きで実行します。
-> `just openrouter-stats -- --since 2024-01-01` — OpenRouter 障害メトリクスを `artifacts/openrouter` に出力します。
+> 詳細なセットアップ手順は [Quick Start (JA / EN)](#quick-start-ja--en) セクションを参照してください。 / For detailed onboarding, see [Quick Start (JA / EN)](#quick-start-ja--en).
 >
-> ✅ 詳細手順は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) を参照してください。
+> ✅ ローカル環境の準備が必要な場合は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) も併せて確認してください。
 
 ---
 
