@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
+import re
 
 import pytest
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

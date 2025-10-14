@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-
 DOC_PATH = Path("docs/development-log-hub.md")
 
 
