@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from adapter.core.config import ProviderConfig, QualityGatesConfig, RateLimitConfig, RetryConfig, PricingConfig
-from adapter.core.providers import BaseProvider, ProviderResponse
+from adapter.core.config import (
+    PricingConfig,
+    ProviderConfig,
+    QualityGatesConfig,
+    RateLimitConfig,
+    RetryConfig,
+)
 from adapter.core.provider_spi import ProviderRequest
+from adapter.core.providers import BaseProvider, ProviderResponse
 from adapter.core.runner_execution_call import ensure_invoke_compat
 
 
@@ -37,7 +43,7 @@ class _GenerateOnlyProvider(BaseProvider):
         super().__init__(config)
         self.captured: list[str] = []
 
-    def generate(self, prompt: str) -> ProviderResponse:  # type: ignore[override]
+    def generate(self, prompt: str) -> ProviderResponse:
         self.captured.append(prompt)
         return ProviderResponse(text=f"echo:{prompt}", latency_ms=0)
 
