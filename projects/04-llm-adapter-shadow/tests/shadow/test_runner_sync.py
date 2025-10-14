@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import pytest
-from src.llm_adapter.errors import (
+from llm_adapter.errors import (
     AllFailedError,
     AuthError,
     ConfigError,
@@ -11,8 +11,8 @@ from src.llm_adapter.errors import (
     RetriableError,
     TimeoutError,
 )
-from src.llm_adapter.provider_spi import ProviderSPI
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig
+from llm_adapter.provider_spi import ProviderSPI
+from llm_adapter.runner_config import BackoffPolicy, RunnerConfig
 
 from ._runner_test_helpers import (
     _ErrorProvider,
@@ -36,7 +36,7 @@ def _force_event_logger(
         return logger, "unused"
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync.resolve_event_logger",
+        "llm_adapter.runner_sync.resolve_event_logger",
         _resolve,
     )
 
@@ -146,7 +146,7 @@ def test_rate_limit_triggers_backoff_and_logs(
         sleep_calls.append(duration)
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync.time.sleep",
+        "llm_adapter.runner_sync.time.sleep",
         _fake_sleep,
     )
 
