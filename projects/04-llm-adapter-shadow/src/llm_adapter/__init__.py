@@ -1,8 +1,8 @@
 import importlib
 import importlib.abc
+from importlib.machinery import ModuleSpec
 import importlib.util
 import sys
-from importlib.machinery import ModuleSpec
 from types import ModuleType
 
 from .errors import (
