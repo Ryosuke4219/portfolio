@@ -75,7 +75,7 @@ def ensure_invoke_compat(provider: BaseProvider) -> None:
         prompt = getattr(request, "prompt", request)
         return bound_generate(prompt)
 
-    provider.invoke = MethodType(_invoke, provider)
+    setattr(provider, "invoke", MethodType(_invoke, provider))
 
 
 __all__ = ["execute_provider_with_retries", "ensure_invoke_compat"]
