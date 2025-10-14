@@ -24,7 +24,8 @@ warn_unused_configs = true
 warn_unused_ignores = true
 ignore_missing_imports = true
 namespace_packages = true
-mypy_path = ["projects/04-llm-adapter", "projects/04-llm-adapter-shadow"]
+mypy_path = ["projects/04-llm-adapter"]
+exclude = "projects/04-llm-adapter-shadow/"
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
@@ -39,6 +40,12 @@ markers = [
 ]
 pythonpath = [
     ".",
+    "src",
+]
+testpaths = ["tests"]
+addopts = [
+    "--ignore=projects/04-llm-adapter/tests",
+    "--ignore=projects/04-llm-adapter-shadow/tests",
 ]
 
 [tool.coverage.run]
