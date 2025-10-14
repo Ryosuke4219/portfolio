@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from llm_adapter.errors import (
     RateLimitError,
     RetriableError,
