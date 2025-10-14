@@ -63,7 +63,7 @@ Quick Start はこちら → [Quick Start (JA / EN)](#quick-start-ja--en).
 ---
 
 > [!TIP] Quick Start
-> [Quick Start セクションへ](#quick-start-ja--en) — JA/EN 併記のセットアップ手順を収録。 / Jump to the JA/EN Quick Start section for setup steps.
+> Quick Start はこちら → [Quick Start (JA / EN)](#quick-start-ja--en) — JA/EN 併記のセットアップ手順を掲載。 / Jump to the JA/EN Quick Start section for setup steps.
 >
 > ✅ ローカル環境の準備が必要な場合は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) も併せて確認してください。
 
