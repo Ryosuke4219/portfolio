@@ -16,6 +16,7 @@ CLI_PROMPT_PATTERNS = tuple(
         r"--prompts(?:\s|=)",
     )
 )
+PROMPTS_DATASET_PATH = "examples/prompts/ja_one_liner.jsonl"
 
 
 def _normalize_text(value: str) -> str:
@@ -30,6 +31,9 @@ def _assert_cli_flags(snippet: str) -> None:
     assert any(pattern.search(normalized) for pattern in CLI_PROMPT_PATTERNS), (
         "One of --prompt / --prompt-file / --prompts is required"
     )
+    assert (
+        PROMPTS_DATASET_PATH in normalized
+    ), f"{PROMPTS_DATASET_PATH} の記述がありません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
@@ -43,6 +47,10 @@ def _extract_weekly_summary_block(content: str) -> str:
 
 
 def test_llm_adapter_card_describes_provider_integration() -> None:
+    prompt_path = Path(PROMPTS_DATASET_PATH)
+    if not prompt_path.exists():
+        prompt_path = Path("projects/04-llm-adapter") / PROMPTS_DATASET_PATH
+    assert prompt_path.exists(), f"{PROMPTS_DATASET_PATH} が存在しません"
     content = Path("docs/en/index.md").read_text(encoding="utf-8")
 
     card_match = re.search(
