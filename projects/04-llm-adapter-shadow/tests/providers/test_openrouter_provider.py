@@ -4,15 +4,15 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import (
+from llm_adapter.errors import (
     ProviderSkip,
     RateLimitError,
     RetriableError,
     SkipReason,
     TimeoutError,
 )
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.openrouter import OpenRouterProvider
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.openrouter import OpenRouterProvider
 
 from tests.helpers.fakes import FakeResponse, FakeSession
 
@@ -157,7 +157,7 @@ def test_openrouter_provider_normalizes_timeout() -> None:
             stream: bool = False,
             timeout: float | None = None,
         ) -> FakeResponse:
-            from src.llm_adapter.providers._requests_compat import requests_exceptions
+            from llm_adapter.providers._requests_compat import requests_exceptions
 
             raise requests_exceptions.Timeout("timeout")
 
