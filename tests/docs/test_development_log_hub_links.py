@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
+import re
 
 INTERNAL_LINK_PATTERN = re.compile(
     r"\{\{\s*'/[\w\-/]+\.html'\s*\|\s*relative_url\s*\}\}"
