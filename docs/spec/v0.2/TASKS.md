@@ -114,15 +114,13 @@
   - 設定テンプレート: Ollama 向けテンプレートでローカルエンドポイントとレート制御を明示し、OpenRouter 向けテンプレートで API キー・ベース URL のエイリアスや料金目安を定義した。【F:projects/04-llm-adapter/adapter/config/providers/ollama.yaml†L1-L22】【F:projects/04-llm-adapter/adapter/config/providers/openrouter.yaml†L1-L38】
   - テスト/手順: README 更新にあわせ、タスク確認用の `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` 実行手順を整備し、Ollama/OpenRouter 専用 CLI 例が `projects/04-llm-adapter/tests/test_cli_single_prompt.py` で回帰される構成を維持している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L359-L460】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L604-L693】
 
-### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する（未完了）
-- 進捗: 未着手。依存除去と CI 手順の緑化確認が未実行。
-- 対象モジュール:
-  - `pyproject.toml`
-  - `projects/04-llm-adapter/adapter/**`
-- 完了条件:
-  1. Shadow 専用の `src.llm_adapter` 参照をコア側へ移行または削除し、`pyproject.toml` の `known-first-party` や `coverage` 設定から除去する。
-  2. Python/Node 静的解析は CI と同じ順序で `npm run lint:js` → `ruff check .` → `mypy --config-file pyproject.toml projects/04-llm-adapter/adapter` → `mypy --config-file pyproject.toml projects/04-llm-adapter-shadow/src` → `python -m compileall projects/04-llm-adapter-shadow` を通過させる。Node 変更があれば `npm run ci:analyze` で差分の影響を確認し、`pytest projects/04-llm-adapter-shadow/tests` まで含めて CI と同等の検証を完了する。
-  3. コア実装へ統合された場合は該当モジュールの import 先を更新し、Shadow 側の同名ファイルに deprecation を残すかどうかを判断する。
+### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する（完了）
+- 進捗: Shadow 配下の Python パッケージを `llm_adapter` 名前空間へ正規化し、旧 `src.llm_adapter` 参照は `__init__` のメタパスエイリアスで段階移行する構成に置き換えた。`pyproject.toml` の first-party 設定も Shadow 名前空間へ更新済み。
+- 主要モジュール:
+  - `projects/04-llm-adapter-shadow/src/llm_adapter/__init__.py` が `llm_adapter` 直下で公開 API を束ねつつ `src.llm_adapter` への後方互換ロードをメタパスで提供し、Shadow 実装が単一名前空間へ集約されるようにした。【F:projects/04-llm-adapter-shadow/src/llm_adapter/__init__.py†L1-L80】
+  - `pyproject.toml` の `known-first-party` と `mypy_path` を Shadow 側の `llm_adapter` パッケージに合わせて整備し、型・lint ツールが新しい名前空間を優先するよう揃えている。【F:pyproject.toml†L1-L40】
+- 検証テスト:
+  - `projects/04-llm-adapter-shadow/tests/test_no_src_imports.py` が Shadow ツリーとテスト群を走査して `src.llm_adapter` 文字列の混入を禁止し、新旧名前空間の整合を継続的に監視する。【F:projects/04-llm-adapter-shadow/tests/test_no_src_imports.py†L1-L46】
 
 ## CLI 実行制御
 
