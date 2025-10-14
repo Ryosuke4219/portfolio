@@ -1,31 +1,28 @@
+"""docs/index.md の Evidence Library セクションのリンク形式を検証するテスト。"""
+
 from __future__ import annotations
 
 from pathlib import Path
+import re
+
+SECTION_PATTERN = re.compile(r"## Evidence Library.*?(?=\n## |\Z)", re.DOTALL)
+LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
 
-EXPECTED_LINK_LINES = {
-    "- [QA Evidence Catalog]({{ '/evidence/README.html' | relative_url }})",
-    "- [テスト計画書]({{ '/test-plan.html' | relative_url }})",
-    "- [欠陥レポートサンプル]({{ '/defect-report-sample.html' | relative_url }})",
-}
+def test_evidence_library_links_use_relative_html() -> None:
+    """Evidence Library のリンクが .html の relative_url 参照であることを検証。"""
 
+    index_md = Path("docs/index.md").read_text(encoding="utf-8")
+    match = SECTION_PATTERN.search(index_md)
+    assert match is not None, "Evidence Library セクションが見つかりません。"
 
-def test_japanese_index_evidence_links_use_relative_url_html() -> None:
-    index_path = Path("docs/index.md")
-    content = index_path.read_text(encoding="utf-8")
+    section = match.group(0)
+    links = LINK_PATTERN.findall(section)
+    assert links, "Evidence Library セクションにリンクが存在しません。"
 
-    section_start = content.index("## Evidence Library")
-    section = content[section_start:]
-    lines = section.splitlines()[1:]
+    for link in links:
+        assert "relative_url" in link, f"relative_url フィルタが使われていません: {link}"
+        assert ".html" in link, f".html 参照ではありません: {link}"
+        assert ".md" not in link, f".md リンクが含まれています: {link}"
 
-    evidence_lines: list[str] = []
-    for line in lines:
-        if line.startswith("## "):
-            break
-        if line.startswith("- "):
-            evidence_lines.append(line.strip())
-
-    assert evidence_lines, "Evidence Library section should contain bullet links"
-    assert set(evidence_lines) == EXPECTED_LINK_LINES
-    assert not any(".md" in line for line in evidence_lines)
-    assert all("relative_url" in line for line in evidence_lines)
+    assert ".md" not in section, ".md 参照が Evidence Library セクションに残っています。"

@@ -176,7 +176,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 - OpenAI / Azure / ローカルモックを共通トレースで束ね、フォールバック設計と多重呼び出しを両立。
 - `llm-adapter --provider adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl` で JSONL テンプレートから単発実行。
 - `python adapter/run_compare.py --prompts datasets/golden/tasks.jsonl` が比較ランを `data/runs-metrics.jsonl` に記録。
-- 参考資料: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
+- 参考資料: [evidence/llm-adapter]({{ '/evidence/llm-adapter.html' | relative_url }})
 
 [週次サマリの一覧を見る &rarr;]({{ '/weekly-summary.html' | relative_url }})
 
