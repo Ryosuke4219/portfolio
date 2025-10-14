@@ -9,27 +9,11 @@ CLI_PROVIDER_PATTERN = re.compile(
     r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
     re.IGNORECASE,
 )
-CLI_PROMPT_PATTERNS = tuple(
-    re.compile(pattern, re.IGNORECASE)
-    for pattern in (
-        r"--prompt(?:\s|=)",
-        r"--prompt-file(?:\s|=)",
-        r"--prompts(?:\s|=)",
-    )
-)
-PROMPT_FLAG_PATTERN = re.compile(
-    r"--(?:prompt|prompt-file|prompts)(?:\s+|=)([^\s`]+)",
+CLI_PROMPT_FLAG_PATTERN = re.compile(
+    r"--prompts?(?:-file)?(?:\s+|=)([^\s]+)",
     re.IGNORECASE,
 )
-EXPECTED_PROMPT_PATH = Path("examples/prompts/ja_one_liner.jsonl")
-
-
-def _resolve_prompt_path(prompt_path: str) -> Path:
-    path = Path(prompt_path)
-    if path.exists():
-        return path
-    candidate = Path("projects/04-llm-adapter") / path
-    return candidate
+PROMPT_SUFFIX = "examples/prompts/ja_one_liner.jsonl"
 
 
 def _normalize_text(value: str) -> str:
@@ -37,13 +21,23 @@ def _normalize_text(value: str) -> str:
 
 
 def _assert_cli_flags(snippet: str) -> None:
-    snippet_without_tags = re.sub(r"<[^>]+>", " ", snippet)
-    normalized = _normalize_text(snippet_without_tags)
+    sanitized = re.sub(r"<[^>]+>", " ", snippet)
+    normalized = _normalize_text(sanitized)
     assert CLI_PROVIDER_PATTERN.search(
         normalized
     ), "--provider adapter/config/providers/*.yaml が不足しています"
-    assert any(pattern.search(normalized) for pattern in CLI_PROMPT_PATTERNS), (
-        "--prompt / --prompt-file / --prompts のいずれかが不足しています"
+    prompt_match = CLI_PROMPT_FLAG_PATTERN.search(sanitized)
+    assert prompt_match, "--prompt / --prompt-file / --prompts のいずれかが不足しています"
+    prompt_path = prompt_match.group(1).strip().strip("`'\"")
+    assert prompt_path.casefold().endswith(PROMPT_SUFFIX), (
+        f"{PROMPT_SUFFIX} を指していません: {prompt_path}"
+    )
+    candidate_paths = (
+        Path(prompt_path),
+        Path("projects/04-llm-adapter") / prompt_path,
+    )
+    assert any(path.exists() for path in candidate_paths), (
+        f"{prompt_path} の実体が存在しません"
     )
     prompt_match = PROMPT_FLAG_PATTERN.search(snippet_without_tags)
     assert prompt_match, "--prompt 系フラグからパスを抽出できません"
