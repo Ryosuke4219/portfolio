@@ -1,7 +1,6 @@
 """adapter.core への shim を保証するテスト。"""
 
-from adapter.core import errors as core_errors
-from adapter.core import provider_spi as core_provider_spi
+from adapter.core import errors as core_errors, provider_spi as core_provider_spi
 
 
 def test_provider_spi_reuses_core_types() -> None:
