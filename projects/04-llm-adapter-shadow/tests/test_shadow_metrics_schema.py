@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import Runner
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import Runner
 
 
 def _load_shadow_diff(metrics_path: Path) -> dict[str, object]:
