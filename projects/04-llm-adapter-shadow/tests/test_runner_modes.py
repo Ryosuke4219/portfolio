@@ -4,11 +4,11 @@ from collections.abc import Callable
 from enum import Enum
 import time
 
-import pytest
 from llm_adapter.parallel_exec import ParallelExecutionError
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
 from llm_adapter.runner_sync import Runner
+import pytest
 
 
 class _ExternalRunnerMode(Enum):
