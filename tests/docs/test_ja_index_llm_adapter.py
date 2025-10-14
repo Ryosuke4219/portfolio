@@ -8,14 +8,11 @@ CLI_PROVIDER_PATTERN = re.compile(
     r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
     re.IGNORECASE,
 )
-CLI_PROMPT_PATTERNS = tuple(
-    re.compile(pattern, re.IGNORECASE)
-    for pattern in (
-        r"--prompt(?:\s|=)",
-        r"--prompt-file(?:\s|=)",
-        r"--prompts(?:\s|=)",
-    )
+CLI_PROMPT_FLAG_PATTERN = re.compile(
+    r"--prompts?(?:-file)?(?:\s+|=)([^\s]+)",
+    re.IGNORECASE,
 )
+PROMPT_SUFFIX = "examples/prompts/ja_one_liner.jsonl"
 
 
 def _normalize_text(value: str) -> str:
@@ -23,12 +20,23 @@ def _normalize_text(value: str) -> str:
 
 
 def _assert_cli_flags(snippet: str) -> None:
-    normalized = _normalize_text(re.sub(r"<[^>]+>", " ", snippet))
+    sanitized = re.sub(r"<[^>]+>", " ", snippet)
+    normalized = _normalize_text(sanitized)
     assert CLI_PROVIDER_PATTERN.search(
         normalized
     ), "--provider adapter/config/providers/*.yaml が不足しています"
-    assert any(pattern.search(normalized) for pattern in CLI_PROMPT_PATTERNS), (
-        "--prompt / --prompt-file / --prompts のいずれかが不足しています"
+    prompt_match = CLI_PROMPT_FLAG_PATTERN.search(sanitized)
+    assert prompt_match, "--prompt / --prompt-file / --prompts のいずれかが不足しています"
+    prompt_path = prompt_match.group(1).strip().strip("`'\"")
+    assert prompt_path.casefold().endswith(PROMPT_SUFFIX), (
+        f"{PROMPT_SUFFIX} を指していません: {prompt_path}"
+    )
+    candidate_paths = (
+        Path(prompt_path),
+        Path("projects/04-llm-adapter") / prompt_path,
+    )
+    assert any(path.exists() for path in candidate_paths), (
+        f"{prompt_path} の実体が存在しません"
     )
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
