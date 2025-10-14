@@ -18,6 +18,9 @@ CLI_PROMPT_PATTERNS = tuple(
 )
 
 
+PROMPTS_PATH = Path("examples/prompts/ja_one_liner.jsonl")
+
+
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().casefold()
 
@@ -30,6 +33,11 @@ def _assert_cli_flags(snippet: str) -> None:
     assert any(pattern.search(normalized) for pattern in CLI_PROMPT_PATTERNS), (
         "One of --prompt / --prompt-file / --prompts is required"
     )
+    expected_prompts_arg = f"--prompts {PROMPTS_PATH.as_posix()}".casefold()
+    assert (
+        expected_prompts_arg in normalized
+    ), f"CLI は {PROMPTS_PATH} を参照してください"
+    assert PROMPTS_PATH.exists(), f"{PROMPTS_PATH} が存在しません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
