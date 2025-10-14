@@ -13,9 +13,9 @@ PROMPTS_FLAG_PATTERNS = (
     re.compile(r"--prompt-file(?:\s+|=)([^\s]+)", re.IGNORECASE),
 )
 PROMPTS_DATASET_PATH = Path(
-    "projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl"
+    "projects/04-llm-adapter/datasets/golden/tasks.jsonl"
 )
-PROMPTS_PATH = Path("examples/prompts/ja_one_liner.jsonl")
+PROMPTS_PATH = Path("datasets/golden/tasks.jsonl")
 expected_prompts_arg = f"--prompts {PROMPTS_PATH.as_posix()}"
 
 
@@ -43,7 +43,7 @@ def _assert_cli_flags(snippet: str) -> None:
     ), f"CLI は {PROMPTS_PATH} を参照してください"
     assert "adapter/prompts/demo-04.yaml" not in normalized, "adapter/prompts/demo-04.yaml は存在しません"
     assert "adapter/prompts/" not in normalized, "adapter/prompts/ ディレクトリは存在しません"
-    assert PROMPTS_PATH.exists(), f"{PROMPTS_PATH} が存在しません"
+    assert PROMPTS_DATASET_PATH.exists(), f"{PROMPTS_DATASET_PATH} が存在しません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
 
@@ -54,6 +54,32 @@ def _extract_weekly_summary_block(content: str) -> str:
     remainder = content[start:]
     next_heading = remainder.find("\n### ")
     return remainder if next_heading == -1 else remainder[:next_heading]
+
+
+def _extract_run_compare_snippet(snippet: str) -> str:
+    html_match = re.search(
+        r"<code>(python\s+adapter/run_compare.py[^<]+)</code>",
+        snippet,
+        re.IGNORECASE,
+    )
+    if html_match:
+        return _normalize_text(html_match.group(1))
+
+    code_block_match = re.search(
+        r"```(?:bash|sh|shell)?\s*(python\s+adapter/run_compare.py[^`]+)```",
+        snippet,
+        re.IGNORECASE,
+    )
+    if code_block_match:
+        return _normalize_text(code_block_match.group(1))
+
+    plain_match = re.search(
+        r"(python\s+adapter/run_compare.py[^\n]+)",
+        snippet,
+        re.IGNORECASE,
+    )
+    assert plain_match, "run_compare CLI snippet が見つかりません"
+    return _normalize_text(plain_match.group(1))
 
 
 def test_llm_adapter_card_describes_provider_integration() -> None:
@@ -80,7 +106,15 @@ def test_llm_adapter_card_describes_provider_integration() -> None:
         assert keyword in normalized_card, f"{keyword} の説明がありません"
 
     _assert_cli_flags(card_block)
+    run_compare_card = _extract_run_compare_snippet(card_block)
+    assert (
+        expected_prompts_arg in run_compare_card
+    ), "run_compare CLI は datasets/golden/tasks.jsonl を参照してください"
     assert "pnpm" not in normalized_card, "旧 CLI コマンドが残っています"
 
     summary_block = _extract_weekly_summary_block(content)
     _assert_cli_flags(summary_block)
+    run_compare_summary = _extract_run_compare_snippet(summary_block)
+    assert (
+        expected_prompts_arg in run_compare_summary
+    ), "Weekly Summary の run_compare CLI は datasets/golden/tasks.jsonl を参照してください"
