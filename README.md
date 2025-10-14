@@ -62,7 +62,7 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 ---
 
 > [!TIP] Quick Start
-> 詳細なセットアップ手順は [Quick Start (JA / EN)](#quick-start-ja--en) セクションを参照してください。 / For detailed onboarding, see [Quick Start (JA / EN)](#quick-start-ja--en).
+> [Quick Start セクションへ](#quick-start-ja--en) — JA/EN 併記のセットアップ手順を収録。 / Jump to the JA/EN Quick Start section for setup steps.
 >
 > ✅ ローカル環境の準備が必要な場合は [ローカルセットアップ (Local onboarding)](#ローカルセットアップ-local-onboarding) も併せて確認してください。
 

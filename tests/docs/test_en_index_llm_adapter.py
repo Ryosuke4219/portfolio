@@ -28,5 +28,11 @@ def test_llm_adapter_card_describes_provider_integration() -> None:
     assert "ollama" in normalized, "Ollama の説明がありません"
     assert "openrouter" in normalized, "OpenRouter の説明がありません"
     assert "llm-adapter --provider" in normalized, "llm-adapter CLI の記述がありません"
+    assert (
+        "--provider adapter/config/providers/openai.yaml" in normalized
+    ), "provider 設定ファイルのパス指定がありません"
+    assert (
+        "--prompt-file" in normalized or "--prompts" in normalized
+    ), "プロンプト指定オプションがありません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
     assert "pnpm" not in normalized, "旧 CLI コマンドが残っています"
