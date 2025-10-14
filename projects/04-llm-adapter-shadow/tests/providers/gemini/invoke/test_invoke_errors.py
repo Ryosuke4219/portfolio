@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, NoReturn
 
 import pytest
+
 from llm_adapter.errors import (
     AuthError,
     ProviderSkip,
