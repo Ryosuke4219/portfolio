@@ -3,9 +3,9 @@
 
 ## {{ summary.report_date }} 時点の主要KPI
 
-- 総テスト数: {{ summary.total_tests }}
-- 成功率: {{ summary.pass_rate_percent }}
-- 新規欠陥数: {{ summary.new_defects }}
+- 実行テスト総数: {{ summary.total_tests }}
+- テスト成功率: {{ summary.pass_rate_percent }}
+- 新規検出欠陥数: {{ summary.new_defects }}
 
 ## {{ summary.report_date }} 時点の失敗サマリ
 
