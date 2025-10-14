@@ -9,7 +9,7 @@ import pytest
 
 pytest.importorskip("adapter.core.runner_async_support")
 
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 
 
 class _FakeClock:
@@ -134,8 +134,8 @@ def _patch_runner_sleep(
             calls.append(duration)
         await clock.async_sleep(duration)
 
-    monkeypatch.setattr("src.llm_adapter.runner_async.asyncio.sleep", _fake_sleep)
-    monkeypatch.setattr("src.llm_adapter.parallel_exec.asyncio.sleep", _fake_sleep)
+    monkeypatch.setattr("llm_adapter.runner_async.asyncio.sleep", _fake_sleep)
+    monkeypatch.setattr("llm_adapter.parallel_exec.asyncio.sleep", _fake_sleep)
 
 
 __all__ = [
