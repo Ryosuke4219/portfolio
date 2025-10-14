@@ -20,6 +20,12 @@
 - 解析ストア: `../../projects/03-ci-flaky/data/runs.jsonl` — `npx flaky parse --input <junit-xml>` で追記
 - サマリ HTML: `npx flaky analyze` で生成される `../../projects/03-ci-flaky/out/index.html`（CI からダウンロード可能）
 
+## 04. LLM Adapter
+- プロダクト README: `../../projects/04-llm-adapter/README.md`
+- エビデンス詳細: `./llm-adapter.md`
+- プロバイダ設定サンプル: `../../projects/04-llm-adapter/adapter/config/providers`
+- ゴールデンタスク: `../../projects/04-llm-adapter/datasets/golden`
+
 ## Docs Cross Reference
 - テスト計画: `../test-plan.md`
 - 欠陥レポ例: `../defect-report-sample.md`
