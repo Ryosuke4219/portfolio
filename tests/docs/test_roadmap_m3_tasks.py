@@ -1,10 +1,10 @@
-"""04/ROADMAP.md の M3 残タスク検証。"""
+"""docs/04/ROADMAP.md の M3 残タスク検証。"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-ROADMAP_PATH = Path("04/ROADMAP.md")
+ROADMAP_PATH = Path("docs/04/ROADMAP.md")
 
 EXPECTED_TASKS = [
     'OpenRouter の 429/5xx エラー統計を週次で集計し、バックオフ/RPM 調整の指標に取り込む。',
