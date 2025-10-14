@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 import pytest
+
 from llm_adapter.provider_spi import ProviderResponse
 from llm_adapter.runner_config import ConsensusConfig
 from llm_adapter.runner_parallel.consensus import (
