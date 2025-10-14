@@ -56,11 +56,19 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
       <h2><a href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">LLM Adapter — Provider Orchestration</a></h2>
     </header>
     <p>An adapter that orchestrates provider calls and comparison runs while keeping production fallbacks intact.</p>
-    <ul>
-      <li>Supports OpenAI, Gemini, Ollama, and OpenRouter behind a unified tracing layer.</li>
-      <li>Run prompts with <code>llm-adapter --provider adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl</code> to replay the shared JSONL dataset.</li>
-      <li>Launch batch comparisons via <code>python adapter/run_compare.py --prompts examples/prompts/ja_one_liner.jsonl</code> for side-by-side provider diffs.</li>
-    </ul>
+      <ul>
+        <li>Supports OpenAI, Gemini, Ollama, and OpenRouter behind a unified tracing layer.</li>
+        <li>
+          Run prompts with
+          <code>llm-adapter --provider adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl</code>
+          to replay the shared JSONL dataset.
+        </li>
+        <li>
+          Launch batch comparisons via
+          <code>python adapter/run_compare.py --prompts examples/prompts/ja_one_liner.jsonl</code>
+          for side-by-side provider diffs.
+        </li>
+      </ul>
     <p><a class="demo-card__link" href="{{ '/en/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
   </article>
 </div>
@@ -87,7 +95,8 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 
 ### 04. LLM Adapter — Provider Orchestration
 - Connects OpenAI, Gemini, Ollama, and OpenRouter with resilient fallback strategies and shared telemetry hooks.
-- `llm-adapter --provider adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl` replays the JSONL dataset with a single provider.
+- `llm-adapter --provider adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl`
+  replays the JSONL dataset with a single provider.
 - `python adapter/run_compare.py --prompts examples/prompts/ja_one_liner.jsonl` records comparison metrics from the JSONL prompt list for audits.
 - Reference: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
