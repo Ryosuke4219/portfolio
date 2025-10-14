@@ -109,10 +109,10 @@
 
 ```csv
 RequirementID,RequirementTitle,Priority,Risk,TestID,Project,TestType,Status,Coverage,EvidenceLink,LastRunAt,Owner
-REQ-LOGIN-001,正しい資格情報でログインできる,H,M,T-02-E2E-LOGIN-VALID,02,E2E,Implemented,Full,../projects/02-e2e/README.md#login,2025-09-20,ryo
-REQ-LOGIN-002,パスワード誤り時はエラー表示,H,M,T-02-E2E-LOGIN-INVALID,02,E2E,Implemented,Full,../projects/02-e2e/README.md#invalid,2025-09-20,ryo
-REQ-A11Y-001,フォーム要素に適切なラベルがある,M,M,T-02-E2E-A11Y-LABEL,02,a11y,Implemented,Partial,../projects/02-e2e/README.md#a11y,2025-09-20,ryo
-REQ-REPORT-001,JUnitを解析して失敗傾向を把握できる,M,M,T-03-REPORT-SUMMARY,03,Integration,Implemented,Full,../projects/03-ci-flaky/README.md#summary,2025-09-21,ryo
+REQ-LOGIN-001,正しい資格情報でログインできる,H,M,T-02-E2E-LOGIN-VALID,02,E2E,Implemented,Full,../projects/02-blueprint-to-playwright/tests/README.md#data-driven-実行,2025-09-20,ryo
+REQ-LOGIN-002,パスワード誤り時はエラー表示,H,M,T-02-E2E-LOGIN-INVALID,02,E2E,Implemented,Full,../projects/02-blueprint-to-playwright/tests/README.md#data-driven-実行,2025-09-20,ryo
+REQ-A11Y-001,フォーム要素に適切なラベルがある,M,M,T-02-E2E-A11Y-LABEL,02,a11y,Implemented,Partial,../projects/02-blueprint-to-playwright/tests/README.md#a11y-スキャン,2025-09-20,ryo
+REQ-REPORT-001,JUnitを解析して失敗傾向を把握できる,M,M,T-03-REPORT-SUMMARY,03,Integration,Implemented,Full,../projects/03-ci-flaky/README.md#代表的な使い方,2025-09-21,ryo
 ```
 
 **DoD**
