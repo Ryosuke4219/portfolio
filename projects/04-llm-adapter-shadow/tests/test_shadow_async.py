@@ -6,9 +6,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 from llm_adapter.shadow_async import run_with_shadow_async
-import pytest
 
 
 class _DummyAsyncProvider:
