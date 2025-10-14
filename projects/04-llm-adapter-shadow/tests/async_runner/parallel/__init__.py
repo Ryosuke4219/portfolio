@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.llm_adapter.runner import ParallelAllResult
+from llm_adapter.runner import ParallelAllResult
 
 from .test_parallel_all import *  # noqa: F401,F403
 from .test_parallel_any_failures import *  # noqa: F401,F403

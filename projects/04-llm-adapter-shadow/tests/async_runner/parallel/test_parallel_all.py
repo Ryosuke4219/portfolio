@@ -4,10 +4,10 @@ import asyncio
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import RateLimitError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
-from src.llm_adapter.runner import AsyncRunner, ParallelAllResult
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
+from llm_adapter.errors import RateLimitError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+from llm_adapter.runner import AsyncRunner, ParallelAllResult
+from llm_adapter.runner_config import RunnerConfig, RunnerMode
 
 from .conftest import _AsyncProbeProvider, _CapturingLogger, _FakeClock, _patch_runner_sleep
 
