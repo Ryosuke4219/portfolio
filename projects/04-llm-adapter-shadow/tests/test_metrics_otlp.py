@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from src.llm_adapter.metrics_otlp import OtlpJsonExporter
+from llm_adapter.metrics_otlp import OtlpJsonExporter
 
 
 def _collect(event: str, record: dict[str, Any]) -> dict[str, Any]:
