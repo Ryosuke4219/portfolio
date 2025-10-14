@@ -1,15 +1,15 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 
-DOC_PATH = Path("docs/weekly-summary.md")
-
-
-def test_weekly_summary_metrics_placeholders() -> None:
-    content = DOC_PATH.read_text(encoding="utf-8")
-
-    for placeholder in (
+def test_weekly_summary_exposes_kpi_placeholders() -> None:
+    text = Path("docs/weekly-summary.md").read_text(encoding="utf-8")
+    expected_tokens = [
         "{{ summary.total_tests }}",
         "{{ summary.pass_rate_percent }}",
         "{{ summary.new_defects }}",
-    ):
-        assert placeholder in content, f"missing placeholder: {placeholder}"
+    ]
+
+    for token in expected_tokens:
+        assert token in text, f"テンプレートに {token} が存在しません"
