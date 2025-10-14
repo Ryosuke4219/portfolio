@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import pytest
+
 from llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
 from llm_adapter.parallel_exec import ParallelExecutionError
 from llm_adapter.provider_spi import ProviderRequest
 from llm_adapter.runner import AsyncRunner
 from llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
-
 from tests.shadow._runner_test_helpers import (
     _ErrorProvider,
     _SuccessProvider,
