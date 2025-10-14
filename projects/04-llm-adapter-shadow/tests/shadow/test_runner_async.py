@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from src.llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
-from src.llm_adapter.parallel_exec import ParallelExecutionError
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.runner import AsyncRunner
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
+from llm_adapter.errors import RateLimitError, RetriableError, TimeoutError
+from llm_adapter.parallel_exec import ParallelExecutionError
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.runner import AsyncRunner
+from llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 
 from tests.shadow._runner_test_helpers import (
     _ErrorProvider,
@@ -28,7 +28,7 @@ async def test_async_rate_limit_triggers_backoff_and_logs(
     async def _fake_sleep(duration: float) -> None:
         sleep_calls.append(duration)
 
-    monkeypatch.setattr("src.llm_adapter.runner_async.asyncio.sleep", _fake_sleep)
+    monkeypatch.setattr("llm_adapter.runner_async.asyncio.sleep", _fake_sleep)
 
     logger = FakeLogger()
     runner = AsyncRunner(

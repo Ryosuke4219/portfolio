@@ -5,12 +5,12 @@ import json
 from pathlib import Path
 
 import pytest
-from src.llm_adapter.errors import RateLimitError, TimeoutError
-from src.llm_adapter.parallel_exec import ParallelExecutionError
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import AsyncRunner
-from src.llm_adapter.runner_config import (
+from llm_adapter.errors import RateLimitError, TimeoutError
+from llm_adapter.parallel_exec import ParallelExecutionError
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import AsyncRunner
+from llm_adapter.runner_config import (
     BackoffPolicy,
     ConsensusConfig,
     RunnerConfig,
@@ -30,7 +30,7 @@ class _CostProbeProvider(_AsyncProbeProvider):
 
 
 def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+    monkeypatch.setattr("llm_adapter.providers.mock.random.random", lambda: 0.0)
 
     agree_text = "agree: async"
     agree_a = _StaticProvider("agree_a", agree_text, latency_ms=5)
@@ -93,7 +93,7 @@ def test_async_consensus_vote_event(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 def test_async_consensus_run_metric_latency_matches_winner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+    monkeypatch.setattr("llm_adapter.providers.mock.random.random", lambda: 0.0)
 
     agree_text = "agree: async"
     fast = _StaticProvider("fast", agree_text, latency_ms=3)
@@ -243,7 +243,7 @@ def test_async_consensus_weighted_vote_prefers_weight(
         ]
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_async_modes.consensus.run_parallel_all_async",
+        "llm_adapter.runner_async_modes.consensus.run_parallel_all_async",
         _fake_run_parallel_all_async,
     )
 

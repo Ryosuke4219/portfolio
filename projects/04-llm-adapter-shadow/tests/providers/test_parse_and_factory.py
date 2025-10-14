@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderSPI
-from src.llm_adapter.providers import factory as providers_factory
+from llm_adapter.provider_spi import ProviderSPI
+from llm_adapter.providers import factory as providers_factory
 
 
 class DummyProvider(ProviderSPI):

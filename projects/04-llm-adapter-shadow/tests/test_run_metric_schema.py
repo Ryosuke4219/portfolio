@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.runner import Runner, RunnerConfig
-from src.llm_adapter.runner_config import RunnerMode
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.runner import Runner, RunnerConfig
+from llm_adapter.runner_config import RunnerMode
 
 from .shadow._runner_test_helpers import _SuccessProvider, FakeLogger
 

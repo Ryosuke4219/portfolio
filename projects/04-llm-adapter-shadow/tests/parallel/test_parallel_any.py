@@ -8,12 +8,12 @@ import time
 from typing import Any
 
 import pytest
-from src.llm_adapter.errors import RateLimitError, TimeoutError
-from src.llm_adapter.parallel_exec import ParallelExecutionError, run_parallel_any_sync
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import Runner
-from src.llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
+from llm_adapter.errors import RateLimitError, TimeoutError
+from llm_adapter.parallel_exec import ParallelExecutionError, run_parallel_any_sync
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import Runner
+from llm_adapter.runner_config import BackoffPolicy, RunnerConfig, RunnerMode
 
 from ..parallel_helpers import (
     _install_recording_executor,
@@ -107,7 +107,7 @@ def test_runner_parallel_any_records_failures() -> None:
 
 
 def test_parallel_any_primitives(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+    monkeypatch.setattr("llm_adapter.providers.mock.random.random", lambda: 0.0)
     failing = MockProvider("fail", base_latency_ms=1, error_markers={"[TIMEOUT]"})
     fast = MockProvider("fast", base_latency_ms=1, error_markers=set())
     fail_request = ProviderRequest(prompt="[TIMEOUT] hi", model="m1")
@@ -157,7 +157,7 @@ def test_runner_parallel_any_returns_success_after_fast_failure(
         return 0.0
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync.estimate_cost", _record_cost, raising=False
+        "llm_adapter.runner_sync.estimate_cost", _record_cost, raising=False
     )
     logger = RecordingLogger()
     runner = Runner(

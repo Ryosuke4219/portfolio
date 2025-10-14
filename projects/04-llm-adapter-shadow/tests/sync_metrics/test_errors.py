@@ -4,11 +4,11 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pytest
-from src.llm_adapter.errors import AllFailedError, FatalError, TimeoutError
-from src.llm_adapter.parallel_exec import ParallelExecutionError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
-from src.llm_adapter.runner_config import RunnerMode
-from src.llm_adapter.runner_shared.logging.status import error_family
+from llm_adapter.errors import AllFailedError, FatalError, TimeoutError
+from llm_adapter.parallel_exec import ParallelExecutionError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, ProviderSPI
+from llm_adapter.runner_config import RunnerMode
+from llm_adapter.runner_shared.logging.status import error_family
 
 from ..parallel_helpers import _StaticProvider
 from .helpers import (

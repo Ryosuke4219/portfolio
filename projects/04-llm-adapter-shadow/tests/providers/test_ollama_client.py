@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import pytest
-from src.llm_adapter.errors import (
+from llm_adapter.errors import (
     RateLimitError,
     RetriableError,
     TimeoutError,
 )
-from src.llm_adapter.providers._requests_compat import requests_exceptions
-from src.llm_adapter.providers.ollama_client import OllamaClient
+from llm_adapter.providers._requests_compat import requests_exceptions
+from llm_adapter.providers.ollama_client import OllamaClient
 
 # isort: split
 from tests.helpers.fakes import FakeResponse, FakeSession

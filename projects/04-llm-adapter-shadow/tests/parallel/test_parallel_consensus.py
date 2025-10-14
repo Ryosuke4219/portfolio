@@ -5,20 +5,20 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-from src.llm_adapter.parallel_exec import (
+from llm_adapter.parallel_exec import (
     ParallelExecutionError,
     run_parallel_any_sync,
 )
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner import Runner
-from src.llm_adapter.runner_config import RunnerConfig, RunnerMode
-from src.llm_adapter.runner_parallel.consensus import (
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner import Runner
+from llm_adapter.runner_config import RunnerConfig, RunnerMode
+from llm_adapter.runner_parallel.consensus import (
     _normalize_candidate_text,
     compute_consensus,
     ConsensusConfig,
 )
-from src.llm_adapter.shadow import run_with_shadow
+from llm_adapter.shadow import run_with_shadow
 
 from ..parallel_helpers import _StaticProvider
 
@@ -105,7 +105,7 @@ def test_normalize_candidate_text_for_json_payloads() -> None:
 def test_parallel_any_with_shadow_logs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+    monkeypatch.setattr("llm_adapter.providers.mock.random.random", lambda: 0.0)
     failing = MockProvider("fail", base_latency_ms=1, error_markers={"[TIMEOUT]"})
     primary = MockProvider("primary", base_latency_ms=1, error_markers=set())
     shadow = MockProvider("shadow", base_latency_ms=1, error_markers={"[TIMEOUT]"})
@@ -143,7 +143,7 @@ def test_parallel_any_with_shadow_logs(
 def test_consensus_vote_event_and_shadow_delta(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("src.llm_adapter.providers.mock.random.random", lambda: 0.0)
+    monkeypatch.setattr("llm_adapter.providers.mock.random.random", lambda: 0.0)
 
     agree_text = "agree: hello"
     agree_a = _StaticProvider("agree_a", agree_text, latency_ms=5)

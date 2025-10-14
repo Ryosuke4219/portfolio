@@ -10,9 +10,9 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = PROJECT_ROOT / "src"
 TEST_TARGETS: tuple[Path, ...] = (
-    PROJECT_ROOT / "tests" / "test_runner_consensus.py",
+    PROJECT_ROOT / "tests",
 )
-FORBIDDEN = "src.llm_adapter"
+FORBIDDEN = ".".join(("src", "llm_adapter"))
 
 
 def _collect_references(targets: Iterable[Path]) -> OrderedDict[str, int]:
@@ -42,4 +42,5 @@ def test_no_src_llm_adapter_in_source(path: Path) -> None:
 
 
 def test_src_llm_adapter_references_snapshot() -> None:
-    assert _collect_references(TEST_TARGETS) == {}
+    references = _collect_references(TEST_TARGETS)
+    assert references == OrderedDict()

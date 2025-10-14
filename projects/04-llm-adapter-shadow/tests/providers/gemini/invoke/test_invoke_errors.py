@@ -5,17 +5,17 @@ from types import SimpleNamespace
 from typing import Any, NoReturn
 
 import pytest
-from src.llm_adapter.errors import (
+from llm_adapter.errors import (
     AuthError,
     ProviderSkip,
     RateLimitError,
     SkipReason,
     TimeoutError,
 )
-from src.llm_adapter.provider_spi import ProviderRequest
-from src.llm_adapter.providers import gemini as gemini_module
-from src.llm_adapter.providers.gemini import GeminiProvider
-from src.llm_adapter.providers.gemini_client import (
+from llm_adapter.provider_spi import ProviderRequest
+from llm_adapter.providers import gemini as gemini_module
+from llm_adapter.providers.gemini import GeminiProvider
+from llm_adapter.providers.gemini_client import (
     GeminiModelsAPI,
     GeminiResponsesAPI,
 )

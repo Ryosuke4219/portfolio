@@ -1,6 +1,5 @@
-import importlib
+from llm_adapter import __version__
 
 
 def test_version_constant() -> None:
-    module = importlib.import_module("src.llm_adapter")
-    assert module.__version__ == "0.1.0"
+    assert __version__ == "0.1.0"
