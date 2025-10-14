@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.llm_adapter import cli
+from llm_adapter import cli
 from src.llm_adapter.provider_spi import ProviderResponse, TokenUsage
 
 
