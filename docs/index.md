@@ -188,3 +188,4 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 - `weekly-qa-summary.yml` ワークフローが `docs/weekly-summary.md` を自動更新。
 - `tools/generate_gallery_snippets.py` が週次サマリからハイライトカードを生成。
 - `.github/workflows/pages.yml` が `docs/` 配下を GitHub Pages にデプロイ（別途 publish-docs ワークフローは廃止済み）。
+- 開発ログのナビゲーションは [Development Log Hub]({{ '/development-log-hub.html' | relative_url }}) に集約。
