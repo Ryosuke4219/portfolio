@@ -38,6 +38,8 @@ def _assert_cli_flags(snippet: str) -> None:
     assert (
         expected_prompts_arg in normalized
     ), f"CLI は {PROMPTS_PATH} を参照してください"
+    assert "adapter/prompts/demo-04.yaml" not in normalized, "adapter/prompts/demo-04.yaml は存在しません"
+    assert "adapter/prompts/" not in normalized, "adapter/prompts/ ディレクトリは存在しません"
     assert PROMPTS_PATH.exists(), f"{PROMPTS_PATH} が存在しません"
     assert "python adapter/run_compare.py" in normalized, "Python CLI の記述がありません"
 
