@@ -65,7 +65,7 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
         </li>
         <li>
           Launch batch comparisons via
-          <code>python adapter/run_compare.py --prompts examples/prompts/ja_one_liner.jsonl</code>
+          <code>python adapter/run_compare.py --providers adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl</code>
           for side-by-side provider diffs.
         </li>
       </ul>
@@ -97,7 +97,7 @@ description: A portal showcasing QA / SDET / LLM highlights with weekly summarie
 - Connects OpenAI, Gemini, Ollama, and OpenRouter with resilient fallback strategies and shared telemetry hooks.
 - `llm-adapter --provider adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl`
   replays the JSONL dataset with a single provider.
-- `python adapter/run_compare.py --prompts examples/prompts/ja_one_liner.jsonl` records comparison metrics from the JSONL prompt list for audits.
+- `python adapter/run_compare.py --providers adapter/config/providers/openai.yaml --prompts examples/prompts/ja_one_liner.jsonl` records comparison metrics from the JSONL prompt list for audits.
 - Reference: [evidence/llm-adapter](https://ryosuke4219.github.io/portfolio/evidence/llm-adapter.html)
 
 [View all weekly summaries &rarr;]({{ '/en/weekly-summary.html' | relative_url }})

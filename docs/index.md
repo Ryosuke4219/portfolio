@@ -141,7 +141,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
     <ul>
       <li>プロバイダ統合レイヤーでトレースを共通化し、切替や多重呼び出しを安全に制御。</li>
       <li><code>llm-adapter --provider adapter/config/providers/openai.yaml --prompts projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl</code> で JSONL テンプレートから単発実行。</li>
-      <li><code>python adapter/run_compare.py --prompts datasets/golden/tasks.jsonl</code> が比較ランを一括管理。</li>
+      <li><code>python adapter/run_compare.py --providers adapter/config/providers/openai.yaml --prompts datasets/golden/tasks.jsonl</code> が比較ランを一括管理。</li>
       <li>差分メトリクスは <code>data/runs-metrics.jsonl</code> に JSONL で蓄積し、監査ログへ接続。</li>
     </ul>
     <p><a class="demo-card__link" href="{{ '/evidence/llm-adapter.html' | relative_url }}">Evidence &rarr;</a></p>
@@ -175,7 +175,7 @@ description: QA / SDET / LLM 成果物のハイライトと週次サマリを俯
 ### 04. LLM Adapter — Provider Orchestration
 - OpenAI / Azure / ローカルモックを共通トレースで束ね、フォールバック設計と多重呼び出しを両立。
 - `llm-adapter --provider adapter/config/providers/openai.yaml --prompts projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl` で JSONL テンプレートから単発実行。
-- `python adapter/run_compare.py --prompts datasets/golden/tasks.jsonl` が比較ランを `data/runs-metrics.jsonl` に記録。
+- `python adapter/run_compare.py --providers adapter/config/providers/openai.yaml --prompts datasets/golden/tasks.jsonl` が比較ランを `data/runs-metrics.jsonl` に記録。
 - 参考資料: [evidence/llm-adapter]({{ '/evidence/llm-adapter.html' | relative_url }})
 
 [週次サマリの一覧を見る &rarr;]({{ '/weekly-summary.html' | relative_url }})

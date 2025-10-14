@@ -7,6 +7,7 @@ CLI_PROVIDER_PATTERN = re.compile(
     r"--provider(?:\s+|=)adapter/config/providers/[\w\-/]+\.ya?ml",
     re.IGNORECASE,
 )
+RUN_COMPARE_PROVIDERS_ARG = "--providers adapter/config/providers/openai.yaml"
 PROMPTS_FLAG_PATTERNS = (
     re.compile(r"--prompts(?:\s+|=)([^\s]+)", re.IGNORECASE),
     re.compile(r"--prompt-file(?:\s+|=)([^\s]+)", re.IGNORECASE),
@@ -28,6 +29,9 @@ def _assert_cli_flags(snippet: str) -> None:
     assert CLI_PROVIDER_PATTERN.search(
         normalized
     ), "Missing --provider adapter/config/providers/*.yaml"
+    assert (
+        RUN_COMPARE_PROVIDERS_ARG in normalized
+    ), f"Missing {RUN_COMPARE_PROVIDERS_ARG}"
     prompt_match = None
     for pattern in PROMPTS_FLAG_PATTERNS:
         prompt_match = pattern.search(sanitized)
