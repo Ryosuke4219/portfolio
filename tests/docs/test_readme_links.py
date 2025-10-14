@@ -98,7 +98,16 @@ def test_readme_quick_start_is_single_section() -> None:
         "Quick Start 情報は箇条書きではなく Quick Start セクションに集約してください。"
     )
 
-    intro_lines = readme_lines[:40]
+    heading_index = next(
+        index
+        for index, line in enumerate(readme_lines)
+        if line.strip().lower() == "### quick start (ja / en)"
+    )
+
+    intro_lines = readme_lines[:heading_index]
+    assert any(
+        "Quick Start はこちら" in line for line in intro_lines
+    ), "README.md 冒頭に Quick Start セクションへの短い導線を記載してください。"
     intro_mentions = [
         line
         for line in intro_lines
