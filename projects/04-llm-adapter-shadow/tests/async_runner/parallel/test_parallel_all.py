@@ -4,6 +4,7 @@ import asyncio
 from typing import Any
 
 import pytest
+
 from llm_adapter.errors import RateLimitError
 from llm_adapter.provider_spi import ProviderRequest, ProviderResponse
 from llm_adapter.runner import AsyncRunner, ParallelAllResult
