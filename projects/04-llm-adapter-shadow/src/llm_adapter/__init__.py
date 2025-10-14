@@ -1,8 +1,8 @@
 import importlib
 import importlib.abc
-from importlib.machinery import ModuleSpec
 import importlib.util
 import sys
+from importlib.machinery import ModuleSpec, PathFinder
 from types import ModuleType
 
 from .errors import (
@@ -23,6 +23,14 @@ from .shadow import run_with_shadow as run_with_shadow
 __version__ = "0.1.0"
 
 
+def _register_module_alias(actual_name: str, alias_name: str) -> ModuleType:
+    actual_module = sys.modules[actual_name]
+    existing = sys.modules.get(alias_name)
+    if existing is not actual_module:
+        sys.modules[alias_name] = actual_module
+    return actual_module
+
+
 class _AliasLoader(importlib.abc.Loader):
     def __init__(self, alias_name: str, actual_name: str) -> None:
         self._alias_name = alias_name
@@ -32,8 +40,56 @@ class _AliasLoader(importlib.abc.Loader):
         return None
 
     def exec_module(self, module: ModuleType) -> None:
-        actual = importlib.import_module(self._actual_name)
-        sys.modules[self._alias_name] = actual
+        placeholder = sys.modules.pop(self._alias_name, None)
+        try:
+            importlib.import_module(self._actual_name)
+        except Exception:
+            if placeholder is not None:
+                sys.modules[self._alias_name] = placeholder
+            raise
+        _register_module_alias(self._actual_name, self._alias_name)
+
+
+class _ActualAliasLoader(importlib.abc.Loader):
+    def __init__(self, delegate: importlib.abc.Loader, actual_name: str, alias_name: str) -> None:
+        self._delegate = delegate
+        self._actual_name = actual_name
+        self._alias_name = alias_name
+
+    def create_module(self, spec: ModuleSpec) -> ModuleType | None:
+        if hasattr(self._delegate, "create_module"):
+            return self._delegate.create_module(spec)  # type: ignore[no-any-return]
+        return None
+
+    def exec_module(self, module: ModuleType) -> None:
+        if hasattr(self._delegate, "exec_module"):
+            self._delegate.exec_module(module)
+        else:
+            raise ImportError(f"Loader for {self._actual_name!r} does not implement exec_module")
+        _register_module_alias(self._actual_name, self._alias_name)
+
+
+class _ExistingModuleLoader(importlib.abc.Loader):
+    def __init__(
+        self,
+        module: ModuleType,
+        actual_name: str,
+        alias_name: str,
+    ) -> None:
+        self._module = module
+        self._actual_name = actual_name
+        self._alias_name = alias_name
+        self._original_spec = getattr(module, "__spec__", None)
+        self._original_package = module.__package__
+
+    def create_module(self, spec: ModuleSpec) -> ModuleType:
+        return self._module
+
+    def exec_module(self, module: ModuleType) -> None:
+        sys.modules[self._actual_name] = self._module
+        _register_module_alias(self._actual_name, self._alias_name)
+        module.__spec__ = self._original_spec
+        module.__package__ = self._original_package
 
 
 class _AliasFinder(importlib.abc.MetaPathFinder):
@@ -59,6 +115,40 @@ class _AliasFinder(importlib.abc.MetaPathFinder):
 _alias_finder = _AliasFinder()
 
 
+class _ActualAliasFinder(importlib.abc.MetaPathFinder):
+    def find_spec(
+        self,
+        fullname: str,
+        path: object,
+        target: ModuleType | None = None,
+    ) -> ModuleSpec | None:
+        if not fullname.startswith("src.llm_adapter."):
+            return None
+        alias_name = fullname.removeprefix("src.")
+        alias_module = sys.modules.get(alias_name)
+        if alias_module is not None:
+            spec = ModuleSpec(
+                name=fullname,
+                loader=_ExistingModuleLoader(alias_module, fullname, alias_name),
+                origin="existing module",
+                is_package=hasattr(alias_module, "__path__"),
+            )
+            alias_spec = getattr(alias_module, "__spec__", None)
+            if alias_spec and alias_spec.submodule_search_locations is not None:
+                spec.submodule_search_locations = list(alias_spec.submodule_search_locations)
+            elif hasattr(alias_module, "__path__"):
+                spec.submodule_search_locations = list(alias_module.__path__)
+            return spec
+        actual_spec = PathFinder.find_spec(fullname, path, target)
+        if actual_spec is None or actual_spec.loader is None:
+            return actual_spec
+        actual_spec.loader = _ActualAliasLoader(actual_spec.loader, fullname, alias_name)
+        return actual_spec
+
+
+_actual_alias_finder = _ActualAliasFinder()
+
+
 def _install_aliases() -> None:
     module = sys.modules[__name__]
     sys.modules["llm_adapter"] = module
@@ -68,6 +158,16 @@ def _install_aliases() -> None:
 
     if not any(isinstance(finder, _AliasFinder) for finder in sys.meta_path):
         sys.meta_path.insert(0, _alias_finder)
+    if not any(isinstance(finder, _ActualAliasFinder) for finder in sys.meta_path):
+        sys.meta_path.insert(0, _actual_alias_finder)
+
+    shadow_prefix = f"{src_package}."
+    public_prefix = f"{package_name}."
+    for name in list(sys.modules):
+        if name == src_package or name.startswith(shadow_prefix):
+            _register_module_alias(name, name.removeprefix("src."))
+        if name == package_name or name.startswith(public_prefix):
+            _register_module_alias(name, ".".join(("src", name)))
 
 __all__ = [
     "__version__",
