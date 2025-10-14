@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.shadow_async import run_with_shadow_async
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.shadow_async import run_with_shadow_async
 
 
 class _DummyAsyncProvider:
@@ -115,7 +115,7 @@ async def test_run_with_shadow_async_timeout_records_timeout(
     ) -> Any:
         raise TimeoutError
 
-    monkeypatch.setattr("src.llm_adapter.shadow_async.asyncio.wait_for", _raise_timeout)
+    monkeypatch.setattr("llm_adapter.shadow_async.asyncio.wait_for", _raise_timeout)
 
     request = ProviderRequest(prompt="hello", model="primary-model")
     metrics_path = tmp_path / "timeout.jsonl"
