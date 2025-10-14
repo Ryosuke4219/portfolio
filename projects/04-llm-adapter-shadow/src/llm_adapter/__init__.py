@@ -2,6 +2,7 @@ import importlib
 import importlib.abc
 import importlib.util
 import sys
+from collections.abc import Sequence
 from importlib.machinery import ModuleSpec, PathFinder
 from types import ModuleType
 
@@ -67,7 +68,7 @@ class _ActualAliasLoader(importlib.abc.Loader):
 
     def create_module(self, spec: ModuleSpec) -> ModuleType | None:
         if hasattr(self._delegate, "create_module"):
-            return self._delegate.create_module(spec)  # type: ignore[no-any-return]
+            return self._delegate.create_module(spec)
         return None
 
     def exec_module(self, module: ModuleType) -> None:
@@ -105,7 +106,7 @@ class _AliasFinder(importlib.abc.MetaPathFinder):
     def find_spec(
         self,
         fullname: str,
-        path: object,
+        path: Sequence[str] | None,
         target: ModuleType | None = None,
     ) -> ModuleSpec | None:
         if not fullname.startswith("llm_adapter."):
@@ -128,7 +129,7 @@ class _ActualAliasFinder(importlib.abc.MetaPathFinder):
     def find_spec(
         self,
         fullname: str,
-        path: object,
+        path: Sequence[str] | None,
         target: ModuleType | None = None,
     ) -> ModuleSpec | None:
         if not fullname.startswith("src.llm_adapter."):
