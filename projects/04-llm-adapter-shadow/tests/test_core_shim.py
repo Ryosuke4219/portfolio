@@ -5,11 +5,7 @@ from adapter.core import provider_spi as core_provider_spi
 
 
 def test_provider_spi_reuses_core_types() -> None:
-    from llm_adapter.provider_spi import (
-        ProviderRequest,
-        ProviderResponse,
-        TokenUsage,
-    )
+    from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
 
     assert issubclass(ProviderRequest, core_provider_spi.ProviderRequest)
     assert issubclass(ProviderResponse, core_provider_spi.ProviderResponse)
