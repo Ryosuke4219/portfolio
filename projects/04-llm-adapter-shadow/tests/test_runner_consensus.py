@@ -1,10 +1,10 @@
+from llm_adapter.errors import RetriableError, TimeoutError
+from llm_adapter.parallel_exec import ParallelExecutionError
+from llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
+from llm_adapter.providers.mock import MockProvider
+from llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
+from llm_adapter.runner_sync import ProviderInvocationResult, Runner
 import pytest
-from src.llm_adapter.errors import RetriableError, TimeoutError
-from src.llm_adapter.parallel_exec import ParallelExecutionError
-from src.llm_adapter.provider_spi import ProviderRequest, ProviderResponse, TokenUsage
-from src.llm_adapter.providers.mock import MockProvider
-from src.llm_adapter.runner_config import ConsensusConfig, RunnerConfig, RunnerMode
-from src.llm_adapter.runner_sync import ProviderInvocationResult, Runner
 
 from tests.shadow._runner_test_helpers import _SuccessProvider
 
@@ -68,7 +68,7 @@ def test_runner_consensus_failure_details(monkeypatch: pytest.MonkeyPatch) -> No
         return invocations
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        "llm_adapter.runner_sync.run_parallel_all_sync",
         _fake_run_parallel_all_sync,
     )
 
@@ -163,7 +163,7 @@ def test_runner_consensus_partial_failure(monkeypatch: pytest.MonkeyPatch) -> No
         return invocations
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        "llm_adapter.runner_sync.run_parallel_all_sync",
         _fake_run_parallel_all_sync,
     )
 
@@ -237,7 +237,7 @@ def test_runner_consensus_weighted_vote_prefers_weight(
         return invocations
 
     monkeypatch.setattr(
-        "src.llm_adapter.runner_sync.run_parallel_all_sync",
+        "llm_adapter.runner_sync.run_parallel_all_sync",
         _fake_run_parallel_all_sync,
     )
 
