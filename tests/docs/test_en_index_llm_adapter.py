@@ -15,6 +15,8 @@ PROMPTS_FLAG_PATTERNS = (
 PROMPTS_DATASET_PATH = Path(
     "projects/04-llm-adapter/examples/prompts/ja_one_liner.jsonl"
 )
+PROMPTS_PATH = Path("examples/prompts/ja_one_liner.jsonl")
+expected_prompts_arg = f"--prompts {PROMPTS_PATH.as_posix()}"
 
 
 def _normalize_text(value: str) -> str:
