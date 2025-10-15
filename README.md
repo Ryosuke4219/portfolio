@@ -2,13 +2,18 @@
 _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 
 
-[![Tests](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests)](https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml)
-[![Lint](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint)](https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml)
+[![Tests][badge-tests]][ci-workflow]
+[![Lint][badge-lint]][lint-workflow]
 [![CodeQL](https://github.com/Ryosuke4219/portfolio/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Ryosuke4219/portfolio/actions/workflows/codeql.yml)
 [![Pages](https://img.shields.io/website?url=https%3A%2F%2Fryosuke4219.github.io%2Fportfolio%2F&label=pages)](https://ryosuke4219.github.io/portfolio/)
 [![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
 [![Release](https://img.shields.io/github/v/release/Ryosuke4219/portfolio?display_name=tag&sort=semver)](https://github.com/Ryosuke4219/portfolio/releases)
 [![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest.html)
+
+[badge-tests]: https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests
+[ci-workflow]: https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml
+[badge-lint]: https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint
+[lint-workflow]: https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml
 
 
 <!-- qa-metrics:start -->
@@ -28,7 +33,11 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 <sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
 
 
-> 🔎 最新CIレポート: [JUnit要約](https://ryosuke4219.github.io/portfolio/reports/junit/index.html) / [Flakyランキング](https://ryosuke4219.github.io/portfolio/reports/flaky/index.html) / [Coverage HTML](https://ryosuke4219.github.io/portfolio/reports/coverage/index.html)
+> 🔎 最新CIレポート: [JUnit要約][junit-report] / [Flakyランキング][flaky-report] / [Coverage HTML][coverage-report]
+
+[junit-report]: https://ryosuke4219.github.io/portfolio/reports/junit/index.html
+[flaky-report]: https://ryosuke4219.github.io/portfolio/reports/flaky/index.html
+[coverage-report]: https://ryosuke4219.github.io/portfolio/reports/coverage/index.html
 
 > QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines.
 
