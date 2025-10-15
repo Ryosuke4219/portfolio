@@ -163,7 +163,7 @@
 ## CLI 実行制御
 
 ### タスク15: `prompt_runner` の RateLimiter/実行順序をテストでガードする（完了）
-- 進捗: `RateLimiter.wait` の 60 秒ウィンドウ処理と `execute_prompts` の並列制御/エラー種別伝搬を回帰テスト化し、CLI 実装のロック・セマフォ制御と整合することを確認した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L1-L154】【F:projects/04-llm-adapter/tests/test_prompt_runner_rate_limit.py†L1-L117】
+- 進捗: `RateLimiter.wait` の 60 秒ウィンドウ処理と `execute_prompts` の並列制御/エラー種別伝搬を回帰テスト化し、CLI 実装のロック・セマフォ制御と整合することを確認した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L1-L197】【F:projects/04-llm-adapter/tests/test_prompt_runner_rate_limit.py†L1-L117】
 - 品質エビデンス: `pytest projects/04-llm-adapter/tests/test_prompt_runner_rate_limit.py` が `rpm=0/1` の境界と gather 戻り順逆転を模擬するケースで `PromptResult.index` ソートと `error_kind` 伝搬を検証し、RateLimiter 実装の破壊を防いでいる。 【F:projects/04-llm-adapter/tests/test_prompt_runner_rate_limit.py†L31-L117】
 
 ## CLI 実装の再構成
