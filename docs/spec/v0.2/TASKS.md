@@ -118,7 +118,7 @@
 - 成果/エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py` で 429/5xx の正規化と週次スライスが検証されている。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py†L1-L52】
   - ✅ `pytest projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py` でストリーミングプローブとメトリクス収集の互換性を担保している。【F:projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py†L1-L120】
-- ✅ `python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter --since 2025-10-01`（`just openrouter-stats -- --since 2025-10-01` 相当）の実行手順と CI スケジュールを本タスクへ記録し、`--out` で指定した `artifacts/openrouter/` に最新集計を生成する運用ログを共有している。【F:justfile†L96-L101】
+- ✅ `python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter --since 2025-10-01`（`just openrouter-stats -- --since 2025-10-01` 相当）の実行手順と CI スケジュールを本タスクへ記録し、`--out` で指定した `artifacts/openrouter/` に最新集計を生成する運用ログを共有している。【F:justfile†L96-L99】
 
 ## CLI Request Pipeline
 
