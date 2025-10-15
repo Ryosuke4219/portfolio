@@ -48,7 +48,12 @@
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
-  - `projects/04-llm-adapter/tests/providers/test_ollama_provider.py`
+  - `projects/04-llm-adapter/tests/providers/ollama/test_success.py`
+    【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L1-L100】
+  - `projects/04-llm-adapter/tests/providers/ollama/test_streaming.py`
+    【F:projects/04-llm-adapter/tests/providers/ollama/test_streaming.py†L1-L57】
+  - `projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py`
+    【F:projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py†L1-L98】
 - 対応状況:
   - `OllamaProvider` が環境変数・設定ファイル・CLI からホストやタイムアウト、自動 Pull の優先順位を解決し、CI/オフライン制御に応じて `ProviderSkip` を返す挙動を含めてコアへ組み込まれた。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L50-L166】
   - `ProviderRequest` のメッセージと `options.*` をチャットペイロードへ取り込み、ストリーミング応答を `ProviderResponse` に正規化する処理を実装した。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L168-L268】
@@ -67,7 +72,16 @@
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
-  - `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py`
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L200】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L200】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_options.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
 - 対応状況:
   - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
