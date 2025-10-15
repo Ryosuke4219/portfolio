@@ -83,6 +83,8 @@
   - `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py`
     【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
 - 対応状況:
+  - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
+  - `_build_payload` が `ProviderRequest` のオプション優先順位を HTTP ペイロードへ織り込み、`invoke` がストリーミング要求を `_consume_stream` と協調させてチャンクを `ProviderResponse` へ集約する実装を整備した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L327-L352】【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L354-L444】【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L446-L506】
   - `OpenRouterProvider` が API キーを環境変数/オプションから解決し、ベース URL を優先順位で決定した上でセッションの Authorization ヘッダを初期化する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L223-L316】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
   - CLI からのリテラル API キー指定や設定ファイルの `api_key`/`env` を `ProviderRequest.options["api_key"]` へ結線し、OpenRouter でも CLI からの入力が確実に伝播する完了経路として整理した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
