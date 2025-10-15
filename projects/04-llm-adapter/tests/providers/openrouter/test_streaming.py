@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from adapter.core.provider_spi import ProviderRequest
 from adapter.core.providers import ProviderFactory
-
 from tests.providers.openrouter.conftest import (
     FakeResponse,
     install_fake_session,
