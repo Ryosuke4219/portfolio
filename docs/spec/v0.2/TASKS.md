@@ -73,9 +73,9 @@
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py`
-    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L200】
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L371】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py`
-    【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L200】
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L260】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_options.py`
     【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py`
