@@ -80,6 +80,15 @@
 - 実サーバーでのストリーミング透過性検証と運用フロー整備（タスク13を参照）。
 - OpenRouter 429/5xx 発生状況の集計とドキュメント拡充（タスク14を参照）。
 
+#### OpenRouter テスト分割チェックリスト
+- [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py` へ移設し、API キー解決とスキップ判定の回帰を担保する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L229】
+- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、エンドポイント解決とセッション初期化を検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L169】
+- [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の上書き順序を確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L102】
+- [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L68】
+- [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L123】
+- [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L7】
+- [ ] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
+
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
 - 主要モジュール: `adapter/core/providers/openai.py` が `_prepare_request_kwargs` で `ProviderRequest.options`・温度・停止語・タイムアウトを統合し、`responses`/`chat.completions`/`completions` それぞれの呼び出しでストリーミングと `max_tokens` の上書きを一貫化した。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L200-L296】
 - 検証テスト: `test_openai_provider_applies_request_overrides` が CLI から渡されるオプションを通じて `stream`/`seed`/`response_format` が SDK 呼び出しへ渡ること、ストリーム結果が `ProviderResponse` に正規化されることを確認する。【F:projects/04-llm-adapter/tests/providers/test_openai_provider_request_overrides.py†L1-L158】
