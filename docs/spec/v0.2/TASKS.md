@@ -59,7 +59,7 @@
   - `ProviderRequest` のメッセージと `options.*` をチャットペイロードへ取り込み、ストリーミング応答を `ProviderResponse` に正規化する処理を実装した。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L168-L268】
   - CLI からリテラル指定した API キーを `ProviderRequest.options["api_key"]` に格納し、Ollama へも伝播できるよう CLI パイプラインを整備した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
 - 品質エビデンス:
-- ✅ CLI API キー透過テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI で指定したリテラル API キーが `ProviderRequest.options` を介して Ollama へ伝播する経路を検証している。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
+- ✅ CLI API キー透過テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI が受け取ったリテラル API キーを `ProviderRequest.options["api_key"]` へ載せ替えてから Ollama に渡す経路を検証している。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
 - ✅ 成功/ストリーミング/429・5xx 検証テスト: `projects/04-llm-adapter/tests/providers/ollama/test_success.py`・`test_streaming.py`・`test_retriable_errors.py` が `ProviderResponse` 正規化とリトライ戦略を担保している。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L55-L99】【F:projects/04-llm-adapter/tests/providers/ollama/test_streaming.py†L9-L57】【F:projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py†L11-L98】
 
 #### Ollama テスト分割チェックリスト
