@@ -66,7 +66,7 @@
 - [x] 成功系テストを `projects/04-llm-adapter/tests/providers/ollama/test_success.py` へ移行する。
 - [x] ストリーミング系テストを `projects/04-llm-adapter/tests/providers/ollama/test_streaming.py` へ移行する。
 - [x] 429/5xx・自動 Pull 異常系テストを `projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py` へ移行する。
-- [ ] 旧 `projects/04-llm-adapter/tests/providers/test_ollama_provider.py` のブリッジを削除し、新ディレクトリのみで運用する。
+- [ ] 旧 `projects/04-llm-adapter/tests/providers/test_ollama_provider.py` のブリッジを削除し、新ディレクトリのみで運用する（成功/スキップ回帰は `test_ollama_provider_executor_success_cases` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L55-L100】
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
@@ -100,7 +100,7 @@
 - [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の上書き順序を確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L102】
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L68】
 - [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L123】
-- [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L10】
+- [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する（オプション上書き検証は `test_openrouter_provider_request_options_override` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】
 - [ ] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
