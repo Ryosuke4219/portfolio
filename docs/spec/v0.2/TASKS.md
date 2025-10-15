@@ -127,7 +127,7 @@
   - `projects/04-llm-adapter/adapter/cli/prompt_runner.py`
   - `projects/04-llm-adapter/adapter/core/_provider_execution.py`
 - 対応状況:
-  - `prompt_runner.execute_prompts` が CLI から渡された `ProviderConfig` を `_build_request` で `ProviderRequest` に正規化し、プロンプト・オプション・メタデータを統合した上で `invoke` の同期呼び出しへ供給する実装に刷新した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L142】
+  - `prompt_runner.execute_prompts` は RateLimiter とセマフォで同時実行数を制御しつつ `_process_prompt` をスケジュールし、各タスクが `_build_request` で正規化した `ProviderRequest` を `run_in_executor` で同期 `invoke` へ引き渡しているため、CLI で束ねたプロンプト・オプション・メタデータがそのままプロバイダへ届く。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L73-L134】【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L177-L197】
   - `ProviderCallExecutor.execute` が `_invoke_provider` を介して `adapter/core/_provider_execution.py` 内で `ProviderRequest` を構築し、CLI 側 `_build_request` と同一のフィールド構成（`prompt`/`options`/`metadata`）を共有して API 移行を完了させた。【F:projects/04-llm-adapter/adapter/core/_provider_execution.py†L40-L139】
   - `prompts.run_prompts` が `ProviderFactory.create` で得たプロバイダへ `execute_prompts` を介して `ProviderRequest` をまとめて投入し、CLI からのオプション上書きやモデル指定を `ProviderConfig` に反映してから渡す構成へ整理された。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L28-L67】
 - 品質エビデンス:
