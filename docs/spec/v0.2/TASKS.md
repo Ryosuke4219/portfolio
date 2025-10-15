@@ -13,7 +13,7 @@
 - [x] `test_provider_errors.py` へエラー種別テストを移設し、終了コードの回帰を担保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py†L1-L94】
 - [x] `test_credentials.py` へ資格情報関連テストを集約し、API キー伝播の整合性を確保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L172】
 - [x] `test_openrouter_flow.py` へ OpenRouter 専用テストを分離し、認証パスの回帰を保持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L1-L74】
-- [ ] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L6】
+- [ ] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
 
 ## Datasets / ゴールデン検証
 
@@ -52,9 +52,9 @@
 - 対応状況:
   - `OllamaProvider` が環境変数・設定ファイル・CLI からホストやタイムアウト、自動 Pull の優先順位を解決し、CI/オフライン制御に応じて `ProviderSkip` を返す挙動を含めてコアへ組み込まれた。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L50-L166】
   - `ProviderRequest` のメッセージと `options.*` をチャットペイロードへ取り込み、ストリーミング応答を `ProviderResponse` に正規化する処理を実装した。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L168-L268】
-  - CLI からリテラル指定した API キーを `ProviderRequest.options["api_key"]` に格納し、Ollama へも伝播できるよう CLI パイプラインを整備した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L359-L392】
+  - CLI からリテラル指定した API キーを `ProviderRequest.options["api_key"]` に格納し、Ollama へも伝播できるよう CLI パイプラインを整備した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
 - 品質エビデンス:
-- ✅ CLI API キー透過テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI で指定したリテラル API キーが `ProviderRequest.options` を介して Ollama へ伝播する経路を検証している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L359-L392】
+- ✅ CLI API キー透過テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI で指定したリテラル API キーが `ProviderRequest.options` を介して Ollama へ伝播する経路を検証している。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
   - ✅ ストリーミング・429/5xx 検証テスト: `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` がストリーミング結合と 429/5xx 正規化を含むケースを通過し、`ProviderResponse` 正規化とリトライ戦略を担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
 
 #### Ollama テスト分割チェックリスト
@@ -71,11 +71,11 @@
 - 対応状況:
   - `OpenRouterProvider` が API キー/ベース URL の環境変数マッピングとセッションヘッダ初期化を担い、Shadow 依存なしでコア提供する構成へ移行した。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L126-L200】
   - `ProviderRequest` のオプション優先順位を HTTP ペイロードへ反映し、ストリーミングチャンクからのテキスト/トークン統合を `ProviderResponse` へ集約している。【F:projects/04-llm-adapter/adapter/core/providers/openrouter.py†L202-L330】
-  - CLI からのリテラル API キー指定や設定ファイルの `api_key`/`env` を `ProviderRequest.options["api_key"]` へ結線し、OpenRouter でも CLI からの入力が確実に伝播する完了経路として整理した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L604-L693】
+  - CLI からのリテラル API キー指定や設定ファイルの `api_key`/`env` を `ProviderRequest.options["api_key"]` へ結線し、OpenRouter でも CLI からの入力が確実に伝播する完了経路として整理した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
   - OpenRouter 運用ドキュメントを `projects/04-llm-adapter/README.md` と `docs/releases/v0.1.0.md` に同期し、`python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter --since ...`（`just openrouter-stats -- --since ...` 経由でも同等）と `llm-adapter-openrouter-probe` の手順を最新化した。【F:projects/04-llm-adapter/README.md†L198-L206】【F:docs/releases/v0.1.0.md†L1-L23】
 - 品質エビデンス:
   - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、`ProviderRequest.options` 経由で付与される認証ヘッダが秘匿されたまま HTTP セッションへ反映され、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
-- ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けのリテラル API キーが `ProviderRequest.options` で秘匿されたまま CLI からプロバイダへ伝播することを確認済み。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L662-L693】
+- ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けのリテラル API キーが `ProviderRequest.options` で秘匿されたまま CLI からプロバイダへ伝播することを確認済み。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
 #### 継続課題（Providers）
 - 実サーバーでのストリーミング透過性検証と運用フロー整備（タスク13を参照）。
 - OpenRouter 429/5xx 発生状況の集計とドキュメント拡充（タスク14を参照）。
@@ -117,7 +117,7 @@
   - `ProviderCallExecutor.execute` が `_invoke_provider` を介して `adapter/core/_provider_execution.py` 内で `ProviderRequest` を構築し、CLI 側 `_build_request` と同一のフィールド構成（`prompt`/`options`/`metadata`）を共有して API 移行を完了させた。【F:projects/04-llm-adapter/adapter/core/_provider_execution.py†L40-L139】
   - `prompts.run_prompts` が `ProviderFactory.create` で得たプロバイダへ `execute_prompts` を介して `ProviderRequest` をまとめて投入し、CLI からのオプション上書きやモデル指定を `ProviderConfig` に反映してから渡す構成へ整理された。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L335-L384】
 - 品質エビデンス:
-  - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` — CLI が `_build_request` で構築した `ProviderRequest` に API キーやプロンプト配列を束ね、`prompt_runner.execute_prompts` が `ProviderResponse` を取得する流れを検証。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L22-L219】
+- ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py` — CLI が `_build_request` で構築した `ProviderRequest` に API キーやプロンプト配列を束ね、`prompt_runner.execute_prompts` が `ProviderResponse` を取得する流れを検証。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L24-L170】
   - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.execute` が `_invoke_provider` を通じて `ProviderRequest` を構築し、`options`/`metadata` の整合性を担保する回帰テストを維持。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L108-L139】
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する（対応済み）
@@ -125,8 +125,8 @@
   - `adapter/cli/prompts.py` が CLI 引数で受けた `--provider-option` を設定 YAML の `options` とマージし、`ProviderConfig.raw` を差し替えて `api_key` などのリテラル値を統合する。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L242-L331】
   - `adapter/cli/prompt_runner.py` の `_build_request` が統合済み `ProviderConfig` から `options`/`metadata` を抽出し、`ProviderRequest` へ確実に反映する。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】
 - 検証テスト:
-  - `test_cli_provider_option_coerces_types` / `test_run_prompts_provider_option_coerces_types` が `--provider-option` の文字列を型変換して `ProviderRequest.options` に伝播することを検証する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L396-L460】
-  - `test_cli_openrouter_accepts_provider_option_api_key` が CLI から渡した OpenRouter の `api_key` が `ProviderRequest.options` 経由でプロバイダへ届くことを確認する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L662-L692】
+- `test_cli_provider_option_coerces_types` / `test_run_prompts_provider_option_coerces_types` が `--provider-option` の文字列を型変換して `ProviderRequest.options` に伝播することを検証する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L205-L278】
+- `test_cli_openrouter_accepts_provider_option_api_key` が CLI から渡した OpenRouter の `api_key` が `ProviderRequest.options` 経由でプロバイダへ届くことを確認する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
 
 ## Docs & Templates
 
@@ -134,7 +134,7 @@
 - 対応状況:
   - README: Ollama/Ollama 並列実行時のストリーミング設定や OpenRouter の `.env`・CLI 併用手順、運用チェックリストを追記し、タスク要件の手順差分を反映済み。【F:projects/04-llm-adapter/README.md†L160-L214】
   - 設定テンプレート: Ollama 向けテンプレートでローカルエンドポイントとレート制御を明示し、OpenRouter 向けテンプレートで API キー・ベース URL のエイリアスや料金目安を定義した。【F:projects/04-llm-adapter/adapter/config/providers/ollama.yaml†L1-L22】【F:projects/04-llm-adapter/adapter/config/providers/openrouter.yaml†L1-L38】
-  - テスト/手順: README 更新にあわせ、タスク確認用の `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` 実行手順を整備し、Ollama/OpenRouter 専用 CLI 例が `projects/04-llm-adapter/tests/test_cli_single_prompt.py` で回帰される構成を維持している。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L359-L460】【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L604-L693】
+- テスト/手順: README 更新にあわせ、タスク確認用の `npx --yes markdownlint-cli2 "docs/spec/v0.2/TASKS.md"` 実行手順を整備し、Ollama/OpenRouter 専用 CLI 例が `projects/04-llm-adapter/tests/cli_single_prompt/` 配下で回帰される構成を維持している。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
 
 ### タスク11: Shadow 実装からの `src.llm_adapter` 依存を排除する（完了）
 - 進捗: Shadow 配下の Python パッケージを `llm_adapter` 名前空間へ正規化し、旧 `src.llm_adapter` 参照は `__init__` のメタパスエイリアスで段階移行する構成に置き換えた。`pyproject.toml` の first-party 設定も Shadow 名前空間へ更新済み。
