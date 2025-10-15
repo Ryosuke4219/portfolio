@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+import importlib
 from pathlib import Path
 from typing import Any, Protocol
-
-import importlib
 
 import pytest
 
