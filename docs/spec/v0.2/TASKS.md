@@ -132,7 +132,8 @@
   - `prompts.run_prompts` が `ProviderFactory.create` で得たプロバイダへ `execute_prompts` を介して `ProviderRequest` をまとめて投入し、CLI からのオプション上書きやモデル指定を `ProviderConfig` に反映してから渡す構成へ整理された。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L28-L67】
 - 品質エビデンス:
 - ✅ CLI パイプライン回帰: `pytest projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py` — CLI が `_build_request` で構築した `ProviderRequest` に API キーやプロンプト配列を束ね、`prompt_runner.execute_prompts` が `ProviderResponse` を取得する流れを検証。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L24-L170】
-  - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.execute` が `_invoke_provider` を通じて `ProviderRequest` を構築し、`options`/`metadata` の整合性を担保する回帰テストを維持。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L108-L139】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.execute` が `_invoke_provider` を通じて `ProviderRequest` を構築し、`model`/`prompt`/`max_tokens` などの基本フィールドが正しく揃うことを検証。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L108-L139】
+  - ✅ `pytest projects/04-llm-adapter/tests/test_provider_execution_request_options.py` — CLI と同一経路で `ProviderRequest.options`/`metadata` がコピーされることを `ProviderCallExecutor.execute` と `BaseProvider.generate` の両方で確認。【F:projects/04-llm-adapter/tests/test_provider_execution_request_options.py†L52-L76】
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する（対応済み）
 - 主要モジュール:
