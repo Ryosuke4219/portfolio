@@ -55,7 +55,7 @@
   - CLI からリテラル指定した API キーを `ProviderRequest.options["api_key"]` に格納し、Ollama へも伝播できるよう CLI パイプラインを整備した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
 - 品質エビデンス:
 - ✅ CLI API キー透過テスト: `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_literal_api_key_option` が成功し、CLI で指定したリテラル API キーが `ProviderRequest.options` を介して Ollama へ伝播する経路を検証している。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
-  - ✅ ストリーミング・429/5xx 検証テスト: `pytest projects/04-llm-adapter/tests/providers/test_ollama_provider.py` がストリーミング結合と 429/5xx 正規化を含むケースを通過し、`ProviderResponse` 正規化とリトライ戦略を担保している。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L200-L389】
+- ✅ 成功/ストリーミング/429・5xx 検証テスト: `projects/04-llm-adapter/tests/providers/ollama/test_success.py`・`test_streaming.py`・`test_retriable_errors.py` が `ProviderResponse` 正規化とリトライ戦略を担保している。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L55-L99】【F:projects/04-llm-adapter/tests/providers/ollama/test_streaming.py†L9-L57】【F:projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py†L11-L98】
 
 #### Ollama テスト分割チェックリスト
 - [x] 成功系テストを `projects/04-llm-adapter/tests/providers/ollama/test_success.py` へ移行する。
@@ -74,7 +74,7 @@
   - CLI からのリテラル API キー指定や設定ファイルの `api_key`/`env` を `ProviderRequest.options["api_key"]` へ結線し、OpenRouter でも CLI からの入力が確実に伝播する完了経路として整理した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
   - OpenRouter 運用ドキュメントを `projects/04-llm-adapter/README.md` と `docs/releases/v0.1.0.md` に同期し、`python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter --since ...`（`just openrouter-stats -- --since ...` 経由でも同等）と `llm-adapter-openrouter-probe` の手順を最新化した。【F:projects/04-llm-adapter/README.md†L198-L206】【F:docs/releases/v0.1.0.md†L1-L23】
 - 品質エビデンス:
-  - ✅ `pytest projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` が成功し、`ProviderRequest.options` 経由で付与される認証ヘッダが秘匿されたまま HTTP セッションへ反映され、429/503 正規化と `ProviderCallExecutor` 連携を網羅している。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L140-L396】
+- ✅ `projects/04-llm-adapter/tests/providers/openrouter/test_options.py`・`test_errors.py`・`test_streaming.py` が `ProviderRequest.options` 経由の認証・429/503 正規化・ストリーミング統合を網羅している。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L20-L157】【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L19-L62】
 - ✅ `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けのリテラル API キーが `ProviderRequest.options` で秘匿されたまま CLI からプロバイダへ伝播することを確認済み。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
 #### 継続課題（Providers）
 - 実サーバーでのストリーミング透過性検証と運用フロー整備（タスク13を参照）。
@@ -86,7 +86,7 @@
 - [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の上書き順序を確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L102】
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L68】
 - [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L123】
-- [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L7】
+- [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L10】
 - [ ] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
