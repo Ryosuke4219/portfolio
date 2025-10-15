@@ -41,12 +41,12 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 **完了成果物**:
 
 1. OpenRouter 429/5xx 週次集計 CLI — [`projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py) の集計検証で本番データ反映経路を担保。
-2. CLI からの API キー透過 — [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までのエンドツーエンド経路を回帰確認。
+2. CLI からの API キー透過 — [`projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py::test_cli_literal_api_key_option`](../projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py#L81-L115) により `ProviderRequest.options["api_key"]` までのエンドツーエンド経路を回帰確認。
 3. ストリーミングプローブ運用 — [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) のリアルタイム検証で監視体制を証跡化。
 
 **完了した成果物のエビデンス**:
 - 429/5xx 集計 CLI は [`projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stats_cli.py) で週次集計フローを検証済。
-- CLI API キー透過は [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) により `ProviderRequest.options["api_key"]` までの経路を回帰確認。
+- CLI API キー透過は [`projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py::test_cli_literal_api_key_option`](../projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py#L81-L115) により `ProviderRequest.options["api_key"]` までの経路を回帰確認。
 - ストリーミングプローブ検証は [`projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py`](../projects/04-llm-adapter/tests/tools/test_openrouter_stream_probe.py) でリアルタイム監視フローを証跡化。
 
 **タスク**:
@@ -56,7 +56,7 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
-[^m6-cli-flow]: CLI は [`projects/04-llm-adapter/adapter/cli/prompt_runner.py`](../projects/04-llm-adapter/adapter/cli/prompt_runner.py) の `_process_prompt` で `invoke = getattr(provider, "invoke")` を検証したのち `_build_request()` で `ProviderRequest` を生成し、同期実装の `invoke(request)` を実行する一連のフローを採用している。`ProviderRequest` 必須化は [`projects/04-llm-adapter/tests/test_cli_single_prompt.py`](../projects/04-llm-adapter/tests/test_cli_single_prompt.py) の `pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_errors_when_provider_lacks_invoke`・`pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_errors_when_provider_factory_returns_non_invoke_provider`・`pytest projects/04-llm-adapter/tests/test_cli_single_prompt.py::test_cli_fake_provider` が証跡となり、呼び出し時に `ProviderRequest` が必ず構築されることを検証している。
+[^m6-cli-flow]: CLI は [`projects/04-llm-adapter/adapter/cli/prompt_runner.py`](../projects/04-llm-adapter/adapter/cli/prompt_runner.py) の `_process_prompt` で `invoke = getattr(provider, "invoke")` を検証したのち `_build_request()` で `ProviderRequest` を生成し、同期実装の `invoke(request)` を実行する一連のフローを採用している。`ProviderRequest` 必須化は [`projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py::test_cli_errors_when_provider_lacks_invoke`](../projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py#L11-L44)・[`projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py::test_cli_errors_when_provider_factory_returns_non_invoke_provider`](../projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py#L46-L71)・[`projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py::test_cli_fake_provider`](../projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py#L24-L53) が証跡となり、呼び出し時に `ProviderRequest` が必ず構築されることを検証している。
 
 ## M4 — Parallel & Consensus
 **進捗**: ✅ `projects/04-llm-adapter/adapter/core/runner_execution_parallel.py`と`aggregation_controller.py`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定を実装。`AggregationController.apply` が`RunMetrics.ci_meta`へ`aggregate_mode`・`aggregate_votes`・`consensus`を追記し、比較勝者のメタデータ検証もCIで緑。
