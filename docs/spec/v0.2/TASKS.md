@@ -136,7 +136,7 @@
 
 ### タスク9: CLI 入力パイプラインに Ollama/OpenRouter の設定項目を追加する（対応済み）
 - 主要モジュール:
-  - `adapter/cli/config_loader.py` の `load_provider_configuration` が CLI 引数で受けた `--provider-option` を設定 YAML の `options` とマージし、`ProviderConfig.raw` を差し替えて `api_key` などのリテラル値を統合する。【F:projects/04-llm-adapter/adapter/cli/config_loader.py†L25-L74】
+  - `adapter/cli/config_loader.py` の `load_provider_configuration` が CLI 引数で受けた `--provider-option` を設定 YAML の `options` とマージし、`ProviderConfig.raw` を差し替えて `api_key` などのリテラル値を統合する。【F:projects/04-llm-adapter/adapter/cli/config_loader.py†L28-L67】
   - `adapter/cli/prompt_runner.py` の `_build_request` が統合済み `ProviderConfig` から `options`/`metadata` を抽出し、`ProviderRequest` へ確実に反映する。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】
 - 検証テスト:
 - `test_cli_provider_option_coerces_types` / `test_run_prompts_provider_option_coerces_types` が `--provider-option` の文字列を型変換して `ProviderRequest.options` に伝播することを検証する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L205-L278】
@@ -167,5 +167,5 @@
 ## CLI 実装の再構成
 
 ### タスク16: `prompts.run_prompts` を責務単位で分割しテスタビリティを改善する（完了）
-- 進捗: `run_prompts` を薄いオーケストレータに整理し、引数解析・設定統合・実行/エラー制御を `args.py`・`config_loader.py`・`runner.py` へ移譲した。CLI API は維持しつつ ProviderFactory 連携と RateLimiter 公開を再利用できる構造になった。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L1-L67】【F:projects/04-llm-adapter/adapter/cli/args.py†L1-L113】【F:projects/04-llm-adapter/adapter/cli/config_loader.py†L1-L172】【F:projects/04-llm-adapter/adapter/cli/runner.py†L1-L178】
+- 進捗: `run_prompts` を薄いオーケストレータに整理し、引数解析・設定統合・実行/エラー制御を `args.py`・`config_loader.py`・`runner.py` へ移譲した。CLI API は維持しつつ ProviderFactory 連携と RateLimiter 公開を再利用できる構造になった。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L1-L74】【F:projects/04-llm-adapter/adapter/cli/args.py†L1-L113】【F:projects/04-llm-adapter/adapter/cli/config_loader.py†L1-L160】【F:projects/04-llm-adapter/adapter/cli/runner.py†L1-L178】
 - 品質エビデンス: `pytest projects/04-llm-adapter/tests/test_cli_prompts_refactor.py` が環境変数未設定・`.env` ロード・`--provider-option` マージ・RateLimit 例外などの主要パスを網羅し、再構成後も出力/終了コードが変わらないことを確認する。 【F:projects/04-llm-adapter/tests/test_cli_prompts_refactor.py†L1-L158】
