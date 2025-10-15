@@ -73,9 +73,9 @@
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py`
-    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L371】
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L370】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py`
-    【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L260】
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_options.py`
     【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py`
@@ -96,11 +96,11 @@
 - OpenRouter 429/5xx 発生状況の集計とドキュメント拡充（タスク14を参照）。
 
 #### OpenRouter テスト分割チェックリスト
-- [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py` へ移設し、API キー解決とスキップ判定の回帰を担保する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L229】
-- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、エンドポイント解決とセッション初期化を検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L169】
-- [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の上書き順序を確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L102】
+- [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py` へ移設し、API キー解決とスキップ判定の回帰を担保する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L370】
+- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、エンドポイント解決とセッション初期化を検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
+- [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の上書き順序を確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
-- [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L123】
+- [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
 - [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する（オプション上書き検証は `test_openrouter_provider_request_options_override` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】
 - [ ] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
 
