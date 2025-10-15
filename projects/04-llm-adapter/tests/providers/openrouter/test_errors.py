@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from adapter.core._provider_execution import ProviderCallExecutor
 from adapter.core.errors import AuthError, RateLimitError, RetriableError
 from adapter.core.providers import ProviderFactory
-
 from tests.providers.openrouter.conftest import (
     FakeResponse,
     install_fake_session,
