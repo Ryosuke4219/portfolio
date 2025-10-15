@@ -40,7 +40,7 @@
 
 ### タスク5: `runner_execution.py` を責務単位で分割し可読性を向上させる（完了）
 - 進捗: RunnerExecution 本体を 6 モジュールへ再構成し、プロバイダ呼び出し・再試行・並列実行・メトリクス確定・シャドウ連携を専用モジュールで管理する構成に移行した。【F:projects/04-llm-adapter/adapter/core/runner_execution.py†L1-L170】【F:projects/04-llm-adapter/adapter/core/runner_execution_call.py†L1-L69】【F:projects/04-llm-adapter/adapter/core/runner_execution_metrics.py†L1-L85】【F:projects/04-llm-adapter/adapter/core/runner_execution_attempts.py†L1-L71】【F:projects/04-llm-adapter/adapter/core/runner_execution_parallel.py†L1-L90】【F:projects/04-llm-adapter/adapter/core/runner_execution_shadow.py†L1-L94】
-- 品質エビデンス: 直列/並列の双方で `RunnerExecution` 公開 API を通じた既存テストが緑を維持し、再試行処理と影実行メトリクスを個別に検証している（再試行: `pytest projects/04-llm-adapter/tests/runner_retry/test_runner_execution_retries.py`、影付き並列: `pytest projects/04-llm-adapter/tests/parallel/test_runner_execution_parallel_metrics.py`）。【F:projects/04-llm-adapter/tests/runner_retry/test_runner_execution_retries.py†L1-L156】【F:projects/04-llm-adapter/tests/parallel/test_runner_execution_parallel_metrics.py†L1-L180】
+- 品質エビデンス: 直列/並列の双方で `RunnerExecution` 公開 API を通じた既存テストが緑を維持し、再試行処理と影実行メトリクスを個別に検証している（再試行: `pytest projects/04-llm-adapter/tests/runner_retry/test_runner_execution_retries.py`、影付き並列: `pytest projects/04-llm-adapter/tests/parallel/test_runner_execution_parallel_metrics.py`）。【F:projects/04-llm-adapter/tests/runner_retry/test_runner_execution_retries.py†L1-L150】【F:projects/04-llm-adapter/tests/parallel/test_runner_execution_parallel_metrics.py†L1-L166】
 
 ## Providers
 
