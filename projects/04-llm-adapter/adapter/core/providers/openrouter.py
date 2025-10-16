@@ -1,112 +1,29 @@
 """OpenRouter provider implementation for adapter core."""
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, MutableMapping
-import json
-import os
-import re
+from collections.abc import Mapping, MutableMapping
 import time
-from typing import Any, cast
+from typing import Any
 
 from ..config import ProviderConfig
 from ..errors import AuthError, ProviderSkip, RateLimitError, RetriableError, SkipReason, TimeoutError
-from ..provider_spi import ProviderRequest, TokenUsage
+from ..provider_spi import ProviderRequest
 from . import BaseProvider, ProviderResponse
-from ._requests_compat import create_session, requests_exceptions, SessionProtocol
+from ._requests_compat import create_session, requests_exceptions
+from .openrouter_auth import INTERNAL_OPTION_KEYS, prepare_auth
+from .openrouter_payload import (
+    build_payload,
+    coerce_finish_reason,
+    coerce_text,
+    coerce_usage,
+    extract_option_api_key,
+)
+from .openrouter_stream import consume_stream
 
 __all__ = ["OpenRouterProvider", "requests_exceptions"]
 
 
-_OPTION_CREDENTIAL_KEYS = ("api_key", "api_token", "token", "access_token")
-
-
-_INTERNAL_OPTION_KEYS = {
-    "stream",
-    "request_timeout_s",
-    "REQUEST_TIMEOUT_S",
-    *_OPTION_CREDENTIAL_KEYS,
-}
-
-
-_LITERAL_ENV_VALUE_PREFIXES = ("file:", "mailto:")
-_INLINE_SECRET_PREFIXES = (
-    "sk-",
-    "sk_",
-    "rk-",
-    "rk_",
-    "pk-",
-    "pk_",
-    "ak-",
-    "ak_",
-    "gsk-",
-    "gsk_",
-    "hf-",
-    "hf_",
-    "xai-",
-    "xai_",
-)
-_ENV_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
-
-
-def _coerce_text(payload: Mapping[str, Any] | None) -> str:
-    if not isinstance(payload, Mapping):
-        return ""
-    choices = payload.get("choices")
-    if isinstance(choices, Iterable):
-        chunks: list[str] = []
-        for choice in choices:
-            if not isinstance(choice, Mapping):
-                continue
-            message = choice.get("message")
-            if isinstance(message, Mapping):
-                content = message.get("content")
-                if isinstance(content, str):
-                    chunks.append(content)
-            delta = choice.get("delta")
-            if isinstance(delta, Mapping):
-                content = delta.get("content")
-                if isinstance(content, str):
-                    chunks.append(content)
-            if isinstance(delta, str):
-                chunks.append(delta)
-            text_value = choice.get("text")
-            if isinstance(text_value, str):
-                chunks.append(text_value)
-        if chunks:
-            return "".join(chunks)
-    return ""
-
-
-def _coerce_usage(payload: Mapping[str, Any] | None) -> TokenUsage:
-    if not isinstance(payload, Mapping):
-        return TokenUsage()
-    prompt_tokens = payload.get("prompt_tokens") or 0
-    completion_tokens = payload.get("completion_tokens") or 0
-    try:
-        prompt_value = int(prompt_tokens)
-    except (TypeError, ValueError):
-        prompt_value = 0
-    try:
-        completion_value = int(completion_tokens)
-    except (TypeError, ValueError):
-        completion_value = 0
-    return TokenUsage(prompt=prompt_value, completion=completion_value)
-
-
-def _coerce_finish_reason(payload: Mapping[str, Any] | None) -> str | None:
-    if not isinstance(payload, Mapping):
-        return None
-    choices = payload.get("choices")
-    if isinstance(choices, Iterable):
-        for choice in choices:
-            if isinstance(choice, Mapping):
-                finish = choice.get("finish_reason")
-                if isinstance(finish, str):
-                    return finish
-    finish = payload.get("finish_reason")
-    if isinstance(finish, str):
-        return finish
-    return None
+_INTERNAL_OPTION_KEYS = INTERNAL_OPTION_KEYS
 
 
 def _extract_status_code(exc: Exception) -> int | None:
@@ -116,48 +33,6 @@ def _extract_status_code(exc: Exception) -> int | None:
         return int(status) if status is not None else None
     except (TypeError, ValueError):  # pragma: no cover - defensive
         return None
-
-
-def _resolve_env(name: Any) -> str:
-    if not isinstance(name, str):
-        return ""
-    env_name = name.strip()
-    if not env_name or env_name.upper() == "NONE":
-        return ""
-    return (os.getenv(env_name) or "").strip()
-
-
-def _looks_like_env_name(value: str) -> bool:
-    candidate = value.strip()
-    if not candidate:
-        return False
-    return bool(_ENV_NAME_PATTERN.fullmatch(candidate))
-
-
-def _is_literal_env_value(value: str) -> bool:
-    candidate = value.strip()
-    if not candidate:
-        return False
-    if _looks_like_env_name(candidate):
-        return False
-    if "://" in candidate:
-        return True
-    candidate_lower = candidate.lower()
-    if any(candidate_lower.startswith(prefix) for prefix in _INLINE_SECRET_PREFIXES):
-        return True
-    if any(candidate_lower.startswith(prefix) for prefix in _LITERAL_ENV_VALUE_PREFIXES):
-        return True
-    return True
-
-
-def _normalize_option_credential(value: object) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        candidate = value.strip()
-    else:
-        candidate = str(value).strip()
-    return candidate
 
 
 def _normalize_error(exc: Exception) -> Exception:
@@ -193,180 +68,25 @@ class OpenRouterProvider(BaseProvider):
 
     def __init__(self, config: ProviderConfig) -> None:
         super().__init__(config)
-        raw = config.raw if isinstance(config.raw, Mapping) else {}
-        raw_env = raw.get("env") if isinstance(raw, Mapping) else None
-
-        auth_env_name = ""
-        if isinstance(config.auth_env, str):
-            auth_env_name = config.auth_env.strip()
-        if not auth_env_name or auth_env_name.upper() == "NONE":
-            auth_env_name = "OPENROUTER_API_KEY"
-        self._configured_auth_env = auth_env_name
-        override_candidates: list[str] = []
-        resolved_auth_env_name = auth_env_name
-        if isinstance(raw_env, Mapping):
-            override_name = raw_env.get(auth_env_name)
-            if isinstance(override_name, str):
-                candidate = override_name.strip()
-                if candidate:
-                    override_candidates.append(candidate)
-            elif isinstance(override_name, Iterable) and not isinstance(override_name, Mapping):
-                for item in override_name:
-                    if isinstance(item, str):
-                        candidate = item.strip()
-                        if candidate and candidate not in override_candidates:
-                            override_candidates.append(candidate)
-        if override_candidates:
-            resolved_auth_env_name = override_candidates[0]
-        self._auth_env_name = resolved_auth_env_name
-
-        def _resolve_literal_or_env(name: str) -> str:
-            if not isinstance(name, str):
-                return ""
-            candidate = name.strip()
-            if not candidate:
-                return ""
-            if _is_literal_env_value(candidate):
-                return candidate
-            resolved = _resolve_env(candidate)
-            if resolved:
-                return resolved
-            candidate_lower = candidate.lower()
-            if any(candidate_lower.startswith(prefix) for prefix in _INLINE_SECRET_PREFIXES):
-                return candidate
-            return resolved
-
-        def _resolve_from_env_mapping(default_name: str) -> str:
-            if not isinstance(default_name, str):
-                return ""
-            override_name = None
-            if isinstance(raw_env, Mapping):
-                override_name = raw_env.get(default_name)
-            candidates: list[str] = []
-            if isinstance(override_name, str):
-                candidate = override_name.strip()
-                if candidate:
-                    candidates.append(candidate)
-            elif isinstance(override_name, Iterable) and not isinstance(override_name, Mapping):
-                for item in override_name:
-                    if isinstance(item, str):
-                        candidate = item.strip()
-                        if candidate and candidate not in candidates:
-                            candidates.append(candidate)
-            for candidate in candidates:
-                resolved_value = _resolve_literal_or_env(candidate)
-                if resolved_value:
-                    return resolved_value
-            return _resolve_literal_or_env(default_name)
-
-        mapped_api_key = _resolve_from_env_mapping("OPENROUTER_API_KEY")
-        seen_candidates: set[str] = set()
-        api_key_value = ""
-        for candidate_name in override_candidates:
-            normalized = candidate_name.strip()
-            if not normalized or normalized in seen_candidates:
-                continue
-            seen_candidates.add(normalized)
-            resolved_value = _resolve_literal_or_env(normalized)
-            if resolved_value:
-                api_key_value = resolved_value
-                break
-        if not api_key_value:
-            configured_value = _resolve_from_env_mapping(auth_env_name)
-            if configured_value:
-                api_key_value = configured_value
-        if not api_key_value and mapped_api_key:
-            api_key_value = mapped_api_key
-        if not api_key_value:
-            api_key_obj = raw.get("api_key")
-            if isinstance(api_key_obj, str):
-                api_key_value = api_key_obj.strip()
-            elif api_key_obj is not None:
-                api_key_value = str(api_key_obj).strip()
-        if not api_key_value:
-            api_key_value = mapped_api_key
-        self._api_key = api_key_value
-        session_override = raw.get("session") if isinstance(raw, Mapping) else None
-        if session_override is None:
-            session: SessionProtocol = create_session()
-        else:
-            session = cast(SessionProtocol, session_override)
-        self._session = session
-        base_url_value: str | None = None
-        mapped_base_url = _resolve_from_env_mapping("OPENROUTER_BASE_URL")
-        if mapped_base_url:
-            base_url_value = mapped_base_url
-        else:
-            env_candidate = _resolve_env(raw.get("base_url_env"))
-            if env_candidate:
-                base_url_value = env_candidate
-        if base_url_value is None and isinstance(raw, Mapping):
-            base_candidate = raw.get("base_url")
-            if isinstance(base_candidate, str):
-                base_url_value = base_candidate
-        if base_url_value is None and config.endpoint:
-            base_url_value = config.endpoint
-        default_base = mapped_base_url or "https://openrouter.ai/api/v1"
-        self._base_url = (base_url_value or default_base).rstrip("/")
-        headers = getattr(self._session, "headers", None)
-        if isinstance(headers, MutableMapping):
-            headers.setdefault("Content-Type", "application/json")
-            if self._api_key:
-                headers["Authorization"] = f"Bearer {self._api_key}"
-        self._default_timeout = float(config.timeout_s or 30)
-        options_from_config = raw.get("options") if isinstance(raw, Mapping) else None
-        if isinstance(options_from_config, Mapping):
-            self._config_options = {
-                key: value
-                for key, value in options_from_config.items()
-                if key not in _INTERNAL_OPTION_KEYS
-            }
-        else:
-            self._config_options = {}
+        context = prepare_auth(config, session_factory=create_session)
+        self._session = context.session
+        self._api_key = context.api_key
+        self._base_url = context.base_url
+        self._default_timeout = context.default_timeout
+        self._auth_env_name = context.auth_env_name
+        self._configured_auth_env = context.configured_auth_env
+        self._config_options = dict(context.config_options)
 
     def _build_payload(self, request: ProviderRequest) -> dict[str, Any]:
-        messages = [dict(message) for message in (request.messages or [])]
-        payload: dict[str, Any] = {
-            "model": request.model,
-            "messages": messages,
-        }
-        if request.max_tokens is not None:
-            payload["max_tokens"] = int(request.max_tokens)
-        if request.temperature is not None:
-            payload["temperature"] = request.temperature
-        if request.top_p is not None:
-            payload["top_p"] = request.top_p
-        if request.stop is not None:
-            payload["stop"] = list(request.stop)
-        if self._config_options:
-            for key, value in self._config_options.items():
-                if key in _INTERNAL_OPTION_KEYS:
-                    continue
-                payload[key] = value
         options = request.options or {}
-        if isinstance(options, Mapping):
-            for key, value in options.items():
-                if key in _INTERNAL_OPTION_KEYS:
-                    continue
-                payload[key] = value
-        return payload
+        return build_payload(request, self._config_options, options if isinstance(options, Mapping) else None)
 
     def invoke(self, request: ProviderRequest) -> ProviderResponse:
         options = request.options or {}
-        option_api_key = ""
-        sanitized_option_keys: set[str] = set()
-        if isinstance(options, Mapping):
-            for key in _OPTION_CREDENTIAL_KEYS:
-                if key not in options:
-                    continue
-                sanitized_option_keys.add(key)
-                raw_value = options.get(key)
-                credential = _normalize_option_credential(raw_value)
-                if credential and not option_api_key:
-                    option_api_key = credential
+        option_api_key, sanitized_option_keys = extract_option_api_key(options if isinstance(options, Mapping) else None)
 
         if sanitized_option_keys:
-            _INTERNAL_OPTION_KEYS.update(sanitized_option_keys)
+            INTERNAL_OPTION_KEYS.update(sanitized_option_keys)
 
         api_key = option_api_key or self._api_key
         if not api_key:
@@ -409,13 +129,13 @@ class OpenRouterProvider(BaseProvider):
         try:
             if stream:
                 response.raise_for_status()
-                aggregated, final_payload, finish_reason = self._consume_stream(response)
+                aggregated, final_payload, finish_reason = consume_stream(response)
             else:
                 response.raise_for_status()
                 data = response.json()
-                aggregated = _coerce_text(data)
+                aggregated = coerce_text(data)
                 final_payload = data
-                finish_reason = _coerce_finish_reason(data)
+                finish_reason = coerce_finish_reason(data)
         except Exception as exc:
             response.close()
             raise _normalize_error(exc) from exc
@@ -426,7 +146,7 @@ class OpenRouterProvider(BaseProvider):
             candidate = final_payload.get("usage")
             if isinstance(candidate, Mapping):
                 usage_payload = candidate
-        usage = _coerce_usage(usage_payload)
+        usage = coerce_usage(usage_payload)
         model_name = None
         if isinstance(final_payload, Mapping):
             model_value = final_payload.get("model")
@@ -442,64 +162,3 @@ class OpenRouterProvider(BaseProvider):
             finish_reason=finish_reason,
             raw=final_payload,
         )
-
-    def _consume_stream(
-        self, response: Any
-    ) -> tuple[str, Mapping[str, Any], str | None]:  # pragma: no cover - exercised via tests
-        chunks: list[str] = []
-        final_payload: Mapping[str, Any] = {}
-        finish_reason: str | None = None
-        for raw_line in response.iter_lines():
-            if not raw_line:
-                continue
-            try:
-                decoded = raw_line.decode("utf-8")
-            except AttributeError:  # pragma: no cover - defensive
-                decoded = str(raw_line)
-            decoded = decoded.strip()
-            if not decoded:
-                continue
-            if decoded.startswith("data:"):
-                decoded = decoded[len("data:") :].strip()
-            if not decoded or decoded == "[DONE]":
-                continue
-            try:
-                event = json.loads(decoded)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(event, Mapping):
-                continue
-            choices = event.get("choices")
-            if isinstance(choices, Iterable):
-                for choice in choices:
-                    if not isinstance(choice, Mapping):
-                        continue
-                    delta = choice.get("delta")
-                    if isinstance(delta, Mapping):
-                        content = delta.get("content")
-                        if isinstance(content, str):
-                            chunks.append(content)
-                    elif isinstance(delta, str):
-                        chunks.append(delta)
-                    message = choice.get("message")
-                    if isinstance(message, Mapping):
-                        content = message.get("content")
-                        if isinstance(content, str):
-                            final_payload = event
-                    finish = choice.get("finish_reason")
-                    if isinstance(finish, str):
-                        finish_reason = finish
-            usage_payload = event.get("usage")
-            if isinstance(usage_payload, Mapping):
-                final_payload = event
-        if not final_payload:
-            text_value = "".join(chunks)
-            final_payload = {
-                "choices": [
-                    {"message": {"role": "assistant", "content": text_value}},
-                ]
-            }
-        aggregated = "".join(chunks) or _coerce_text(final_payload)
-        if finish_reason is None:
-            finish_reason = _coerce_finish_reason(final_payload)
-        return aggregated, final_payload, finish_reason

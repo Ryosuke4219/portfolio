@@ -1,6 +1,7 @@
 # ruff: noqa: B009, B010
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,29 @@ from tests.providers.openrouter.conftest import (
     load_openrouter_module,
     provider_config,
 )
+
+
+def test_openrouter_auth_prepare_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    load_openrouter_module()
+    auth_module = import_module("adapter.core.providers.openrouter_auth")
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "prepare-auth-key")
+
+    config = provider_config(tmp_path)
+    config.raw = {
+        **config.raw,
+        "env": {"OPENROUTER_BASE_URL": "https://prepared.example/api/v1"},
+    }
+
+    context = auth_module.prepare_auth(config)
+
+    assert hasattr(context.session, "post")
+    headers = getattr(context.session, "headers", {})
+    assert headers.get("Authorization") == "Bearer prepare-auth-key"
+    assert context.api_key == "prepare-auth-key"
+    assert context.base_url == "https://prepared.example/api/v1"
+    assert context.auth_env_name == "OPENROUTER_API_KEY"
+    assert context.configured_auth_env == "OPENROUTER_API_KEY"
 
 
 def test_openrouter_provider_resolves_api_key_from_auth_env(
