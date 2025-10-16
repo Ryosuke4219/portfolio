@@ -6,16 +6,15 @@ import pytest
 
 from adapter.core.providers import BaseProvider, ProviderResponse
 from adapter.core.runners import CompareRunner
-
+from tests.compare_runner_parallel.conftest import (
+    ProviderConfigFactory,
+    TaskFactory,
+)
 from .common import (
     ProviderSetup,
     create_runner,
     patch_run_parallel_any_first,
     run_parallel_any,
-)
-from tests.compare_runner_parallel.conftest import (
-    ProviderConfigFactory,
-    TaskFactory,
 )
 
 
