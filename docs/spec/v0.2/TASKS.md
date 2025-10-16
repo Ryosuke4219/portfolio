@@ -3,7 +3,7 @@
 > 2025-11-09 更新: v0.1.0 リリースチェックリストと OpenRouter 運用ガイドを追加し、M6 Exit Criteria を満たした。以降は v0.2 タスクとして保守・拡張を継続する。
 
 ## 未完了タスク一覧
-- v0.2 の継続保守は CI 監視（タスク4）など運用タスクが中心。Ollama/OpenRouter の旧ブリッジ削除は完了し、テストは `projects/04-llm-adapter/tests/providers/ollama/` と `projects/04-llm-adapter/tests/providers/openrouter/` へ統合済み。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L1-L100】【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L102】
+- （なし）
 
 ## CLI / 入力整備
 
@@ -77,8 +77,12 @@
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/openrouter.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
-  - `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py`
-    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L370】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L1-L132】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L1-L91】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py`
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L1-L81】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py`
     【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_options.py`
@@ -94,6 +98,7 @@
   - CLI からのリテラル API キー指定や設定ファイルの `api_key`/`env` を `ProviderRequest.options["api_key"]` へ結線し、OpenRouter でも CLI からの入力が確実に伝播する完了経路として整理した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
   - OpenRouter 運用ドキュメントを `projects/04-llm-adapter/README.md` と `docs/releases/v0.1.0.md` に同期し、`python -m tools.report.metrics.openrouter_stats --metrics artifacts/runs-metrics.jsonl --out artifacts/openrouter --since ...`（`just openrouter-stats -- --since ...` 経由でも同等）と `llm-adapter-openrouter-probe` の手順を最新化した。【F:projects/04-llm-adapter/README.md†L198-L206】【F:docs/releases/v0.1.0.md†L1-L23】
 - 品質エビデンス:
+- ✅ 認証経路: `test_auth_api_key_resolution.py`・`test_auth_request_options.py`・`test_auth_skip_behavior.py` が API キー解決優先順位と CLI からの指定欠落時の `ProviderSkip` 伝搬を網羅する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】
 - ✅ `projects/04-llm-adapter/tests/providers/openrouter/test_options.py`・`test_errors.py`・`test_streaming.py` が `ProviderRequest.options` 経由の認証・429/503 正規化・ストリーミング統合を網羅している。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L20-L157】【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L19-L62】
 - ✅ OpenRouter 品質エビデンス: `pytest projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けのリテラル API キーが `ProviderRequest.options` で秘匿されたまま CLI からプロバイダへ伝播することを確認済み。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
 #### 継続課題（Providers）
@@ -101,14 +106,14 @@
 - OpenRouter 429/5xx 発生状況の集計とドキュメント拡充（タスク14を参照）。
 
 #### OpenRouter テスト分割チェックリスト
-- [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth.py` へ移設し、API キー解決とスキップ判定の回帰を担保する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L370】
+- [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py`・`test_auth_request_options.py`・`test_auth_skip_behavior.py` へ分割し、API キー解決とスキップ判定の回帰を担保する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】
 - [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、エンドポイント解決とセッション初期化を検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
 - [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の上書き順序を確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
 - [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
 - [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する（オプション上書き検証は `test_openrouter_provider_request_options_override` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】
 - [x] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
-- 完了状況: OpenRouter 関連テストは `projects/04-llm-adapter/tests/providers/openrouter/` 配下で完結し、旧ブリッジを削除済み。API キー透過・ベース URL・ストリーミング・エラー正規化の各検証を新ディレクトリ内のテストだけで維持している。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L370】【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
+- 完了状況: OpenRouter 関連テストは `projects/04-llm-adapter/tests/providers/openrouter/` 配下で完結し、旧ブリッジを削除済み。API キー透過・ベース URL・ストリーミング・エラー正規化の各検証を新ディレクトリ内のテストだけで維持している。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L19-L62】
 - 検証証跡: `pytest projects/04-llm-adapter/tests/providers/openrouter` が成功し、旧ブリッジなしで OpenRouter 専用テストが緑化することを確認した。
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
