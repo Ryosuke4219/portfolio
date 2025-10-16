@@ -11,7 +11,7 @@
 ### タスク17: CLI 単発プロンプトテスト分割チェックリスト（進行中）
 - [x] `test_prompt_flow.py` へ基本フロー系テストを移設し、従来の CLI 期待値を維持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L1-L198】
 - [x] `test_provider_errors.py` へエラー種別テストを移設し、終了コードの回帰を担保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py†L1-L126】
-- [x] `test_credentials.py` へ資格情報関連テストを集約し、API キー伝播とエイリアス整合性を確保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L232】
+- [x] `test_credentials.py` へ資格情報関連テストを集約し、API キー伝播とエイリアス整合性を確保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L232】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L142-L232】
 - [x] `test_openrouter_flow.py` へ OpenRouter 専用テストを分離し、認証パスの回帰を保持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L1-L107】
 - [ ] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
 
