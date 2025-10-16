@@ -113,7 +113,7 @@
 
 #### OpenRouter テスト分割チェックリスト
 - [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py`・`test_auth_request_options.py`・`test_auth_skip_behavior.py` へ分割し、環境変数マッピング／CLI オプション優先／API キー欠落時の `ProviderSkip` をそれぞれ検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】
-- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、`router_base_url` のフォールバックとセッションヘッダ初期化を回帰する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
+- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、`base_url`／`base_url_env` フォールバックと `OPENROUTER_BASE_URL` からカスタム環境変数へのマッピング、リテラル上書きを通じてセッション初期化を回帰する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L65-L261】
 - [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の `api_key` 上書きと `stream` 指定が HTTP ペイロードへ反映されることを確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合とトークン使用量の合算を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
 - [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化と再試行判定を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
