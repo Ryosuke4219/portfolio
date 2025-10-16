@@ -5,7 +5,6 @@
 ## 未完了タスク一覧
 - タスク17: CLI 単発プロンプト分割の最終ステップとして、旧 `test_cli_single_prompt.py` のブリッジ削除が未着手。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
 - タスク6（Ollama チェックリスト）: 旧 `tests/providers/test_ollama_provider.py` のブリッジ削除が未完了。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
-- タスク7（OpenRouter チェックリスト）: 旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が残存。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
 
 ## CLI / 入力整備
 
@@ -107,7 +106,7 @@
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
 - [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
 - [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する（オプション上書き検証は `test_openrouter_provider_request_options_override` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】
-- [ ] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
+- [x] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
 - 主要モジュール: `adapter/core/providers/openai.py` が `_prepare_request_kwargs` で `ProviderRequest.options`・温度・停止語・タイムアウトを統合し、`responses`/`chat.completions`/`completions` それぞれの呼び出しでストリーミングと `max_tokens` の上書きを一貫化した。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L200-L296】
