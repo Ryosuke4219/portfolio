@@ -12,7 +12,8 @@
 | **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済。CLI は `prompt_runner` の RateLimiter テストや `prompts.py` 再構成で運用ガードを追加）[^m6-cli-flow] |
 
 ### 未完了タスク（v0.2 保守）
-- （該当なし。CLI・Ollama・OpenRouter の旧ブリッジ削除は完了し、新ディレクトリ配下のテストのみで回帰を維持している。）
+- Ollama プロバイダのテスト移行は旧 `tests/providers/test_ollama_provider.py` のブリッジ削除待ちで保留中。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
+- OpenRouter プロバイダのテスト移行も旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が未完。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
 
 ---
 
