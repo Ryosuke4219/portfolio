@@ -12,7 +12,7 @@
 | **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済。CLI は `prompt_runner` の RateLimiter テストや `prompts.py` 再構成で運用ガードを追加）[^m6-cli-flow] |
 
 ### 未完了タスク（v0.2 保守）
-- v0.2 時点で追加の保守タスクは設定されていない。更新が必要になった場合は `docs/spec/v0.2/TASKS.md` を起点に同期する。
+- v0.2 の未完了タスク一覧は空であり、旧ブリッジ削除待ちなどの保留事項は存在しない。差分が発生した場合は `docs/spec/v0.2/TASKS.md`（「未完了タスク一覧」節）を更新し、本ロードマップと相互に同期する。[^v02-maintenance]
 
 ---
 
@@ -60,6 +60,8 @@ JSONLスキーマは`projects/04-llm-adapter/adapter/core/metrics/models.py`と`
 [^provider-registry]: `ProviderFactory` が公開するプロバイダは `simulated`・`openai`・`gemini`・`ollama`・`openrouter`。詳細は`projects/04-llm-adapter/adapter/core/providers/__init__.py` を参照。
 
 [^m6-cli-flow]: CLI は [`projects/04-llm-adapter/adapter/cli/prompt_runner.py`](../../projects/04-llm-adapter/adapter/cli/prompt_runner.py) の `_process_prompt` で `invoke = getattr(provider, "invoke")` を検証したのち `_build_request()` で `ProviderRequest` を生成し、同期実装の `invoke(request)` を実行する一連のフローを採用している。`ProviderRequest` 必須化は [`projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py::test_cli_errors_when_provider_lacks_invoke`](../../projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py#L11-L44)・[`projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py::test_cli_errors_when_provider_factory_returns_non_invoke_provider`](../../projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py#L46-L71)・[`projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py::test_cli_fake_provider`](../../projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py#L24-L53) が証跡となり、呼び出し時に `ProviderRequest` が必ず構築されることを検証している。
+
+[^v02-maintenance]: `docs/spec/v0.2/TASKS.md` の「未完了タスク一覧」は v0.2 時点で空である。
 
 ## M4 — Parallel & Consensus
 **進捗**: ✅ `projects/04-llm-adapter/adapter/core/runner_execution_parallel.py`と`aggregation_controller.py`がparallel_all/consensusで全候補を集約し、多数決＋タイブレーク＋judgeまで備えた合議決定を実装。`AggregationController.apply` が`RunMetrics.ci_meta`へ`aggregate_mode`・`aggregate_votes`・`consensus`を追記し、比較勝者のメタデータ検証もCIで緑。
