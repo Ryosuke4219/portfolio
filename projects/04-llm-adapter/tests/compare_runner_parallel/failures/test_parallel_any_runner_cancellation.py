@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
+import time
 
 import pytest
 
 from adapter.core.providers import BaseProvider, ProviderResponse
-
-from .common import ProviderSetup, create_runner, run_parallel_any
 from tests.compare_runner_parallel.conftest import (
     ProviderConfigFactory,
     TaskFactory,
 )
+
+from .common import create_runner, ProviderSetup, run_parallel_any
 
 
 def test_parallel_any_cancels_pending_workers(

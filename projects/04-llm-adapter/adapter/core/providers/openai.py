@@ -9,12 +9,15 @@ from ..errors import AuthError, ProviderSkip, RateLimitError, TimeoutError
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
 from .openai_client import OpenAIClientFactory
-from .openai_extractors import coerce_raw_output, extract_text_from_response, extract_usage_tokens
-from .openai_payloads import build_chat_messages, build_responses_input
+from .openai_extractors import (
+    coerce_raw_output,
+    extract_text_from_response,
+    extract_usage_tokens,
+)
 from .openai_helpers import (
-    ModeStrategy,
     build_mode_strategies,
     coerce_mapping,
+    ModeStrategy,
     normalize_openai_exception,
     prepare_common_kwargs,
     resolve_api_key,

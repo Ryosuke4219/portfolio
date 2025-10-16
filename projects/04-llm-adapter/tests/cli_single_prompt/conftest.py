@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import os
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+import os
 from pathlib import Path
-from typing import Any, Callable, Protocol, Sequence
+from typing import Any, Protocol
 
 import pytest
 
@@ -140,7 +141,7 @@ def provider_config_builder(tmp_path: Path) -> Callable[..., Path]:
 
 @pytest.fixture
 def expect_successful_echo(
-    echo_provider: type["EchoProvider"],
+    echo_provider: type[EchoProvider],
 ) -> EchoAssertion:
     def _expect(
         result: CliResult,
@@ -164,7 +165,7 @@ def expect_successful_echo(
 
 @pytest.fixture
 def expect_single_config(
-    echo_provider: type["EchoProvider"],
+    echo_provider: type[EchoProvider],
 ) -> ConfigAssertion:
     def _expect(*, model: str | None = None) -> ProviderConfig:
         assert len(echo_provider.configs) == 1

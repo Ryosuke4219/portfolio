@@ -10,10 +10,11 @@ from tests.compare_runner_parallel.conftest import (
     ProviderConfigFactory,
     TaskFactory,
 )
+
 from .common import (
-    ProviderSetup,
     create_runner,
     patch_run_parallel_any_first,
+    ProviderSetup,
     run_parallel_any,
 )
 
