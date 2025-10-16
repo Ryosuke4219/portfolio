@@ -4,7 +4,6 @@
 
 ## 未完了タスク一覧
 - タスク17: CLI 単発プロンプト分割の最終ステップとして、旧 `test_cli_single_prompt.py` のブリッジ削除が未着手。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
-- タスク6（Ollama チェックリスト）: 旧 `tests/providers/test_ollama_provider.py` のブリッジ削除が未完了。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
 - タスク7（OpenRouter チェックリスト）: 旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が残存。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
 
 ## CLI / 入力整備
@@ -71,7 +70,7 @@
 - [x] 成功系テストを `projects/04-llm-adapter/tests/providers/ollama/test_success.py` へ移行する。
 - [x] ストリーミング系テストを `projects/04-llm-adapter/tests/providers/ollama/test_streaming.py` へ移行する。
 - [x] 429/5xx・自動 Pull 異常系テストを `projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py` へ移行する。
-- [ ] 旧 `projects/04-llm-adapter/tests/providers/test_ollama_provider.py` のブリッジを削除し、新ディレクトリのみで運用する（成功/スキップ回帰は `test_ollama_provider_executor_success_cases` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L55-L100】
+- [x] 旧 `projects/04-llm-adapter/tests/providers/test_ollama_provider.py` のブリッジを削除し、新ディレクトリのみで運用する（成功/スキップ回帰は `test_ollama_provider_executor_success_cases` へ移設済み）。
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
