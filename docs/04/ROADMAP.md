@@ -13,7 +13,6 @@
 
 ### 未完了タスク（v0.2 保守）
 - CLI 単発プロンプト分割の最終ステップとして、旧 `test_cli_single_prompt.py` のブリッジ削除が残存しているため、ブリッジ撤去タスクの完了が必要。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
-- Ollama プロバイダのテスト移行は旧 `tests/providers/test_ollama_provider.py` のブリッジ削除待ちで保留中。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
 - OpenRouter プロバイダのテスト移行も旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が未完。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
 
 ---
