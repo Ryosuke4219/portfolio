@@ -3,7 +3,6 @@
 > 2025-11-09 更新: v0.1.0 リリースチェックリストと OpenRouter 運用ガイドを追加し、M6 Exit Criteria を満たした。以降は v0.2 タスクとして保守・拡張を継続する。
 
 ## 未完了タスク一覧
-- タスク17: CLI 単発プロンプト分割の最終ステップとして、旧 `test_cli_single_prompt.py` のブリッジ削除が未着手。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
 - タスク6（Ollama チェックリスト）: 旧 `tests/providers/test_ollama_provider.py` のブリッジ削除が未完了。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
 - タスク7（OpenRouter チェックリスト）: 旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が残存。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
 
@@ -13,12 +12,12 @@
 - 対応状況: `collect_prompts` は `prompt_file` を UTF-8 で読み込み、末尾の `\r\n` を除去してからプロンプト一覧に追加する。`read_jsonl_prompts` も BOM 付き JSONL 行を `lstrip("\ufeff")` で正規化してから `json.loads` を実行し、辞書・文字列のどちらも既存キー順で解決している。【F:projects/04-llm-adapter/adapter/cli/prompt_io.py†L18-L71】
 - 品質エビデンス: `projects/04-llm-adapter/tests/test_cli_prompt_io.py` が CRLF 付きテキストと BOM 付き JSONL の双方を読み込めることを回帰テストとして検証済み。【F:projects/04-llm-adapter/tests/test_cli_prompt_io.py†L1-L21】
 
-### タスク17: CLI 単発プロンプトテスト分割チェックリスト（進行中）
+### タスク17: CLI 単発プロンプトテスト分割チェックリスト（完了）
 - [x] `test_prompt_flow.py` へ基本フロー系テストを移設し、従来の CLI 期待値を維持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L1-L198】
 - [x] `test_provider_errors.py` へエラー種別テストを移設し、終了コードの回帰を担保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py†L1-L126】
 - [x] `test_credentials.py` へ資格情報関連テストを集約し、API キー伝播とエイリアス整合性を確保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L232】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L142-L232】
 - [x] `test_openrouter_flow.py` へ OpenRouter 専用テストを分離し、認証パスの回帰を保持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L1-L107】
-- [ ] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
+- [x] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する（`tests/cli_single_prompt/` 配下のテスト単体で収集可能な構成へ移行済み）。
 
 ## Datasets / ゴールデン検証
 
@@ -71,7 +70,9 @@
 - [x] 成功系テストを `projects/04-llm-adapter/tests/providers/ollama/test_success.py` へ移行する。
 - [x] ストリーミング系テストを `projects/04-llm-adapter/tests/providers/ollama/test_streaming.py` へ移行する。
 - [x] 429/5xx・自動 Pull 異常系テストを `projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py` へ移行する。
-- [ ] 旧 `projects/04-llm-adapter/tests/providers/test_ollama_provider.py` のブリッジを削除し、新ディレクトリのみで運用する（成功/スキップ回帰は `test_ollama_provider_executor_success_cases` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L55-L100】
+- [x] 旧 `projects/04-llm-adapter/tests/providers/test_ollama_provider.py` のブリッジを削除し、新ディレクトリのみで運用する（成功/スキップ回帰は `test_ollama_provider_executor_success_cases` へ移設済み）。
+- 完了状況: Ollama 関連テストは `projects/04-llm-adapter/tests/providers/ollama/` 配下へ集約し、旧ブリッジを削除した上で `pytest projects/04-llm-adapter/tests/providers/ollama` のみで回帰を担保する構成へ移行した。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L1-L100】【F:projects/04-llm-adapter/tests/providers/ollama/test_streaming.py†L1-L57】【F:projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py†L1-L98】
+- 検証証跡: `pytest projects/04-llm-adapter/tests/providers/ollama` が成功し、成功・ストリーミング・再試行の各テストが単独で通過することを確認した。
 
 ### タスク7: OpenRouter プロバイダを v0.2 コアに統合する（対応済み）
 - 対象モジュール:
@@ -107,7 +108,9 @@
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
 - [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
 - [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する（オプション上書き検証は `test_openrouter_provider_request_options_override` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】
-- [ ] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
+- [x] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
+- 完了状況: OpenRouter 関連テストは `projects/04-llm-adapter/tests/providers/openrouter/` 配下で完結し、旧ブリッジを削除済み。API キー透過・ベース URL・ストリーミング・エラー正規化の各検証を新ディレクトリ内のテストだけで維持している。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth.py†L1-L370】【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
+- 検証証跡: `pytest projects/04-llm-adapter/tests/providers/openrouter` が成功し、旧ブリッジなしで OpenRouter 専用テストが緑化することを確認した。
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
 - 主要モジュール: `adapter/core/providers/openai.py` が `_prepare_request_kwargs` で `ProviderRequest.options`・温度・停止語・タイムアウトを統合し、`responses`/`chat.completions`/`completions` それぞれの呼び出しでストリーミングと `max_tokens` の上書きを一貫化した。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L200-L296】

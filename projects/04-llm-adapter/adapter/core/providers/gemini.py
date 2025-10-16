@@ -9,16 +9,20 @@ from typing import Any, cast, Protocol
 from ..config import ProviderConfig
 from ..provider_spi import ProviderRequest
 from . import BaseProvider, ProviderResponse
-from .gemini_support import (
+from .gemini_auth import (
+    normalize_gemini_exception as _normalize_gemini_exception,
+    resolve_api_key as _resolve_api_key,
+)
+from .gemini_config import (
+    prepare_generation_config as _prepare_generation_config,
+    prepare_safety_settings as _prepare_safety_settings,
+)
+from .gemini_response import (
     coerce_raw_output as _coerce_raw_output,
     extract_output_text as _extract_output_text,
     extract_usage as _extract_usage,
-    invoke_gemini as _invoke_gemini,
-    normalize_gemini_exception as _normalize_gemini_exception,
-    prepare_generation_config as _prepare_generation_config,
-    prepare_safety_settings as _prepare_safety_settings,
-    resolve_api_key as _resolve_api_key,
 )
+from .gemini_support import invoke_gemini as _invoke_gemini
 
 __all__ = ["GeminiProvider"]
 
