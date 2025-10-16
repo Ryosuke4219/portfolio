@@ -10,15 +10,10 @@ from ..config import ProviderConfig
 from ..errors import AuthError, ProviderSkip, RateLimitError, RetriableError, TimeoutError
 from ..provider_spi import ProviderRequest, TokenUsage
 from . import BaseProvider, ProviderResponse
-from .openai_utils import (
-    build_chat_messages,
-    build_responses_input,
-    coerce_raw_output,
-    determine_modes,
-    extract_text_from_response,
-    extract_usage_tokens,
-    OpenAIClientFactory,
-)
+from .openai_client import OpenAIClientFactory
+from .openai_extractors import coerce_raw_output, extract_text_from_response, extract_usage_tokens
+from .openai_payloads import build_chat_messages, build_responses_input
+from .openai_utils import determine_modes
 
 __all__ = ["OpenAIProvider"]
 
