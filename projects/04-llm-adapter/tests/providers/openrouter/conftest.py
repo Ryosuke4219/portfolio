@@ -112,10 +112,41 @@ def install_fake_session(module: Any, responder: Responder) -> pytest.MonkeyPatc
     return monkeypatch
 
 
+def single_choice_responder(
+    content: str,
+    *,
+    expected_stream: bool | None = False,
+    ensure_no_api_key: bool = False,
+) -> Responder:
+    def _responder(
+        url: str,
+        payload: dict[str, Any] | None,
+        stream: bool,
+        timeout: float | None,
+    ) -> FakeResponse:
+        if expected_stream is not None:
+            assert stream is expected_stream
+        if ensure_no_api_key:
+            assert payload is not None and "api_key" not in payload
+        return FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": content},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
+
+    return _responder
+
+
 __all__ = [
     "FakeResponse",
     "Responder",
     "install_fake_session",
     "load_openrouter_module",
     "provider_config",
+    "single_choice_responder",
 ]
