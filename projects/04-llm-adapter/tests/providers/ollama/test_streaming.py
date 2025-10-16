@@ -6,6 +6,7 @@ from adapter.core.provider_spi import ProviderRequest
 from adapter.core.providers import ProviderFactory
 
 
+# ストリームレスポンスがチャンク単位で結合されることを確認する。
 def test_ollama_provider_streaming_concat(
     monkeypatch: pytest.MonkeyPatch,
     provider_config_factory,
@@ -32,6 +33,7 @@ def test_ollama_provider_streaming_concat(
     assert response.token_usage.completion == 2
 
 
+# イテレータがメッセージ本文のみを返す構成でも同等結果になることを保証する。
 def test_ollama_provider_streaming_iter_lines_only(
     monkeypatch: pytest.MonkeyPatch,
     provider_config_factory,

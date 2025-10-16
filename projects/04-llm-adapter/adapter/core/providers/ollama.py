@@ -7,11 +7,8 @@ from ..provider_spi import ProviderRequest
 from . import BaseProvider, ProviderResponse
 from ._requests_compat import create_session, requests_exceptions
 from .ollama_client import OllamaClient
-from .ollama_helpers import (
-    DEFAULT_HOST,
-    OllamaConnectionHelper,
-    OllamaRuntimeHelper,
-)
+from .ollama_connection import DEFAULT_HOST, OllamaConnectionHelper
+from .ollama_runtime import OllamaRuntimeHelper
 
 __all__ = ["OllamaProvider", "DEFAULT_HOST", "requests_exceptions"]
 
