@@ -89,8 +89,8 @@
     【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L1-L91】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py`
     【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L1-L81】
-  - `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py`
-    【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
+  - `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` — `base_url`／`base_url_env` フォールバックと `env` マッピング、リテラル指定を使った URL 上書きを検証する。
+    【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L65-L208】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_options.py`
     【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
   - `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py`
@@ -106,6 +106,7 @@
 - 品質エビデンス:
   - ✅ 認証経路: `test_auth_api_key_resolution.py`・`test_auth_request_options.py`・`test_auth_skip_behavior.py` が環境変数マッピング優先度、リクエストオプション経由の API キー上書き、欠落時の `ProviderSkip` を個別に検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】
   - ✅ オプション/ストリーム/エラー: `test_options.py` が構成値とリクエスト値の優先順位を比較し、`test_streaming.py` がチャンク統合と使用量集計を確認し、`test_errors.py` が 401/403/429/503 を正規化してリトライ判定を保証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L19-L62】【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L20-L157】
+  - ✅ ベース URL 解決: `test_base_url.py` が `base_url_env` 優先のフォールバック、`env` マッピング経由の環境変数委譲、設定ファイルでのリテラル URL 指定をそれぞれ通過させ、`base_url` を確実に決定する経路を回帰する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L65-L208】
 - ✅ OpenRouter 品質エビデンス: `pytest projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py::test_cli_openrouter_accepts_provider_option_api_key` を含む CLI テスト群で、OpenRouter 向けのリテラル API キーが `ProviderRequest.options` で秘匿されたまま CLI からプロバイダへ伝播することを確認済み。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
 #### 継続課題（Providers）
 - 実サーバーでのストリーミング透過性検証と運用フロー整備（タスク13を参照）。
@@ -113,7 +114,7 @@
 
 #### OpenRouter テスト分割チェックリスト
 - [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py`・`test_auth_request_options.py`・`test_auth_skip_behavior.py` へ分割し、環境変数マッピング／CLI オプション優先／API キー欠落時の `ProviderSkip` をそれぞれ検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】
-- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、`base_url`／`base_url_env` フォールバックと `OPENROUTER_BASE_URL` からカスタム環境変数へのマッピング、リテラル上書きを通じてセッション初期化を回帰する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L65-L261】
+- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、`base_url`／`base_url_env` フォールバックと `env` マッピング、リテラル指定の URL 上書きを通じてセッション初期化を回帰する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L65-L208】
 - [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の `api_key` 上書きと `stream` 指定が HTTP ペイロードへ反映されることを確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
 - [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合とトークン使用量の合算を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
 - [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化と再試行判定を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
