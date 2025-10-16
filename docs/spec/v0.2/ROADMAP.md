@@ -10,4 +10,4 @@ OpenRouter を含むプロバイダ別セットアップ手順は `projects/04-l
 
 `llm-adapter` CLI は `ProviderRequest` 経由でプロバイダを呼び出します[^cli-provider-request]。
 
-[^cli-provider-request]: `adapter/cli/prompts.py` で設定読込時に CLI 引数を `ProviderRequest` 用に正規化し、`adapter/cli/prompt_runner.py` の `_build_request` がモデル・オプション・メタデータを束ねて `invoke` へ渡す。`projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py::test_cli_fake_provider` が代表的なリグレッションテスト。
+[^cli-provider-request]: [`adapter/cli/prompts.py`](../../../adapter/cli/prompts.py) で設定読込時に CLI 引数を `ProviderRequest` 用に正規化し、[`adapter/cli/prompt_runner.py`](../../../adapter/cli/prompt_runner.py) の `_build_request` がモデル・オプション・メタデータを束ねて `invoke` へ渡す。CLI 設定ファイル由来の `options` と `max_tokens` が `ProviderRequest` に保持されることは [`projects/04-llm-adapter/tests/cli_single_prompt/test_provider_options.py::test_cli_fake_provider`](../../../projects/04-llm-adapter/tests/cli_single_prompt/test_provider_options.py#L4-L26) で回帰確認している。
