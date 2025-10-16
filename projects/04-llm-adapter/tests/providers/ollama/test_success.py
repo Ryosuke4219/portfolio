@@ -52,6 +52,8 @@ def _execute_with_env(
     return result
 
 
+# 成功パス: 環境変数がオンライン運用を許可する場合は
+# 既存クライアントを利用して通常応答を返す。
 @pytest.mark.parametrize("env", _SUCCESS_ENV_CASES)
 def test_ollama_provider_executor_success_cases(
     monkeypatch: pytest.MonkeyPatch,
@@ -76,6 +78,8 @@ def test_ollama_provider_executor_success_cases(
     assert result.response.token_usage.completion == 3
 
 
+# スキップパス: 明示的にオフライン指定された場合は
+# ProviderSkip を返し次プロバイダへフォールバックする。
 @pytest.mark.parametrize("env", _SKIP_ENV_CASES)
 def test_ollama_provider_skip_cases(
     monkeypatch: pytest.MonkeyPatch,

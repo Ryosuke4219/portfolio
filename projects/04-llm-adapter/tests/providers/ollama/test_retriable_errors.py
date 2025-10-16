@@ -8,6 +8,7 @@ from adapter.core.provider_spi import ProviderRequest
 from adapter.core.providers import ProviderFactory
 
 
+# 自動 pull を無効化した場合はモデル不足を即時リトライエラーとして扱う。
 def test_ollama_provider_auto_pull_disabled(
     monkeypatch: pytest.MonkeyPatch,
     provider_config_factory,
@@ -31,6 +32,7 @@ def test_ollama_provider_auto_pull_disabled(
     assert getattr(fake_client, "pull_called", False) is False
 
 
+# config.raw に auto_pull=True が設定されても環境変数で無効化されることを確認する。
 def test_ollama_provider_auto_pull_disabled_env_override(
     monkeypatch: pytest.MonkeyPatch,
     provider_config_factory,
@@ -56,6 +58,7 @@ def test_ollama_provider_auto_pull_disabled_env_override(
     assert getattr(fake_client, "pull_called", False) is False
 
 
+# Ollama の 429 応答を RateLimitError に正規化する。
 def test_ollama_provider_rate_limit_normalized(
     provider_config_factory,
     fake_client_installer,
@@ -77,6 +80,7 @@ def test_ollama_provider_rate_limit_normalized(
     assert result.backoff_next_provider is True
 
 
+# 5xx 応答は RetriableError として扱い次プロバイダを待機しない。
 def test_ollama_provider_server_error_normalized(
     provider_config_factory,
     fake_client_installer,
