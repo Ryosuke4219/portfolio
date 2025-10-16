@@ -12,7 +12,7 @@
 | **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済。CLI は `prompt_runner` の RateLimiter テストや `prompts.py` 再構成で運用ガードを追加）[^m6-cli-flow] |
 
 ### 未完了タスク（v0.2 保守）
-- Ollama/OpenRouter の旧ブリッジテストは `projects/04-llm-adapter/tests/providers/{ollama,openrouter}/` 配下へ統合済みで、残タスクなし。最新の保守対象は `docs/spec/v0.2/TASKS.md` の一覧を参照。
+- v0.2 時点で追加の保守タスクは設定されていない。更新が必要になった場合は `docs/spec/v0.2/TASKS.md` を起点に同期する。
 
 ---
 
