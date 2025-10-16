@@ -12,11 +12,11 @@
 - 品質エビデンス: `projects/04-llm-adapter/tests/test_cli_prompt_io.py` が CRLF 付きテキストと BOM 付き JSONL の双方を読み込めることを回帰テストとして検証済み。【F:projects/04-llm-adapter/tests/test_cli_prompt_io.py†L1-L21】
 
 ### タスク17: CLI 単発プロンプトテスト分割チェックリスト（完了）
-- [x] `test_prompt_flow.py` へ基本フロー系テストを移設し、従来の CLI 期待値を維持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L1-L198】
-- [x] `test_provider_errors.py` へエラー種別テストを移設し、終了コードの回帰を担保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py†L1-L126】
-- [x] `test_credentials.py` へ資格情報関連テストを集約し、API キー伝播とエイリアス整合性を確保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L232】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L142-L232】
-- [x] `test_openrouter_flow.py` へ OpenRouter 専用テストを分離し、認証パスの回帰を保持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L1-L107】
-- [x] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する（`tests/cli_single_prompt/` 配下のテスト単体で収集可能な構成へ移行済み）。
+- [x] `test_help.py` に CLI ヘルプのスモークテストを配置し、分割後もエントリポイントの使用方法を即時検証できるようにした。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_help.py†L1-L13】
+- [x] `test_metadata.py` にメタデータ伝播テストを移設し、単発プロンプト実行時に `ProviderRequest.metadata` が保持されることを保証する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_metadata.py†L4-L46】
+- [x] `test_model_override.py` に `--model` 上書きテストを集約し、`cli` コマンドと `prompts` モジュールの双方でモデル指定が反映されることを検証する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_model_override.py†L4-L51】
+- [x] `test_provider_options.py` にプロバイダオプションと型変換テストを集約し、単発/複数プロンプト双方で `ProviderRequest.options` が整合することを確認する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_options.py†L4-L81】
+- [x] CLI エラーと資格情報・OpenRouter 経路は `test_provider_errors.py`・`test_credentials.py`・`test_openrouter_flow.py` に分散し、旧 `test_cli_single_prompt.py` を削除したうえで `tests/cli_single_prompt/` 配下のみで回帰できる構成へ更新した。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py†L1-L126】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L232】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L1-L107】
 
 ## Datasets / ゴールデン検証
 
@@ -106,11 +106,11 @@
 - OpenRouter 429/5xx 発生状況の集計とドキュメント拡充（タスク14を参照）。
 
 #### OpenRouter テスト分割チェックリスト
-- [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py`・`test_auth_request_options.py`・`test_auth_skip_behavior.py` へ分割し、API キー解決とスキップ判定の回帰を担保する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】
-- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、エンドポイント解決とセッション初期化を検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
-- [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の上書き順序を確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
-- [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合と usage 計測を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
-- [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
+- [x] 認証系テストを `projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py`・`test_auth_request_options.py`・`test_auth_skip_behavior.py` へ分割し、環境変数マッピング／CLI オプション優先／API キー欠落時の `ProviderSkip` をそれぞれ検証する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】
+- [x] ベース URL／セッション関連テストを `projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py` へ移設し、`router_base_url` のフォールバックとセッションヘッダ初期化を回帰する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】
+- [x] オプション優先順位テストを `projects/04-llm-adapter/tests/providers/openrouter/test_options.py` へ移設し、`ProviderRequest.options` の `api_key` 上書きと `stream` 指定が HTTP ペイロードへ反映されることを確認する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L110】
+- [x] ストリーミングと使用量集計テストを `projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py` へ移設し、チャンク統合とトークン使用量の合算を保持する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L1-L62】
+- [x] エラー正規化テストを `projects/04-llm-adapter/tests/providers/openrouter/test_errors.py` へ移設し、429/503/401/403 正規化と再試行判定を分割後も継続監視する。【F:projects/04-llm-adapter/tests/providers/openrouter/test_errors.py†L1-L157】
 - [x] 旧 `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を暫定ブリッジ化し、新ディレクトリのテストだけをインポートする構成へ更新する（オプション上書き検証は `test_openrouter_provider_request_options_override` へ移設済み）。【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L20-L110】
 - [x] ブリッジ不要となったタイミングで `projects/04-llm-adapter/tests/providers/test_openrouter_provider.py` を削除し、本タスクをクローズする。
 - 完了状況: OpenRouter 関連テストは `projects/04-llm-adapter/tests/providers/openrouter/` 配下で完結し、旧ブリッジを削除済み。API キー透過・ベース URL・ストリーミング・エラー正規化の各検証を新ディレクトリ内のテストだけで維持している。【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_api_key_resolution.py†L18-L132】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_request_options.py†L19-L91】【F:projects/04-llm-adapter/tests/providers/openrouter/test_auth_skip_behavior.py†L19-L81】【F:projects/04-llm-adapter/tests/providers/openrouter/test_base_url.py†L1-L261】【F:projects/04-llm-adapter/tests/providers/openrouter/test_streaming.py†L19-L62】
