@@ -10,16 +10,17 @@ from adapter.core.config import ProviderConfig
 from adapter.core.errors import AuthError, ConfigError, ProviderSkip, TimeoutError
 from adapter.core.metrics.models import BudgetSnapshot, RunMetrics
 from adapter.core.providers import BaseProvider, ProviderResponse
-from adapter.core.runner_execution import RunnerExecution
 from adapter.core.runner_api import RunnerConfig
+from adapter.core.runner_execution import RunnerExecution
 from adapter.core.runner_execution_parallel import ProviderFailureSummary
-
-from .common import ProviderSetup, create_runner
 from tests.compare_runner_parallel.conftest import (
     ProviderConfigFactory,
     RunMetricsFactory,
     TaskFactory,
 )
+
+from .common import create_runner, ProviderSetup
+
 
 @pytest.fixture
 def failure_summaries(

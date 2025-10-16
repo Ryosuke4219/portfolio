@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import pytest
 
@@ -10,7 +10,6 @@ from adapter.core.metrics.models import RunMetrics
 from adapter.core.providers import BaseProvider, ProviderFactory
 from adapter.core.runner_api import RunnerConfig
 from adapter.core.runners import CompareRunner
-
 from tests.compare_runner_parallel.conftest import (
     ProviderConfigFactory,
     TaskFactory,
