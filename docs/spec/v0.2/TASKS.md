@@ -3,7 +3,6 @@
 > 2025-11-09 更新: v0.1.0 リリースチェックリストと OpenRouter 運用ガイドを追加し、M6 Exit Criteria を満たした。以降は v0.2 タスクとして保守・拡張を継続する。
 
 ## 未完了タスク一覧
-- タスク17: CLI 単発プロンプト分割の最終ステップとして、旧 `test_cli_single_prompt.py` のブリッジ削除が未着手。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
 - タスク6（Ollama チェックリスト）: 旧 `tests/providers/test_ollama_provider.py` のブリッジ削除が未完了。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
 - タスク7（OpenRouter チェックリスト）: 旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が残存。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
 
@@ -18,7 +17,7 @@
 - [x] `test_provider_errors.py` へエラー種別テストを移設し、終了コードの回帰を担保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_errors.py†L1-L126】
 - [x] `test_credentials.py` へ資格情報関連テストを集約し、API キー伝播とエイリアス整合性を確保する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L1-L232】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L142-L232】
 - [x] `test_openrouter_flow.py` へ OpenRouter 専用テストを分離し、認証パスの回帰を保持する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L1-L107】
-- [ ] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
+- [x] ブリッジ不要になった時点で旧 `test_cli_single_prompt.py` を削除し、分割作業を完了する（`tests/cli_single_prompt/` 配下のテスト単体で収集可能な構成へ移行済み）。
 
 ## Datasets / ゴールデン検証
 

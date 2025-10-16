@@ -8,7 +8,7 @@ import pytest
 
 import adapter.cli as cli_module
 
-pytest_plugins = ("tests.test_cli_single_prompt",)
+pytest_plugins = ("tests.cli_single_prompt.conftest",)
 
 
 class _FailingFactory:
