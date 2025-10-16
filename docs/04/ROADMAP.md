@@ -11,6 +11,11 @@
 | **M5 — Telemetry & QA Integration** | Week44: 10-27〜11-02 | 可視化＋QA連携 | OTLP/JSON変換 / `projects/04-llm-adapter/tools/report/metrics/weekly_summary.py` / Evidence更新 | ✅ 完了（OTLP JSONエクスポータを`projects/04-llm-adapter-shadow/src/llm_adapter/{metrics_otlp.py,metrics.py,shadow_metrics.py}`で維持しつつ、週次サマリ生成ツールを`projects/04-llm-adapter/tools/report/metrics/{data.py,weekly_summary.py}`へ移行して`just report`から実行） |
 | **M6 — CLI/Docs/Release 0.1.0** | Week45: 11-03〜11-09 | デモ〜配布 | `just`/CLI / README(JP/EN) / `pyproject.toml` / CHANGELOG / v0.1.0 | ✅ 完了（`docs/releases/v0.1.0.md` を整備し、OpenRouter 運用ガイドとタグ発行手順を最新化済。CLI は `prompt_runner` の RateLimiter テストや `prompts.py` 再構成で運用ガードを追加）[^m6-cli-flow] |
 
+### 未完了タスク（v0.2 保守）
+- CLI 単発プロンプト分割の最終ステップとして、旧 `test_cli_single_prompt.py` のブリッジ削除が残存しているため、ブリッジ撤去タスクの完了が必要。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
+- Ollama プロバイダのテスト移行は旧 `tests/providers/test_ollama_provider.py` のブリッジ削除待ちで保留中。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
+- OpenRouter プロバイダのテスト移行も旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が未完。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
+
 ---
 
 ## M0 — SRS確定 & 骨子固定
