@@ -56,7 +56,7 @@ def extract_text_from_response(response: Any) -> str:
             return text_attr
     output = _read_attr(response, "output")
     if isinstance(output, Sequence):
-        parts: list[str] = []
+        output_parts: list[str] = []
         for item in output:
             if isinstance(item, Mapping):
                 content = item.get("content")
@@ -65,11 +65,11 @@ def extract_text_from_response(response: Any) -> str:
                         if isinstance(fragment, Mapping):
                             text_part = fragment.get("text")
                             if isinstance(text_part, str):
-                                parts.append(text_part)
+                                output_parts.append(text_part)
                 elif isinstance(content, str):
-                    parts.append(content)
-        if parts:
-            return "".join(parts)
+                    output_parts.append(content)
+        if output_parts:
+            return "".join(output_parts)
     if hasattr(response, "model_dump"):
         try:
             dumped = response.model_dump()

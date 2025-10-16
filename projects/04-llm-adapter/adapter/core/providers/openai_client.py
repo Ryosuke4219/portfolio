@@ -32,19 +32,19 @@ class OpenAIClientFactory:
             if default_headers:
                 kwargs["default_headers"] = dict(default_headers)
             return openai_module.OpenAI(**kwargs)
-        openai_module.api_key = api_key  # type: ignore[attr-defined]
+        openai_module.api_key = api_key
         if endpoint_url:
-            openai_module.base_url = endpoint_url  # type: ignore[attr-defined]
+            openai_module.base_url = endpoint_url
         if organization:
-            openai_module.organization = organization  # type: ignore[attr-defined]
+            openai_module.organization = organization
         if default_headers:
             if hasattr(openai_module, "_default_headers"):
-                headers_source = openai_module._default_headers  # type: ignore[attr-defined]
+                headers_source = openai_module._default_headers
             else:
                 headers_source = {}
             headers = dict(headers_source)
             headers.update(default_headers)
-            openai_module._default_headers = headers  # type: ignore[attr-defined]
+            openai_module._default_headers = headers
         return openai_module
 
 
