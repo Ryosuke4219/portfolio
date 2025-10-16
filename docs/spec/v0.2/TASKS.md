@@ -50,7 +50,8 @@
 ### タスク6: Ollama プロバイダを v0.2 コアへ移植する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`
-  - `projects/04-llm-adapter/adapter/core/providers/ollama_helpers.py`
+  - `projects/04-llm-adapter/adapter/core/providers/ollama_connection.py`
+  - `projects/04-llm-adapter/adapter/core/providers/ollama_runtime.py`
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/ollama/test_success.py`
     【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L1-L100】
@@ -59,8 +60,9 @@
   - `projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py`
     【F:projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py†L1-L98】
 - 対応状況:
-  - `OllamaProvider` は `ollama_helpers` で公開される `OllamaConnectionHelper`・`OllamaRuntimeHelper` を組み立てて接続確立と実行フローを委譲する薄いオーケストレータとなり、モデル準備と応答構築をヘルパー経由で行う。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L21-L58】【F:projects/04-llm-adapter/adapter/core/providers/ollama_helpers.py†L1-L7】
-  - `OllamaConnectionHelper` がホスト/タイムアウト/オフライン制御を環境変数・設定から正規化し、`OllamaRuntimeHelper` がネットワーク許可判定・モデル Pull・チャットペイロード構築・レスポンス正規化まで一括で担う構成へ整理した。【F:projects/04-llm-adapter/adapter/core/providers/ollama_connection.py†L1-L135】【F:projects/04-llm-adapter/adapter/core/providers/ollama_runtime.py†L18-L209】
+  - `OllamaProvider` は `OllamaConnectionHelper.from_config` で `OllamaClient` と接続パラメータを取得し、インスタンス内に接続情報と準備済みモデル集合を保持しながら、ネットワーク許可判定・モデル準備・ペイロード組み立て・チャット呼び出し・応答正規化を `OllamaRuntimeHelper` へ委譲する薄いオーケストレータとして機能する。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L19-L58】【F:projects/04-llm-adapter/adapter/core/providers/ollama_runtime.py†L21-L205】
+  - `OllamaConnectionHelper` がホスト/タイムアウト/オフライン制御を環境変数・設定から正規化し、クライアント生成やオート Pull 設定を一元管理する構成である。【F:projects/04-llm-adapter/adapter/core/providers/ollama_connection.py†L36-L135】
+  - `OllamaRuntimeHelper` がネットワークアクセス確認、モデル Pull と存在チェック、チャット API へのペイロード組み立て・送信、レスポンス/トークン使用量の正規化、ストリーミング応答の集約まで担当する。【F:projects/04-llm-adapter/adapter/core/providers/ollama_runtime.py†L21-L254】
   - CLI からリテラル指定した API キーを `ProviderRequest.options["api_key"]` に格納し、Ollama へも伝播できるよう CLI パイプラインを整備した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
 - 品質エビデンス:
 - ✅ Ollama 品質エビデンス: `pytest projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py::test_cli_literal_api_key_option` が成功し、CLI が受け取ったリテラル API キーを `ProviderRequest.options["api_key"]` へ載せ替えてから Ollama に渡す経路を検証している。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
