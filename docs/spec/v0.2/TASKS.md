@@ -143,7 +143,7 @@
   - `ProviderCallExecutor.execute` が `_invoke_provider` を介して `adapter/core/_provider_execution.py` 内で `ProviderRequest` を構築し、CLI 側 `_build_request` と同一のフィールド構成（`prompt`/`options`/`metadata`）を共有して API 移行を完了させた。【F:projects/04-llm-adapter/adapter/core/_provider_execution.py†L40-L139】
   - `prompts.run_prompts` が `ProviderFactory.create` で得たプロバイダへ `execute_prompts` を介して `ProviderRequest` をまとめて投入し、CLI からのオプション上書きやモデル指定を `ProviderConfig` に反映してから渡す構成へ整理された。【F:projects/04-llm-adapter/adapter/cli/prompts.py†L28-L67】
 - 品質エビデンス:
-- ✅ CLI パイプライン回帰: `pytest projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py` — CLI が `_build_request` で構築した `ProviderRequest` に API キーやプロンプト配列を束ね、`prompt_runner.execute_prompts` が `ProviderResponse` を取得する流れを検証。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L24-L170】
+- ✅ CLI パイプライン回帰: `pytest projects/04-llm-adapter/tests/cli_single_prompt/test_provider_options.py::{test_cli_fake_provider,test_cli_provider_option_coerces_types,test_run_prompts_provider_option_coerces_types}` — CLI が `_build_request` でプロバイダ設定の `max_tokens` と `options` を維持しつつ `--provider-option` の文字列を型変換して `ProviderRequest.options` に取り込み、`prompts.run_prompts` でも同一経路でマージされることを検証。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_options.py†L4-L81】
   - ✅ `pytest projects/04-llm-adapter/tests/test_base_provider_spi.py` — `ProviderCallExecutor.execute` が `_invoke_provider` を通じて `ProviderRequest` を構築し、`model`/`prompt`/`max_tokens` などの基本フィールドが正しく揃うことを検証。【F:projects/04-llm-adapter/tests/test_base_provider_spi.py†L108-L139】
   - ✅ `pytest projects/04-llm-adapter/tests/test_provider_execution_request_options.py` — CLI と同一経路で `ProviderRequest.options`/`metadata` がコピーされることを `ProviderCallExecutor.execute` と `BaseProvider.generate` の両方で確認。【F:projects/04-llm-adapter/tests/test_provider_execution_request_options.py†L52-L76】
 
@@ -152,7 +152,7 @@
   - `adapter/cli/config_loader.py` の `load_provider_configuration` が CLI 引数で受けた `--provider-option` を設定 YAML の `options` とマージし、`ProviderConfig.raw` を差し替えて `api_key` などのリテラル値を統合する。【F:projects/04-llm-adapter/adapter/cli/config_loader.py†L28-L67】
   - `adapter/cli/prompt_runner.py` の `_build_request` が統合済み `ProviderConfig` から `options`/`metadata` を抽出し、`ProviderRequest` へ確実に反映する。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】
 - 検証テスト:
-- `test_cli_provider_option_coerces_types` / `test_run_prompts_provider_option_coerces_types` が `--provider-option` の文字列を型変換して `ProviderRequest.options` に伝播することを検証する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_prompt_flow.py†L205-L278】
+- `test_cli_provider_option_coerces_types` / `test_run_prompts_provider_option_coerces_types` が `--provider-option` の文字列を型変換して `ProviderRequest.options` に伝播することを検証する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_provider_options.py†L29-L81】
 - `test_cli_openrouter_accepts_provider_option_api_key` が CLI から渡した OpenRouter の `api_key` が `ProviderRequest.options` 経由でプロバイダへ届くことを確認する。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_openrouter_flow.py†L74-L107】
 
 ## Docs & Templates
