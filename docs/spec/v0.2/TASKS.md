@@ -2,6 +2,11 @@
 
 > 2025-11-09 更新: v0.1.0 リリースチェックリストと OpenRouter 運用ガイドを追加し、M6 Exit Criteria を満たした。以降は v0.2 タスクとして保守・拡張を継続する。
 
+## 未完了タスク一覧
+- タスク17: CLI 単発プロンプト分割の最終ステップとして、旧 `test_cli_single_prompt.py` のブリッジ削除が未着手。【F:projects/04-llm-adapter/tests/test_cli_single_prompt.py†L1-L16】
+- タスク6（Ollama チェックリスト）: 旧 `tests/providers/test_ollama_provider.py` のブリッジ削除が未完了。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
+- タスク7（OpenRouter チェックリスト）: 旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が残存。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
+
 ## CLI / 入力整備
 
 ### タスク1: `--prompt-file` / `--prompts` のCRLF・BOM対応を強化する（対応済み）
