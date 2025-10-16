@@ -3,8 +3,7 @@
 > 2025-11-09 更新: v0.1.0 リリースチェックリストと OpenRouter 運用ガイドを追加し、M6 Exit Criteria を満たした。以降は v0.2 タスクとして保守・拡張を継続する。
 
 ## 未完了タスク一覧
-- タスク6（Ollama チェックリスト）: 旧 `tests/providers/test_ollama_provider.py` のブリッジ削除が未完了。【F:projects/04-llm-adapter/tests/providers/test_ollama_provider.py†L1-L38】
-- タスク7（OpenRouter チェックリスト）: 旧 `tests/providers/test_openrouter_provider.py` のブリッジ削除が残存。【F:projects/04-llm-adapter/tests/providers/test_openrouter_provider.py†L1-L11】
+- v0.2 の継続保守は CI 監視（タスク4）など運用タスクが中心。Ollama/OpenRouter の旧ブリッジ削除は完了し、テストは `projects/04-llm-adapter/tests/providers/ollama/` と `projects/04-llm-adapter/tests/providers/openrouter/` へ統合済み。【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L1-L100】【F:projects/04-llm-adapter/tests/providers/openrouter/test_options.py†L1-L102】
 
 ## CLI / 入力整備
 
