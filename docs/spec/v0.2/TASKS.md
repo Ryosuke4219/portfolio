@@ -59,8 +59,8 @@
   - `projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py`
     【F:projects/04-llm-adapter/tests/providers/ollama/test_retriable_errors.py†L1-L98】
 - 対応状況:
-  - `OllamaProvider` は接続確立と実行フローを `ollama_helpers` のヘルパーへ委譲する薄いオーケストレータとなり、生成した `OllamaConnectionHelper`・`OllamaRuntimeHelper` を通じてモデル準備と応答組み立てを行う。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L22-L62】
-  - `OllamaConnectionHelper` がホスト/タイムアウト/オフライン制御を環境変数・設定から正規化し、`OllamaRuntimeHelper` がネットワーク許可判定・モデル Pull・チャットペイロード構築・レスポンス正規化まで一括で担う構成へ整理した。【F:projects/04-llm-adapter/adapter/core/providers/ollama_helpers.py†L46-L333】
+  - `OllamaProvider` は `ollama_helpers` で公開される `OllamaConnectionHelper`・`OllamaRuntimeHelper` を組み立てて接続確立と実行フローを委譲する薄いオーケストレータとなり、モデル準備と応答構築をヘルパー経由で行う。【F:projects/04-llm-adapter/adapter/core/providers/ollama.py†L21-L58】【F:projects/04-llm-adapter/adapter/core/providers/ollama_helpers.py†L1-L7】
+  - `OllamaConnectionHelper` がホスト/タイムアウト/オフライン制御を環境変数・設定から正規化し、`OllamaRuntimeHelper` がネットワーク許可判定・モデル Pull・チャットペイロード構築・レスポンス正規化まで一括で担う構成へ整理した。【F:projects/04-llm-adapter/adapter/core/providers/ollama_connection.py†L1-L135】【F:projects/04-llm-adapter/adapter/core/providers/ollama_runtime.py†L18-L209】
   - CLI からリテラル指定した API キーを `ProviderRequest.options["api_key"]` に格納し、Ollama へも伝播できるよう CLI パイプラインを整備した。【F:projects/04-llm-adapter/adapter/cli/prompt_runner.py†L58-L107】【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
 - 品質エビデンス:
 - ✅ Ollama 品質エビデンス: `pytest projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py::test_cli_literal_api_key_option` が成功し、CLI が受け取ったリテラル API キーを `ProviderRequest.options["api_key"]` へ載せ替えてから Ollama に渡す経路を検証している。【F:projects/04-llm-adapter/tests/cli_single_prompt/test_credentials.py†L81-L115】
@@ -117,8 +117,8 @@
 
 ### タスク12: OpenAI プロバイダのリクエストオプションを v0.2 コアへ拡張する（対応済み）
 - 主要モジュール:
-  - `OpenAIProvider` が委譲先のストラテジーに必要な接続情報とシステムプロンプト/レスポンスフォーマットをまとめ、`build_mode_strategies` で得たモード別ロジックを順に実行する薄いオーケストレータへ再構成した。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L37-L151】
-  - `openai_helpers.py` が API キー解決・共通キーワード引き回し・モードストラテジー生成・例外正規化を担い、各ストラテジー内部で `ProviderRequest` のオプション/制御値を最終ペイロードへ組み込む。【F:projects/04-llm-adapter/adapter/core/providers/openai_helpers.py†L27-L200】
+  - `OpenAIProvider` が `build_mode_strategies` で得たモード別ロジックへ接続情報やシステムプロンプトを引き渡し、委譲先のストラテジー呼び出しを制御する薄いオーケストレータへ再構成した。【F:projects/04-llm-adapter/adapter/core/providers/openai.py†L53-L140】
+  - `openai_helpers.py` が API キー解決・共通キーワード引き回し・モードストラテジー生成・例外正規化を担い、各ストラテジー内部で `ProviderRequest` のオプション/制御値を最終ペイロードへ組み込む。【F:projects/04-llm-adapter/adapter/core/providers/openai_helpers.py†L27-L204】
   - `openai_extractors.py` がレスポンスからの本文抽出・トークン使用量集計・生データ化を一元化し、`OpenAIProvider` の戻り値構築に利用している。【F:projects/04-llm-adapter/adapter/core/providers/openai_extractors.py†L21-L184】
 - 検証テスト: `test_openai_provider_applies_request_overrides` が CLI から渡されるオプションを通じて `stream`/`seed`/`response_format` が SDK 呼び出しへ渡ること、ストリーム結果が `ProviderResponse` に正規化されることを確認する。【F:projects/04-llm-adapter/tests/providers/test_openai_provider_request_overrides.py†L1-L158】
 
