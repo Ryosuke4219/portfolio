@@ -50,8 +50,11 @@
 ### タスク6: Ollama プロバイダを v0.2 コアへ移植する（対応済み）
 - 対象モジュール:
   - `projects/04-llm-adapter/adapter/core/providers/ollama.py`
+    - `OllamaProvider` が `OllamaConnectionHelper` と `OllamaRuntimeHelper` を束ね、`ProviderRequest` の受け取りからレスポンス返却までを統括する。
   - `projects/04-llm-adapter/adapter/core/providers/ollama_connection.py`
+    - `OllamaConnectionHelper` が接続情報・タイムアウト・自動 Pull 設定を正規化し、`OllamaClient` 生成と設定伝播を担う。
   - `projects/04-llm-adapter/adapter/core/providers/ollama_runtime.py`
+    - `OllamaRuntimeHelper` がネットワーク許可判定、モデル準備、チャット API 呼び出し、レスポンス正規化までを担当する。
   - `projects/04-llm-adapter/adapter/core/providers/__init__.py`
   - `projects/04-llm-adapter/tests/providers/ollama/test_success.py`
     【F:projects/04-llm-adapter/tests/providers/ollama/test_success.py†L1-L100】
