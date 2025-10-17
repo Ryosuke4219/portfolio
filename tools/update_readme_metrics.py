@@ -15,6 +15,11 @@ README_MARKERS_NOT_FOUND = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Update README QA metrics table")
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Persist README updates (for CLI compatibility)",
+    )
     parser.add_argument("--readme", type=Path, default=Path("README.md"), help="Path to README")
     parser.add_argument("--source", type=Path, required=True, help="Path to metrics JSON")
     parser.add_argument(
