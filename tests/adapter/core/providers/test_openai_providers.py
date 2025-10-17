@@ -6,15 +6,15 @@ from typing import Any
 
 import pytest
 
-hypothesis = pytest.importorskip("hypothesis")
-st = hypothesis.strategies
-given = hypothesis.given
-
 from adapter.core.errors import RateLimitError
 from adapter.core.models import PricingConfig, ProviderConfig, QualityGatesConfig, RateLimitConfig, RetryConfig
 from adapter.core.provider_spi import ProviderRequest
 from adapter.core.providers import openai as openai_module
 from adapter.core.providers.openai_utils import extract_text_from_response, extract_usage_tokens
+
+hypothesis = pytest.importorskip("hypothesis")
+st = hypothesis.strategies
+given = hypothesis.given
 
 
 def _make_config(raw: dict[str, Any] | None = None) -> ProviderConfig:
@@ -27,7 +27,9 @@ def test_openai_provider_responses_mode_builds_payload(monkeypatch: pytest.Monke
     result = SimpleNamespace(output_text="generated", usage={"prompt_tokens": 11, "completion_tokens": 5}, model_dump=lambda: {"output_text": "generated", "usage": {"prompt_tokens": 11, "completion_tokens": 5}})
 
     def _create(**payload: Any) -> SimpleNamespace:
-        captured.clear(); captured.update(payload); return result
+        captured.clear()
+        captured.update(payload)
+        return result
 
     client = SimpleNamespace(responses=SimpleNamespace(create=_create))
     monkeypatch.setattr(openai_module, "OpenAIClientFactory", lambda *_: SimpleNamespace(create=lambda *_a, **_k: client))
