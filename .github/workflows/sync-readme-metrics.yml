@@ -1,0 +1,40 @@
+name: Sync README metrics
+
+on:
+  schedule:
+    - cron: '0 22 * * 1'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    name: Sync README metrics
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt || true
+
+      - name: Download latest metrics JSON
+        run: |
+          curl -fSL https://ryosuke4219.github.io/portfolio/reports/latest.json -o /tmp/latest.json
+
+      - name: Update README metrics
+        run: >-
+          python tools/update_readme_metrics.py
+          --write
+          --readme README.md
+          --source /tmp/latest.json
+          --report-url https://ryosuke4219.github.io/portfolio/reports/latest.html
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: chore: sync README metrics (weekly)
+          file_pattern: README.md
