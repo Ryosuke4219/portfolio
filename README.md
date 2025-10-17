@@ -10,6 +10,8 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 [![Release](https://img.shields.io/github/v/release/Ryosuke4219/portfolio?display_name=tag&sort=semver)](https://github.com/Ryosuke4219/portfolio/releases)
 [![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://rna4219.github.io/portfolio/reports/latest.html)
 
+[GitHub Pages Dashboard](https://rna4219.github.io/portfolio/) → [Coverage HTML](https://rna4219.github.io/portfolio/reports/coverage/) ・ [Weekly Summary](https://rna4219.github.io/portfolio/weekly-summary.html)
+
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests
 [ci-workflow]: https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml
 [badge-lint]: https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint
