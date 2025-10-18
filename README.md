@@ -32,7 +32,7 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 - local_20250923T074604Z_19_20250923074604 (2025-09-23T07:46:04.396000Z): Pass Rate 100.00% (±0.00pp) / Flaky 0件 (±0)
 
 <!-- qa-metrics:end -->
-<sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。</sub>
+<sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。手動で反映する場合は `python tools/update_readme_metrics.py --source artifacts/runs-metrics.jsonl --report-url https://rna4219.github.io/portfolio/reports/latest.html --write` を実行してください。</sub>
 
 
 > 🔎 最新CIレポート: [JUnit要約][junit-report] / [Flakyランキング][flaky-report] / [Coverage HTML][coverage-report]
@@ -309,6 +309,16 @@ VS Code Dev Container を利用する場合は `devcontainer.json` の postCreat
 ```bash
 just setup
 just test
+```
+
+### 品質ゲート (Quality Gates)
+
+Python 側の静的解析・型チェック・テストは CI で `ruff` / `mypy(strict)` / `pytest` を採用しています。ローカルでも以下を実行すると同じ品質ゲートを再現できます（`uv tool run` が利用できない環境では `pipx run` や仮想環境への直接インストールに置き換えてください）。
+
+```bash
+uv tool run ruff check .
+uv tool run mypy --config-file pyproject.toml projects/04-llm-adapter
+uv tool run pytest projects/04-llm-adapter/tests
 ```
 
 ---
