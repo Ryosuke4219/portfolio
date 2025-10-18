@@ -5,12 +5,12 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 [![Tests][badge-tests]][ci-workflow]
 [![Lint][badge-lint]][lint-workflow]
 [![CodeQL](https://github.com/Ryosuke4219/portfolio/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Ryosuke4219/portfolio/actions/workflows/codeql.yml)
-[![Pages](https://img.shields.io/website?url=https%3A%2F%2Frna4219.github.io%2Fportfolio%2F&label=pages)](https://rna4219.github.io/portfolio/)
+[![Pages](https://img.shields.io/website?url=https%3A%2F%2Fryosuke4219.github.io%2Fportfolio%2F&label=pages)](https://ryosuke4219.github.io/portfolio/)
 [![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
 [![Release](https://img.shields.io/github/v/release/Ryosuke4219/portfolio?display_name=tag&sort=semver)](https://github.com/Ryosuke4219/portfolio/releases)
-[![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://rna4219.github.io/portfolio/reports/latest.html)
+[![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://ryosuke4219.github.io/portfolio/reports/latest.html)
 
-[GitHub Pages Dashboard](https://rna4219.github.io/portfolio/) → [Coverage HTML](https://rna4219.github.io/portfolio/reports/coverage/) ・ [Weekly Summary](https://rna4219.github.io/portfolio/weekly-summary.html)
+[GitHub Pages Dashboard](https://ryosuke4219.github.io/portfolio/) → [Coverage HTML](https://ryosuke4219.github.io/portfolio/reports/coverage/) ・ [Weekly Summary](https://ryosuke4219.github.io/portfolio/weekly-summary.html)
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests
 [ci-workflow]: https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml
@@ -24,7 +24,7 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 | Pass Rate | 100.00% (134/134) |
 | Top Flaky | データなし |
 | 最終更新 | 2025-09-29T10:38:40.894000Z |
-| レポート | [最新レポートを見る](https://rna4219.github.io/portfolio/reports/latest.html) |
+| レポート | [最新レポートを見る](https://ryosuke4219.github.io/portfolio/reports/latest.html) |
 
 直近3回の差分:
 - local_1759142320 (2025-09-29T10:38:40.894000Z): Pass Rate 100.00% (±0.00pp) / Flaky 0件 (±0)
@@ -32,18 +32,18 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 - local_20250923T074604Z_19_20250923074604 (2025-09-23T07:46:04.396000Z): Pass Rate 100.00% (±0.00pp) / Flaky 0件 (±0)
 
 <!-- qa-metrics:end -->
-<sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。手動で反映する場合は `python tools/update_readme_metrics.py --source artifacts/runs-metrics.jsonl --report-url https://rna4219.github.io/portfolio/reports/latest.html --write` を実行してください。</sub>
+<sub>※週次ワークフロー (`weekly-qa-summary.yml`) が `tools/update_readme_metrics.py` で自動更新します。手動で反映する場合は `python tools/update_readme_metrics.py --source artifacts/runs-metrics.jsonl --report-url https://ryosuke4219.github.io/portfolio/reports/latest.html --write` を実行してください。</sub>
 
 
 > 🔎 最新CIレポート: [JUnit要約][junit-report] / [Flakyランキング][flaky-report] / [Coverage HTML][coverage-report]
 
-[junit-report]: https://rna4219.github.io/portfolio/reports/junit/index.html
-[flaky-report]: https://rna4219.github.io/portfolio/reports/flaky/index.html
-[coverage-report]: https://rna4219.github.io/portfolio/reports/coverage/index.html
+[junit-report]: https://ryosuke4219.github.io/portfolio/reports/junit/index.html
+[flaky-report]: https://ryosuke4219.github.io/portfolio/reports/flaky/index.html
+[coverage-report]: https://ryosuke4219.github.io/portfolio/reports/coverage/index.html
 
 > QA × SDET × LLM の実践ポートフォリオ。小さく完結した自動化パイプラインを公開。 / Practical QA × SDET × LLM portfolio featuring compact automation pipelines.
 
-- **Website:** <https://rna4219.github.io/portfolio/> — Portfolio Gallery on GitHub Pages
+- **Website:** <https://ryosuke4219.github.io/portfolio/> — Portfolio Gallery on GitHub Pages
 - **行動規範:** [Contributor Covenant v2.1](CODE_OF_CONDUCT.md)
 - **Docs Deploy:** `.github/workflows/pages.yml` が `docs/` をビルド&公開（追加の Pages ワークフローは不要）
 - **CI:** `.github/workflows/ci.yml` が Node/Python の回帰と LLM Adapter Shadow を `push`／`pull_request`／`workflow_dispatch` で実行。
@@ -61,11 +61,11 @@ Quick Start はこちら → [Quick Start (JA / EN)](#quick-start-ja--en).
 - **`just report`** — Python プロジェクトのテスト＋カバレッジレポートを生成します。 / Produce pytest coverage reports for the Python adapter.
 - **`just openrouter-stream-probe -- --dry-run`** — OpenRouter のストリーミングプローブを CLI 引数付きで実行します。 / Launch the OpenRouter streaming probe with passthrough CLI flags.
 - **`just openrouter-stats -- --since 2024-01-01`** — OpenRouter 障害メトリクスを `artifacts/openrouter` に出力します。 / Export OpenRouter failure metrics into `artifacts/openrouter`.
-- **GitHub Pages** — <https://rna4219.github.io/portfolio/> — 公開ギャラリー。 / Public gallery on GitHub Pages.
+- **GitHub Pages** — <https://ryosuke4219.github.io/portfolio/> — 公開ギャラリー。 / Public gallery on GitHub Pages.
 
 ### GitHub Pages 公開 / 復旧手順
 
-- 公開 URL: <https://rna4219.github.io/portfolio/>
+- 公開 URL: <https://ryosuke4219.github.io/portfolio/>
 - 復旧手順:
   1. GitHub Actions → Pages ワークフローを `Run workflow` で再実行し、`Build with Jekyll` と `Deploy to GitHub Pages` の両ステップが `Completed` になったことを実行ログで確認。
   2. ビルド失敗時はローカルで `bundle exec jekyll build --source docs --destination _site` を実行しエラー箇所を修正。
