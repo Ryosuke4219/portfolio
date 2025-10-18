@@ -4,18 +4,18 @@ _QA / SDET / LLM 成果物をまとめた可視化ポータル_
 
 [![Tests][badge-tests]][ci-workflow]
 [![Lint][badge-lint]][lint-workflow]
-[![CodeQL](https://github.com/Ryosuke4219/portfolio/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Ryosuke4219/portfolio/actions/workflows/codeql.yml)
+[![CodeQL](https://github.com/RNA4219/portfolio/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/RNA4219/portfolio/actions/workflows/codeql.yml)
 [![Pages](https://img.shields.io/website?url=https%3A%2F%2Frna4219.github.io%2Fportfolio%2F&label=pages)](https://rna4219.github.io/portfolio/)
-[![Coverage](https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/Ryosuke4219/portfolio/actions/workflows/coverage.yml)
-[![Release](https://img.shields.io/github/v/release/Ryosuke4219/portfolio?display_name=tag&sort=semver)](https://github.com/Ryosuke4219/portfolio/releases)
+[![Coverage](https://img.shields.io/github/actions/workflow/status/RNA4219/portfolio/coverage.yml?branch=main&label=coverage)](https://github.com/RNA4219/portfolio/actions/workflows/coverage.yml)
+[![Release](https://img.shields.io/github/v/release/RNA4219/portfolio?display_name=tag&sort=semver)](https://github.com/RNA4219/portfolio/releases)
 [![QA Snapshot](https://img.shields.io/badge/QA%20Snapshot-Auto%20weekly-6f42c1?logo=github)](https://rna4219.github.io/portfolio/reports/latest.html)
 
 [GitHub Pages Dashboard](https://rna4219.github.io/portfolio/) → [Coverage HTML](https://rna4219.github.io/portfolio/reports/coverage/) ・ [Weekly Summary](https://rna4219.github.io/portfolio/weekly-summary.html)
 
-[badge-tests]: https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/ci.yml?branch=main&label=tests
-[ci-workflow]: https://github.com/Ryosuke4219/portfolio/actions/workflows/ci.yml
-[badge-lint]: https://img.shields.io/github/actions/workflow/status/Ryosuke4219/portfolio/lint.yml?branch=main&label=lint
-[lint-workflow]: https://github.com/Ryosuke4219/portfolio/actions/workflows/lint.yml
+[badge-tests]: https://img.shields.io/github/actions/workflow/status/RNA4219/portfolio/ci.yml?branch=main&label=tests
+[ci-workflow]: https://github.com/RNA4219/portfolio/actions/workflows/ci.yml
+[badge-lint]: https://img.shields.io/github/actions/workflow/status/RNA4219/portfolio/lint.yml?branch=main&label=lint
+[lint-workflow]: https://github.com/RNA4219/portfolio/actions/workflows/lint.yml
 
 
 <!-- qa-metrics:start -->
@@ -259,7 +259,7 @@ llm-adapter --provider adapter/config/providers/openai.yaml \
 
 ## リリース (Releases)
 
-- 最新: [v1.0.0 – ポートフォリオ統合リリース](docs/releases/v1.0.0.md) — [GitHub Releases 一覧](https://github.com/Ryosuke4219/portfolio/releases)
+- 最新: [v1.0.0 – ポートフォリオ統合リリース](docs/releases/v1.0.0.md) — [GitHub Releases 一覧](https://github.com/RNA4219/portfolio/releases)
 
 ### マイルストーン一覧
 
